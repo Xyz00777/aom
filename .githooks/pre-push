@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# pre-push: run full test suite
+# pre-push hook: delegates to pre-commit framework (pre-push stage)
+# See .pre-commit-config.yaml for configured hooks (pytest at pre-push stage)
 set -e
 
-echo "[pre-push] pytest..."
-uv run pytest tests/ -q --tb=short || exit 1
+echo "[pre-push] running pre-commit pre-push checks..."
+uv run pre-commit run --hook-stage push "$@"

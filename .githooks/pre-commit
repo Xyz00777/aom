@@ -1,12 +1,7 @@
 #!/usr/bin/env bash
-# pre-commit: format, lint, type check
+# pre-commit hook: delegates to pre-commit framework
+# See .pre-commit-config.yaml for configured hooks
 set -e
 
-echo "[pre-commit] ruff format..."
-uv run ruff format . || exit 1
-
-echo "[pre-commit] ruff check..."
-uv run ruff check --fix . || exit 1
-
-echo "[pre-commit] mypy..."
-uv run mypy src/ansible_aom || exit 1
+echo "[pre-commit] running pre-commit checks..."
+uv run pre-commit run "$@"
