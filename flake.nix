@@ -57,7 +57,8 @@
           ]);
 
           shellHook = ''
-            export PYTHONPATH="${self}/src:$PYTHONPATH"
+            # PYTHONPATH intentionally not set - uv manages the environment
+            # and installs the package in editable mode via .venv
           '';
         };
 
