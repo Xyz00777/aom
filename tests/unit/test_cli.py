@@ -544,13 +544,23 @@ class TestExitCodes:
 
     def test_exit_code_127_for_missing_ansible(self):
         """TC-027: Exit code 127 when ansible-playbook not found."""
-        exit_code_not_found = 127
-        assert exit_code_not_found == 127
+        from ansible_aom.cli import main
+
+        with patch("ansible_aom.renderer.factory.create_renderer") as mock_renderer:
+            mock_renderer.side_effect = FileNotFoundError("ansible-playbook")
+            with patch("sys.argv", ["aom", "playbook.yml"]):
+                result = main()
+                assert result == 127
 
     def test_exit_code_130_for_sigint(self):
         """TC-028: Exit code 130 for user cancelled (Ctrl+C)."""
-        exit_code_sigint = 130
-        assert exit_code_sigint == 130
+        from ansible_aom.cli import main
+
+        with patch("ansible_aom.renderer.factory.create_renderer") as mock_renderer:
+            mock_renderer.side_effect = KeyboardInterrupt()
+            with patch("sys.argv", ["aom", "playbook.yml"]):
+                result = main()
+                assert result == 130
 
     def test_main_returns_int(self):
         """TC-024: main() returns integer exit code."""

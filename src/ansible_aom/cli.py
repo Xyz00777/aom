@@ -203,6 +203,12 @@ def main() -> int:
             renderer = create_renderer(tui_mode=args.tui)
             print(f"Running playbook: {args.playbook}")
             return 0
+        except FileNotFoundError:
+            print("Error: ansible-playbook not found", file=sys.stderr)
+            return 127
+        except KeyboardInterrupt:
+            print("Cancelled by user", file=sys.stderr)
+            return 130
         except NotImplementedError:
             print("Renderer not yet implemented")
             return 1
