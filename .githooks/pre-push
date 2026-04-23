@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# pre-push: run full test suite
+set -e
+
+echo "[pre-push] pytest..."
+uv run pytest tests/ -q --tb=short || exit 1

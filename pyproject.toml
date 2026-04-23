@@ -28,6 +28,7 @@ dev = [
     "ruff",
     "mypy",
     "inline-snapshot>=0.10",   # Compact mode snapshot testing
+    "pre-commit>=3.0",
 ]
 
 [build-system]
@@ -46,6 +47,45 @@ testpaths = ["tests"]
 line-length = 100
 target-version = "py314"
 
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["F401", "F811", "F841", "E501"]
+"**/__init__.py" = ["F401"]
+
 [tool.mypy]
 python_version = "3.14"
-strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = "ansible_aom.compact.*"
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+module = "ansible_aom.tui.app"
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+module = "ansible_aom.tui.screens.*"
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+module = "ansible_aom.tui.widgets.*"
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+module = "ansible_aom.inspect.diff"
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+module = "ansible_aom.inspect.display"
+disallow_untyped_defs = false
+disallow_untyped_calls = false

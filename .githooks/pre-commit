@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# pre-commit: format, lint, type check
+set -e
+
+echo "[pre-commit] ruff format..."
+uv run ruff format . || exit 1
+
+echo "[pre-commit] ruff check..."
+uv run ruff check --fix . || exit 1
+
+echo "[pre-commit] mypy..."
+uv run mypy src/ansible_aom || exit 1
