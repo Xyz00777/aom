@@ -40,5 +40,9 @@ htmlcov/
 # AOM session artifacts (runtime)
 .aom/
 
+# Nix / direnv
+.direnv/
+result
+
 # OS
 Thumbs.db
