@@ -1,0 +1,5 @@
+{"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+{"_event": "v2_playbook_on_play_start", "_timestamp": "2026-04-20T10:00:01Z", "play": {"id": "play-uuid-1", "name": "Setup webservers"}}
+{"_event": "v2_playbook_on_task_start", "_timestamp": "2026-04-20T10:00:02Z", "task": {"id": "task-uuid-1", "name": "Install nginx"}, "play": {"id": "play-uuid-1"}}
+{"_event": "v2_runner_on_ok", "_timestamp": "2026-04-20T10:00:05Z", "task": {"id": "task-uuid-1", "name": "Install nginx"}, "hosts": {"web1": {"ok": true, "changed": false}}}
+{"_event": "v2_playbook_on_stats", "_timestamp": "2026-04-20T10:01:00Z", "stats": {"web1": {"ok": 1, "changed": 0, "failures": 0, "skipped": 0, "unreachable": 0, "rescued": 0, "ignored": 0}}, "custom_stats": {}, "global_custom_stats": {}}
