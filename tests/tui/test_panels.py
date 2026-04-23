@@ -29,7 +29,6 @@ from ansible_aom.core.models import (
     WarningType,
 )
 
-
 # =============================================================================
 # Section 7.2: Log Panel Tests (TC-274 to TC-284)
 # =============================================================================
@@ -133,7 +132,9 @@ class TestLogPanelAutoScroll:
         # Simulating RichLog's is_vertical_scroll_end method
         # Returns True when scrolled to last line
 
-        def is_vertical_scroll_end(scroll_offset: int, total_lines: int, visible_height: int) -> bool:
+        def is_vertical_scroll_end(
+            scroll_offset: int, total_lines: int, visible_height: int
+        ) -> bool:
             """Determine if scrolled to end."""
             # scroll_offset = index of first visible line
             # visible_height = number of lines visible
@@ -323,7 +324,9 @@ class TestLogPanelSearchOverlay:
 
         # Case-insensitive (default)
         search_term = "error"
-        matches_insensitive = [i for i, line in enumerate(lines) if search_term.lower() in line.lower()]
+        matches_insensitive = [
+            i for i, line in enumerate(lines) if search_term.lower() in line.lower()
+        ]
         assert len(matches_insensitive) == 2  # Lines 0, 1
 
         # Case-sensitive
@@ -364,7 +367,9 @@ class TestLogPanelSearchOverlay:
         current_index = 3  # At last match
 
         # F3: wrap to first
-        next_match_line = matches[0] if current_index == len(matches) - 1 else matches[current_index + 1]
+        next_match_line = (
+            matches[0] if current_index == len(matches) - 1 else matches[current_index + 1]
+        )
 
         assert next_match_line == 0  # Wrapped to first
 
@@ -665,7 +670,9 @@ class TestSummaryPanelHostStatusBreakdown:
 
         lines = []
         for host, counts in hosts.items():
-            lines.append(f"{host}: ok {counts['ok']}, changed {counts['changed']}, failed {counts['failed']}")
+            lines.append(
+                f"{host}: ok {counts['ok']}, changed {counts['changed']}, failed {counts['failed']}"
+            )
 
         assert len(lines) == 2
         assert "web1:" in lines[0]
@@ -684,9 +691,7 @@ class TestStatusBarElementConfiguration:
         """TC-290: Status bar displays configured elements from config.yaml."""
         from ansible_aom.core.config import StatusBarConfig
 
-        config = StatusBarConfig(
-            elements=["playbook_name", "elapsed_time", "task_progress"]
-        )
+        config = StatusBarConfig(elements=["playbook_name", "elapsed_time", "task_progress"])
 
         # Verify config has those elements
         assert len(config.elements) == 3
@@ -698,9 +703,7 @@ class TestStatusBarElementConfiguration:
         """TC-290: Elements display in configured order."""
         from ansible_aom.core.config import StatusBarConfig
 
-        config = StatusBarConfig(
-            elements=["playbook_name", "elapsed_time", "task_progress"]
-        )
+        config = StatusBarConfig(elements=["playbook_name", "elapsed_time", "task_progress"])
 
         # Order should be preserved
         assert config.elements[0] == "playbook_name"
@@ -736,9 +739,7 @@ class TestStatusBarElementConfiguration:
         }
 
         # Invalid element should not crash
-        config = StatusBarConfig(
-            elements=["playbook_name", "invalid_element", "elapsed_time"]
-        )
+        config = StatusBarConfig(elements=["playbook_name", "invalid_element", "elapsed_time"])
 
         # Implementation should filter/validate
         filtered = [e for e in config.elements if e in valid_elements]
@@ -752,7 +753,7 @@ class TestStatusBarAvailableElements:
         """TC-291: playbook_name element renders with correct data."""
         playbook = "site.yml"
 
-        element_text = f"site.yml"
+        element_text = "site.yml"
 
         assert element_text == playbook
 
@@ -1043,8 +1044,8 @@ class TestDebugPanelParsingErrors:
         """TC-297: Parsing errors listed with count and sample."""
         parsing_errors = [
             '{"broken": "json"',
-            'not even json',
-            '{missing brace',
+            "not even json",
+            "{missing brace",
         ]
 
         error_count = len(parsing_errors)
@@ -1246,7 +1247,9 @@ class TestFilterPanelStatusCheckboxes:
         show_all = not any(filter_state.values())
         # Actually, per spec, unchecked all might show all
         # Let's assume it shows all
-        should_show_all_tasks = all(v is False for v in filter_state.values()) or all(v is True for v in filter_state.values())
+        should_show_all_tasks = all(v is False for v in filter_state.values()) or all(
+            v is True for v in filter_state.values()
+        )
 
         # Implementation should clarify: if all unchecked, show all
         # This test documents expected behavior
@@ -1303,7 +1306,9 @@ class TestFilterPanelTextFilter:
         """TC-302: Clear filter shows all tasks."""
         search_term = ""
 
-        filtered = [t for t in tasks if search_term.lower() in t["name"].lower()] if search_term else tasks
+        filtered = (
+            [t for t in tasks if search_term.lower() in t["name"].lower()] if search_term else tasks
+        )
 
         assert len(filtered) == len(tasks)
 
@@ -1363,7 +1368,11 @@ class TestFilterPanelHostFilter:
         """TC-303 edge case: Empty host input shows all tasks."""
         host_filter = ""
 
-        filtered = tasks_with_hosts if not host_filter else [t for t in tasks_with_hosts if host_filter in t["hosts"]]
+        filtered = (
+            tasks_with_hosts
+            if not host_filter
+            else [t for t in tasks_with_hosts if host_filter in t["hosts"]]
+        )
 
         assert len(filtered) == len(tasks_with_hosts)
 
@@ -1400,9 +1409,10 @@ class TestFilterPanelWarningCheckboxes:
 
         # Apply filter
         visible = [
-            w for w in warnings_list
-            if (w.type == WarningType.WARNING and filter_state["warning"]) or
-               (w.type == WarningType.DEPRECATION and filter_state["deprecation"])
+            w
+            for w in warnings_list
+            if (w.type == WarningType.WARNING and filter_state["warning"])
+            or (w.type == WarningType.DEPRECATION and filter_state["deprecation"])
         ]
 
         # Only warnings visible, deprecations hidden
@@ -1419,9 +1429,10 @@ class TestFilterPanelWarningCheckboxes:
 
         # Apply filter
         visible = [
-            w for w in warnings_list
-            if (w.type == WarningType.WARNING and filter_state["warning"]) or
-               (w.type == WarningType.DEPRECATION and filter_state["deprecation"])
+            w
+            for w in warnings_list
+            if (w.type == WarningType.WARNING and filter_state["warning"])
+            or (w.type == WarningType.DEPRECATION and filter_state["deprecation"])
         ]
 
         # Only deprecations visible, warnings hidden
@@ -1438,9 +1449,10 @@ class TestFilterPanelWarningCheckboxes:
         filter_state = {"warning": False, "deprecation": True}
 
         visible = [
-            w for w in warnings_list
-            if (w.type == WarningType.WARNING and filter_state["warning"]) or
-               (w.type == WarningType.DEPRECATION and filter_state["deprecation"])
+            w
+            for w in warnings_list
+            if (w.type == WarningType.WARNING and filter_state["warning"])
+            or (w.type == WarningType.DEPRECATION and filter_state["deprecation"])
         ]
 
         assert len(visible) == 0
@@ -1556,7 +1568,12 @@ class TestSummaryPanelDataAggregation:
             for task in play.tasks.values():
                 for host in task.hosts.values():
                     total += 1
-                    if host.status in (Status.OK, Status.FAILED, Status.SKIPPED, Status.UNREACHABLE):
+                    if host.status in (
+                        Status.OK,
+                        Status.FAILED,
+                        Status.SKIPPED,
+                        Status.UNREACHABLE,
+                    ):
                         completed += 1
 
         assert total == 2

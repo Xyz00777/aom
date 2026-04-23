@@ -7,10 +7,10 @@ TC-234 through TC-260.
 import pytest
 
 from ansible_aom.core.state import (
+    VALID_TRANSITIONS,
     ExecutionState,
     InvalidTransitionError,
     StateMachine,
-    VALID_TRANSITIONS,
 )
 
 
@@ -57,9 +57,7 @@ class TestValidTransitionsDictionary:
 
     def test_idle_transitions(self):
         """IDLE can only transition to STARTING."""
-        assert VALID_TRANSITIONS[ExecutionState.IDLE] == {
-            ExecutionState.STARTING
-        }
+        assert VALID_TRANSITIONS[ExecutionState.IDLE] == {ExecutionState.STARTING}
 
     def test_starting_transitions(self):
         """STARTING can transition to LOADING_TASKS or CRASHED."""
@@ -93,21 +91,15 @@ class TestValidTransitionsDictionary:
 
     def test_completed_transitions(self):
         """COMPLETED can only transition to IDLE."""
-        assert VALID_TRANSITIONS[ExecutionState.COMPLETED] == {
-            ExecutionState.IDLE
-        }
+        assert VALID_TRANSITIONS[ExecutionState.COMPLETED] == {ExecutionState.IDLE}
 
     def test_failed_transitions(self):
         """FAILED can only transition to IDLE."""
-        assert VALID_TRANSITIONS[ExecutionState.FAILED] == {
-            ExecutionState.IDLE
-        }
+        assert VALID_TRANSITIONS[ExecutionState.FAILED] == {ExecutionState.IDLE}
 
     def test_crashed_transitions(self):
         """CRASHED can only transition to IDLE."""
-        assert VALID_TRANSITIONS[ExecutionState.CRASHED] == {
-            ExecutionState.IDLE
-        }
+        assert VALID_TRANSITIONS[ExecutionState.CRASHED] == {ExecutionState.IDLE}
 
 
 class TestStateMachineInit:
@@ -609,7 +601,12 @@ class TestMemoryBounds:
 
     def test_memory_bound_warning_message_constant(self):
         """TC-257: Memory bounds have associated warning constants."""
-        from ansible_aom.core.state import MAX_PLAYS, MAX_TASKS_PER_PLAY, MAX_HOSTS_PER_TASK, MAX_TOTAL_HOST_RUN_STATES
+        from ansible_aom.core.state import (
+            MAX_HOSTS_PER_TASK,
+            MAX_PLAYS,
+            MAX_TASKS_PER_PLAY,
+            MAX_TOTAL_HOST_RUN_STATES,
+        )
 
         assert isinstance(MAX_PLAYS, int)
         assert isinstance(MAX_TASKS_PER_PLAY, int)
@@ -642,9 +639,9 @@ class TestMemoryBounds:
         """Verify memory bounds scale appropriately."""
         from ansible_aom.core.state import (
             MAX_HOSTS_PER_TASK,
+            MAX_PLAYS,
             MAX_TASKS_PER_PLAY,
             MAX_TOTAL_HOST_RUN_STATES,
-            MAX_PLAYS,
         )
 
         assert MAX_PLAYS < MAX_TASKS_PER_PLAY

@@ -96,7 +96,9 @@ class TestRedactionConfig:
         from ansible_aom.core.config import RedactionConfig
 
         config = RedactionConfig(
-            custom_patterns=[{"regex": r"--db-password=\S+", "replacement": "--db-password=********"}]
+            custom_patterns=[
+                {"regex": r"--db-password=\S+", "replacement": "--db-password=********"}
+            ]
         )
         assert len(config.custom_patterns) == 1
         assert config.custom_patterns[0]["regex"] == r"--db-password=\S+"
@@ -309,7 +311,9 @@ class TestAppConfigValidation:
         with pytest.raises(ValidationError) as exc_info:
             AppConfig(log_max_lines=999)
 
-        assert "greater than or equal to 1000" in str(exc_info.value).lower() or "ge=1000" in str(exc_info.value)
+        assert "greater than or equal to 1000" in str(exc_info.value).lower() or "ge=1000" in str(
+            exc_info.value
+        )
 
     def test_log_max_lines_above_maximum_raises_error(self):
         """TC-318: log_max_lines above 100000 raises ValidationError."""
@@ -318,7 +322,9 @@ class TestAppConfigValidation:
         with pytest.raises(ValidationError) as exc_info:
             AppConfig(log_max_lines=100001)
 
-        assert "less than or equal to 100000" in str(exc_info.value).lower() or "le=100000" in str(exc_info.value)
+        assert "less than or equal to 100000" in str(exc_info.value).lower() or "le=100000" in str(
+            exc_info.value
+        )
 
     def test_session_keep_count_ge_1(self):
         """TC-318: session_keep_count minimum is 1."""
@@ -337,7 +343,9 @@ class TestAppConfigValidation:
         with pytest.raises(ValidationError) as exc_info:
             AppConfig(session_keep_count=0)
 
-        assert "greater than or equal to 1" in str(exc_info.value).lower() or "ge=1" in str(exc_info.value)
+        assert "greater than or equal to 1" in str(exc_info.value).lower() or "ge=1" in str(
+            exc_info.value
+        )
 
     def test_session_keep_count_negative_raises_error(self):
         """TC-318: session_keep_count negative raises ValidationError."""
@@ -363,7 +371,9 @@ class TestAppConfigValidation:
         with pytest.raises(ValidationError) as exc_info:
             AppConfig(session_keep_days=0)
 
-        assert "greater than or equal to 1" in str(exc_info.value).lower() or "ge=1" in str(exc_info.value)
+        assert "greater than or equal to 1" in str(exc_info.value).lower() or "ge=1" in str(
+            exc_info.value
+        )
 
     def test_session_keep_days_negative_raises_error(self):
         """TC-318: session_keep_days negative raises ValidationError."""
@@ -405,8 +415,9 @@ class TestAppConfigYamlFile:
 
     def test_app_config_with_model_config_dict(self):
         """AppConfig uses SettingsConfigDict for configuration."""
-        from ansible_aom.core.config import AppConfig
         from pydantic_settings import SettingsConfigDict
+
+        from ansible_aom.core.config import AppConfig
 
         # Verify SettingsConfigDict is used
         assert hasattr(AppConfig, "model_config")
@@ -418,29 +429,33 @@ class TestConfigModelBasics:
 
     def test_status_bar_config_is_pydantic_model(self):
         """StatusBarConfig is a Pydantic model."""
-        from ansible_aom.core.config import StatusBarConfig
         from pydantic import BaseModel
+
+        from ansible_aom.core.config import StatusBarConfig
 
         assert issubclass(StatusBarConfig, BaseModel)
 
     def test_redaction_config_is_pydantic_model(self):
         """RedactionConfig is a Pydantic model."""
-        from ansible_aom.core.config import RedactionConfig
         from pydantic import BaseModel
+
+        from ansible_aom.core.config import RedactionConfig
 
         assert issubclass(RedactionConfig, BaseModel)
 
     def test_warnings_config_is_pydantic_model(self):
         """WarningsConfig is a Pydantic model."""
-        from ansible_aom.core.config import WarningsConfig
         from pydantic import BaseModel
+
+        from ansible_aom.core.config import WarningsConfig
 
         assert issubclass(WarningsConfig, BaseModel)
 
     def test_app_config_is_pydantic_settings(self):
         """AppConfig is a Pydantic Settings model."""
-        from ansible_aom.core.config import AppConfig
         from pydantic_settings import BaseSettings
+
+        from ansible_aom.core.config import AppConfig
 
         assert issubclass(AppConfig, BaseSettings)
 
@@ -541,10 +556,10 @@ class TestLoadConfig:
 
     def test_load_config_accepts_optional_config_path(self):
         """load_config accepts optional config_path parameter."""
-        from ansible_aom.core.config import load_config
-
         # Function signature should accept optional path
         import inspect
+
+        from ansible_aom.core.config import load_config
 
         sig = inspect.signature(load_config)
         params = list(sig.parameters.keys())
@@ -552,9 +567,9 @@ class TestLoadConfig:
 
     def test_load_config_signature_has_str_union_none(self):
         """load_config config_path is str | None."""
-        from ansible_aom.core.config import load_config
-
         import inspect
+
+        from ansible_aom.core.config import load_config
 
         sig = inspect.signature(load_config)
         config_path_param = sig.parameters.get("config_path")
@@ -688,9 +703,7 @@ class TestRedactionCustomPatterns:
         """Custom pattern dicts have regex and replacement keys."""
         from ansible_aom.core.config import RedactionConfig
 
-        config = RedactionConfig(
-            custom_patterns=[{"regex": "test", "replacement": "***"}]
-        )
+        config = RedactionConfig(custom_patterns=[{"regex": "test", "replacement": "***"}])
         pattern = config.custom_patterns[0]
         assert "regex" in pattern
         assert "replacement" in pattern

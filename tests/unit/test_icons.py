@@ -151,10 +151,10 @@ class TestStatusIcons:
 
     def test_running_frame_order_is_correct(self):
         """TC-369: Animation cycles in correct order: ◐ → ◓ → ◑ → ◒."""
-        assert RUNNING_FRAMES[0] == "◐"   # U+25D0 - Left half filled
-        assert RUNNING_FRAMES[1] == "◓"   # U+25D3 - Bottom half filled
-        assert RUNNING_FRAMES[2] == "◑"   # U+25D1 - Right half filled
-        assert RUNNING_FRAMES[3] == "◒"   # U+25D5 - Top half filled
+        assert RUNNING_FRAMES[0] == "◐"  # U+25D0 - Left half filled
+        assert RUNNING_FRAMES[1] == "◓"  # U+25D3 - Bottom half filled
+        assert RUNNING_FRAMES[2] == "◑"  # U+25D1 - Right half filled
+        assert RUNNING_FRAMES[3] == "◒"  # U+25D5 - Top half filled
 
     def test_running_color_is_cyan(self):
         """TC-369: RUNNING icon uses cyan color."""
@@ -243,10 +243,10 @@ class TestStatusIcons:
 
     def test_get_running_frame_large_counter(self):
         """TC-372: Large counter values still cycle correctly."""
-        assert get_running_frame(1000) == "◐"   # 1000 % 4 = 0
-        assert get_running_frame(1001) == "◓"   # 1001 % 4 = 1
-        assert get_running_frame(1002) == "◑"   # 1002 % 4 = 2
-        assert get_running_frame(1003) == "◒"   # 1003 % 4 = 3
+        assert get_running_frame(1000) == "◐"  # 1000 % 4 = 0
+        assert get_running_frame(1001) == "◓"  # 1001 % 4 = 1
+        assert get_running_frame(1002) == "◑"  # 1002 % 4 = 2
+        assert get_running_frame(1003) == "◒"  # 1003 % 4 = 3
 
     def test_four_frames_per_second_timing(self):
         """TC-372: Animation completes full cycle in 1 second (4 frames @ 4 FPS)."""
@@ -424,9 +424,7 @@ class TestStatusIconUniqueness:
                 # COMPLETED shares icon with OK, skip check
                 continue
             if icon in icons_seen:
-                pytest.fail(
-                    f"Icon collision: {status} and {icons_seen[icon]} both use '{icon}'"
-                )
+                pytest.fail(f"Icon collision: {status} and {icons_seen[icon]} both use '{icon}'")
             icons_seen[icon] = status
 
     def test_all_ascii_icons_are_unique(self):
@@ -445,10 +443,23 @@ class TestStatusIconUniqueness:
     def test_all_colors_are_valid_rich_colors(self):
         """All color names should be valid Rich color names."""
         valid_colors = {
-            "red", "green", "yellow", "blue", "magenta", "cyan",
-            "white", "black", "bright_red", "bright_green", "bright_yellow",
-            "bright_blue", "bright_magenta", "bright_cyan", "bright_white",
-            "dim", "bold",
+            "red",
+            "green",
+            "yellow",
+            "blue",
+            "magenta",
+            "cyan",
+            "white",
+            "black",
+            "bright_red",
+            "bright_green",
+            "bright_yellow",
+            "bright_blue",
+            "bright_magenta",
+            "bright_cyan",
+            "bright_white",
+            "dim",
+            "bold",
         }
         for status, color in STATUS_COLORS.items():
             assert color in valid_colors, f"Invalid color '{color}' for {status}"
@@ -484,10 +495,14 @@ class TestFrameParameterIgnoedForNonRunning:
 
     def test_frame_ignored_for_unreachable(self):
         """Frame parameter ignored for UNREACHABLE status."""
-        assert get_status_icon(Status.UNREACHABLE, frame=0) == get_status_icon(Status.UNREACHABLE, frame=5)
+        assert get_status_icon(Status.UNREACHABLE, frame=0) == get_status_icon(
+            Status.UNREACHABLE, frame=5
+        )
         assert get_status_icon(Status.UNREACHABLE, frame=100) == "⊝"
 
     def test_frame_ignored_for_completed(self):
         """Frame parameter ignored for COMPLETED status."""
-        assert get_status_icon(Status.COMPLETED, frame=0) == get_status_icon(Status.COMPLETED, frame=5)
+        assert get_status_icon(Status.COMPLETED, frame=0) == get_status_icon(
+            Status.COMPLETED, frame=5
+        )
         assert get_status_icon(Status.COMPLETED, frame=100) == "●"

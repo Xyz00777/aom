@@ -34,7 +34,7 @@ class TestHostNameResolution:
             id="1",
             name="Setup webservers",
             hosts="webservers",
-            resolved_hosts=["web1.example.com", "web2.example.com"]
+            resolved_hosts=["web1.example.com", "web2.example.com"],
         )
 
         # Assert resolved_hosts is populated and matches expected hosts
@@ -51,10 +51,7 @@ class TestHostNameResolution:
         """
         # Create PlayDefinition with known resolved_hosts
         play = PlayDefinition(
-            id="1",
-            name="Setup webservers",
-            hosts="webservers",
-            resolved_hosts=["web1", "web2"]
+            id="1", name="Setup webservers", hosts="webservers", resolved_hosts=["web1", "web2"]
         )
 
         # Runner event comes in with unexpected host "web3"
@@ -65,9 +62,7 @@ class TestHostNameResolution:
         with patch("logging.Logger.warning") as mock_warning:
             if unexpected_host not in resolved_hosts:
                 logging.getLogger("ansible_aom.core.models").warning(
-                    "Host '%s' not in resolved_hosts for play '%s'",
-                    unexpected_host,
-                    play.name
+                    "Host '%s' not in resolved_hosts for play '%s'", unexpected_host, play.name
                 )
                 mock_warning.assert_called_once()
 
@@ -82,7 +77,7 @@ class TestHostNameResolution:
             id="1",
             name="Setup webservers",
             hosts="webservers",
-            resolved_hosts=[]  # Empty due to --list-hosts failure
+            resolved_hosts=[],  # Empty due to --list-hosts failure
         )
 
         # Verify initial state
@@ -106,10 +101,7 @@ class TestHostNameResolution:
         """
         # Create PlayDefinition with resolved_hosts from --list-hosts
         play = PlayDefinition(
-            id="1",
-            name="Setup webservers",
-            hosts="webservers",
-            resolved_hosts=["web1", "web2"]
+            id="1", name="Setup webservers", hosts="webservers", resolved_hosts=["web1", "web2"]
         )
 
         # Mock stats event with hosts that were seen during execution
@@ -123,8 +115,7 @@ class TestHostNameResolution:
         with patch("logging.Logger.warning") as mock_warning:
             if missing_hosts:
                 logging.getLogger("ansible_aom.core.models").warning(
-                    "Hosts in resolved_hosts but not seen during run: %s",
-                    sorted(missing_hosts)
+                    "Hosts in resolved_hosts but not seen during run: %s", sorted(missing_hosts)
                 )
                 mock_warning.assert_called_once()
                 call_args = mock_warning.call_args
@@ -137,16 +128,10 @@ class TestHostNameResolutionIntegration:
     def test_multiple_plays_host_resolution(self):
         """Multiple plays each have their own resolved_hosts."""
         play1 = PlayDefinition(
-            id="1",
-            name="Web servers",
-            hosts="webservers",
-            resolved_hosts=["web1", "web2"]
+            id="1", name="Web servers", hosts="webservers", resolved_hosts=["web1", "web2"]
         )
         play2 = PlayDefinition(
-            id="2",
-            name="Database servers",
-            hosts="dbservers",
-            resolved_hosts=["db1", "db2"]
+            id="2", name="Database servers", hosts="dbservers", resolved_hosts=["db1", "db2"]
         )
 
         assert play1.resolved_hosts == ["web1", "web2"]
@@ -156,11 +141,7 @@ class TestHostNameResolutionIntegration:
     def test_resolved_hosts_immutable_after_creation(self):
         """resolved_hosts can be modified after creation (mutable default)."""
         # Dataclass with field(default_factory=list) creates new list per instance
-        play = PlayDefinition(
-            id="1",
-            name="Test",
-            hosts="all"
-        )
+        play = PlayDefinition(id="1", name="Test", hosts="all")
 
         # Initially empty
         assert play.resolved_hosts == []
@@ -172,11 +153,7 @@ class TestHostNameResolutionIntegration:
         assert play.resolved_hosts == ["host1", "host2"]
 
         # Create another instance - should have its own list
-        play2 = PlayDefinition(
-            id="2",
-            name="Test2",
-            hosts="all"
-        )
+        play2 = PlayDefinition(id="2", name="Test2", hosts="all")
         assert play2.resolved_hosts == []  # Not affected by play1
 
     def test_empty_resolved_hosts_when_no_inventory(self):
@@ -185,7 +162,7 @@ class TestHostNameResolutionIntegration:
             id="1",
             name="Orphaned play",
             hosts="nonexistent_group",
-            resolved_hosts=[]  # No hosts match the pattern
+            resolved_hosts=[],  # No hosts match the pattern
         )
 
         assert play.resolved_hosts == []

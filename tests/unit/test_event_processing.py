@@ -18,7 +18,6 @@ from ansible_aom.core.models import (
     TaskRunState,
 )
 
-
 # ==============================================================================
 # TC-197: handle_event Dispatcher Routing
 # ==============================================================================
@@ -27,15 +26,11 @@ from ansible_aom.core.models import (
 class TestHandleEventDispatcher:
     """Tests for handle_event routing events to correct handlers (TC-197)."""
 
-    def test_handle_event_routes_to_playbook_on_start(
-        self, event_playbook_start: dict
-    ) -> None:
+    def test_handle_event_routes_to_playbook_on_start(self, event_playbook_start: dict) -> None:
         """TC-197: handle_event routes v2_playbook_on_start to correct handler."""
         run_state = RunState(playbook="test.yml")
 
-        with patch.object(
-            run_state, "_handle_v2_playbook_on_start"
-        ) as mock_handler:
+        with patch.object(run_state, "_handle_v2_playbook_on_start") as mock_handler:
             run_state.handle_event(event_playbook_start)
             mock_handler.assert_called_once()
 
@@ -51,9 +46,7 @@ class TestHandleEventDispatcher:
         """TC-197: handle_event routes v2_playbook_on_task_start to correct handler."""
         run_state = RunState(playbook="test.yml")
 
-        with patch.object(
-            run_state, "_handle_v2_playbook_on_task_start"
-        ) as mock_handler:
+        with patch.object(run_state, "_handle_v2_playbook_on_task_start") as mock_handler:
             run_state.handle_event(event_task_start)
             mock_handler.assert_called_once()
 
@@ -73,9 +66,7 @@ class TestHandleEventDispatcher:
             run_state.handle_event(event_runner_ok)
             mock_handler.assert_called_once()
 
-    def test_handle_event_routes_to_runner_failed(
-        self, event_runner_failed: dict
-    ) -> None:
+    def test_handle_event_routes_to_runner_failed(self, event_runner_failed: dict) -> None:
         """TC-197: handle_event routes v2_runner_on_failed to correct handler."""
         run_state = RunState(playbook="test.yml")
 
@@ -83,9 +74,7 @@ class TestHandleEventDispatcher:
             run_state.handle_event(event_runner_failed)
             mock_handler.assert_called_once()
 
-    def test_handle_event_routes_to_runner_skipped(
-        self, event_runner_skipped: dict
-    ) -> None:
+    def test_handle_event_routes_to_runner_skipped(self, event_runner_skipped: dict) -> None:
         """TC-197: handle_event routes v2_runner_on_skipped to correct handler."""
         run_state = RunState(playbook="test.yml")
 
@@ -99,9 +88,7 @@ class TestHandleEventDispatcher:
         """TC-197: handle_event routes v2_runner_on_unreachable to correct handler."""
         run_state = RunState(playbook="test.yml")
 
-        with patch.object(
-            run_state, "_handle_v2_runner_on_unreachable"
-        ) as mock_handler:
+        with patch.object(run_state, "_handle_v2_runner_on_unreachable") as mock_handler:
             run_state.handle_event(event_runner_unreachable)
             mock_handler.assert_called_once()
 
@@ -122,16 +109,12 @@ class TestHandleEventDispatcher:
 class TestHandleEventTimestampParsing:
     """Tests for timestamp parsing in handle_event (TC-198)."""
 
-    def test_handle_event_parses_iso_timestamp(
-        self, event_playbook_start: dict
-    ) -> None:
+    def test_handle_event_parses_iso_timestamp(self, event_playbook_start: dict) -> None:
         """TC-198: Timestamp is parsed from _timestamp field as ISO format datetime."""
         run_state = RunState(playbook="test.yml")
 
         # The fixture has timestamp "2026-04-20T10:00:00Z"
-        with patch.object(
-            run_state, "_handle_v2_playbook_on_start"
-        ) as mock_handler:
+        with patch.object(run_state, "_handle_v2_playbook_on_start") as mock_handler:
             run_state.handle_event(event_playbook_start)
 
             # Check that handler was called with parsed datetime
@@ -154,9 +137,7 @@ class TestHandleEventTimestampParsing:
 
         before = datetime.now(timezone.utc)
 
-        with patch.object(
-            run_state, "_handle_v2_playbook_on_start"
-        ) as mock_handler:
+        with patch.object(run_state, "_handle_v2_playbook_on_start") as mock_handler:
             run_state.handle_event(event)
 
             call_args = mock_handler.call_args
@@ -175,9 +156,7 @@ class TestHandleEventTimestampParsing:
         }
 
         # Should not raise exception - should use default time
-        with patch.object(
-            run_state, "_handle_v2_playbook_on_start"
-        ) as mock_handler:
+        with patch.object(run_state, "_handle_v2_playbook_on_start") as mock_handler:
             run_state.handle_event(event)
             mock_handler.assert_called_once()
             ts_arg = mock_handler.call_args[0][1]
@@ -229,9 +208,7 @@ class TestHandleEventUnknownType:
 class TestPlaybookOnStart:
     """Tests for v2_playbook_on_start handling (TC-200)."""
 
-    def test_playbook_on_start_sets_status_running(
-        self, event_playbook_start: dict
-    ) -> None:
+    def test_playbook_on_start_sets_status_running(self, event_playbook_start: dict) -> None:
         """TC-200: v2_playbook_on_start sets status to RUNNING."""
         run_state = RunState(playbook="test.yml")
         assert run_state.status == Status.PENDING
@@ -240,9 +217,7 @@ class TestPlaybookOnStart:
 
         assert run_state.status == Status.RUNNING
 
-    def test_playbook_on_start_sets_start_time(
-        self, event_playbook_start: dict
-    ) -> None:
+    def test_playbook_on_start_sets_start_time(self, event_playbook_start: dict) -> None:
         """TC-200: v2_playbook_on_start sets start_time."""
         run_state = RunState(playbook="test.yml")
         assert run_state.start_time is None
@@ -284,9 +259,7 @@ class TestPlaybookOnStart:
 class TestPlayStart:
     """Tests for v2_playbook_on_play_start handling (TC-201)."""
 
-    def test_play_start_creates_play_run_state(
-        self, event_play_start: dict
-    ) -> None:
+    def test_play_start_creates_play_run_state(self, event_play_start: dict) -> None:
         """TC-201: v2_playbook_on_play_start creates new PlayRunState."""
         run_state = RunState(playbook="test.yml")
 
@@ -354,31 +327,37 @@ class TestTaskStart:
         run_state = RunState(playbook="test.yml")
 
         # First, set up play
-        run_state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-04-20T10:00:01Z",
-            "play": {"id": "play-uuid-1", "name": "Setup"},
-        })
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "play-uuid-1", "name": "Setup"},
+            }
+        )
 
         # First task_start sets strategy to linear
-        run_state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-04-20T10:00:02Z",
-            "task": {"id": "task-uuid-1", "name": "Task 1"},
-            "play": {"id": "play-uuid-1"},
-        })
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "task-uuid-1", "name": "Task 1"},
+                "play": {"id": "play-uuid-1"},
+            }
+        )
         assert run_state.plays["play-uuid-1"].detected_strategy == "linear"
 
         # Manually set strategy to something else (simulating prior detection)
         run_state.plays["play-uuid-1"].detected_strategy = "free"
 
         # Another task_start should not change it
-        run_state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-04-20T10:00:03Z",
-            "task": {"id": "task-uuid-2", "name": "Task 2"},
-            "play": {"id": "play-uuid-1"},
-        })
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:03Z",
+                "task": {"id": "task-uuid-2", "name": "Task 2"},
+                "play": {"id": "play-uuid-1"},
+            }
+        )
         assert run_state.plays["play-uuid-1"].detected_strategy == "free"
 
     def test_task_start_missing_play_creates_play(self, event_task_start: dict) -> None:
@@ -416,27 +395,33 @@ class TestRunnerOnStartStrategy:
         """TC-203 edge case: runner_on_start after task_start keeps linear strategy."""
         run_state = RunState(playbook="test.yml")
 
-        run_state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-04-20T10:00:01Z",
-            "play": {"id": "play-uuid-1", "name": "Setup"},
-        })
-        run_state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-04-20T10:00:02Z",
-            "task": {"id": "task-uuid-1", "name": "Task"},
-            "play": {"id": "play-uuid-1"},
-        })
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "play-uuid-1", "name": "Setup"},
+            }
+        )
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "task-uuid-1", "name": "Task"},
+                "play": {"id": "play-uuid-1"},
+            }
+        )
         assert run_state.plays["play-uuid-1"].detected_strategy == "linear"
 
         # Now runner_on_start arrives - strategy should remain linear
-        run_state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-04-20T10:00:03Z",
-            "task": {"id": "task-uuid-1", "name": "Task"},
-            "host": "web1",
-            "play": {"id": "play-uuid-1"},
-        })
+        run_state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:03Z",
+                "task": {"id": "task-uuid-1", "name": "Task"},
+                "host": "web1",
+                "play": {"id": "play-uuid-1"},
+            }
+        )
 
         assert run_state.plays["play-uuid-1"].detected_strategy == "linear"
 
@@ -485,9 +470,7 @@ class TestRunnerOnStartTaskCreation:
         assert task_state.start_time.minute == 0
         assert task_state.start_time.second == 2
 
-    def test_runner_start_missing_play_creates_play(
-        self, event_runner_start: dict
-    ) -> None:
+    def test_runner_start_missing_play_creates_play(self, event_runner_start: dict) -> None:
         """TC-204: runner_on_start with unknown play_id creates minimal PlayRunState."""
         event = {
             **event_runner_start,
@@ -549,23 +532,27 @@ class TestRunnerOnOk:
         run_state = RunState(playbook="test.yml")
 
         run_state.handle_event(event_play_start)
-        run_state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-04-20T10:00:02Z",
-            "task": {"id": "task-uuid-1", "name": "Install nginx"},
-            "host": "web1",
-            "play": {"id": "play-uuid-1"},
-        })
-        run_state.handle_event({
-            "_event": "v2_runner_on_ok",
-            "_timestamp": "2026-04-20T10:00:05Z",
-            "task": {"id": "task-uuid-1", "name": "Install nginx"},
-            "hosts": {
-                "web1": {"ok": True, "changed": False},
-                "web2": {"ok": True, "changed": False},
-            },
-            "play": {"id": "play-uuid-1"},
-        })
+        run_state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "task-uuid-1", "name": "Install nginx"},
+                "host": "web1",
+                "play": {"id": "play-uuid-1"},
+            }
+        )
+        run_state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "task-uuid-1", "name": "Install nginx"},
+                "hosts": {
+                    "web1": {"ok": True, "changed": False},
+                    "web2": {"ok": True, "changed": False},
+                },
+                "play": {"id": "play-uuid-1"},
+            }
+        )
 
         task_state = run_state.plays["play-uuid-1"].tasks["task-uuid-1"]
         assert "web1" in task_state.hosts
@@ -626,13 +613,15 @@ class TestRunnerOnOkStatus:
         run_state.handle_event(event_play_start)
         runner_start = {**event_runner_start, "play": {"id": "play-uuid-1"}}
         run_state.handle_event(runner_start)
-        run_state.handle_event({
-            "_event": "v2_runner_on_ok",
-            "_timestamp": "2026-04-20T10:00:05Z",
-            "task": {"id": "task-uuid-1", "name": "Install nginx"},
-            "hosts": {"web1": {"ok": True}},  # No 'changed' field
-            "play": {"id": "play-uuid-1"},
-        })
+        run_state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "task-uuid-1", "name": "Install nginx"},
+                "hosts": {"web1": {"ok": True}},  # No 'changed' field
+                "play": {"id": "play-uuid-1"},
+            }
+        )
 
         host_state = run_state.plays["play-uuid-1"].tasks["task-uuid-1"].hosts["web1"]
         assert host_state.status == Status.OK
@@ -715,30 +704,36 @@ class TestRunnerOnFailedIgnoreErrors:
         """TC-209: Nested ignore_errors location in _ansible_verbose_always."""
         run_state = RunState(playbook="test.yml")
 
-        run_state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-04-20T10:00:01Z",
-            "play": {"id": "play-uuid-1", "name": "Setup"},
-        })
-        run_state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-04-20T10:00:02Z",
-            "task": {"id": "task-uuid-1", "name": "Task"},
-            "host": "web1",
-            "play": {"id": "play-uuid-1"},
-        })
-        run_state.handle_event({
-            "_event": "v2_runner_on_failed",
-            "_timestamp": "2026-04-20T10:00:05Z",
-            "task": {"id": "task-uuid-1", "name": "Task"},
-            "hosts": {
-                "web1": {
-                    "_ansible_verbose_always": {"ignore_errors": True},
-                    "failed": True,
-                }
-            },
-            "play": {"id": "play-uuid-1"},
-        })
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "play-uuid-1", "name": "Setup"},
+            }
+        )
+        run_state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "task-uuid-1", "name": "Task"},
+                "host": "web1",
+                "play": {"id": "play-uuid-1"},
+            }
+        )
+        run_state.handle_event(
+            {
+                "_event": "v2_runner_on_failed",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "task-uuid-1", "name": "Task"},
+                "hosts": {
+                    "web1": {
+                        "_ansible_verbose_always": {"ignore_errors": True},
+                        "failed": True,
+                    }
+                },
+                "play": {"id": "play-uuid-1"},
+            }
+        )
 
         host_state = run_state.plays["play-uuid-1"].tasks["task-uuid-1"].hosts["web1"]
         assert host_state.status == Status.OK
@@ -762,10 +757,12 @@ class TestRunnerOnFailedStateTransition:
         run_state = RunState(playbook="test.yml")
 
         # Start the playbook
-        run_state.handle_event({
-            "_event": "v2_playbook_on_start",
-            "_timestamp": "2026-04-20T10:00:00Z",
-        })
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_start",
+                "_timestamp": "2026-04-20T10:00:00Z",
+            }
+        )
         assert run_state.status == Status.RUNNING
 
         run_state.handle_event(event_play_start)
@@ -780,36 +777,46 @@ class TestRunnerOnFailedStateTransition:
         """TC-210 edge case: Multiple failures - state remains FAILED."""
         run_state = RunState(playbook="test.yml")
 
-        run_state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
-        run_state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-04-20T10:00:01Z",
-            "play": {"id": "play-uuid-1", "name": "Setup"},
-        })
-        run_state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-04-20T10:00:02Z",
-            "task": {"id": "task-uuid-1", "name": "Task"},
-            "host": "web1",
-            "play": {"id": "play-uuid-1"},
-        })
-        run_state.handle_event({
-            "_event": "v2_runner_on_failed",
-            "_timestamp": "2026-04-20T10:00:05Z",
-            "task": {"id": "task-uuid-1", "name": "Task"},
-            "hosts": {"web1": {"failed": True, "msg": "Error 1"}},
-            "play": {"id": "play-uuid-1"},
-        })
+        run_state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "play-uuid-1", "name": "Setup"},
+            }
+        )
+        run_state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "task-uuid-1", "name": "Task"},
+                "host": "web1",
+                "play": {"id": "play-uuid-1"},
+            }
+        )
+        run_state.handle_event(
+            {
+                "_event": "v2_runner_on_failed",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "task-uuid-1", "name": "Task"},
+                "hosts": {"web1": {"failed": True, "msg": "Error 1"}},
+                "play": {"id": "play-uuid-1"},
+            }
+        )
         assert run_state.status == Status.FAILED
 
         # Second failure
-        run_state.handle_event({
-            "_event": "v2_runner_on_failed",
-            "_timestamp": "2026-04-20T10:00:06Z",
-            "task": {"id": "task-uuid-2", "name": "Task 2"},
-            "hosts": {"web1": {"failed": True, "msg": "Error 2"}},
-            "play": {"id": "play-uuid-1"},
-        })
+        run_state.handle_event(
+            {
+                "_event": "v2_runner_on_failed",
+                "_timestamp": "2026-04-20T10:00:06Z",
+                "task": {"id": "task-uuid-2", "name": "Task 2"},
+                "hosts": {"web1": {"failed": True, "msg": "Error 2"}},
+                "play": {"id": "play-uuid-1"},
+            }
+        )
         assert run_state.status == Status.FAILED
 
     def test_runner_failed_ignore_errors_no_state_transition(
@@ -821,7 +828,9 @@ class TestRunnerOnFailedStateTransition:
         """TC-210: ignore_errors=true does NOT trigger FAILED state."""
         run_state = RunState(playbook="test.yml")
 
-        run_state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        run_state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
         run_state.handle_event(event_play_start)
         runner_start = {**event_runner_start, "play": {"id": "play-uuid-1"}}
         run_state.handle_event(runner_start)
@@ -862,20 +871,24 @@ class TestRunnerOnSkipped:
         run_state = RunState(playbook="test.yml")
 
         run_state.handle_event(event_play_start)
-        run_state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-04-20T10:00:02Z",
-            "task": {"id": "task-uuid-1", "name": "Task"},
-            "host": "web1",
-            "play": {"id": "play-uuid-1"},
-        })
-        run_state.handle_event({
-            "_event": "v2_runner_on_skipped",
-            "_timestamp": "2026-04-20T10:00:05Z",
-            "task": {"id": "task-uuid-1", "name": "Task"},
-            "hosts": {"web1": {"skipped": True}, "web2": {"skipped": True}},
-            "play": {"id": "play-uuid-1"},
-        })
+        run_state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "task-uuid-1", "name": "Task"},
+                "host": "web1",
+                "play": {"id": "play-uuid-1"},
+            }
+        )
+        run_state.handle_event(
+            {
+                "_event": "v2_runner_on_skipped",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "task-uuid-1", "name": "Task"},
+                "hosts": {"web1": {"skipped": True}, "web2": {"skipped": True}},
+                "play": {"id": "play-uuid-1"},
+            }
+        )
 
         task_state = run_state.plays["play-uuid-1"].tasks["task-uuid-1"]
         assert task_state.hosts["web1"].status == Status.SKIPPED
@@ -945,7 +958,9 @@ class TestRunnerOnUnreachableStateTransition:
         """TC-213: Unreachable host triggers FAILED state transition."""
         run_state = RunState(playbook="test.yml")
 
-        run_state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        run_state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
         assert run_state.status == Status.RUNNING
 
         run_state.handle_event(event_play_start)
@@ -968,7 +983,9 @@ class TestPlaybookOnStats:
     def test_stats_sets_end_time(self, event_stats: dict) -> None:
         """TC-214: v2_playbook_on_stats sets RunState.end_time."""
         run_state = RunState(playbook="test.yml")
-        run_state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        run_state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
 
         run_state.handle_event(event_stats)
 
@@ -979,7 +996,9 @@ class TestPlaybookOnStats:
     def test_stats_no_failures_status_completed(self, event_stats: dict) -> None:
         """TC-214: Stats with no failures sets status to COMPLETED."""
         run_state = RunState(playbook="test.yml")
-        run_state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        run_state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
 
         run_state.handle_event(event_stats)
 
@@ -988,7 +1007,9 @@ class TestPlaybookOnStats:
     def test_stats_with_failures_status_failed(self) -> None:
         """TC-214: Stats with failures sets status to FAILED."""
         run_state = RunState(playbook="test.yml")
-        run_state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        run_state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
 
         event_with_failure = {
             "_event": "v2_playbook_on_stats",
@@ -1010,7 +1031,9 @@ class TestPlaybookOnStats:
     def test_stats_with_unreachable_status_failed(self) -> None:
         """TC-214: Stats with unreachable sets status to FAILED."""
         run_state = RunState(playbook="test.yml")
-        run_state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        run_state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
 
         event_with_unreachable = {
             "_event": "v2_playbook_on_stats",
@@ -1032,7 +1055,9 @@ class TestPlaybookOnStats:
     def test_stats_empty_plays(self, event_stats: dict) -> None:
         """TC-214 edge case: Stats with empty plays dict still works."""
         run_state = RunState(playbook="test.yml")
-        run_state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        run_state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
 
         run_state.handle_event(event_stats)
 
@@ -1054,20 +1079,24 @@ class TestStatsCrossValidation:
         """TC-215: Stats event cross-checks hosts against HostRunStates."""
         run_state = RunState(playbook="test.yml")
 
-        run_state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        run_state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
         run_state.handle_event(event_play_start)
         runner_start = {**event_runner_start, "play": {"id": "play-uuid-1"}}
         run_state.handle_event(runner_start)
         runner_ok = {**event_runner_ok, "play": {"id": "play-uuid-1"}}
         run_state.handle_event(runner_ok)
 
-        run_state.handle_event({
-            "_event": "v2_playbook_on_stats",
-            "_timestamp": "2026-04-20T10:01:00Z",
-            "stats": {
-                "web1": {"ok": 1, "changed": 0, "failures": 0, "skipped": 0, "unreachable": 0},
-            },
-        })
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_stats",
+                "_timestamp": "2026-04-20T10:01:00Z",
+                "stats": {
+                    "web1": {"ok": 1, "changed": 0, "failures": 0, "skipped": 0, "unreachable": 0},
+                },
+            }
+        )
 
         # HostRunState exists for web1
         assert "web1" in run_state.plays["play-uuid-1"].tasks["task-uuid-1"].hosts
@@ -1076,18 +1105,22 @@ class TestStatsCrossValidation:
         """TC-215 edge case: Stats contain hosts not in HostRunStates."""
         run_state = RunState(playbook="test.yml")
 
-        run_state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        run_state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
         run_state.handle_event(event_play_start)
 
         # Stats mention a host we never saw events for
-        run_state.handle_event({
-            "_event": "v2_playbook_on_stats",
-            "_timestamp": "2026-04-20T10:01:00Z",
-            "stats": {
-                "web1": {"ok": 5, "changed": 2, "failures": 0, "skipped": 1, "unreachable": 0},
-                "web2": {"ok": 5, "changed": 2, "failures": 0, "skipped": 1, "unreachable": 0},
-            },
-        })
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_stats",
+                "_timestamp": "2026-04-20T10:01:00Z",
+                "stats": {
+                    "web1": {"ok": 5, "changed": 2, "failures": 0, "skipped": 1, "unreachable": 0},
+                    "web2": {"ok": 5, "changed": 2, "failures": 0, "skipped": 1, "unreachable": 0},
+                },
+            }
+        )
 
         # Stats should be processed without error
         assert run_state.status == Status.COMPLETED
@@ -1105,42 +1138,54 @@ class TestStatsMissingHosts:
         """TC-216: Hosts in HostRunState but not in stats are marked unreachable."""
         run_state = RunState(playbook="test.yml")
 
-        run_state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
-        run_state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-04-20T10:00:01Z",
-            "play": {"id": "play-uuid-1", "name": "Setup"},
-        })
-        run_state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-04-20T10:00:02Z",
-            "task": {"id": "task-uuid-1", "name": "Task"},
-            "host": "web1",
-            "play": {"id": "play-uuid-1"},
-        })
-        run_state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-04-20T10:00:03Z",
-            "task": {"id": "task-uuid-2", "name": "Task 2"},
-            "host": "web2",  # web2 starts but doesn't finish
-            "play": {"id": "play-uuid-1"},
-        })
-        run_state.handle_event({
-            "_event": "v2_runner_on_ok",
-            "_timestamp": "2026-04-20T10:00:05Z",
-            "task": {"id": "task-uuid-1", "name": "Task"},
-            "hosts": {"web1": {"ok": True, "changed": False}},
-            "play": {"id": "play-uuid-1"},
-        })
+        run_state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "play-uuid-1", "name": "Setup"},
+            }
+        )
+        run_state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "task-uuid-1", "name": "Task"},
+                "host": "web1",
+                "play": {"id": "play-uuid-1"},
+            }
+        )
+        run_state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:03Z",
+                "task": {"id": "task-uuid-2", "name": "Task 2"},
+                "host": "web2",  # web2 starts but doesn't finish
+                "play": {"id": "play-uuid-1"},
+            }
+        )
+        run_state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "task-uuid-1", "name": "Task"},
+                "hosts": {"web1": {"ok": True, "changed": False}},
+                "play": {"id": "play-uuid-1"},
+            }
+        )
 
         # Stats only include web1, web2 is missing (it never completed)
-        run_state.handle_event({
-            "_event": "v2_playbook_on_stats",
-            "_timestamp": "2026-04-20T10:01:00Z",
-            "stats": {
-                "web1": {"ok": 5, "changed": 2, "failures": 0, "skipped": 1, "unreachable": 0},
-            },
-        })
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_stats",
+                "_timestamp": "2026-04-20T10:01:00Z",
+                "stats": {
+                    "web1": {"ok": 5, "changed": 2, "failures": 0, "skipped": 1, "unreachable": 0},
+                },
+            }
+        )
 
         assert "task-uuid-2" in run_state.plays["play-uuid-1"].tasks
 
@@ -1167,22 +1212,28 @@ class TestEventProcessingEdgeCases:
         """Events with missing optional fields are handled gracefully."""
         run_state = RunState(playbook="test.yml")
 
-        run_state.handle_event({
-            "_event": "v2_playbook_on_start",
-            "_timestamp": "2026-04-20T10:00:00Z",
-        })
-        run_state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-04-20T10:00:01Z",
-            "play": {"id": "play-uuid-1"},
-        })
-        run_state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-04-20T10:00:02Z",
-            "task": {"id": "task-uuid-1"},
-            "host": "web1",
-            "play": {"id": "play-uuid-1"},
-        })
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_start",
+                "_timestamp": "2026-04-20T10:00:00Z",
+            }
+        )
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "play-uuid-1"},
+            }
+        )
+        run_state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "task-uuid-1"},
+                "host": "web1",
+                "play": {"id": "play-uuid-1"},
+            }
+        )
 
         assert "play-uuid-1" in run_state.plays
         assert "task-uuid-1" in run_state.plays["play-uuid-1"].tasks

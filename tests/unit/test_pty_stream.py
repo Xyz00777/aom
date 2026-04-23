@@ -21,7 +21,6 @@ import pytest
 from ansible_aom.core.models import WarningType
 from ansible_aom.core.parser import PtyStreamParser, StreamPhase
 
-
 # =============================================================================
 # Section 5.6: StreamPhase Enum Tests
 # =============================================================================
@@ -176,7 +175,7 @@ class TestPasswordPromptPatterns:
         """TC-133: All PASSWORD_PATTERNS exist in parser."""
         parser = PtyStreamParser()
         # Verify all patterns are compiled/stored
-        assert hasattr(parser, 'PASSWORD_PATTERNS')
+        assert hasattr(parser, "PASSWORD_PATTERNS")
         assert len(parser.PASSWORD_PATTERNS) >= 7  # All documented patterns
 
     def test_password_prompt_in_pre_run_phase(self, password_prompt_vault):
@@ -336,7 +335,7 @@ class TestWarningPatternDetection:
     def test_all_warning_patterns_in_parser(self):
         """TC-141: All warning patterns exist in parser."""
         parser = PtyStreamParser()
-        assert hasattr(parser, 'WARNING_PATTERNS')
+        assert hasattr(parser, "WARNING_PATTERNS")
         assert len(parser.WARNING_PATTERNS) >= 3  # [WARNING], [DEPRECATION WARNING], [DEPRECATED]
 
 
@@ -549,7 +548,9 @@ class TestPasswordPromptHandling:
         # Most recent prompt stored
         assert "Vault password" in parser.pending_password_prompt
 
-    def test_password_prompt_preserved_across_phases(self, password_prompt_vault, event_playbook_start):
+    def test_password_prompt_preserved_across_phases(
+        self, password_prompt_vault, event_playbook_start
+    ):
         """Password prompt persists across phase transition."""
         parser = PtyStreamParser()
         parser.feed_line(password_prompt_vault)
@@ -587,7 +588,7 @@ class TestCompactModePasswordPassThrough:
     def test_password_prompt_multiple_types(self):
         """TC-144: All password types set correct pending state."""
         parser = PtyStreamParser()
-        
+
         test_cases = [
             "SSH password: ",
             "Vault password: ",
@@ -597,7 +598,7 @@ class TestCompactModePasswordPassThrough:
             "New Vault password: ",
             "Confirm New Vault password: ",
         ]
-        
+
         for prompt in test_cases:
             parser = PtyStreamParser()
             parser.feed_line(prompt)
@@ -654,7 +655,7 @@ class TestEdgeCases:
     def test_malformed_json_handled(self):
         """Malformed JSON doesn't crash parser."""
         parser = PtyStreamParser()
-        events = parser.feed_line('{invalid json')
+        events = parser.feed_line("{invalid json")
         assert events == []
 
     def test_json_with_newline(self, event_playbook_start):
@@ -782,14 +783,14 @@ class TestPhaseStateMachine:
     def test_phase_transition_order(self, event_playbook_start, event_stats):
         """Phases transition in correct order: PRE -> EXECUTION -> POST."""
         parser = PtyStreamParser()
-        
+
         # Initial state
         assert parser.phase == StreamPhase.PRE_RUN_PROMPTS
-        
+
         # After start event
         parser.feed_line(json.dumps(event_playbook_start))
         assert parser.phase == StreamPhase.EXECUTION
-        
+
         # After stats event
         parser.feed_line(json.dumps(event_stats))
         assert parser.phase == StreamPhase.POST_RUN_RECAP
@@ -799,7 +800,7 @@ class TestPhaseStateMachine:
         parser = PtyStreamParser()
         parser.feed_line(json.dumps(event_playbook_start))
         assert parser.phase == StreamPhase.EXECUTION
-        
+
         # Try to feed another start event (shouldn't change phase)
         parser.feed_line(json.dumps(event_playbook_start))
         # Phase should remain EXECUTION
@@ -808,13 +809,13 @@ class TestPhaseStateMachine:
     def test_phase_properties_immutability(self):
         """Phase properties return correct values in each state."""
         parser = PtyStreamParser()
-        
+
         # PRE_RUN_PROMPTS
         assert parser.phase == StreamPhase.PRE_RUN_PROMPTS
         assert parser.pending_password_prompt is None
         assert len(parser.warnings) == 0
         assert len(parser.recap_lines) == 0
-        
+
         # Add a warning
         parser.phase = StreamPhase.EXECUTION
         parser.feed_line("[WARNING]: Test")
@@ -833,14 +834,14 @@ class TestRendererProtocolPasswordHandling:
         """Parser provides interface for password prompt handling."""
         parser = PtyStreamParser()
         parser.feed_line("Vault password: ")
-        
+
         # Renderer can check pending prompt
         prompt = parser.pending_password_prompt
         assert prompt is not None
-        
+
         # Renderer handles prompt (e.g., shows modal, gets input)
         # ...
-        
+
         # Renderer clears prompt when done
         parser.clear_password_prompt()
         assert parser.pending_password_prompt is None
@@ -848,43 +849,45 @@ class TestRendererProtocolPasswordHandling:
     def test_password_prompt_detected_before_jsonl(self):
         """Password prompts detected before playbook starts."""
         parser = PtyStreamParser()
-        
+
         # Typical pre-run sequence
         parser.feed_line("[WARNING]: ansible.version deprecated")
         parser.feed_line("Vault password (prod): ")
         parser.clear_password_prompt()
         # ... user enters password ...
         parser.feed_line('{"_event": "v2_playbook_on_start"}')
-        
+
         assert parser.phase == StreamPhase.EXECUTION
         assert len(parser.warnings) == 1
 
-    def test_full_workflow_simulation(self, event_playbook_start, event_task_start, event_runner_ok, event_stats):
+    def test_full_workflow_simulation(
+        self, event_playbook_start, event_task_start, event_runner_ok, event_stats
+    ):
         """Simulate full playbook workflow with parser."""
         parser = PtyStreamParser()
-        
+
         # Pre-run password prompts
         parser.feed_line("Vault password: ")
         assert parser.pending_password_prompt is not None
         parser.clear_password_prompt()
-        
+
         # Playbook starts
         events = parser.feed_line(json.dumps(event_playbook_start))
         assert parser.phase == StreamPhase.EXECUTION
         assert len(events) == 1
-        
+
         # Execution phase events
         parser.phase = StreamPhase.EXECUTION
         events = parser.feed_line(json.dumps(event_task_start))
         assert len(events) == 1
-        
+
         events = parser.feed_line(json.dumps(event_runner_ok))
         assert len(events) == 1
-        
+
         # Stats event - transition to POST_RUN_RECAP
         parser.feed_line(json.dumps(event_stats))
         assert parser.phase == StreamPhase.POST_RUN_RECAP
-        
+
         # Recap lines collected
         parser.feed_line("web1 : ok=5   changed=0")
         assert len(parser.recap_lines) >= 1

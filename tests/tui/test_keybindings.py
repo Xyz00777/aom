@@ -29,9 +29,9 @@ All tests are self-contained and use the keybindings module directly.
 import pytest
 
 from ansible_aom.tui.keybindings import (
+    KEYBINDINGS,
     KeyAction,
     KeyContext,
-    KEYBINDINGS,
     get_action_keybindings,
     get_all_actions,
     get_keybinding,

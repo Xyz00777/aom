@@ -35,7 +35,6 @@ from ansible_aom.core.models import (
     TaskRunState,
 )
 
-
 # =============================================================================
 # Status Icon Mapping Tests (TC-030 related, for tree display)
 # =============================================================================
@@ -143,10 +142,7 @@ class TestTreeViewHierarchyStructure:
     def test_hierarchy_play_to_role_group_to_task(self):
         """TC-264: Play level can contain RoleGroup which contains Tasks."""
         # Create role group with tasks (5+ consecutive same-role tasks)
-        tasks = [
-            TaskDefinition(f"task{i}", "nginx", [], "1", 0, i)
-            for i in range(5)
-        ]
+        tasks = [TaskDefinition(f"task{i}", "nginx", [], "1", 0, i) for i in range(5)]
         role_group = RoleGroupDefinition(role="nginx", tasks=tasks)
 
         # RoleGroup contains tasks
@@ -423,6 +419,7 @@ class TestTreeViewTaskNameTruncation:
 
     def test_truncation_long_name_with_ellipsis(self):
         """TC-270: Long task names are truncated with ellipsis."""
+
         # Truncation function should use '…' (U+2026) for truncation
         def truncate_name(name: str, max_width: int) -> str:
             """Truncate name with ellipsis if too long."""
@@ -442,6 +439,7 @@ class TestTreeViewTaskNameTruncation:
 
     def test_truncation_minimum_10_visible_chars(self):
         """TC-270: Minimum 10 visible characters before ellipsis."""
+
         def truncate_name(name: str, max_width: int) -> str:
             if len(name) <= max_width:
                 return name
@@ -462,6 +460,7 @@ class TestTreeViewTaskNameTruncation:
 
     def test_truncation_exact_width(self):
         """TC-270 edge case: Name exactly at width boundary."""
+
         def truncate_name(name: str, max_width: int) -> str:
             if len(name) <= max_width:
                 return name
@@ -612,10 +611,7 @@ class TestRoleGroupCreationThreshold:
 
     def test_role_grouping_exactly_five_tasks(self):
         """TC-273 edge case: Exactly 5 tasks are grouped."""
-        tasks = [
-            TaskDefinition(f"task{i}", "nginx", [], "1", 0, i)
-            for i in range(5)
-        ]
+        tasks = [TaskDefinition(f"task{i}", "nginx", [], "1", 0, i) for i in range(5)]
 
         def should_group(role_tasks: list[TaskDefinition]) -> bool:
             return len(role_tasks) >= 5
@@ -625,10 +621,7 @@ class TestRoleGroupCreationThreshold:
 
     def test_role_grouping_many_tasks(self):
         """TC-273: Many tasks (>5) with same role are grouped."""
-        tasks = [
-            TaskDefinition(f"task{i}", "nginx", [], "1", 0, i)
-            for i in range(20)
-        ]
+        tasks = [TaskDefinition(f"task{i}", "nginx", [], "1", 0, i) for i in range(20)]
 
         def should_group(role_tasks: list[TaskDefinition]) -> bool:
             return len(role_tasks) >= 5

@@ -26,8 +26,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from ansible_aom.core.state import ExecutionState, StateMachine
-
+from ansible_aom.core.state import VALID_TRANSITIONS, ExecutionState, StateMachine
 
 # =============================================================================
 # Section 14.1: Crash Recovery (TC-441 to TC-444)
@@ -398,6 +397,7 @@ class TestPasswordTimeoutMechanisn:
     def test_password_prompt_detected_patterns(self):
         """Password prompts match expected patterns."""
         import re
+
         from ansible_aom.core.parser import PtyStreamParser
 
         parser = PtyStreamParser()
@@ -516,9 +516,8 @@ class TestQueueHandlerLogging:
 
     def test_queue_handler_exists_in_stdlib(self):
         """TC-458: QueueHandler is available in Python stdlib."""
-        from logging.handlers import QueueHandler, QueueListener
-
         import queue
+        from logging.handlers import QueueHandler, QueueListener
 
         log_queue = queue.Queue()
         handler = QueueHandler(log_queue)
@@ -537,6 +536,7 @@ class TestMissingAnsiblePlaybook:
 
     def test_ansible_playbook_not_found_detection(self, monkeypatch):
         """TC-465: ansible-playbook not found detected at startup."""
+
         # Mock shutil.which to return None (not found)
         def mock_which(cmd):
             if "ansible-playbook" in cmd:
@@ -819,9 +819,9 @@ class TestExitCodeConstants:
     def test_signal_exit_codes(self):
         """Verify signal exit code calculations."""
         # Exit codes for signals: 128 + signal_number
-        exit_sigint = 128 + 2   # SIGINT = 2
+        exit_sigint = 128 + 2  # SIGINT = 2
         exit_sigkill = 128 + 9  # SIGKILL = 9
-        exit_sigterm = 128 + 15 # SIGTERM = 15
+        exit_sigterm = 128 + 15  # SIGTERM = 15
 
         assert exit_sigint == 130
         assert exit_sigkill == 137
@@ -968,6 +968,7 @@ class TestPasswordPromptHandling:
 
         # Test some patterns match expected prompts
         import re
+
         for pattern in patterns:
             # Pattern should be compilable regex
             compiled = re.compile(pattern)
@@ -977,7 +978,3 @@ class TestPasswordPromptHandling:
         """Password timeout defaults to 60 seconds."""
         PASSWORD_TIMEOUT_DEFAULT = 60
         assert PASSWORD_TIMEOUT_DEFAULT == 60
-
-
-# Import at module level for tests that need VALID_TRANSITIONS
-from ansible_aom.core.state import VALID_TRANSITIONS

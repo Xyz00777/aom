@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 
 import pytest
 
-
 # --- Event Fixtures ---
 
 
@@ -190,9 +189,7 @@ def play_definition() -> dict:
 @pytest.fixture
 def jsonl_line() -> str:
     """A minimal JSONL event line."""
-    return json.dumps(
-        {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
-    )
+    return json.dumps({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
 
 
 @pytest.fixture
@@ -216,10 +213,7 @@ def password_prompt_become() -> str:
 @pytest.fixture
 def deprecation_warning_line() -> str:
     """Ansible deprecation warning line."""
-    return (
-        "[DEPRECATION WARNING]: Setting 'foo' is deprecated "
-        "and will be removed in version 2.20."
-    )
+    return "[DEPRECATION WARNING]: Setting 'foo' is deprecated and will be removed in version 2.20."
 
 
 @pytest.fixture

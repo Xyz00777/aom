@@ -1000,10 +1000,7 @@ class TestMemoryBounds:
 
     def test_play_definition_can_have_role_group(self):
         """PlayDefinition tasks list can hold RoleGroupDefinition."""
-        tasks = [
-            TaskDefinition(f"task{i}", "nginx", [], "1", 0, i)
-            for i in range(5)
-        ]
+        tasks = [TaskDefinition(f"task{i}", "nginx", [], "1", 0, i) for i in range(5)]
         role_group = RoleGroupDefinition(role="nginx", tasks=tasks)
         play = PlayDefinition(
             id="1",
@@ -1017,14 +1014,9 @@ class TestMemoryBounds:
 
     def test_play_definition_can_have_mixed_tasks_and_groups(self):
         """PlayDefinition tasks can mix TaskDefinition and RoleGroupDefinition."""
-        group_tasks = [
-            TaskDefinition(f"task{i}", "nginx", [], "1", 0, i)
-            for i in range(5)
-        ]
+        group_tasks = [TaskDefinition(f"task{i}", "nginx", [], "1", 0, i) for i in range(5)]
         role_group = RoleGroupDefinition(role="nginx", tasks=group_tasks)
-        standalone_task = TaskDefinition(
-            "standalone", None, [], "1", 0, 10
-        )
+        standalone_task = TaskDefinition("standalone", None, [], "1", 0, 10)
         play = PlayDefinition(
             id="1",
             name="Setup",

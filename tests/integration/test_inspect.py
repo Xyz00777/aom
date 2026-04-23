@@ -41,7 +41,6 @@ from ansible_aom.inspect.display import (
     format_tree_view,
 )
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -251,6 +250,7 @@ class TestInspectList:
         manager1.end_session(id1, "completed")
 
         import time
+
         time.sleep(0.01)  # Ensure different timestamps
 
         manager2 = SessionManager(session_dir=session_dir, playbook="second.yml")
@@ -279,7 +279,9 @@ class TestInspectList:
         sessions = list_sessions(empty_dir)
         assert sessions == []
 
-    def test_list_filters_failed_flag(self, session_dir: Path, sample_session: str, failed_session: str):
+    def test_list_filters_failed_flag(
+        self, session_dir: Path, sample_session: str, failed_session: str
+    ):
         """TC-262: --failed flag filters to failed sessions only."""
         # Get all sessions
         all_sessions = list_sessions(session_dir)
@@ -342,8 +344,7 @@ class TestInspectShow:
 
         # Find play events
         play_events = [
-            e for e in session.get("events", [])
-            if e.get("_event") == "v2_playbook_on_play_start"
+            e for e in session.get("events", []) if e.get("_event") == "v2_playbook_on_play_start"
         ]
 
         assert len(play_events) == 1
@@ -355,8 +356,7 @@ class TestInspectShow:
 
         # Find task events
         task_events = [
-            e for e in session.get("events", [])
-            if e.get("_event") == "v2_playbook_on_task_start"
+            e for e in session.get("events", []) if e.get("_event") == "v2_playbook_on_task_start"
         ]
 
         assert len(task_events) == 1
@@ -368,13 +368,9 @@ class TestInspectShow:
         session = load_session(multi_host_session, session_dir)
 
         # Find runner events to check host status
-        ok_events = [
-            e for e in session.get("events", [])
-            if e.get("_event") == "v2_runner_on_ok"
-        ]
+        ok_events = [e for e in session.get("events", []) if e.get("_event") == "v2_runner_on_ok"]
         failed_events = [
-            e for e in session.get("events", [])
-            if e.get("_event") == "v2_runner_on_failed"
+            e for e in session.get("events", []) if e.get("_event") == "v2_runner_on_failed"
         ]
 
         assert len(ok_events) == 1
@@ -398,8 +394,7 @@ class TestInspectShow:
 
         # Filter to failed events only
         failed_events = [
-            e for e in session.get("events", [])
-            if e.get("_event") == "v2_runner_on_failed"
+            e for e in session.get("events", []) if e.get("_event") == "v2_runner_on_failed"
         ]
 
         assert len(failed_events) == 1
@@ -424,8 +419,7 @@ class TestInspectShow:
 
         # The failed event should NOT include web1
         failed_on_db = [
-            e for e in session.get("events", [])
-            if e.get("_event") == "v2_runner_on_failed"
+            e for e in session.get("events", []) if e.get("_event") == "v2_runner_on_failed"
         ][0]
         assert "web1" not in failed_on_db["hosts"]
 
@@ -454,7 +448,9 @@ class TestInspectShow:
 class TestInspectDiff:
     """TC-272 to TC-275: Inspect Diff Command."""
 
-    def test_diff_compares_two_sessions(self, session_dir: Path, sample_session: str, failed_session: str):
+    def test_diff_compares_two_sessions(
+        self, session_dir: Path, sample_session: str, failed_session: str
+    ):
         """TC-272: 'aom inspect diff <id1> <id2>' compares task results."""
         session1 = load_session(sample_session, session_dir)
         session2 = load_session(failed_session, session_dir)
@@ -467,7 +463,9 @@ class TestInspectDiff:
         assert "tasks" in result
         assert "classifications" in result
 
-    def test_diff_shows_changed_marker(self, session_dir: Path, sample_session: str, failed_session: str):
+    def test_diff_shows_changed_marker(
+        self, session_dir: Path, sample_session: str, failed_session: str
+    ):
         """TC-273: Diff highlights task result changes."""
         session1 = load_session(sample_session, session_dir)
         session2 = load_session(failed_session, session_dir)
@@ -484,27 +482,38 @@ class TestInspectDiff:
         # Create two similar sessions
         manager1 = SessionManager(session_dir=session_dir, playbook="same.yml")
         id1 = manager1.start_session("same.yml")
-        manager1.record_event(id1, {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
-        manager1.record_event(id1, {
-            "_event": "v2_runner_on_ok",
-            "_timestamp": "2026-04-20T10:00:30Z",
-            "task": {"id": "t1", "name": "Task1"},
-            "hosts": {"h1": {"ok": True}},
-        })
+        manager1.record_event(
+            id1, {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
+        manager1.record_event(
+            id1,
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-04-20T10:00:30Z",
+                "task": {"id": "t1", "name": "Task1"},
+                "hosts": {"h1": {"ok": True}},
+            },
+        )
         manager1.end_session(id1, "completed")
 
         import time
+
         time.sleep(0.01)
 
         manager2 = SessionManager(session_dir=session_dir, playbook="same.yml")
         id2 = manager2.start_session("same.yml")
-        manager2.record_event(id2, {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T11:00:00Z"})
-        manager2.record_event(id2, {
-            "_event": "v2_runner_on_ok",
-            "_timestamp": "2026-04-20T11:00:30Z",
-            "task": {"id": "t1", "name": "Task1"},
-            "hosts": {"h1": {"ok": True}},
-        })
+        manager2.record_event(
+            id2, {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T11:00:00Z"}
+        )
+        manager2.record_event(
+            id2,
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-04-20T11:00:30Z",
+                "task": {"id": "t1", "name": "Task1"},
+                "hosts": {"h1": {"ok": True}},
+            },
+        )
         manager2.end_session(id2, "completed")
 
         session1 = load_session(id1, session_dir)
@@ -569,7 +578,9 @@ class TestInspectDiff:
         # Should match by name when UUID and path not available
         assert len(matches) > 0
 
-    def test_diff_cross_playbook_warning(self, session_dir: Path, sample_session: str, failed_session: str):
+    def test_diff_cross_playbook_warning(
+        self, session_dir: Path, sample_session: str, failed_session: str
+    ):
         """TC-329: Cross-playbook diff shows warning banner."""
         session1 = load_session(sample_session, session_dir)
         session2 = load_session(failed_session, session_dir)
@@ -582,9 +593,13 @@ class TestInspectDiff:
 
         # Result should indicate different playbooks
         assert result is not None
-        assert "playbooks_differ" in result or result.get("baseline_playbook") != result.get("current_playbook")
+        assert "playbooks_differ" in result or result.get("baseline_playbook") != result.get(
+            "current_playbook"
+        )
 
-    def test_diff_changes_only_flag(self, session_dir: Path, sample_session: str, failed_session: str):
+    def test_diff_changes_only_flag(
+        self, session_dir: Path, sample_session: str, failed_session: str
+    ):
         """TC-330: --changes-only flag hides unchanged tasks."""
         session1 = load_session(sample_session, session_dir)
         session2 = load_session(failed_session, session_dir)
@@ -602,24 +617,31 @@ class TestInspectDiff:
         manager1 = SessionManager(session_dir=session_dir, playbook="test.yml")
         id1 = manager1.start_session("test.yml")
         manager1.record_event(id1, {"_event": "v2_playbook_on_start"})
-        manager1.record_event(id1, {
-            "_event": "v2_runner_on_ok",
-            "task": {"id": "t1", "name": "Task1"},
-            "hosts": {"h1": {"ok": True}},
-        })
+        manager1.record_event(
+            id1,
+            {
+                "_event": "v2_runner_on_ok",
+                "task": {"id": "t1", "name": "Task1"},
+                "hosts": {"h1": {"ok": True}},
+            },
+        )
         manager1.end_session(id1, "completed")
 
         import time
+
         time.sleep(0.01)
 
         manager2 = SessionManager(session_dir=session_dir, playbook="test.yml")
         id2 = manager2.start_session("test.yml")
         manager2.record_event(id2, {"_event": "v2_playbook_on_start"})
-        manager2.record_event(id2, {
-            "_event": "v2_runner_on_ok",
-            "task": {"id": "t1", "name": "Task1"},
-            "hosts": {"h1": {"ok": True}},
-        })
+        manager2.record_event(
+            id2,
+            {
+                "_event": "v2_runner_on_ok",
+                "task": {"id": "t1", "name": "Task1"},
+                "hosts": {"h1": {"ok": True}},
+            },
+        )
         manager2.end_session(id2, "completed")
 
         session1 = load_session(id1, session_dir)
@@ -726,6 +748,7 @@ class TestInspectPrune:
 
         # Create new session
         import time
+
         time.sleep(0.01)
 
         new_manager = SessionManager(session_dir=session_dir, playbook="new.yml")
@@ -833,7 +856,9 @@ class TestInspectCLI:
         # inspect_diff should return exit code 0
         assert result == 0 or result is None
 
-    def test_inspect_diff_cli_with_flags(self, session_dir: Path, sample_session: str, failed_session: str):
+    def test_inspect_diff_cli_with_flags(
+        self, session_dir: Path, sample_session: str, failed_session: str
+    ):
         """Test inspect_diff with --changes-only flag."""
         result = inspect_diff(sample_session, failed_session, session_dir, changes_only=True)
 

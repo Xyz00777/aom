@@ -31,7 +31,6 @@ from ansible_aom.core.models import (
 )
 from ansible_aom.core.parser import JsonLineStream, PtyStreamParser, StreamPhase
 
-
 # =============================================================================
 # Section 5.1: JSONL Parser Tests
 # =============================================================================
@@ -175,10 +174,7 @@ class TestJsonLineStreamBasics:
     def test_timestamp_parsing_iso8601_utc(self):
         """TC-084: Timestamp parsing (ISO 8601 UTC)."""
         parser = JsonLineStream()
-        line = json.dumps({
-            "_event": "v2_playbook_on_start",
-            "_timestamp": "2026-04-20T10:00:00Z"
-        })
+        line = json.dumps({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
         result = parser.feed_line(line)
         assert len(result) == 1
         # Timestamp should be preserved as string or parsed
@@ -189,7 +185,9 @@ class TestJsonLineStreamBasics:
         parser = JsonLineStream()
         with caplog.at_level(logging.WARNING, logger="ansible_aom.core.parser"):
             result1 = parser.feed_line("not valid json")
-            result2 = parser.feed_line('{"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}')
+            result2 = parser.feed_line(
+                '{"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}'
+            )
         assert result1 == []
         assert len(result2) == 1
 
@@ -197,11 +195,13 @@ class TestJsonLineStreamBasics:
         """TC-142: Non-JSON handler called for non-JSON lines."""
         parser = JsonLineStream()
         non_json_calls = []
+
         def handler(line: str) -> None:
             non_json_calls.append(line)
+
         parser.set_non_json_handler(handler)
         parser.feed_line("PLAY RECAP *************")
-        parser.feed_line('[WARNING]: Some warning')
+        parser.feed_line("[WARNING]: Some warning")
         assert len(non_json_calls) == 2
 
 
@@ -224,7 +224,9 @@ class TestPtyStreamParserPhases:
         """TC-132: Stats event triggers EXECUTION -> POST_RUN_RECAP."""
         parser = PtyStreamParser()
         parser.phase = StreamPhase.EXECUTION
-        parser.feed_line('{"_event": "v2_playbook_on_stats", "_timestamp": "2026-04-20T10:01:00Z", "stats": {}}')
+        parser.feed_line(
+            '{"_event": "v2_playbook_on_stats", "_timestamp": "2026-04-20T10:01:00Z", "stats": {}}'
+        )
         assert parser.phase == StreamPhase.POST_RUN_RECAP
 
     def test_password_pattern_vault(self, password_prompt_vault):
@@ -332,6 +334,7 @@ class TestListHostsParser:
     def test_parse_play_line_pattern(self, list_hosts_output):
         """TC-097: Parse play line format: play #N (hosts): name\\tTAGS: [tags]."""
         from ansible_aom.core.parser import parse_list_hosts_output
+
         result = parse_list_hosts_output(list_hosts_output)
         assert len(result) == 2
         assert result[0]["play_number"] == 1
@@ -341,6 +344,7 @@ class TestListHostsParser:
     def test_parse_hostname_extraction(self, list_hosts_output):
         """TC-098: Parse hostnames from 6-space indented lines."""
         from ansible_aom.core.parser import parse_list_hosts_output
+
         result = parse_list_hosts_output(list_hosts_output)
         assert "web1.example.com" in result[0]["hosts"]
         assert "web2.example.com" in result[0]["hosts"]
@@ -349,6 +353,7 @@ class TestListHostsParser:
     def test_skip_non_host_lines(self, list_hosts_output):
         """TC-099: Parser skips 'pattern:', 'hosts (N):', 'tasks:', and blank lines."""
         from ansible_aom.core.parser import parse_list_hosts_output
+
         result = parse_list_hosts_output(list_hosts_output)
         # Should only return plays with hosts, not include pattern/tasks lines
         for play in result:
@@ -358,12 +363,14 @@ class TestListHostsParser:
     def test_empty_output_returns_empty_list(self):
         """TC-105: Empty --list-hosts output returns empty list."""
         from ansible_aom.core.parser import parse_list_hosts_output
+
         result = parse_list_hosts_output("")
         assert result == []
 
     def test_localhost_handling(self):
         """TC-100: hosts: localhost returns ['localhost']."""
         from ansible_aom.core.parser import parse_list_hosts_output
+
         output = """playbook: test.yml
 
   play #1 (localhost): Local play\tTAGS: []
@@ -377,6 +384,7 @@ class TestListHostsParser:
     def test_playbook_header_skipped(self):
         """TC-112: First line 'playbook: <path>' skipped."""
         from ansible_aom.core.parser import parse_list_hosts_output
+
         output = """playbook: site.yml
 
   play #1 (all): Test play\tTAGS: []"""
@@ -397,6 +405,7 @@ class TestListTasksParser:
     def test_tab_separator_used(self, list_tasks_output):
         """TC-108: Separator between task name and TAGS: is literal TAB."""
         from ansible_aom.core.parser import parse_list_tasks_output
+
         # The output should properly split on TAB
         result = parse_list_tasks_output(list_tasks_output)
         assert len(result) == 2  # 2 plays
@@ -406,6 +415,7 @@ class TestListTasksParser:
     def test_play_indent_recognition(self, list_tasks_output):
         """TC-109: Play lines have exactly 2-space indent."""
         from ansible_aom.core.parser import parse_list_tasks_output
+
         result = parse_list_tasks_output(list_tasks_output)
         assert len(result) == 2
         assert result[0]["name"] == "Setup web servers"
@@ -414,6 +424,7 @@ class TestListTasksParser:
     def test_task_indent_recognition(self, list_tasks_output):
         """TC-110: Task lines have exactly 6-space indent."""
         from ansible_aom.core.parser import parse_list_tasks_output
+
         result = parse_list_tasks_output(list_tasks_output)
         # Tasks should be extracted with correct indentation
         assert "install nginx" in [t["name"] for t in result[0]["tasks"]]
@@ -422,6 +433,7 @@ class TestListTasksParser:
     def test_role_prefix_extraction(self):
         """TC-111: Role prefix format 'role_name : task_name'."""
         from ansible_aom.core.parser import parse_list_tasks_output
+
         output = """playbook: test.yml
 
   play #1 (all): Test\tTAGS: []
@@ -441,6 +453,7 @@ class TestListTasksParser:
     def test_task_without_role(self):
         """TC-115: Tasks without role prefix."""
         from ansible_aom.core.parser import parse_list_tasks_output
+
         output = """playbook: test.yml
 
   play #1 (all): Test\tTAGS: []
@@ -454,6 +467,7 @@ class TestListTasksParser:
     def test_task_tags_extraction(self):
         """TC-108: Tags extracted from TAGS: [tag1, tag2]."""
         from ansible_aom.core.parser import parse_list_tasks_output
+
         output = """playbook: test.yml
 
   play #1 (all): Test\tTAGS: []
@@ -468,6 +482,7 @@ class TestListTasksParser:
     def test_empty_tags(self):
         """TC-097: Empty tags handled correctly."""
         from ansible_aom.core.parser import parse_list_tasks_output
+
         output = """playbook: test.yml
 
   play #1 (all): Test\tTAGS: []
@@ -479,6 +494,7 @@ class TestListTasksParser:
     def test_playbook_header_skipped(self):
         """TC-112: First line 'playbook: <path>' followed by blank skipped."""
         from ansible_aom.core.parser import parse_list_tasks_output
+
         output = """playbook: site.yml
 
   play #1 (all): Test\tTAGS: []"""
@@ -488,6 +504,7 @@ class TestListTasksParser:
     def test_multiple_plays(self, list_tasks_output):
         """Multiple plays parsed correctly."""
         from ansible_aom.core.parser import parse_list_tasks_output
+
         result = parse_list_tasks_output(list_tasks_output)
         assert len(result) == 2
         assert result[0]["play_number"] == 1
@@ -496,6 +513,7 @@ class TestListTasksParser:
     def test_include_tasks_not_expanded(self):
         """TC-113: include_tasks shown as single task (NOT expanded)."""
         from ansible_aom.core.parser import parse_list_tasks_output
+
         output = """playbook: test.yml
 
   play #1 (all): Test\tTAGS: []
@@ -507,6 +525,7 @@ class TestListTasksParser:
     def test_no_json_output(self):
         """TC-107: --list-tasks output is always plain text; no JSON mode."""
         from ansible_aom.core.parser import parse_list_tasks_output
+
         # Parser should handle text format, not JSON
         output = """playbook: test.yml
 
@@ -527,8 +546,11 @@ class TestRoleGrouping:
     def test_five_same_role_tasks_creates_group(self):
         """TC-122: 5+ consecutive same-role tasks are grouped."""
         from ansible_aom.core.parser import group_roles
+
         tasks = [
-            TaskDefinition(name=f"Task {i}", role="nginx", tags=[], play_id="1", play_order=0, task_order=i)
+            TaskDefinition(
+                name=f"Task {i}", role="nginx", tags=[], play_id="1", play_order=0, task_order=i
+            )
             for i in range(5)
         ]
         groups = group_roles(tasks)
@@ -540,8 +562,11 @@ class TestRoleGrouping:
     def test_four_same_role_tasks_no_grouping(self):
         """TC-122: 4 same-role tasks NOT grouped (threshold is 5)."""
         from ansible_aom.core.parser import group_roles
+
         tasks = [
-            TaskDefinition(name=f"Task {i}", role="nginx", tags=[], play_id="1", play_order=0, task_order=i)
+            TaskDefinition(
+                name=f"Task {i}", role="nginx", tags=[], play_id="1", play_order=0, task_order=i
+            )
             for i in range(4)
         ]
         groups = group_roles(tasks)
@@ -553,13 +578,26 @@ class TestRoleGrouping:
     def test_mixed_roles_no_grouping(self):
         """TC-122: Mixed roles do not create groups."""
         from ansible_aom.core.parser import group_roles
+
         tasks = [
-            TaskDefinition(name="Task 1", role="nginx", tags=[], play_id="1", play_order=0, task_order=0),
-            TaskDefinition(name="Task 2", role="db", tags=[], play_id="1", play_order=0, task_order=1),
-            TaskDefinition(name="Task 3", role="nginx", tags=[], play_id="1", play_order=0, task_order=2),
-            TaskDefinition(name="Task 4", role="nginx", tags=[], play_id="1", play_order=0, task_order=3),
-            TaskDefinition(name="Task 5", role="nginx", tags=[], play_id="1", play_order=0, task_order=4),
-            TaskDefinition(name="Task 6", role="nginx", tags=[], play_id="1", play_order=0, task_order=5),
+            TaskDefinition(
+                name="Task 1", role="nginx", tags=[], play_id="1", play_order=0, task_order=0
+            ),
+            TaskDefinition(
+                name="Task 2", role="db", tags=[], play_id="1", play_order=0, task_order=1
+            ),
+            TaskDefinition(
+                name="Task 3", role="nginx", tags=[], play_id="1", play_order=0, task_order=2
+            ),
+            TaskDefinition(
+                name="Task 4", role="nginx", tags=[], play_id="1", play_order=0, task_order=3
+            ),
+            TaskDefinition(
+                name="Task 5", role="nginx", tags=[], play_id="1", play_order=0, task_order=4
+            ),
+            TaskDefinition(
+                name="Task 6", role="nginx", tags=[], play_id="1", play_order=0, task_order=5
+            ),
         ]
         groups = group_roles(tasks)
         # No grouping because roles are mixed
@@ -571,23 +609,40 @@ class TestRoleGrouping:
         role_group = RoleGroupDefinition(
             role="nginx",
             tasks=[
-                TaskDefinition(name=f"Task {i}", role="nginx", tags=[], play_id="1", play_order=0, task_order=i)
+                TaskDefinition(
+                    name=f"Task {i}", role="nginx", tags=[], play_id="1", play_order=0, task_order=i
+                )
                 for i in range(7)
-            ]
+            ],
         )
         assert role_group.name == "Role: nginx (7 tasks)"
 
     def test_role_group_with_mixed_none_role(self):
         """Tasks without role (None) do not interrupt role grouping."""
         from ansible_aom.core.parser import group_roles
+
         tasks = [
-            TaskDefinition(name="Task 1", role=None, tags=[], play_id="1", play_order=0, task_order=0),
-            TaskDefinition(name="Task 2", role="nginx", tags=[], play_id="1", play_order=0, task_order=1),
-            TaskDefinition(name="Task 3", role="nginx", tags=[], play_id="1", play_order=0, task_order=2),
-            TaskDefinition(name="Task 4", role="nginx", tags=[], play_id="1", play_order=0, task_order=3),
-            TaskDefinition(name="Task 5", role="nginx", tags=[], play_id="1", play_order=0, task_order=4),
-            TaskDefinition(name="Task 6", role="nginx", tags=[], play_id="1", play_order=0, task_order=5),
-            TaskDefinition(name="Task 7", role="nginx", tags=[], play_id="1", play_order=0, task_order=6),
+            TaskDefinition(
+                name="Task 1", role=None, tags=[], play_id="1", play_order=0, task_order=0
+            ),
+            TaskDefinition(
+                name="Task 2", role="nginx", tags=[], play_id="1", play_order=0, task_order=1
+            ),
+            TaskDefinition(
+                name="Task 3", role="nginx", tags=[], play_id="1", play_order=0, task_order=2
+            ),
+            TaskDefinition(
+                name="Task 4", role="nginx", tags=[], play_id="1", play_order=0, task_order=3
+            ),
+            TaskDefinition(
+                name="Task 5", role="nginx", tags=[], play_id="1", play_order=0, task_order=4
+            ),
+            TaskDefinition(
+                name="Task 6", role="nginx", tags=[], play_id="1", play_order=0, task_order=5
+            ),
+            TaskDefinition(
+                name="Task 7", role="nginx", tags=[], play_id="1", play_order=0, task_order=6
+            ),
         ]
         groups = group_roles(tasks)
         # First task has no role, then 6 nginx tasks should NOT be grouped
@@ -599,13 +654,27 @@ class TestRoleGrouping:
     def test_multiple_role_groups(self):
         """Multiple role groups in sequence."""
         from ansible_aom.core.parser import group_roles
+
         tasks = [
             # First nginx role group (5 tasks)
-            *(TaskDefinition(name=f"nginx {i}", role="nginx", tags=[], play_id="1", play_order=0, task_order=i)
-              for i in range(5)),
+            *(
+                TaskDefinition(
+                    name=f"nginx {i}",
+                    role="nginx",
+                    tags=[],
+                    play_id="1",
+                    play_order=0,
+                    task_order=i,
+                )
+                for i in range(5)
+            ),
             # db role group (5 tasks)
-            *(TaskDefinition(name=f"db {i}", role="db", tags=[], play_id="1", play_order=0, task_order=i+5)
-              for i in range(5)),
+            *(
+                TaskDefinition(
+                    name=f"db {i}", role="db", tags=[], play_id="1", play_order=0, task_order=i + 5
+                )
+                for i in range(5)
+            ),
         ]
         groups = group_roles(tasks)
         assert len(groups) == 2
@@ -615,12 +684,26 @@ class TestRoleGrouping:
     def test_role_group_at_end_of_list(self):
         """Role group can be at end of task list."""
         from ansible_aom.core.parser import group_roles
+
         tasks = [
-            TaskDefinition(name="Task 1", role=None, tags=[], play_id="1", play_order=0, task_order=0),
-            TaskDefinition(name="Task 2", role=None, tags=[], play_id="1", play_order=0, task_order=1),
+            TaskDefinition(
+                name="Task 1", role=None, tags=[], play_id="1", play_order=0, task_order=0
+            ),
+            TaskDefinition(
+                name="Task 2", role=None, tags=[], play_id="1", play_order=0, task_order=1
+            ),
             # 5 nginx tasks at end
-            *(TaskDefinition(name=f"nginx {i}", role="nginx", tags=[], play_id="1", play_order=0, task_order=i+2)
-              for i in range(5)),
+            *(
+                TaskDefinition(
+                    name=f"nginx {i}",
+                    role="nginx",
+                    tags=[],
+                    play_id="1",
+                    play_order=0,
+                    task_order=i + 2,
+                )
+                for i in range(5)
+            ),
         ]
         groups = group_roles(tasks)
         # Should have 2 non-grouped tasks + 1 group
@@ -675,7 +758,11 @@ class TestListTasksListHostsIntegration:
 
     def test_preparse_result_assembly(self, list_tasks_output, list_hosts_output):
         """TC-088: PreParseResult contains both plays and play_hosts."""
-        from ansible_aom.core.parser import parse_list_tasks_output, parse_list_hosts_output, PreParseResult
+        from ansible_aom.core.parser import (
+            PreParseResult,
+            parse_list_hosts_output,
+            parse_list_tasks_output,
+        )
 
         plays = parse_list_tasks_output(list_tasks_output)
         play_hosts = parse_list_hosts_output(list_hosts_output)
@@ -687,6 +774,7 @@ class TestListTasksListHostsIntegration:
     def test_list_tasks_play_id_sequential(self):
         """TC-183: Play ID is sequential number string from --list-tasks."""
         from ansible_aom.core.parser import parse_list_tasks_output
+
         output = """playbook: test.yml
 
   play #1 (all): First\tTAGS: []
@@ -715,7 +803,7 @@ class TestTaskDefinition:
             tags=["web"],
             play_id="1",
             play_order=0,
-            task_order=0
+            task_order=0,
         )
         assert task.name == "Install nginx"
         assert task.role == "nginx"
@@ -727,48 +815,28 @@ class TestTaskDefinition:
     def test_task_definition_is_dynamic_default(self):
         """TC-175: is_dynamic defaults to False."""
         task = TaskDefinition(
-            name="Test",
-            role=None,
-            tags=[],
-            play_id="1",
-            play_order=0,
-            task_order=0
+            name="Test", role=None, tags=[], play_id="1", play_order=0, task_order=0
         )
         assert task.is_dynamic is False
 
     def test_task_definition_uuid_nullable(self):
         """TC-176: UUID is None before JSONL matching."""
         task = TaskDefinition(
-            name="Test",
-            role=None,
-            tags=[],
-            play_id="1",
-            play_order=0,
-            task_order=0
+            name="Test", role=None, tags=[], play_id="1", play_order=0, task_order=0
         )
         assert task.uuid is None
 
     def test_task_definition_path_nullable(self):
         """TC-177: path is None before JSONL matching."""
         task = TaskDefinition(
-            name="Test",
-            role=None,
-            tags=[],
-            play_id="1",
-            play_order=0,
-            task_order=0
+            name="Test", role=None, tags=[], play_id="1", play_order=0, task_order=0
         )
         assert task.path is None
 
     def test_task_definition_children_default(self):
         """TC-178: children defaults to empty list."""
         task = TaskDefinition(
-            name="Test",
-            role=None,
-            tags=[],
-            play_id="1",
-            play_order=0,
-            task_order=0
+            name="Test", role=None, tags=[], play_id="1", play_order=0, task_order=0
         )
         assert task.children == []
 
@@ -781,7 +849,7 @@ class TestTaskDefinition:
             play_id="1",
             play_order=0,
             task_order=-1,
-            is_dynamic=True
+            is_dynamic=True,
         )
         assert task.task_order == -1
         assert task.is_dynamic is True
@@ -793,10 +861,7 @@ class TestPlayDefinition:
     def test_play_definition_creation(self):
         """TC-182: PlayDefinition fields validated."""
         play = PlayDefinition(
-            id="1",
-            name="Setup webservers",
-            hosts="webservers",
-            resolved_hosts=["web1", "web2"]
+            id="1", name="Setup webservers", hosts="webservers", resolved_hosts=["web1", "web2"]
         )
         assert play.id == "1"
         assert play.name == "Setup webservers"
@@ -805,31 +870,20 @@ class TestPlayDefinition:
 
     def test_play_definition_id_sequential_string(self):
         """TC-183: ID is sequential number string."""
-        play = PlayDefinition(
-            id="1",
-            name="Test",
-            hosts="all"
-        )
+        play = PlayDefinition(id="1", name="Test", hosts="all")
         assert play.id == "1"  # String, not int
 
     def test_play_definition_hosts_vs_resolved(self):
         """TC-184: hosts is pattern, resolved_hosts is list."""
         play = PlayDefinition(
-            id="1",
-            name="Test",
-            hosts="webservers",
-            resolved_hosts=["web1", "web2"]
+            id="1", name="Test", hosts="webservers", resolved_hosts=["web1", "web2"]
         )
         assert isinstance(play.hosts, str)
         assert isinstance(play.resolved_hosts, list)
 
     def test_play_definition_resolved_hosts_default_empty(self):
         """TC-185: resolved_hosts defaults to empty list."""
-        play = PlayDefinition(
-            id="1",
-            name="Test",
-            hosts="all"
-        )
+        play = PlayDefinition(id="1", name="Test", hosts="all")
         assert play.resolved_hosts == []
 
 
@@ -845,7 +899,7 @@ class TestStatusEnum:
             Status.FAILED,
             Status.SKIPPED,
             Status.UNREACHABLE,
-            Status.COMPLETED
+            Status.COMPLETED,
         }
         actual_values = set(Status)
         assert actual_values == expected_values
@@ -869,12 +923,7 @@ class TestRoleGroupDefinition:
         """TC-180: RoleGroupDefinition groups consecutive same-role tasks."""
         tasks = [
             TaskDefinition(
-                name=f"Task {i}",
-                role="nginx",
-                tags=[],
-                play_id="1",
-                play_order=0,
-                task_order=i
+                name=f"Task {i}", role="nginx", tags=[], play_id="1", play_order=0, task_order=i
             )
             for i in range(5)
         ]
@@ -886,12 +935,7 @@ class TestRoleGroupDefinition:
         """TC-181: name property returns formatted string."""
         tasks = [
             TaskDefinition(
-                name=f"Task {i}",
-                role="nginx",
-                tags=[],
-                play_id="1",
-                play_order=0,
-                task_order=i
+                name=f"Task {i}", role="nginx", tags=[], play_id="1", play_order=0, task_order=i
             )
             for i in range(7)
         ]
@@ -904,11 +948,7 @@ class TestHostRunState:
 
     def test_host_run_state_creation(self):
         """TC-187: HostRunState fields validated."""
-        state = HostRunState(
-            hostname="web1",
-            status=Status.OK,
-            changed=False
-        )
+        state = HostRunState(hostname="web1", status=Status.OK, changed=False)
         assert state.hostname == "web1"
         assert state.status == Status.OK
         assert state.changed is False

@@ -17,7 +17,6 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-
 # ============================================================================
 # Unicode Support Detection (TC-059)
 # ============================================================================
@@ -58,8 +57,9 @@ class TestUnicodeSupportDetection:
         # If encoding supports UTF-8, unicode is available
         try:
             import blessed
+
             term = blessed.Terminal()
-            has_unicode = 'utf' in term.encoding.lower() if hasattr(term, 'encoding') else False
+            has_unicode = "utf" in term.encoding.lower() if hasattr(term, "encoding") else False
         except ImportError:
             has_unicode = False
 
@@ -118,7 +118,7 @@ class TestUnicodeFallback:
             "unreachable": "-",
             "skipped": ".",
         }
-        
+
         if unicode_supported:
             return unicode_icons.get(status, "?")
         else:
@@ -130,7 +130,10 @@ class TestUnicodeFallback:
 
     def test_pending_icon_ascii_fallback(self, ascii_fallback_icons: dict[str, str]):
         """TC-060: PENDING icon ASCII fallback is period."""
-        assert self.get_status_icon("pending", unicode_supported=False) == ascii_fallback_icons["pending"]
+        assert (
+            self.get_status_icon("pending", unicode_supported=False)
+            == ascii_fallback_icons["pending"]
+        )
 
     def test_running_icon_unicode(self, unicode_icons: dict[str, str]):
         """TC-060: RUNNING icon unicode is ◐."""
@@ -138,7 +141,10 @@ class TestUnicodeFallback:
 
     def test_running_icon_ascii_fallback(self, ascii_fallback_icons: dict[str, str]):
         """TC-060: RUNNING icon ASCII fallback is at sign."""
-        assert self.get_status_icon("running", unicode_supported=False) == ascii_fallback_icons["running"]
+        assert (
+            self.get_status_icon("running", unicode_supported=False)
+            == ascii_fallback_icons["running"]
+        )
 
     def test_ok_icon_unicode(self, unicode_icons: dict[str, str]):
         """TC-060: OK icon unicode is ●."""
@@ -154,7 +160,10 @@ class TestUnicodeFallback:
 
     def test_changed_icon_ascii_fallback(self, ascii_fallback_icons: dict[str, str]):
         """TC-060: CHANGED icon ASCII fallback is plus."""
-        assert self.get_status_icon("changed", unicode_supported=False) == ascii_fallback_icons["changed"]
+        assert (
+            self.get_status_icon("changed", unicode_supported=False)
+            == ascii_fallback_icons["changed"]
+        )
 
     def test_failed_icon_unicode(self, unicode_icons: dict[str, str]):
         """TC-060: FAILED icon unicode is ✖."""
@@ -162,15 +171,24 @@ class TestUnicodeFallback:
 
     def test_failed_icon_ascii_fallback(self, ascii_fallback_icons: dict[str, str]):
         """TC-060: FAILED icon ASCII fallback is X."""
-        assert self.get_status_icon("failed", unicode_supported=False) == ascii_fallback_icons["failed"]
+        assert (
+            self.get_status_icon("failed", unicode_supported=False)
+            == ascii_fallback_icons["failed"]
+        )
 
     def test_unreachable_icon_unicode(self, unicode_icons: dict[str, str]):
         """TC-060: UNREACHABLE icon unicode is ⊝."""
-        assert self.get_status_icon("unreachable", unicode_supported=True) == unicode_icons["unreachable"]
+        assert (
+            self.get_status_icon("unreachable", unicode_supported=True)
+            == unicode_icons["unreachable"]
+        )
 
     def test_unreachable_icon_ascii_fallback(self, ascii_fallback_icons: dict[str, str]):
         """TC-060: UNREACHABLE icon ASCII fallback is dash."""
-        assert self.get_status_icon("unreachable", unicode_supported=False) == ascii_fallback_icons["unreachable"]
+        assert (
+            self.get_status_icon("unreachable", unicode_supported=False)
+            == ascii_fallback_icons["unreachable"]
+        )
 
 
 # ============================================================================
@@ -219,6 +237,7 @@ class TestColorSupportDetection:
         """TC-061: blessed.Terminal().number_of_colors returns color level."""
         try:
             import blessed
+
             term = blessed.Terminal()
             num_colors = term.number_of_colors
             assert num_colors in (0, 8, 16, 256, 16777216)
@@ -329,8 +348,9 @@ class TestMonochromeFallback:
     def test_text_labels_no_ansi_codes(self):
         """TC-063: Text labels contain no ANSI escape codes."""
         import re
-        ansi_pattern = re.compile(r'\033\[')
-        
+
+        ansi_pattern = re.compile(r"\033\[")
+
         for status in ["ok", "changed", "failed", "running"]:
             label = self.map_status_to_text_label(status)
             assert ansi_pattern.search(label) is None
@@ -368,7 +388,7 @@ class TestMinimumWidthEightyColumns:
             {"name": "Start services", "status": "pending"},
         ]
         lines = self.format_compact_panel_at_80(playbook, tasks, width=80)
-        
+
         assert len(lines) > 0
         for line in lines:
             assert len(line) <= 80
@@ -408,7 +428,7 @@ class TestWidthSixtyToSeventyNineTruncation:
         if max_name_width < min_chars:
             max_name_width = min_chars
         if len(name) > max_name_width:
-            return name[:max_name_width - 3] + "..."
+            return name[: max_name_width - 3] + "..."
         return name
 
     def test_truncation_at_70_columns(self):

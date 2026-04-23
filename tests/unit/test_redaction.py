@@ -24,12 +24,11 @@ from ansible_aom.core.redaction import (
     PASSWORD_MATCH,
     PASSWORD_WHITELIST,
     REDACTED,
-    should_redact,
     redact_dict,
     redact_event,
     sanitize_string,
+    should_redact,
 )
-
 
 # =============================================================================
 # Fixtures
@@ -48,9 +47,7 @@ def custom_config() -> RedactionConfig:
     return RedactionConfig(
         whitelist=["my_passenger_field", "custom_bypass"],
         custom_fields=["my_secret_var", "db_connection_string"],
-        custom_patterns=[
-            {"regex": r"--db-password=\S+", "replacement": "--db-password=********"}
-        ],
+        custom_patterns=[{"regex": r"--db-password=\S+", "replacement": "--db-password=********"}],
     )
 
 
@@ -99,8 +96,16 @@ class TestLayer1AnsibleNoLog:
         }
         result = redact_event(event, default_config)
         # items[0] and items[2] should remain unchanged
-        assert result["res"]["results"][0] == {"item": "item1", "output": "visible", "_ansible_no_log": False}
-        assert result["res"]["results"][2] == {"item": "item3", "output": "also_visible", "_ansible_no_log": False}
+        assert result["res"]["results"][0] == {
+            "item": "item1",
+            "output": "visible",
+            "_ansible_no_log": False,
+        }
+        assert result["res"]["results"][2] == {
+            "item": "item3",
+            "output": "also_visible",
+            "_ansible_no_log": False,
+        }
         # items[1] should be {"censored": "(no_log)"}
         assert result["res"]["results"][1] == {"censored": "(no_log)"}
 
@@ -281,7 +286,27 @@ class TestRecursiveRedaction:
     def test_max_depth_truncation(self, default_config: RedactionConfig) -> None:
         """TC-158 edge case: Max depth (10) truncation."""
         # Create deeply nested dict beyond max depth
-        data = {"level1": {"level2": {"level3": {"level4": {"level5": {"level6": {"level7": {"level8": {"level9": {"level10": {"level11": {"password": "deep_secret"}}}}}}}}}}}}
+        data = {
+            "level1": {
+                "level2": {
+                    "level3": {
+                        "level4": {
+                            "level5": {
+                                "level6": {
+                                    "level7": {
+                                        "level8": {
+                                            "level9": {
+                                                "level10": {"level11": {"password": "deep_secret"}}
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         result = redact_dict(data, default_config)
         # At max depth, should stop recursing - password at depth 11 should not be redacted
         # or should be truncated depending on implementation
@@ -317,7 +342,9 @@ class TestWhitelistFalsePositives:
             "passport_number",
         ],
     )
-    def test_default_whitelist_fields_not_redacted(self, field_name: str, default_config: RedactionConfig) -> None:
+    def test_default_whitelist_fields_not_redacted(
+        self, field_name: str, default_config: RedactionConfig
+    ) -> None:
         """TC-159: PASSWORD_WHITELIST prevents false positive redaction."""
         # Default whitelist from spec
         assert field_name.lower() in PASSWORD_WHITELIST or field_name in PASSWORD_WHITELIST
@@ -433,33 +460,21 @@ class TestSanitizationAppliedFields:
 
     def test_stdout_field_sanitized(self, default_config: RedactionConfig) -> None:
         """TC-162: res.stdout field is sanitized."""
-        event = {
-            "res": {
-                "stdout": "Error: Connection failed for mysql://user:pass@db.example.com"
-            }
-        }
+        event = {"res": {"stdout": "Error: Connection failed for mysql://user:pass@db.example.com"}}
         result = redact_event(event, default_config)
         # URL credentials should be redacted in stdout
         assert "pass" not in result["res"]["stdout"] or REDACTED in result["res"]["stdout"]
 
     def test_stderr_field_sanitized(self, default_config: RedactionConfig) -> None:
         """TC-162: res.stderr field is sanitized."""
-        event = {
-            "res": {
-                "stderr": "Authentication failed: --token=abc123 was rejected"
-            }
-        }
+        event = {"res": {"stderr": "Authentication failed: --token=abc123 was rejected"}}
         result = redact_event(event, default_config)
         # CLI credentials should be redacted in stderr
         assert "abc123" not in result["res"]["stderr"] or REDACTED in result["res"]["stderr"]
 
     def test_msg_field_sanitized(self, default_config: RedactionConfig) -> None:
         """TC-162: res.msg field is sanitized."""
-        event = {
-            "res": {
-                "msg": "Using password: secret123 for connection"
-            }
-        }
+        event = {"res": {"msg": "Using password: secret123 for connection"}}
         result = redact_event(event, default_config)
         # Password references in msg should be handled
         # Note: plain text passwords in msg may not be redacted by default,
@@ -480,7 +495,11 @@ class TestSanitizationAppliedFields:
         }
         result = redact_event(event, default_config)
         # All four fields should have credentials redacted
-        cmd_str = " ".join(result["res"]["cmd"]) if isinstance(result["res"]["cmd"], list) else result["res"]["cmd"]
+        cmd_str = (
+            " ".join(result["res"]["cmd"])
+            if isinstance(result["res"]["cmd"], list)
+            else result["res"]["cmd"]
+        )
         assert "pass123" not in cmd_str
         assert "secret" not in result["res"]["stdout"] or REDACTED in result["res"]["stdout"]
         assert "abc123" not in result["res"]["stderr"] or REDACTED in result["res"]["stderr"]
@@ -525,21 +544,16 @@ class TestInvocationModuleArgs:
         event = {
             "res": {
                 "invocation": {
-                    "module_args": {
-                        "level1": {
-                            "level2": {
-                                "level3": {
-                                    "secret_key": "hidden"
-                                }
-                            }
-                        }
-                    }
+                    "module_args": {"level1": {"level2": {"level3": {"secret_key": "hidden"}}}}
                 }
             }
         }
         result = redact_event(event, default_config)
         # Deeply nested secrets should be redacted
-        assert result["res"]["invocation"]["module_args"]["level1"]["level2"]["level3"]["secret_key"] == REDACTED
+        assert (
+            result["res"]["invocation"]["module_args"]["level1"]["level2"]["level3"]["secret_key"]
+            == REDACTED
+        )
 
     def test_module_args_list_values(self, default_config: RedactionConfig) -> None:
         """TC-163: Module args with list values containing secrets."""
@@ -577,6 +591,7 @@ class TestRedactionAlwaysOn:
         # This is a documentation/design test, not a runtime test
         # The implementation should NOT have a --no-redact flag
         from ansible_aom.cli import create_parser
+
         parser = create_parser()
         help_text = parser.format_help()
         # Check that --no-redact is NOT in the help text
@@ -592,12 +607,13 @@ class TestRedactionAlwaysOn:
         # it should be ignored (the field doesn't exist per spec)
         # Verify RedactionConfig has no 'enabled' field
         import inspect
+
         from ansible_aom.core.config import RedactionConfig
-        
+
         # Get the model fields
         fields = RedactionConfig.model_fields
         field_names = set(fields.keys())
-        
+
         # 'enabled' should NOT be a field
         assert "enabled" not in field_names
 
@@ -636,11 +652,7 @@ class TestRedactionInTUIDisplay:
             "res": {
                 "password": "secret",
                 "token": "token123",
-                "invocation": {
-                    "module_args": {
-                        "secret_key": "hidden"
-                    }
-                }
+                "invocation": {"module_args": {"secret_key": "hidden"}},
             }
         }
         result = redact_event(event, default_config)
@@ -671,7 +683,7 @@ class TestRedactionInJSONOutput:
     def test_json_output_redacted(self, default_config: RedactionConfig) -> None:
         """TC-168: `aom inspect --json` shows redacted values."""
         import json
-        
+
         # JSON export should have passwords as "********"
         event = {
             "res": {
@@ -680,7 +692,7 @@ class TestRedactionInJSONOutput:
             }
         }
         result = redact_event(event, default_config)
-        
+
         # Convert to JSON and verify redaction
         json_str = json.dumps(result)
         assert "secret123" not in json_str
@@ -736,10 +748,9 @@ class TestRedactionConfigModel:
         # Pydantic should validate that custom_patterns contain valid regex
         # Try to create config with invalid pattern
         import pydantic
+
         try:
-            config = RedactionConfig(
-                custom_patterns=[{"regex": "[invalid", "replacement": "x"}]
-            )
+            config = RedactionConfig(custom_patterns=[{"regex": "[invalid", "replacement": "x"}])
             # If no error, the regex pattern was stored as-is
             # This is acceptable if Pydantic doesn't validate regex syntax
             assert config.custom_patterns[0]["regex"] == "[invalid"
@@ -904,17 +915,17 @@ class TestRedactionPerformance:
                             "nested": {
                                 "api_key": f"key_{i}",
                             }
-                        }
+                        },
                     }
                     for i in range(100)
                 ]
             }
         }
-        
+
         start_time = time.time()
         result = redact_event(event, default_config)
         elapsed = time.time() - start_time
-        
+
         # Redaction should complete in < 1 second
         assert elapsed < 1.0, f"Redaction took {elapsed:.2f}s, expected < 1s"
         # Verify some redaction happened
@@ -928,7 +939,7 @@ class TestRedactionPerformance:
         for i in range(15):
             current["nested"] = {"password": f"level_{i}"}
             current = current["nested"]
-        
+
         # Should not crash from recursion
         result = redact_dict(data, default_config)
         # Outer password should still be redacted
@@ -947,17 +958,17 @@ class TestRedactionHelperFunctions:
         """should_redact() correctly identifies redactable fields."""
         # This tests the function signature:
         # def should_redact(key: str, config: RedactionConfig) -> bool
-        
+
         # Password keys -> True
         assert should_redact("password", default_config) is True
         assert should_redact("api_key", default_config) is True
         assert should_redact("secret", default_config) is True
         assert should_redact("ansible_ssh_pass", default_config) is True
-        
+
         # Whitelist keys -> False
         assert should_redact("passenger_version", default_config) is False
         assert should_redact("bypass", default_config) is False
-        
+
         # Normal field -> False
         assert should_redact("name", default_config) is False
         assert should_redact("changed", default_config) is False
@@ -966,16 +977,16 @@ class TestRedactionHelperFunctions:
         """redact_dict() recursively redacts password fields."""
         # This tests the function signature:
         # def redact_dict(data: dict, config: RedactionConfig, depth: int = 0) -> dict
-        
+
         data = {
             "password": "secret",
             "name": "nginx",
             "nested": {
                 "api_key": "key123",
-            }
+            },
         }
         result = redact_dict(data, default_config)
-        
+
         assert result["password"] == REDACTED
         assert result["name"] == "nginx"
         assert result["nested"]["api_key"] == REDACTED
@@ -984,13 +995,13 @@ class TestRedactionHelperFunctions:
         """sanitize_string() removes credentials from strings."""
         # This tests the function signature:
         # def sanitize_string(s: str, config: RedactionConfig) -> str
-        
+
         # URL sanitization
         url = "mysql://user:pass@db.example.com"
         result = sanitize_string(url, default_config)
         assert REDACTED in result
         assert "pass" not in result or REDACTED in result
-        
+
         # CLI sanitization
         cmd = "--password=secret123"
         result = sanitize_string(cmd, default_config)
@@ -1001,19 +1012,15 @@ class TestRedactionHelperFunctions:
         """redact_event() applies all redaction layers to event."""
         # This tests the function signature:
         # def redact_event(event: dict, config: RedactionConfig) -> dict
-        
+
         event = {
             "res": {
                 "password": "secret",
                 "cmd": ["--token=abc123"],
-                "invocation": {
-                    "module_args": {
-                        "api_key": "key123"
-                    }
-                }
+                "invocation": {"module_args": {"api_key": "key123"}},
             }
         }
         result = redact_event(event, default_config)
-        
+
         assert result["res"]["password"] == REDACTED
         assert result["res"]["invocation"]["module_args"]["api_key"] == REDACTED

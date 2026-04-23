@@ -14,7 +14,6 @@ from unittest.mock import patch
 
 import pytest
 
-
 CORE_MODULE_PATHS = [
     "src/ansible_aom/cli.py",
     "src/ansible_aom/__main__.py",

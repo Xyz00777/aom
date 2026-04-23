@@ -23,9 +23,8 @@ from datetime import datetime, timezone
 import pytest
 
 from ansible_aom.core.config import WarningsConfig
-from ansible_aom.core.models import WarningType, WarningEntry
+from ansible_aom.core.models import WarningEntry, WarningType
 from ansible_aom.core.parser import PtyStreamParser, StreamPhase
-
 
 # =============================================================================
 # Section 6.1: WarningType Enum Tests (TC-496)
@@ -70,46 +69,29 @@ class TestWarningEntryDataclass:
 
     def test_warning_entry_required_fields(self):
         """TC-497: WarningEntry requires type and message."""
-        entry = WarningEntry(
-            type=WarningType.WARNING,
-            message="Test warning message"
-        )
+        entry = WarningEntry(type=WarningType.WARNING, message="Test warning message")
         assert entry.type == WarningType.WARNING
         assert entry.message == "Test warning message"
 
     def test_warning_entry_optional_timestamp(self):
         """TC-497: timestamp field is optional and defaults to None."""
-        entry = WarningEntry(
-            type=WarningType.WARNING,
-            message="Test"
-        )
+        entry = WarningEntry(type=WarningType.WARNING, message="Test")
         assert entry.timestamp is None
 
     def test_warning_entry_with_timestamp(self):
         """TC-497: WarningEntry can have timestamp set."""
         ts = datetime(2026, 4, 20, 10, 0, 0, tzinfo=timezone.utc)
-        entry = WarningEntry(
-            type=WarningType.WARNING,
-            message="Test",
-            timestamp=ts
-        )
+        entry = WarningEntry(type=WarningType.WARNING, message="Test", timestamp=ts)
         assert entry.timestamp == ts
 
     def test_warning_entry_source_default(self):
         """TC-497: source field defaults to empty string."""
-        entry = WarningEntry(
-            type=WarningType.WARNING,
-            message="Test"
-        )
+        entry = WarningEntry(type=WarningType.WARNING, message="Test")
         assert entry.source == ""
 
     def test_warning_entry_with_source(self):
         """TC-497: WarningEntry can have source set."""
-        entry = WarningEntry(
-            type=WarningType.WARNING,
-            message="Test",
-            source="controller"
-        )
+        entry = WarningEntry(type=WarningType.WARNING, message="Test", source="controller")
         assert entry.source == "controller"
 
     def test_warning_entry_all_fields(self):
@@ -119,7 +101,7 @@ class TestWarningEntryDataclass:
             type=WarningType.DEPRECATION,
             message="This feature is deprecated",
             timestamp=ts,
-            source="controller"
+            source="controller",
         )
         assert entry.type == WarningType.DEPRECATION
         assert entry.message == "This feature is deprecated"
@@ -128,18 +110,12 @@ class TestWarningEntryDataclass:
 
     def test_warning_entry_empty_message(self):
         """TC-497: WarningEntry can have empty message (edge case)."""
-        entry = WarningEntry(
-            type=WarningType.WARNING,
-            message=""
-        )
+        entry = WarningEntry(type=WarningType.WARNING, message="")
         assert entry.message == ""
 
     def test_warning_entry_deprecation_type(self):
         """TC-497: WarningEntry can use DEPRECATION type."""
-        entry = WarningEntry(
-            type=WarningType.DEPRECATION,
-            message="Deprecated feature"
-        )
+        entry = WarningEntry(type=WarningType.DEPRECATION, message="Deprecated feature")
         assert entry.type == WarningType.DEPRECATION
 
 
@@ -156,7 +132,7 @@ class TestWarningClassification:
         parser = PtyStreamParser()
         parser.phase = StreamPhase.EXECUTION
         parser.feed_line(deprecation_warning_line)
-        
+
         assert len(parser.warnings) >= 1
         warning = parser.warnings[0]
         assert warning.type == WarningType.DEPRECATION
@@ -167,7 +143,7 @@ class TestWarningClassification:
         parser = PtyStreamParser()
         parser.phase = StreamPhase.EXECUTION
         parser.feed_line(deprecated_removed_line)
-        
+
         assert len(parser.warnings) >= 1
         warning = parser.warnings[0]
         assert warning.type == WarningType.DEPRECATION
@@ -178,7 +154,7 @@ class TestWarningClassification:
         parser = PtyStreamParser()
         parser.phase = StreamPhase.EXECUTION
         parser.feed_line(warning_line)
-        
+
         assert len(parser.warnings) >= 1
         warning = parser.warnings[0]
         assert warning.type == WarningType.WARNING
@@ -191,7 +167,7 @@ class TestWarningClassification:
         # This is a regular warning that mentions deprecation in its message body
         line = "[WARNING]: Consider updating deprecated configuration option"
         parser.feed_line(line)
-        
+
         assert len(parser.warnings) >= 1
         warning = parser.warnings[0]
         # Should be WARNING, not DEPRECATION, because pattern is [WARNING]:
@@ -204,7 +180,7 @@ class TestWarningClassification:
         # Note: The current pattern uses ^ which requires start of line
         # This tests that the pattern correctly handles leading whitespace
         parser.feed_line("  [DEPRECATION WARNING]: Test")
-        
+
         # The current implementation uses re.match which anchors at start
         # So this should NOT match (whitespace at start)
         # But let's verify the classification is correct when it does match
@@ -228,7 +204,7 @@ class TestPtyStreamParserWarningsList:
         parser = PtyStreamParser()
         parser.phase = StreamPhase.EXECUTION
         parser.feed_line("[WARNING]: Test warning")
-        
+
         assert len(parser.warnings) >= 1
         assert isinstance(parser.warnings[0], WarningEntry)
 
@@ -241,11 +217,11 @@ class TestPtyStreamParserWarningsList:
         """TC-501: Multiple warnings are added in order received."""
         parser = PtyStreamParser()
         parser.phase = StreamPhase.EXECUTION
-        
+
         parser.feed_line("[WARNING]: First warning")
         parser.feed_line("[DEPRECATION WARNING]: Second warning")
         parser.feed_line("[DEPRECATED]: Third warning")
-        
+
         assert len(parser.warnings) == 3
         assert parser.warnings[0].message == "[WARNING]: First warning"
         assert parser.warnings[1].message == "[DEPRECATION WARNING]: Second warning"
@@ -270,7 +246,7 @@ class TestWarningEntrySourceField:
         parser = PtyStreamParser()
         parser.phase = StreamPhase.EXECUTION
         parser.feed_line("[WARNING]: Test warning")
-        
+
         # Check if source is set (depends on implementation)
         # The current implementation may not set source by default
         # Let's verify what the implementation does
@@ -281,18 +257,13 @@ class TestWarningEntrySourceField:
 
     def test_source_field_empty_string_default(self):
         """TC-502: WarningEntry source defaults to empty string if not provided."""
-        entry = WarningEntry(
-            type=WarningType.WARNING,
-            message="[WARNING]: Test"
-        )
+        entry = WarningEntry(type=WarningType.WARNING, message="[WARNING]: Test")
         assert entry.source == ""
 
     def test_source_field_can_be_set(self):
         """TC-502: WarningEntry source can be explicitly set."""
         entry = WarningEntry(
-            type=WarningType.WARNING,
-            message="[WARNING]: Test",
-            source="controller"
+            type=WarningType.WARNING, message="[WARNING]: Test", source="controller"
         )
         assert entry.source == "controller"
 
@@ -309,11 +280,11 @@ class TestWarningEntryTimestamp:
         """TC-503: WarningEntry captures timestamp when created."""
         parser = PtyStreamParser()
         parser.phase = StreamPhase.EXECUTION
-        
+
         before = datetime.now()
         parser.feed_line("[WARNING]: Test warning")
         after = datetime.now()
-        
+
         assert len(parser.warnings) >= 1
         ts = parser.warnings[0].timestamp
         assert ts is not None
@@ -325,7 +296,7 @@ class TestWarningEntryTimestamp:
         parser = PtyStreamParser()
         parser.phase = StreamPhase.EXECUTION
         parser.feed_line("[WARNING]: Test")
-        
+
         if len(parser.warnings) >= 1:
             ts = parser.warnings[0].timestamp
             assert ts is None or isinstance(ts, datetime)
@@ -409,11 +380,11 @@ class TestWarningPatternsEdgeCases:
         """Multiple [DEPRECATION WARNING]: lines are all classified correctly."""
         parser = PtyStreamParser()
         parser.phase = StreamPhase.EXECUTION
-        
+
         parser.feed_line("[DEPRECATION WARNING]: Feature A deprecated")
         parser.feed_line("[DEPRECATION WARNING]: Feature B deprecated")
         parser.feed_line("[DEPRECATED]: Feature C removed")
-        
+
         assert len(parser.warnings) == 3
         for w in parser.warnings:
             assert w.type == WarningType.DEPRECATION
@@ -422,12 +393,12 @@ class TestWarningPatternsEdgeCases:
         """Mixed WARNING and DEPRECATION lines classified correctly."""
         parser = PtyStreamParser()
         parser.phase = StreamPhase.EXECUTION
-        
+
         parser.feed_line("[WARNING]: First warning")
         parser.feed_line("[DEPRECATION WARNING]: Deprecation warning")
         parser.feed_line("[WARNING]: Second warning")
         parser.feed_line("[DEPRECATED]: Removed feature")
-        
+
         assert len(parser.warnings) == 4
         assert parser.warnings[0].type == WarningType.WARNING
         assert parser.warnings[1].type == WarningType.DEPRECATION
@@ -439,7 +410,7 @@ class TestWarningPatternsEdgeCases:
         parser = PtyStreamParser()
         # Phase is PRE_RUN_PROMPTS by default
         parser.feed_line("[WARNING]: Warning before playbook start")
-        
+
         # Warnings may or may not be captured in PRE_RUN_PROMPTS phase
         # The current implementation processes plaintext in all phases
         # Let's verify the behavior
@@ -450,7 +421,7 @@ class TestWarningPatternsEdgeCases:
         parser = PtyStreamParser()
         parser.phase = StreamPhase.EXECUTION
         parser.feed_line('{"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}')
-        
+
         # This is a JSONL event, not a warning
         assert len(parser.warnings) == 0
 
@@ -459,7 +430,7 @@ class TestWarningPatternsEdgeCases:
         parser = PtyStreamParser()
         parser.phase = StreamPhase.EXECUTION
         parser.feed_line("")
-        
+
         assert len(parser.warnings) == 0
 
     def test_non_warning_plaintext_added_to_plaintext_lines(self):
@@ -467,7 +438,7 @@ class TestWarningPatternsEdgeCases:
         parser = PtyStreamParser()
         parser.phase = StreamPhase.EXECUTION
         parser.feed_line("Some random output line")
-        
+
         assert len(parser.warnings) == 0
         assert len(parser.plaintext_lines) >= 1
 
@@ -483,7 +454,7 @@ class TestWarningsConfigWithAppConfig:
     def test_warnings_config_in_app_config(self):
         """TC-512: WarningsConfig is part of AppConfig."""
         from ansible_aom.core.config import AppConfig
-        
+
         config = AppConfig()
         assert hasattr(config, "warnings")
         assert isinstance(config.warnings, WarningsConfig)
@@ -491,7 +462,7 @@ class TestWarningsConfigWithAppConfig:
     def test_warnings_config_default_from_app_config(self):
         """TC-512: Default WarningsConfig values from AppConfig."""
         from ansible_aom.core.config import AppConfig
-        
+
         config = AppConfig()
         assert config.warnings.show_warnings is True
         assert config.warnings.show_deprecations is True
@@ -499,7 +470,7 @@ class TestWarningsConfigWithAppConfig:
     def test_warnings_config_custom_from_app_config(self):
         """TC-512: Custom WarningsConfig values in AppConfig."""
         from ansible_aom.core.config import AppConfig, WarningsConfig
-        
+
         config = AppConfig(warnings=WarningsConfig(show_warnings=False))
         assert config.warnings.show_warnings is False
         assert config.warnings.show_deprecations is True

@@ -28,7 +28,6 @@ from ansible_aom.core.models import (
     TaskRunState,
 )
 
-
 # ============================================================================
 # Status Icon Tests (TC-030)
 # ============================================================================
@@ -41,13 +40,13 @@ class TestStatusIcons:
     def icon_mapping(self) -> dict[str, str]:
         """Return the status icon mapping."""
         return {
-            Status.PENDING: "□",      # pending/skipped
-            Status.RUNNING: "◐",      # in progress
-            Status.OK: "●",           # completed ok
-            Status.CHANGED: "◆",      # completed with changes
-            Status.FAILED: "✖",       # failed
+            Status.PENDING: "□",  # pending/skipped
+            Status.RUNNING: "◐",  # in progress
+            Status.OK: "●",  # completed ok
+            Status.CHANGED: "◆",  # completed with changes
+            Status.FAILED: "✖",  # failed
             Status.UNREACHABLE: "⊝",  # unreachable
-            Status.SKIPPED: "□",      # skipped (same as pending)
+            Status.SKIPPED: "□",  # skipped (same as pending)
         }
 
     def test_status_icon_pending(self, icon_mapping: dict[str, str]):
@@ -142,19 +141,19 @@ class TestStatusBarFormat:
         elapsed_m = (elapsed_seconds % 3600) // 60
         elapsed_s = elapsed_seconds % 60
         elapsed_str = f"{elapsed_h}:{elapsed_m:02d}:{elapsed_s:02d}"
-        
+
         parts = [
             playbook,
             f"{hosts_completed}/{hosts_total} hosts",
         ]
-        
+
         if warnings > 0:
             parts.append(f"⚠ {warnings}")
         if deprecations > 0:
             parts.append(f"✱ {deprecations}")
-            
+
         parts.append(elapsed_str)
-        
+
         return " │ ".join(parts)
 
     def test_status_bar_format_basic(self):
@@ -279,7 +278,7 @@ class TestHostStatusIndicators:
     ) -> str:
         """Format host summary line."""
         parts = [f"{hostname}:"]
-        
+
         if ok > 0:
             icon = "●"  # OK icon
             parts.append(f"{icon} {ok} ok")
@@ -292,7 +291,7 @@ class TestHostStatusIndicators:
         if unreachable > 0:
             icon = "⊝"  # UNREACHABLE icon
             parts.append(f"{icon} {unreachable} unreachable")
-            
+
         return " ".join(parts)
 
     def test_host_summary_all_ok(self):
@@ -375,7 +374,7 @@ class TestExitCodes:
         task.hosts["web2"] = HostRunState(hostname="web2", status=Status.OK)
         play.tasks["t1"] = task
         state.plays["p1"] = play
-        
+
         exit_code = self.determine_exit_code(state)
         assert exit_code == 0
 
@@ -388,7 +387,7 @@ class TestExitCodes:
         task.hosts["web2"] = HostRunState(hostname="web2", status=Status.CHANGED, changed=True)
         play.tasks["t1"] = task
         state.plays["p1"] = play
-        
+
         exit_code = self.determine_exit_code(state)
         assert exit_code == 0
 
@@ -401,7 +400,7 @@ class TestExitCodes:
         task.hosts["web2"] = HostRunState(hostname="web2", status=Status.FAILED, message="Error")
         play.tasks["t1"] = task
         state.plays["p1"] = play
-        
+
         exit_code = self.determine_exit_code(state)
         assert exit_code == 1
 
@@ -411,10 +410,12 @@ class TestExitCodes:
         play = PlayRunState(play_id="p1", name="Test play", status=Status.FAILED)
         task = TaskRunState(task_id="t1", name="Test task", status=Status.UNREACHABLE)
         task.hosts["web1"] = HostRunState(hostname="web1", status=Status.OK)
-        task.hosts["web2"] = HostRunState(hostname="web2", status=Status.UNREACHABLE, message="SSH failed")
+        task.hosts["web2"] = HostRunState(
+            hostname="web2", status=Status.UNREACHABLE, message="SSH failed"
+        )
         play.tasks["t1"] = task
         state.plays["p1"] = play
-        
+
         exit_code = self.determine_exit_code(state)
         assert exit_code == 2
 
@@ -427,7 +428,7 @@ class TestExitCodes:
         task.hosts["web2"] = HostRunState(hostname="web2", status=Status.UNREACHABLE)
         play.tasks["t1"] = task
         state.plays["p1"] = play
-        
+
         # Failed takes precedence (checked first)
         exit_code = self.determine_exit_code(state)
         assert exit_code == 1
@@ -502,7 +503,7 @@ class TestCompactRendererUpdateState:
 
         renderer = CompactRenderer()
         renderer.start("playbook.yml", [])
-        
+
         event = {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
         # Should not raise
         renderer.update_state(event)
@@ -517,7 +518,7 @@ class TestCompactRendererHandlePasswordPrompt:
 
         renderer = CompactRenderer()
         renderer.start("playbook.yml", [])
-        
+
         # Password prompts require mocking getpass/PTY
         # This test validates the interface exists
         # Actual integration tests would mock pexpect
@@ -532,7 +533,7 @@ class TestCompactRendererHandleCompletion:
 
         renderer = CompactRenderer()
         renderer.start("playbook.yml", [])
-        
+
         # Should not raise
         renderer.handle_completion(0, "completed")
 
@@ -546,7 +547,7 @@ class TestCompactRendererStop:
 
         renderer = CompactRenderer()
         renderer.start("playbook.yml", [])
-        
+
         # Should not raise
         renderer.stop()
 
@@ -569,7 +570,7 @@ class TestRichLiveConfiguration:
         # Implementation detail: Rich Live throttles to 4 FPS
         max_renders_per_second = 4
         events_per_second = 10  # More events than renders
-        
+
         # Renders should be capped
         renders = min(events_per_second, max_renders_per_second)
         assert renders == 4
@@ -586,13 +587,13 @@ class TestPasswordPassThrough:
     def test_password_prompt_patterns_exist(self):
         """TC-034: Password prompt patterns are defined."""
         patterns = [
-            r'Vault password: ',
-            r'Vault password \([^)]+\): ',     # vault_id variant
-            r'SSH password: ',
-            r'BECOME password: ',
-            r'BECOME password\[defaults to SSH password\]: ',
-            r'New Vault password: ',
-            r'Confirm New Vault password: ',
+            r"Vault password: ",
+            r"Vault password \([^)]+\): ",  # vault_id variant
+            r"SSH password: ",
+            r"BECOME password: ",
+            r"BECOME password\[defaults to SSH password\]: ",
+            r"New Vault password: ",
+            r"Confirm New Vault password: ",
         ]
         assert len(patterns) == 7
 
@@ -623,6 +624,7 @@ class TestCompactDependencies:
     def test_rich_library_importable(self):
         """TC-035: rich library is importable."""
         import rich
+
         assert rich is not None
 
     def test_blessed_library_optional(self):
@@ -791,7 +793,7 @@ class TestRefreshStrategy:
         # Rich Live refresh_per_second=4
         max_renders_per_second = 4
         rapid_events = 10
-        
+
         # Should throttle to 4 renders
         actual_renders = min(rapid_events, max_renders_per_second)
         assert actual_renders == 4
@@ -877,6 +879,7 @@ class TestViewModeSelection:
 
         renderer = create_renderer()
         from ansible_aom.compact.renderer import CompactRenderer
+
         assert isinstance(renderer, CompactRenderer)
 
     def test_factory_creates_compact_renderer_when_tui_false(self):
@@ -885,6 +888,7 @@ class TestViewModeSelection:
 
         renderer = create_renderer(tui_mode=False)
         from ansible_aom.compact.renderer import CompactRenderer
+
         assert isinstance(renderer, CompactRenderer)
 
     def test_factory_creates_tui_renderer_when_tui_true(self):
@@ -909,53 +913,60 @@ class TestPasswordPromptPatterns:
     def password_patterns(self) -> list[str]:
         """All password prompt patterns from SPECIFICATION."""
         return [
-            r'Vault password: ',
-            r'Vault password \([^)]+\): ',
-            r'SSH password: ',
-            r'BECOME password: ',
-            r'BECOME password\[defaults to SSH password\]: ',
-            r'New Vault password: ',
-            r'Confirm New Vault password: ',
+            r"Vault password: ",
+            r"Vault password \([^)]+\): ",
+            r"SSH password: ",
+            r"BECOME password: ",
+            r"BECOME password\[defaults to SSH password\]: ",
+            r"New Vault password: ",
+            r"Confirm New Vault password: ",
         ]
 
     def test_vault_password_pattern(self, password_patterns: list[str]):
         """Pattern matches 'Vault password: '."""
         import re
+
         pattern = password_patterns[0]
         assert re.search(pattern, "Vault password: ") is not None
 
     def test_vault_id_password_pattern(self, password_patterns: list[str]):
         """Pattern matches vault ID variant."""
         import re
+
         pattern = password_patterns[1]
         assert re.search(pattern, "Vault password (prod): ") is not None
 
     def test_ssh_password_pattern(self, password_patterns: list[str]):
         """Pattern matches 'SSH password: '."""
         import re
+
         pattern = password_patterns[2]
         assert re.search(pattern, "SSH password: ") is not None
 
     def test_become_password_pattern(self, password_patterns: list[str]):
         """Pattern matches 'BECOME password: '."""
         import re
+
         pattern = password_patterns[3]
         assert re.search(pattern, "BECOME password: ") is not None
 
     def test_become_default_password_pattern(self, password_patterns: list[str]):
         """Pattern matches BECOME password default variant."""
         import re
+
         pattern = password_patterns[4]
         assert re.search(pattern, "BECOME password[defaults to SSH password]: ") is not None
 
     def test_new_vault_password_pattern(self, password_patterns: list[str]):
         """Pattern matches 'New Vault password: '."""
         import re
+
         pattern = password_patterns[5]
         assert re.search(pattern, "New Vault password: ") is not None
 
     def test_confirm_new_vault_password_pattern(self, password_patterns: list[str]):
         """Pattern matches 'Confirm New Vault password: '."""
         import re
+
         pattern = password_patterns[6]
         assert re.search(pattern, "Confirm New Vault password: ") is not None

@@ -198,7 +198,9 @@ class TestRecordEvent:
         session_id = manager.start_session("test.yml")
 
         for i in range(5):
-            manager.record_event(session_id, {"_event": f"event_{i}", "_timestamp": f"2026-04-20T10:00:0{i}Z"})
+            manager.record_event(
+                session_id, {"_event": f"event_{i}", "_timestamp": f"2026-04-20T10:00:0{i}Z"}
+            )
 
         events_file = session_dir / session_id / "events.jsonl"
         with open(events_file) as f:
@@ -270,6 +272,7 @@ class TestEndSession:
         session_id = manager.start_session("test.yml")
 
         import time
+
         time.sleep(0.1)
 
         manager.end_session(session_id, "completed")
@@ -366,8 +369,13 @@ class TestCreateArtifact:
             playbook="test.yml",
         )
         session_id = manager.start_session("test.yml")
-        manager.record_event(session_id, {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
-        manager.record_event(session_id, {"_event": "v2_playbook_on_play_start", "_timestamp": "2026-04-20T10:00:01Z"})
+        manager.record_event(
+            session_id, {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
+        manager.record_event(
+            session_id,
+            {"_event": "v2_playbook_on_play_start", "_timestamp": "2026-04-20T10:00:01Z"},
+        )
         manager.end_session(session_id, "completed")
         artifact_path = manager.create_artifact(session_id)
 
@@ -393,7 +401,9 @@ class TestCreateArtifact:
             playbook="test.yml",
         )
         session_id = manager.start_session("test.yml")
-        manager.record_event(session_id, {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        manager.record_event(
+            session_id, {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
         manager.record_event(
             session_id,
             {
@@ -495,7 +505,10 @@ class TestSessionRotation:
 
         for i in range(105):
             (session_dir / f"session_{i:03d}").mkdir()
-            meta = {"playbook": f"test{i}.yml", "start_time": f"2026-04-20T{10+i//60:02d}:{i%60:02d}:00Z"}
+            meta = {
+                "playbook": f"test{i}.yml",
+                "start_time": f"2026-04-20T{10 + i // 60:02d}:{i % 60:02d}:00Z",
+            }
             with open(session_dir / f"session_{i:03d}" / "meta.json", "w") as f:
                 json.dump(meta, f)
 
@@ -595,7 +608,7 @@ class TestCorruptedSessionHandling:
 
         with open(session_dir / session_id / "events.jsonl", "w") as f:
             f.write('{"_event": "valid_event"}\n')
-            f.write('not valid json\n')
+            f.write("not valid json\n")
             f.write('{"_event": "another_valid"}\n')
 
         with open(session_dir / session_id / "meta.json", "w") as f:
@@ -617,7 +630,7 @@ class TestCorruptedSessionHandling:
             for i in range(3):
                 f.write('{"_event": "valid"}\n')
             for i in range(3):
-                f.write('malformed line\n')
+                f.write("malformed line\n")
 
         with open(session_dir / session_id / "meta.json", "w") as f:
             json.dump({"playbook": "test.yml"}, f)
@@ -648,7 +661,11 @@ class TestInspectList:
         for i in range(3):
             sid = f"session_{i}"
             (session_dir / sid).mkdir()
-            meta = {"playbook": f"test{i}.yml", "start_time": f"2026-04-20T1{i}:00:00Z", "status": "completed"}
+            meta = {
+                "playbook": f"test{i}.yml",
+                "start_time": f"2026-04-20T1{i}:00:00Z",
+                "status": "completed",
+            }
             with open(session_dir / sid / "meta.json", "w") as f:
                 json.dump(meta, f)
 
@@ -787,14 +804,18 @@ class TestInspectDiff:
         with open(session_dir / session_id_1 / "meta.json", "w") as f:
             json.dump({"playbook": "site.yml", "status": "completed"}, f)
         with open(session_dir / session_id_1 / "events.jsonl", "w") as f:
-            f.write('{"_event": "v2_runner_on_ok", "task": {"name": "Install nginx"}, "hosts": {"web1": {"ok": true}}}\n')
+            f.write(
+                '{"_event": "v2_runner_on_ok", "task": {"name": "Install nginx"}, "hosts": {"web1": {"ok": true}}}\n'
+            )
 
         session_id_2 = "session_2"
         (session_dir / session_id_2).mkdir()
         with open(session_dir / session_id_2 / "meta.json", "w") as f:
             json.dump({"playbook": "site.yml", "status": "failed"}, f)
         with open(session_dir / session_id_2 / "events.jsonl", "w") as f:
-            f.write('{"_event": "v2_runner_on_failed", "task": {"name": "Install nginx"}, "hosts": {"web1": {"failed": true}}}\n')
+            f.write(
+                '{"_event": "v2_runner_on_failed", "task": {"name": "Install nginx"}, "hosts": {"web1": {"failed": true}}}\n'
+            )
 
         session1 = load_session(session_id_1, session_dir)
         session2 = load_session(session_id_2, session_dir)

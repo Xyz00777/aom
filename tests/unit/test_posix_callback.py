@@ -10,8 +10,8 @@ Test cases cover:
 All tests are self-contained and use mocks to avoid requiring real Ansible installations.
 """
 
-from unittest.mock import patch, MagicMock
 import subprocess
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -80,7 +80,7 @@ def _check_ansible_posix_installed() -> bool:
             timeout=30,
         )
         return "ansible.posix" in result.stdout
-    except (subprocess.SubprocessError, FileNotFoundError):
+    except subprocess.SubprocessError, FileNotFoundError:
         return False
 
 
