@@ -165,8 +165,8 @@ def format_tree_view(session: dict[str, Any]) -> str:
     events = session.get("events", [])
 
     play_events = [e for e in events if e.get("_event") == "v2_playbook_on_play_start"]
-    ok_events = [e for e in events if e.get("_event") == "v2_runner_on_ok"]
-    failed_events = [e for e in events if e.get("_event") == "v2_runner_on_failed"]
+    _ok_events = [e for e in events if e.get("_event") == "v2_runner_on_ok"]
+    _failed_events = [e for e in events if e.get("_event") == "v2_runner_on_failed"]
 
     for play_event in play_events:
         play = play_event.get("play", {})
@@ -178,7 +178,12 @@ def format_tree_view(session: dict[str, Any]) -> str:
 
         task_events_for_play = []
         for event in events:
-            if event.get("_event") in ("v2_runner_on_ok", "v2_runner_on_failed", "v2_runner_on_skipped", "v2_runner_on_unreachable"):
+            if event.get("_event") in (
+                "v2_runner_on_ok",
+                "v2_runner_on_failed",
+                "v2_runner_on_skipped",
+                "v2_runner_on_unreachable",
+            ):
                 play_data = event.get("play", {})
                 if play_data.get("id") == play_id:
                     task_events_for_play.append(event)

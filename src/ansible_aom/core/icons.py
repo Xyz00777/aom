@@ -15,10 +15,7 @@ Icons:
 Running animation cycles through quadrants at 4 FPS.
 """
 
-from enum import Enum
-
 from ansible_aom.core.models import Status
-
 
 # =============================================================================
 # Status Icon Mappings
@@ -27,14 +24,14 @@ from ansible_aom.core.models import Status
 # Mapping from Status enum to Unicode icon string.
 # See SPECIFICATION.md Section 11.1 for icon definitions.
 STATUS_ICONS: dict[Status, str] = {
-    Status.PENDING: "□",     # Empty square (U+25A1)
-    Status.RUNNING: "◐",     # First frame of animation (U+25D0)
-    Status.OK: "●",          # Filled circle (U+25CF)
-    Status.CHANGED: "◆",     # Diamond (U+25C6)
-    Status.FAILED: "✖",      # Cross/ballot X (U+2716)
-    Status.SKIPPED: "○",     # Empty circle (U+25CB)
-    Status.UNREACHABLE: "⊝", # Circle with dash (U+229D)
-    Status.COMPLETED: "●",   # Same as OK (U+25CF)
+    Status.PENDING: "□",  # Empty square (U+25A1)
+    Status.RUNNING: "◐",  # First frame of animation (U+25D0)
+    Status.OK: "●",  # Filled circle (U+25CF)
+    Status.CHANGED: "◆",  # Diamond (U+25C6)
+    Status.FAILED: "✖",  # Cross/ballot X (U+2716)
+    Status.SKIPPED: "○",  # Empty circle (U+25CB)
+    Status.UNREACHABLE: "⊝",  # Circle with dash (U+229D)
+    Status.COMPLETED: "●",  # Same as OK (U+25CF)
 }
 
 # Running animation frames (4 frames cycling at 4 FPS)
@@ -43,14 +40,14 @@ RUNNING_FRAMES = ["◐", "◓", "◑", "◒"]
 # ANSI color names for Rich/Textual rendering.
 # See SPECIFICATION.md Section 11.1 for color definitions.
 STATUS_COLORS: dict[Status, str] = {
-    Status.PENDING: "dim",        # Dim/bright black
-    Status.RUNNING: "cyan",       # Cyan for running animation
-    Status.OK: "green",           # Green for success
-    Status.CHANGED: "yellow",     # Yellow for changes
-    Status.FAILED: "red",         # Red for failures
-    Status.SKIPPED: "dim",        # Dim for skipped
-    Status.UNREACHABLE: "magenta",# Magenta for unreachable
-    Status.COMPLETED: "green",    # Green for completion
+    Status.PENDING: "dim",  # Dim/bright black
+    Status.RUNNING: "cyan",  # Cyan for running animation
+    Status.OK: "green",  # Green for success
+    Status.CHANGED: "yellow",  # Yellow for changes
+    Status.FAILED: "red",  # Red for failures
+    Status.SKIPPED: "dim",  # Dim for skipped
+    Status.UNREACHABLE: "magenta",  # Magenta for unreachable
+    Status.COMPLETED: "green",  # Green for completion
 }
 
 
@@ -59,7 +56,7 @@ STATUS_COLORS: dict[Status, str] = {
 # =============================================================================
 
 TREE_COLLAPSED = "▶"  # Right arrow for collapsed node (U+25B6)
-TREE_EXPANDED = "▼"   # Down arrow for expanded node (U+25BC)
+TREE_EXPANDED = "▼"  # Down arrow for expanded node (U+25BC)
 
 
 # =============================================================================

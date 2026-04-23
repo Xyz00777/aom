@@ -8,7 +8,7 @@ import json
 import sys
 from pathlib import Path
 
-from ansible_aom.core.session import list_sessions, load_session, cleanup_old_sessions
+from ansible_aom.core.session import cleanup_old_sessions, list_sessions, load_session
 from ansible_aom.inspect.diff import diff_sessions
 from ansible_aom.inspect.display import (
     format_diff_table,
@@ -156,7 +156,11 @@ def _filter_failed(session: dict) -> dict:
             filtered_events.append(event)
         elif event_type == "v2_runner_on_unreachable":
             filtered_events.append(event)
-        elif event_type in ("v2_playbook_on_start", "v2_playbook_on_play_start", "v2_playbook_on_stats"):
+        elif event_type in (
+            "v2_playbook_on_start",
+            "v2_playbook_on_play_start",
+            "v2_playbook_on_stats",
+        ):
             filtered_events.append(event)
 
     result = dict(session)
@@ -171,7 +175,11 @@ def _filter_by_host(session: dict, hostname: str) -> dict:
         hosts = event.get("hosts", {})
         if hosts and hostname in hosts:
             filtered_events.append(event)
-        elif event.get("_event") in ("v2_playbook_on_start", "v2_playbook_on_play_start", "v2_playbook_on_stats"):
+        elif event.get("_event") in (
+            "v2_playbook_on_start",
+            "v2_playbook_on_play_start",
+            "v2_playbook_on_stats",
+        ):
             filtered_events.append(event)
 
     result = dict(session)
@@ -179,7 +187,7 @@ def _filter_by_host(session: dict, hostname: str) -> dict:
     return result
 
 
-def main():
+def main() -> int:
     """CLI entry point for inspect commands."""
     parser = argparse.ArgumentParser(description="Inspect AOM sessions")
     subparsers = parser.add_subparsers(dest="command", help="Subcommand")
@@ -212,15 +220,27 @@ def main():
     diff_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     prune_parser = subparsers.add_parser("prune", help="Cleanup old sessions")
-    prune_parser.add_argument("--days", type=int, default=30, help="Remove sessions older than N days")
+    prune_parser.add_argument(
+        "--days", type=int, default=30, help="Remove sessions older than N days"
+    )
 
     args = parser.parse_args()
 
     if args.command == "list":
-        output_format = "jsonl" if getattr(args, "jsonl", False) else ("json" if getattr(args, "json", False) else "table")
+        if getattr(args, "jsonl", False):
+            output_format = "jsonl"
+        elif getattr(args, "json", False):
+            output_format = "json"
+        else:
+            output_format = "table"
         return inspect_list(args.state_dir, output_format)
     elif args.command == "show":
-        output_format = "jsonl" if getattr(args, "jsonl", False) else ("json" if getattr(args, "json", False) else "table")
+        if getattr(args, "jsonl", False):
+            output_format = "jsonl"
+        elif getattr(args, "json", False):
+            output_format = "json"
+        else:
+            output_format = "table"
         return inspect_show(
             args.session_id,
             args.state_dir,

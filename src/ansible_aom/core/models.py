@@ -129,7 +129,7 @@ def _parse_timestamp(event: dict[str, Any]) -> datetime:
         if ts_str.endswith("Z"):
             ts_str = ts_str[:-1] + "+00:00"
         return datetime.fromisoformat(ts_str)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return datetime.now(timezone.utc)
 
 
@@ -168,17 +168,13 @@ class RunState:
         else:
             logger.debug(f"Unknown event type: {event_type}")
 
-    def _handle_v2_playbook_on_start(
-        self, event: dict[str, Any], ts: datetime
-    ) -> None:
+    def _handle_v2_playbook_on_start(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_playbook_on_start event."""
         if self.start_time is None:
             self.start_time = ts
             self.status = Status.RUNNING
 
-    def _handle_v2_playbook_on_play_start(
-        self, event: dict[str, Any], ts: datetime
-    ) -> None:
+    def _handle_v2_playbook_on_play_start(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_playbook_on_play_start event."""
         play_data = event.get("play", {})
         play_id = play_data.get("id", "")
@@ -193,9 +189,7 @@ class RunState:
                 status=Status.RUNNING,
             )
 
-    def _handle_v2_playbook_on_task_start(
-        self, event: dict[str, Any], ts: datetime
-    ) -> None:
+    def _handle_v2_playbook_on_task_start(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_playbook_on_task_start event."""
         task_data = event.get("task", {})
         play_data = event.get("play", {})
@@ -228,13 +222,11 @@ class RunState:
         """Handle v2_playbook_on_handler_task_start event (same as task_start)."""
         self._handle_v2_playbook_on_task_start(event, ts)
 
-    def _handle_v2_runner_on_start(
-        self, event: dict[str, Any], ts: datetime
-    ) -> None:
+    def _handle_v2_runner_on_start(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_start event."""
         task_data = event.get("task", {})
         play_data = event.get("play", {})
-        hostname = event.get("host", "")
+        _hostname = event.get("host", "")
         task_id = task_data.get("id", "")
         task_name = task_data.get("name", "")
         play_id = play_data.get("id", "")
@@ -262,9 +254,7 @@ class RunState:
             play.tasks[task_id].status = Status.RUNNING
             play.tasks[task_id].start_time = ts
 
-    def _handle_v2_runner_on_ok(
-        self, event: dict[str, Any], ts: datetime
-    ) -> None:
+    def _handle_v2_runner_on_ok(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_ok event."""
         task_data = event.get("task", {})
         play_data = event.get("play", {})
@@ -290,9 +280,7 @@ class RunState:
                 end_time=ts,
             )
 
-    def _handle_v2_runner_on_failed(
-        self, event: dict[str, Any], ts: datetime
-    ) -> None:
+    def _handle_v2_runner_on_failed(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_failed event."""
         task_data = event.get("task", {})
         play_data = event.get("play", {})
@@ -335,9 +323,7 @@ class RunState:
                 )
                 self.status = Status.FAILED
 
-    def _handle_v2_runner_on_skipped(
-        self, event: dict[str, Any], ts: datetime
-    ) -> None:
+    def _handle_v2_runner_on_skipped(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_skipped event."""
         task_data = event.get("task", {})
         play_data = event.get("play", {})
@@ -361,9 +347,7 @@ class RunState:
                 end_time=ts,
             )
 
-    def _handle_v2_runner_on_unreachable(
-        self, event: dict[str, Any], ts: datetime
-    ) -> None:
+    def _handle_v2_runner_on_unreachable(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_unreachable event."""
         task_data = event.get("task", {})
         play_data = event.get("play", {})
@@ -391,9 +375,7 @@ class RunState:
 
         self.status = Status.FAILED
 
-    def _handle_v2_playbook_on_stats(
-        self, event: dict[str, Any], ts: datetime
-    ) -> None:
+    def _handle_v2_playbook_on_stats(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_playbook_on_stats event."""
         self.end_time = ts
 

@@ -6,9 +6,7 @@ inspection. See SPECIFICATION.md Section 6.3 for session details.
 
 import json
 import logging
-import os
 import shutil
-import stat
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -119,6 +117,7 @@ class SessionManager:
         self._playbook = playbook
         self._start_time = datetime.now(timezone.utc)
 
+        assert self._session_dir is not None, "Session directory must be set"
         session_path = self._session_dir / session_id
         session_path.mkdir(parents=True, exist_ok=True)
         session_path.chmod(0o755)
@@ -260,7 +259,9 @@ class SessionManager:
                 "type": "metadata",
                 "playbook": meta["playbook"],
                 "version": meta.get("version", "1.0"),
-                "created": meta.get("end_time", datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")),
+                "created": meta.get(
+                    "end_time", datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                ),
                 "session_id": session_id,
             }
             f.write(json.dumps(metadata_line) + "\n")
@@ -319,7 +320,7 @@ def cleanup_old_sessions(
                 if start_time_str:
                     start_time = datetime.fromisoformat(start_time_str.replace("Z", "+00:00"))
                     sessions.append((session_path, start_time, meta))
-            except (json.JSONDecodeError, ValueError):
+            except json.JSONDecodeError, ValueError:
                 sessions.append((session_path, datetime.now(timezone.utc), {}))
         else:
             sessions.append((session_path, datetime.now(timezone.utc), {}))
@@ -375,15 +376,17 @@ def list_sessions(session_dir: Path) -> list[dict[str, Any]]:
                 meta = json.load(f)
 
             session_id = session_path.name
-            sessions.append({
-                "session_id": session_id,
-                "short_id": session_id[:8],
-                "playbook": meta.get("playbook", ""),
-                "start_time": meta.get("start_time", ""),
-                "status": meta.get("status", ""),
-                "duration_seconds": meta.get("duration_seconds"),
-            })
-        except (json.JSONDecodeError, KeyError):
+            sessions.append(
+                {
+                    "session_id": session_id,
+                    "short_id": session_id[:8],
+                    "playbook": meta.get("playbook", ""),
+                    "start_time": meta.get("start_time", ""),
+                    "status": meta.get("status", ""),
+                    "duration_seconds": meta.get("duration_seconds"),
+                }
+            )
+        except json.JSONDecodeError, KeyError:
             continue
 
     sessions.sort(key=lambda x: x.get("start_time", ""), reverse=True)

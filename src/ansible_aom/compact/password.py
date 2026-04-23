@@ -6,7 +6,6 @@ See SPECIFICATION.md Section 5.10 for password handling.
 TDD: This file contains STUB implementations only. Tests come first.
 """
 
-import getpass
 from typing import Any
 
 

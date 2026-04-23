@@ -59,6 +59,7 @@ class CompactRenderer:
         """
         try:
             import getpass
+
             password = getpass.getpass(prompt_text)
             return password
         except Exception:

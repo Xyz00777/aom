@@ -17,19 +17,19 @@ from typing import TypedDict
 
 class KeyContext(str, Enum):
     """Context where a keybinding is active."""
-    
-    GLOBAL = "global"        # Works from any panel
-    TREE = "tree"            # Only when tree panel is focused
-    LOG = "log"              # Only when log panel is focused
-    POST_RUN = "post_run"    # Only after playbook completion
+
+    GLOBAL = "global"  # Works from any panel
+    TREE = "tree"  # Only when tree panel is focused
+    LOG = "log"  # Only when log panel is focused
+    POST_RUN = "post_run"  # Only after playbook completion
 
 
 class KeyAction(TypedDict):
     """Definition of a keybinding action."""
-    
-    action: str              # Action identifier (e.g., "quit", "expand_tree")
-    description: str         # Human-readable description
-    context: KeyContext      # Where the keybinding is active
+
+    action: str  # Action identifier (e.g., "quit", "expand_tree")
+    description: str  # Human-readable description
+    context: KeyContext  # Where the keybinding is active
     requires_confirmation: bool  # Whether action needs user confirmation
 
 
@@ -120,7 +120,6 @@ KEYBINDINGS: dict[str, KeyAction] = {
         "context": KeyContext.GLOBAL,
         "requires_confirmation": False,
     },
-    
     # Tree navigation keybindings
     "up": {
         "action": "navigate_tree_up",
@@ -194,7 +193,6 @@ KEYBINDINGS: dict[str, KeyAction] = {
         "context": KeyContext.GLOBAL,
         "requires_confirmation": False,
     },
-    
     # Post-run keybindings
     "R": {
         "action": "rerun_with_same_args",
@@ -208,7 +206,6 @@ KEYBINDINGS: dict[str, KeyAction] = {
         "context": KeyContext.POST_RUN,
         "requires_confirmation": False,
     },
-    
     # Panel toggle keys
     "1": {
         "action": "toggle_status_bar",
@@ -245,15 +242,15 @@ KEYBINDINGS: dict[str, KeyAction] = {
 
 def get_keybinding(key: str) -> KeyAction | None:
     """Look up a keybinding by key string.
-    
+
     Args:
         key: The key string to look up (e.g., "q", "ctrl+f", "alt+t").
              Uppercase single letters (S, G, R) are distinct from lowercase.
              Modifiers should be lowercase (ctrl, shift, alt).
-    
+
     Returns:
         The KeyAction dict if found, None if key is not bound.
-    
+
     Examples:
         >>> get_keybinding("q")
         {'action': 'quit', 'description': 'Quit...', ...}
@@ -267,7 +264,7 @@ def get_keybinding(key: str) -> KeyAction | None:
     # Direct lookup (exact match first - for case-sensitive keys like S vs s)
     if key in KEYBINDINGS:
         return KEYBINDINGS[key]
-    
+
     # Try lowercase for single-character keys that don't have an uppercase binding
     # This handles 'q' finding 'q' and 'Q' finding 'Q' (if both defined)
     if len(key) == 1:
@@ -279,26 +276,26 @@ def get_keybinding(key: str) -> KeyAction | None:
         # If looking up lowercase and it exists
         if key.islower() and lower_key in KEYBINDINGS:
             return KEYBINDINGS[lower_key]
-    
+
     # Try alternative modifier format (ctrl+f vs ctrl+F)
     if "+" in key:
         modifier, key_part = key.split("+", 1)
         alt_key = f"{modifier.lower()}+{key_part.lower()}"
         if alt_key in KEYBINDINGS:
             return KEYBINDINGS[alt_key]
-    
+
     return None
 
 
 def get_action_keybindings(action: str) -> list[str]:
     """Get all keys that map to a given action.
-    
+
     Args:
         action: The action identifier (e.g., "quit", "expand_node").
-    
+
     Returns:
         List of key strings that trigger this action.
-    
+
     Examples:
         >>> get_action_keybindings("navigate_tree_down")
         ['down', 'j']
@@ -310,37 +307,33 @@ def get_action_keybindings(action: str) -> list[str]:
 
 def get_keybindings_by_context(context: KeyContext) -> dict[str, KeyAction]:
     """Get all keybindings for a specific context.
-    
+
     Args:
         context: The context to filter by (e.g., KeyContext.GLOBAL).
-    
+
     Returns:
         Dict of key -> KeyAction for the specified context.
     """
-    return {
-        key: binding
-        for key, binding in KEYBINDINGS.items()
-        if binding["context"] == context
-    }
+    return {key: binding for key, binding in KEYBINDINGS.items() if binding["context"] == context}
 
 
 def validate_keybindings() -> list[str]:
     """Validate that there are no duplicate keybindings.
-    
+
     Returns:
         List of error messages, empty if all valid.
-    
+
     Note:
         This checks for:
         1. Duplicate key strings (should not happen with dict keys)
         2. Same key with different modifiers being ambiguous
         3. Case conflicts (uppercase vs lowercase single letters)
     """
-    errors = []
-    
+    errors: list[str] = []
+
     # Note: Dict keys are unique by definition, so no need to check for duplicates
     # But we can check for modifier conflicts
-    
+
     # Group by base key (for case-sensitive checks)
     base_keys: dict[str, list[str]] = {}
     for key in KEYBINDINGS:
@@ -350,26 +343,28 @@ def validate_keybindings() -> list[str]:
             base = parts[-1].lower() if len(parts[-1]) == 1 else parts[-1]
         else:
             base = key.lower() if len(key) == 1 else key
-        
+
         if base not in base_keys:
             base_keys[base] = []
         base_keys[base].append(key)
-    
+
     # Check for case conflicts
     for base, keys in base_keys.items():
-        single_letter_keys = [k for k in keys if len(k) == 1 or (len(k.split("+")[-1]) == 1 and "+" in k)]
+        single_letter_keys = [
+            k for k in keys if len(k) == 1 or (len(k.split("+")[-1]) == 1 and "+" in k)
+        ]
         if len(single_letter_keys) > 1:
             # Same base letter with different cases
             # This is intentional for some keys (g vs G, j vs J, etc.)
             # So we don't flag it as error
             pass
-    
+
     return errors
 
 
 def get_all_actions() -> set[str]:
     """Get all unique action names defined in keybindings.
-    
+
     Returns:
         Set of action identifiers.
     """
@@ -380,4 +375,5 @@ def get_all_actions() -> set[str]:
 _validation_errors = validate_keybindings()
 if _validation_errors:
     import warnings
+
     warnings.warn(f"Keybinding validation errors: {_validation_errors}")

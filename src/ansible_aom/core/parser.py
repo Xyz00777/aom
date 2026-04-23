@@ -163,11 +163,13 @@ class PtyStreamParser:
                 elif "DEPRECATED" in pattern:
                     warning_type = WarningType.DEPRECATION
 
-                self._warnings.append(WarningEntry(
-                    type=warning_type,
-                    message=line,
-                    timestamp=datetime.now(),
-                ))
+                self._warnings.append(
+                    WarningEntry(
+                        type=warning_type,
+                        message=line,
+                        timestamp=datetime.now(),
+                    )
+                )
                 return
 
         self._plaintext_lines.append(line)
@@ -178,7 +180,7 @@ class PtyStreamParser:
             return False
         try:
             data = json.loads(line)
-            return data.get("_event") == "v2_playbook_on_start"
+            return bool(data.get("_event") == "v2_playbook_on_start")
         except json.JSONDecodeError:
             return False
 
@@ -188,7 +190,7 @@ class PtyStreamParser:
             return False
         try:
             data = json.loads(line)
-            return data.get("_event") == "v2_playbook_on_stats"
+            return bool(data.get("_event") == "v2_playbook_on_stats")
         except json.JSONDecodeError:
             return False
 
@@ -204,7 +206,9 @@ class PtyStreamParser:
 
     def _parse_json(self, line: str) -> dict:
         """Parse a JSON line into a dict."""
-        return json.loads(line)
+        result = json.loads(line)
+        assert isinstance(result, dict), "Expected JSON object"
+        return result
 
     def _handle_recap_output(self, line: str) -> None:
         """Handle PLAY RECAP output lines."""
@@ -337,13 +341,17 @@ def parse_list_tasks_output(output: str) -> list[dict]:
 
                 tags: list[str] = []
                 if tags_str and tags_str != "[]":
-                    tags = [t.strip().strip("'\"") for t in tags_str.strip("[]").split(",") if t.strip()]
+                    tags = [
+                        t.strip().strip("'\"") for t in tags_str.strip("[]").split(",") if t.strip()
+                    ]
 
-                current_play["tasks"].append({
-                    "name": task_name,
-                    "role": role,
-                    "tags": tags,
-                })
+                current_play["tasks"].append(
+                    {
+                        "name": task_name,
+                        "role": role,
+                        "tags": tags,
+                    }
+                )
 
     if current_play:
         result.append(current_play)
@@ -372,6 +380,7 @@ def group_roles(tasks: list) -> list:
 
         if task_role is None:
             if len(current_group) >= 5:
+                assert current_role is not None, "role should not be None for grouped tasks"
                 result.append(RoleGroupDefinition(role=current_role, tasks=current_group))
             else:
                 result.extend(current_group)
@@ -382,6 +391,7 @@ def group_roles(tasks: list) -> list:
             current_group.append(task)
         else:
             if len(current_group) >= 5:
+                assert current_role is not None, "role should not be None for grouped tasks"
                 result.append(RoleGroupDefinition(role=current_role, tasks=current_group))
             else:
                 result.extend(current_group)
@@ -389,6 +399,7 @@ def group_roles(tasks: list) -> list:
             current_role = task_role
 
     if len(current_group) >= 5:
+        assert current_role is not None, "role should not be None for grouped tasks"
         result.append(RoleGroupDefinition(role=current_role, tasks=current_group))
     else:
         result.extend(current_group)

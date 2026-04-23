@@ -200,7 +200,7 @@ def main() -> int:
         from ansible_aom.renderer.factory import create_renderer
 
         try:
-            renderer = create_renderer(tui_mode=args.tui)
+            create_renderer(tui_mode=args.tui)
             print(f"Running playbook: {args.playbook}")
             return 0
         except FileNotFoundError:

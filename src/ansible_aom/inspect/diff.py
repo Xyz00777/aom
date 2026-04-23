@@ -59,7 +59,7 @@ def diff_sessions(
 
     matched_ids = set(matches.keys())
     for task in new_tasks:
-        task_id = task.get("uuid") or task.get("id") or task.get("name")
+        task_id = task.get("uuid") or task.get("id") or task.get("name") or ""
         if task_id not in matched_ids:
             if changes_only:
                 continue
@@ -75,7 +75,7 @@ def diff_sessions(
             classifications[task_id] = classification
 
     for task in old_tasks:
-        task_id = task.get("uuid") or task.get("id") or task.get("name")
+        task_id = task.get("uuid") or task.get("id") or task.get("name") or ""
         if task_id not in matched_ids:
             if changes_only:
                 continue
@@ -219,7 +219,12 @@ def _extract_tasks(session: dict[str, Any]) -> list[dict[str, Any]]:
     for event in session.get("events", []):
         event_type = event.get("_event", "")
 
-        if event_type in ("v2_runner_on_ok", "v2_runner_on_failed", "v2_runner_on_skipped", "v2_runner_on_unreachable"):
+        if event_type in (
+            "v2_runner_on_ok",
+            "v2_runner_on_failed",
+            "v2_runner_on_skipped",
+            "v2_runner_on_unreachable",
+        ):
             task_data = event.get("task", {})
             task_id = task_data.get("id") or task_data.get("name")
             task_name = task_data.get("name", "")
@@ -237,13 +242,15 @@ def _extract_tasks(session: dict[str, Any]) -> list[dict[str, Any]]:
                 else:
                     status = "ok"
 
-                tasks.append({
-                    "uuid": task_id,
-                    "id": task_id,
-                    "name": task_name,
-                    "status": status,
-                    "path": task_data.get("path"),
-                })
+                tasks.append(
+                    {
+                        "uuid": task_id,
+                        "id": task_id,
+                        "name": task_name,
+                        "status": status,
+                        "path": task_data.get("path"),
+                    }
+                )
                 seen_tasks.add(task_id)
 
     return tasks

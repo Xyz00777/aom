@@ -11,49 +11,55 @@ Layers:
 
 import re
 from copy import deepcopy
+from typing import Any
 
 from ansible_aom.core.config import RedactionConfig
-
 
 # =============================================================================
 # Constants (from SPECIFICATION.md Section 5.9)
 # =============================================================================
 
 PASSWORD_MATCH = re.compile(
-    r'^(?:.+[-_\s])?pass(?:[-_\s]?(?:word|phrase|wrd|wd))?(?:[-_\s].+)?$',
+    r"^(?:.+[-_\s])?pass(?:[-_\s]?(?:word|phrase|wrd|wd))?(?:[-_\s].+)?$",
     re.IGNORECASE,
 )
 
-ANSIBLE_PASSWORD_FIELDS = frozenset({
-    "ansible_ssh_pass",
-    "ansible_password",
-    "ansible_become_pass",
-    "ansible_become_password",
-    "ansible_vault_password",
-})
+ANSIBLE_PASSWORD_FIELDS = frozenset(
+    {
+        "ansible_ssh_pass",
+        "ansible_password",
+        "ansible_become_pass",
+        "ansible_become_password",
+        "ansible_vault_password",
+    }
+)
 
-GENERIC_SECRET_FIELDS = frozenset({
-    "api_key",
-    "api_token",
-    "secret",
-    "secret_key",
-    "token",
-    "auth_token",
-    "access_token",
-    "private_key",
-    "credential",
-    "credentials",
-})
+GENERIC_SECRET_FIELDS = frozenset(
+    {
+        "api_key",
+        "api_token",
+        "secret",
+        "secret_key",
+        "token",
+        "auth_token",
+        "access_token",
+        "private_key",
+        "credential",
+        "credentials",
+    }
+)
 
-PASSWORD_WHITELIST = frozenset({
-    "passenger_version",
-    "passenger_pool",
-    "bypass",
-    "overpass",
-    "compass",
-    "underpass",
-    "passport_number",
-})
+PASSWORD_WHITELIST = frozenset(
+    {
+        "passenger_version",
+        "passenger_pool",
+        "bypass",
+        "overpass",
+        "compass",
+        "underpass",
+        "passport_number",
+    }
+)
 
 URL_CRED_PATTERN = re.compile(r"([a-zA-Z]+://[^:]+:)([^@]+)(@)")
 
@@ -193,7 +199,7 @@ def _redact_list(lst: list, config: RedactionConfig, depth: int) -> list:
     Returns:
         New list with redacted dict items and sanitized strings
     """
-    result = []
+    result: list[Any] = []
     for item in lst:
         if isinstance(item, dict):
             result.append(redact_dict(item, config, depth))
@@ -251,8 +257,10 @@ def redact_event(event: dict, config: RedactionConfig) -> dict:
     # cmd field (may be list of strings or single string)
     if "cmd" in res:
         if isinstance(res["cmd"], list):
-            res["cmd"] = [sanitize_string(item, config) if isinstance(item, str) else item
-                          for item in res["cmd"]]
+            res["cmd"] = [
+                sanitize_string(item, config) if isinstance(item, str) else item
+                for item in res["cmd"]
+            ]
         elif isinstance(res["cmd"], str):
             res["cmd"] = sanitize_string(res["cmd"], config)
 

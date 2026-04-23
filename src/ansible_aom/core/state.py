@@ -13,14 +13,13 @@ Memory bounds (Section 6.5):
 TDD: This file contains STUB implementations only. Tests come first.
 """
 
+from enum import Enum, auto
 
 MAX_PLAYS = 1000
 MAX_TASKS_PER_PLAY = 10000
 MAX_HOSTS_PER_TASK = 10000
 MAX_TOTAL_HOST_RUN_STATES = 1000000
 MAX_LOG_LINES = 50000
-
-from enum import Enum, auto
 
 
 class ExecutionState(Enum):
