@@ -1,0 +1,1 @@
+"""Renderer module for AOM - interface layer between core and UI backends."""
