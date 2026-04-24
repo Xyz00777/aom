@@ -2,10 +2,9 @@
 
 Shows internal state for debugging.
 See SPECIFICATION.md Section 7.5 for debug panel details.
-
-TDD: This file contains STUB implementations only. Tests come first.
 """
 
+from rich.text import Text
 from textual.widget import Widget
 
 
@@ -181,3 +180,53 @@ class DebugPanel(Widget):
             "renderer_fps": self._renderer_fps,
             "event_latency": self._event_latency,
         }
+
+    def render(self) -> Text:
+        """Render the debug panel.
+
+        Returns:
+            Rich Text object with all debug fields
+        """
+        lines = []
+
+        lines.append(f"Command: {self._command if self._command else 'N/A'}")
+
+        if self._env_overrides:
+            env_str = ", ".join(f"{k}={v}" for k, v in self._env_overrides.items())
+            lines.append(f"Environment: {env_str}")
+        else:
+            lines.append("Environment: (none)")
+
+        lines.append(f"Events: {self._event_count}")
+
+        lines.append(f"Parse errors: {len(self._parsing_errors)}")
+
+        lines.append(f"Callback status: {self._callback_status}")
+
+        if self._timing_stats:
+            timing_str = ", ".join(f"{k}={v:.1f}ms" for k, v in self._timing_stats.items())
+            lines.append(f"Timing stats: {timing_str}")
+        else:
+            lines.append("Timing stats: (none)")
+
+        lines.append(f"PID: {self._subprocess_pid if self._subprocess_pid else 'N/A'}")
+
+        if self._state_tree:
+            state_str = ", ".join(f"{k}={v}" for k, v in self._state_tree.items())
+            lines.append(f"State tree: {state_str}")
+        else:
+            lines.append("State tree: (none)")
+
+        lines.append(f"Pending events: {self._pending_events}")
+
+        if self._memory_usage:
+            rss, vsz = self._memory_usage
+            lines.append(f"Memory: RSS: {rss:.0f}m VSZ: {vsz:.0f}m")
+        else:
+            lines.append("Memory: N/A")
+
+        lines.append(f"Renderer FPS: {self._renderer_fps:.1f}")
+
+        lines.append(f"Event latency: {self._event_latency:.1f}ms")
+
+        return Text("\n".join(lines))

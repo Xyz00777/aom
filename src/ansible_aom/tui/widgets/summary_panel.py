@@ -2,10 +2,9 @@
 
 Play-level overview with stats.
 See SPECIFICATION.md Section 7.3 for summary panel details.
-
-TDD: This file contains STUB implementations only. Tests come first.
 """
 
+from rich.text import Text
 from textual.widget import Widget
 
 from ansible_aom.core.icons import STATUS_ICONS
@@ -149,3 +148,18 @@ class SummaryPanel(Widget):
             Unicode icon string
         """
         return STATUS_ICONS.get(status, "?")
+
+    def render(self) -> Text:
+        """Render the summary panel.
+
+        Returns:
+            Rich Text object with play name, hosts progress, tasks progress, and elapsed time
+        """
+        parts = []
+
+        parts.append(self._play_name)
+        parts.append(f"Hosts: {self._hosts_completed}/{self._hosts_total} complete")
+        parts.append(f"Tasks: {self._tasks_completed}/{self._tasks_total} complete")
+        parts.append(self._format_elapsed_time())
+
+        return Text("\n".join(parts))

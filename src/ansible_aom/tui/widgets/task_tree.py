@@ -2,13 +2,14 @@
 
 Tree view showing Play/RoleGroup/Task/Host hierarchy.
 See SPECIFICATION.md Section 7.1 for tree view details.
-
-TDD: This file contains STUB implementations only. Tests come first.
 """
 
 from typing import TYPE_CHECKING
 
+from rich.text import Text
 from textual.widgets import Tree
+
+from ansible_aom.core.icons import STATUS_COLORS, STATUS_ICONS
 
 if TYPE_CHECKING:
     from ansible_aom.core.models import RunState
@@ -105,20 +106,19 @@ class TaskTree(Tree[str]):
         Args:
             run_state: The RunState containing plays, tasks, and hosts
         """
-        # Clear existing tree
         self.root.remove_children()
 
-        # Add plays
         for play_id, play_state in run_state.plays.items():
             play_node = self.root.add(play_state.name, data=play_id)
 
-            # Add tasks under play
             for task_id, task_state in play_state.tasks.items():
-                task_node = play_node.add(
-                    task_state.name,
-                    data=task_id,
-                )
+                task_icon = STATUS_ICONS.get(task_state.status, "?")
+                task_color = STATUS_COLORS.get(task_state.status, "white")
+                task_label = Text(f"{task_icon} {task_state.name}", style=task_color)
+                task_node = play_node.add(task_label, data=task_id)
 
-                # Add hosts under task
                 for hostname, host_state in task_state.hosts.items():
-                    task_node.add(hostname, data=hostname)
+                    host_icon = STATUS_ICONS.get(host_state.status, "?")
+                    host_color = STATUS_COLORS.get(host_state.status, "white")
+                    host_label = Text(f"{host_icon} {hostname}", style=host_color)
+                    task_node.add(host_label, data=hostname)

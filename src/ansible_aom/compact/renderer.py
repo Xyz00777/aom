@@ -2,8 +2,6 @@
 
 This module implements the ANSI-based compact view renderer.
 See SPECIFICATION.md Section 4.1 for compact view details.
-
-TDD: Tests defined in tests/integration/test_compact_renderer.py.
 """
 
 from __future__ import annotations
@@ -186,6 +184,8 @@ class CompactRenderer:
         self._playbook: str = ""
         self._args: list[str] = []
         self._start_time: float = 0.0
+        self._warnings_count: int = 0
+        self._deprecations_count: int = 0
 
     def start(self, playbook: str, args: list[str]) -> None:
         """Start rendering a playbook run.
@@ -235,8 +235,6 @@ class CompactRenderer:
         # Calculate current statistics from state
         hosts_completed = 0
         hosts_total = 0
-        warnings = 0
-        deprecations = 0
 
         # Count hosts and states from RunState
         host_statuses: dict[str, Status] = {}
@@ -245,9 +243,6 @@ class CompactRenderer:
             for task in play.tasks.values():
                 for hostname, host_state in task.hosts.items():
                     host_statuses[hostname] = host_state.status
-
-        # TODO: Count warnings and deprecations from PTY stream warnings tracking
-        # For now, these remain 0 until warnings module integration
 
         hosts_total = len(host_statuses)
         for status in host_statuses.values():
@@ -262,8 +257,8 @@ class CompactRenderer:
             playbook=self._playbook,
             hosts_completed=hosts_completed,
             hosts_total=hosts_total,
-            warnings=warnings,
-            deprecations=deprecations,
+            warnings=self._warnings_count,
+            deprecations=self._deprecations_count,
             elapsed_seconds=elapsed,
         )
         self._display.update(status_bar)
@@ -290,6 +285,21 @@ class CompactRenderer:
         finally:
             # Restart display after password prompt
             self._display.start()
+
+    def add_warning(self, message: str, is_deprecation: bool = False) -> None:
+        """Add a warning or deprecation detected from PTY stream.
+
+        Called by the PTY stream handler when it detects warning patterns
+        in stderr lines (warnings are not emitted as JSONL events).
+
+        Args:
+            message: The warning message text.
+            is_deprecation: True if this is a deprecation warning.
+        """
+        if is_deprecation:
+            self._deprecations_count += 1
+        else:
+            self._warnings_count += 1
 
     def handle_completion(self, exit_code: int, state: str) -> None:
         """Handle playbook completion (success/failure/crash).
@@ -324,8 +334,8 @@ class CompactRenderer:
             playbook=self._playbook,
             hosts_completed=hosts_completed,
             hosts_total=hosts_total,
-            warnings=0,
-            deprecations=0,
+            warnings=self._warnings_count,
+            deprecations=self._deprecations_count,
             elapsed_seconds=elapsed,
         )
 

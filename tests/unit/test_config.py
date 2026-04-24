@@ -547,12 +547,12 @@ class TestAppConfigFieldTypes:
 class TestLoadConfig:
     """Tests for load_config function - TC-304 to TC-306."""
 
-    def test_load_config_raises_not_implemented(self):
-        """load_config is not yet implemented (TDD stub)."""
-        from ansible_aom.core.config import load_config
+    def test_load_config_returns_app_config(self):
+        """load_config returns AppConfig instance."""
+        from ansible_aom.core.config import AppConfig, load_config
 
-        with pytest.raises(NotImplementedError):
-            load_config()
+        config = load_config()
+        assert isinstance(config, AppConfig)
 
     def test_load_config_accepts_optional_config_path(self):
         """load_config accepts optional config_path parameter."""

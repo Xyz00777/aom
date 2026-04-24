@@ -5,8 +5,6 @@ See SPECIFICATION.md Section 4.2 for full TUI details.
 
 AOMApp satisfies the Renderer Protocol (Section 2.3) while also being
 a Textual App that provides the interactive multi-panel interface.
-
-TDD: This file contains STUB implementations only. Tests come first.
 """
 
 from typing import Any
@@ -15,6 +13,7 @@ from textual.app import App
 from textual.binding import Binding
 
 from ansible_aom.tui.keybindings import KEYBINDINGS, KeyContext
+from ansible_aom.tui.widgets import DebugPanel
 
 
 class AOMApp(App[None]):
@@ -94,11 +93,13 @@ class AOMApp(App[None]):
         Returns:
             The password entered by the user, or empty string on timeout.
         """
-        # Stub implementation - full modal with threading comes later
-        # For now, return empty string to satisfy protocol
-        # The full implementation will use Textual's Input widget
-        # with password=True and app.suspend() for terminal control
-        return ""
+        import getpass
+
+        try:
+            with self.suspend():
+                return getpass.getpass(prompt_text + ": ")
+        except EOFError, KeyboardInterrupt:
+            return ""
 
     def handle_completion(self, exit_code: int, state: str) -> None:
         """Handle playbook completion (success/failure/crash).
@@ -143,10 +144,16 @@ class AOMApp(App[None]):
 
         Shows confirmation if running, exits immediately if completed/failed.
         """
-        # Per spec: quit with confirmation if playbook is running
-        # For now, simple exit - confirmation dialog to be implemented
-        # with screens/widgets
-        self.exit()
+        if self._state in ("RUNNING", "STARTING"):
+            from ansible_aom.tui.screens.quit_confirm import QuitConfirmScreen
+
+            def on_result(result: bool | None) -> None:
+                if result:
+                    self.exit()
+
+            self.push_screen(QuitConfirmScreen(), on_result)
+        else:
+            self.exit()
 
     async def action_toggle_debug(self) -> None:
         """Toggle debug panel visibility.
@@ -158,5 +165,8 @@ class AOMApp(App[None]):
         - Subprocess PID
         - etc.
         """
-        # Implementation deferred until debug panel widget exists
-        pass
+        try:
+            debug_panel = self.screen.query_one(DebugPanel)
+            debug_panel.toggle_visibility()
+        except Exception:
+            pass

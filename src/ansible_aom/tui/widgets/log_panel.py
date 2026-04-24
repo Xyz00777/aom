@@ -2,8 +2,6 @@
 
 RichLog with search functionality.
 See SPECIFICATION.md Section 7.2 for log panel details.
-
-TDD: This file contains STUB implementations only. Tests come first.
 """
 
 from typing import TYPE_CHECKING
@@ -77,4 +75,16 @@ class LogPanel(RichLog):
         Args:
             line: The line to write
         """
-        super().write(line)
+        super().write(line, scroll_end=self._auto_scroll)
+
+    def scroll_to_end(self) -> None:
+        """Scroll to bottom and re-enable auto-scroll."""
+        self._auto_scroll = True
+        self.scroll_end(animate=False)
+
+    def on_scroll(self) -> None:
+        """Handle scroll events to manage auto-scroll state."""
+        if self.is_vertical_scroll_end:
+            self._auto_scroll = True
+        else:
+            self._auto_scroll = False

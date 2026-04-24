@@ -2,12 +2,11 @@
 
 Configurable status bar showing playbook info.
 See SPECIFICATION.md Section 7.4 for status bar details.
-
-TDD: This file contains STUB implementations only. Tests come first.
 """
 
 from datetime import datetime
 
+from rich.text import Text
 from textual.widget import Widget
 
 from ansible_aom.core.config import StatusBarConfig
@@ -171,3 +170,30 @@ class StatusBar(Widget):
         if self._subprocess_pid is None:
             return "PID: N/A"
         return f"PID: {self._subprocess_pid}"
+
+    def render(self) -> Text:
+        """Render the status bar.
+
+        Returns:
+            Rich Text object with configured elements separated by │
+        """
+        elements = self.config.elements or ["playbook_name", "elapsed_time", "task_progress"]
+
+        element_map = {
+            "playbook_name": self._playbook_name or "",
+            "elapsed_time": self._format_elapsed_time(),
+            "task_progress": self._format_task_progress(),
+            "current_task": self._current_task or "",
+            "host_count": self._format_host_count(),
+            "memory_usage": self._format_memory_usage(),
+            "subprocess_pid": self._format_pid(),
+        }
+
+        parts = []
+        for element in elements:
+            if element in element_map:
+                value = element_map[element]
+                if value:
+                    parts.append(value)
+
+        return Text(" │ ".join(parts)) if parts else Text("")
