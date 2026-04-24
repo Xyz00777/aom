@@ -390,26 +390,24 @@ class TestAppConfigYamlFile:
         """TC-304: Default YAML file path is ~/.config/aom/config.yaml."""
         from ansible_aom.core.config import AppConfig
 
-        # Check model_config has yaml_file setting
-        assert "yaml_file" in AppConfig.model_config
-        assert AppConfig.model_config["yaml_file"] == "~/.config/aom/config.yaml"
+        assert AppConfig.DEFAULT_YAML_PATH == "~/.config/aom/config.yaml"
 
     def test_yaml_file_expanded_path(self):
         """TC-304: YAML path should be expandable to absolute path."""
+        import os
+
         from ansible_aom.core.config import AppConfig
 
-        yaml_path = AppConfig.model_config["yaml_file"]
-        # Should contain ~ for home directory
-        assert "~" in yaml_path or "config.yaml" in yaml_path
+        expanded = os.path.expanduser(AppConfig.DEFAULT_YAML_PATH)
+        assert "~" not in expanded
+        assert expanded.endswith("config.yaml")
 
     def test_yaml_file_xdg_compliant(self):
         """TC-304: Config path follows XDG spec (~/.config/aom/config.yaml)."""
         from ansible_aom.core.config import AppConfig
 
-        yaml_path = AppConfig.model_config["yaml_file"]
-        # XDG_CONFIG_HOME defaults to ~/.config
-        # Config should be in ~/.config/aom/
-        assert ".config" in yaml_path or "config" in yaml_path
+        yaml_path = AppConfig.DEFAULT_YAML_PATH
+        assert ".config" in yaml_path
         assert "aom" in yaml_path
         assert yaml_path.endswith("config.yaml")
 

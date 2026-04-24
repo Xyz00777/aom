@@ -4,6 +4,8 @@ This module defines Pydantic models for configuration.
 See SPECIFICATION.md Section 8 for configuration schema.
 """
 
+from typing import ClassVar
+
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -32,11 +34,17 @@ class WarningsConfig(BaseModel):
 
 
 class AppConfig(BaseSettings):
-    """Application configuration loaded from YAML and CLI."""
+    """Application configuration loaded from YAML and CLI.
 
-    model_config = SettingsConfigDict(
-        yaml_file="~/.config/aom/config.yaml",
-    )
+    YAML loading is handled explicitly by load_config(), which reads
+    and parses the YAML file before constructing AppConfig. The
+    yaml_file path is stored as a class attribute for load_config()
+    to reference, not as a pydantic-settings config option.
+    """
+
+    model_config = SettingsConfigDict()
+
+    DEFAULT_YAML_PATH: ClassVar[str] = "~/.config/aom/config.yaml"
 
     status_bar: StatusBarConfig = Field(default_factory=StatusBarConfig)
     redaction: RedactionConfig = Field(default_factory=RedactionConfig)
@@ -63,7 +71,7 @@ def load_config(config_path: str | None = None) -> AppConfig:
     logger = logging.getLogger(__name__)
 
     if config_path is None:
-        config_path = os.path.expanduser("~/.config/aom/config.yaml")
+        config_path = os.path.expanduser(AppConfig.DEFAULT_YAML_PATH)
     else:
         config_path = os.path.expanduser(config_path)
 

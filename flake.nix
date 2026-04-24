@@ -47,6 +47,7 @@
             uv
             ruff
             mypy
+            ansible-core
           ] ++ (with python.pkgs; [
             pytest
             pytest-asyncio
@@ -59,6 +60,11 @@
           shellHook = ''
             # PYTHONPATH intentionally not set - uv manages the environment
             # and installs the package in editable mode via .venv
+
+            # Install ansible.posix collection if not present
+            if ! ansible-galaxy collection list ansible.posix 2>/dev/null | grep -q "ansible.posix"; then
+                ansible-galaxy collection install ansible.posix --quiet
+            fi
           '';
         };
 
