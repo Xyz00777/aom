@@ -144,9 +144,8 @@ class Display:
 
         self._is_running = False
 
-        # Reset console output
+        # Reset console output - show cursor
         if self._console is not None:
-            self._console.clear_live()
             self._console.show_cursor()
 
     def update(self, content: str | None = None) -> None:
