@@ -1,0 +1,20 @@
+---
+- name: Credential redaction
+  hosts: webservers
+  gather_facts: false
+  vars:
+    db_url: "postgresql://admin:s3cret@db.example.com:5432/mydb"
+    api_url: "https://api_user:api_pass@api.example.com/v1/data"
+  tasks:
+    - name: URL with credentials
+      ansible.builtin.debug:
+        msg: "Connecting to {{ db_url }}"
+
+    - name: API URL with credentials
+      ansible.builtin.debug:
+        msg: "API at {{ api_url }}"
+
+    - name: CLI with password
+      ansible.builtin.shell: |
+        echo "Would curl with --password but we just echo for safety"
+      changed_when: false

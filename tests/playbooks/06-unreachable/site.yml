@@ -1,0 +1,7 @@
+---
+- name: Deploy to unreachable
+  hosts: unreachable
+  gather_facts: false
+  tasks:
+    - name: Try to connect
+      ansible.builtin.ping:

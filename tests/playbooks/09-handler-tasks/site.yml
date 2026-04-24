@@ -1,0 +1,16 @@
+---
+- name: Handler test
+  hosts: webservers
+  gather_facts: false
+  tasks:
+    - name: Trigger handler
+      ansible.builtin.copy:
+        dest: /tmp/aom-handler-test
+        content: "triggered\n"
+        mode: "0644"
+      notify: Restart service
+
+  handlers:
+    - name: Restart service
+      ansible.builtin.debug:
+        msg: "service restarted"

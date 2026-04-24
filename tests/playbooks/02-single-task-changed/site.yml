@@ -1,0 +1,10 @@
+---
+- name: Apply configuration
+  hosts: webservers
+  gather_facts: false
+  tasks:
+    - name: Create config file
+      ansible.builtin.copy:
+        dest: /tmp/aom-test-config.ini
+        content: "test=true\n"
+        mode: "0644"

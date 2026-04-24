@@ -1,0 +1,10 @@
+---
+- name: Vault-encrypted playbook
+  hosts: webservers
+  gather_facts: false
+  vars_files:
+    - vars/secrets.yml
+  tasks:
+    - name: Use secret
+      ansible.builtin.debug:
+        msg: "{{ secret_api_key }}"

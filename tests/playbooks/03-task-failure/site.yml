@@ -1,0 +1,12 @@
+---
+- name: Configure servers
+  hosts: webservers
+  gather_facts: false
+  tasks:
+    - name: Succeed first
+      ansible.builtin.debug:
+        msg: "this works"
+
+    - name: Fail on purpose
+      ansible.builtin.fail:
+        msg: "Configuration file syntax error at line 42"

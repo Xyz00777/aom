@@ -1,0 +1,23 @@
+---
+- name: Secret operations
+  hosts: webservers
+  gather_facts: false
+  tasks:
+    - name: Hidden command
+      ansible.builtin.shell: echo "super-secret-api-key-12345"
+      no_log: true
+
+    - name: Loop with mixed no_log
+      ansible.builtin.debug:
+        msg: "{{ item }}"
+      loop:
+        - "public data 1"
+        - "secret data"
+        - "public data 2"
+      loop_control:
+        label: "{{ item }}"
+      no_log: false
+
+    - name: Visible command
+      ansible.builtin.debug:
+        msg: "this is visible"

@@ -1,0 +1,7 @@
+---
+- name: Dynamic task A
+  ansible.builtin.debug:
+    msg: "dynamic A"
+- name: Dynamic task B
+  ansible.builtin.debug:
+    msg: "dynamic B"

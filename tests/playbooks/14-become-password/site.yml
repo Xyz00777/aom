@@ -1,0 +1,9 @@
+---
+- name: Become test
+  hosts: webservers
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Root-only task
+      ansible.builtin.debug:
+        msg: "running with privilege escalation"

@@ -1,0 +1,22 @@
+---
+- name: Install nginx package
+  ansible.builtin.debug:
+    msg: "install"
+- name: Configure nginx main
+  ansible.builtin.debug:
+    msg: "main config"
+- name: Configure nginx vhost
+  ansible.builtin.debug:
+    msg: "vhost config"
+- name: Configure nginx ssl
+  ansible.builtin.debug:
+    msg: "ssl config"
+- name: Configure nginx logging
+  ansible.builtin.debug:
+    msg: "logging config"
+- name: Start nginx service
+  ansible.builtin.debug:
+    msg: "start"
+- name: Verify nginx running
+  ansible.builtin.debug:
+    msg: "verify"

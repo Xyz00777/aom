@@ -1,0 +1,31 @@
+---
+- name: Block test
+  hosts: webservers
+  gather_facts: false
+  tasks:
+    - name: Regular task
+      ansible.builtin.debug:
+        msg: "normal"
+
+    - block:
+        - name: Block task 1
+          ansible.builtin.debug:
+            msg: "block 1"
+
+        - name: Block task 2
+          ansible.builtin.debug:
+            msg: "block 2"
+
+      rescue:
+        - name: Rescue task
+          ansible.builtin.debug:
+            msg: "rescued"
+
+      always:
+        - name: Always task
+          ansible.builtin.debug:
+            msg: "always"
+
+    - name: After block
+      ansible.builtin.debug:
+        msg: "after"

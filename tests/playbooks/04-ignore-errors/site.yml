@@ -1,0 +1,13 @@
+---
+- name: Tolerant deployment
+  hosts: webservers
+  gather_facts: false
+  tasks:
+    - name: Optional check that may fail
+      ansible.builtin.fail:
+        msg: "This is acceptable"
+      ignore_errors: true
+
+    - name: Continue after ignored failure
+      ansible.builtin.debug:
+        msg: "Still running"

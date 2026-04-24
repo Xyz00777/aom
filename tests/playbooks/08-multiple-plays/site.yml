@@ -1,0 +1,35 @@
+---
+- name: Setup web servers
+  hosts: webservers
+  gather_facts: false
+  tags: [web]
+  tasks:
+    - name: Install nginx
+      ansible.builtin.debug:
+        msg: "nginx installed"
+      tags: [web]
+
+    - name: Configure nginx
+      ansible.builtin.debug:
+        msg: "nginx configured"
+      tags: [web]
+
+    - name: Deploy site
+      ansible.builtin.debug:
+        msg: "site deployed"
+      tags: [deploy]
+
+- name: Setup database
+  hosts: dbservers
+  gather_facts: false
+  tags: [db]
+  tasks:
+    - name: Install postgres
+      ansible.builtin.debug:
+        msg: "postgres installed"
+      tags: [db]
+
+    - name: Configure postgres
+      ansible.builtin.debug:
+        msg: "postgres configured"
+      tags: [db]

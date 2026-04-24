@@ -1,0 +1,12 @@
+---
+- name: Play recap test
+  hosts: webservers
+  gather_facts: false
+  tasks:
+    - name: Task one
+      ansible.builtin.debug:
+        msg: "running task one"
+
+    - name: Task two
+      ansible.builtin.debug:
+        msg: "running task two"

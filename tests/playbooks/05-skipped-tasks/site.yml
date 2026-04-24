@@ -1,0 +1,15 @@
+---
+- name: Conditional tasks
+  hosts: webservers
+  gather_facts: false
+  vars:
+    deploy_app: false
+  tasks:
+    - name: Always runs
+      ansible.builtin.debug:
+        msg: "running"
+
+    - name: Skip this task
+      ansible.builtin.debug:
+        msg: "skipped"
+      when: deploy_app | bool

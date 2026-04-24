@@ -1,0 +1,10 @@
+---
+- name: Test include vs import
+  hosts: webservers
+  gather_facts: false
+  tasks:
+    - name: Dynamic include
+      ansible.builtin.include_tasks: tasks/dynamic.yml
+
+    - name: Static import
+      ansible.builtin.import_tasks: tasks/static.yml

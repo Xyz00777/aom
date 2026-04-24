@@ -1,0 +1,7 @@
+---
+- name: Static task A
+  ansible.builtin.debug:
+    msg: "static A"
+- name: Static task B
+  ansible.builtin.debug:
+    msg: "static B"

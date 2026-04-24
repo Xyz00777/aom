@@ -1,0 +1,13 @@
+---
+- name: Free strategy execution
+  hosts: webservers
+  gather_facts: false
+  strategy: free
+  tasks:
+    - name: Task A
+      ansible.builtin.debug:
+        msg: "A on {{ inventory_hostname }}"
+
+    - name: Task B
+      ansible.builtin.debug:
+        msg: "B on {{ inventory_hostname }}"

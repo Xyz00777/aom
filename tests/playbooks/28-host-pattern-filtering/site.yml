@@ -1,0 +1,8 @@
+---
+- name: Filtered play
+  hosts: webservers:!ghost
+  gather_facts: false
+  tasks:
+    - name: Ping
+      ansible.builtin.debug:
+        msg: "reached {{ inventory_hostname }}"

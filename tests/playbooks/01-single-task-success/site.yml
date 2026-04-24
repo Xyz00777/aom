@@ -1,0 +1,8 @@
+---
+- name: Setup webservers
+  hosts: webservers
+  gather_facts: false
+  tasks:
+    - name: Install nginx
+      ansible.builtin.debug:
+        msg: "nginx installed"

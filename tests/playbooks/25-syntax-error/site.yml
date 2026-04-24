@@ -1,0 +1,9 @@
+---
+- name: Syntax error test
+  hosts: webservers
+  gather_facts: false
+  tasks:
+    - name: Invalid task definition
+      ansible.builtin.debug:
+        msg: "test"
+      invalid_parameter: true

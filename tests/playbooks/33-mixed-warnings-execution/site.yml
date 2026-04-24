@@ -1,0 +1,23 @@
+---
+- name: Mixed output
+  hosts: webservers
+  gather_facts: false
+  vars:
+    maybe_defined: "{{ undefined_var | default('fallback') }}"
+  tasks:
+    - name: Task 1 - may warn
+      ansible.builtin.debug:
+        msg: "{{ maybe_defined }}"
+
+    - name: Task 2 - normal
+      ansible.builtin.debug:
+        msg: "normal task"
+
+    - name: Task 3 - intentional fail with ignore
+      ansible.builtin.fail:
+        msg: "expected failure"
+      ignore_errors: true
+
+    - name: Task 4 - continue
+      ansible.builtin.debug:
+        msg: "still running"

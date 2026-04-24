@@ -1,0 +1,24 @@
+---
+- name: Tagged playbook
+  hosts: webservers
+  gather_facts: false
+  tasks:
+    - name: Install base
+      ansible.builtin.debug:
+        msg: "base"
+      tags: [install]
+
+    - name: Install app
+      ansible.builtin.debug:
+        msg: "app"
+      tags: [install, app]
+
+    - name: Configure
+      ansible.builtin.debug:
+        msg: "config"
+      tags: [configure]
+
+    - name: Deploy
+      ansible.builtin.debug:
+        msg: "deploy"
+      tags: [deploy]

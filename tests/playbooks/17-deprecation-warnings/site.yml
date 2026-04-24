@@ -1,0 +1,11 @@
+---
+- name: Deprecation test
+  hosts: webservers
+  gather_facts: false
+  tasks:
+    - name: Old-style include
+      ansible.builtin.include_tasks: tasks/subtask.yml
+
+    - name: Deprecated param usage
+      ansible.builtin.command: echo test
+      warn: true

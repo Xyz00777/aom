@@ -1,0 +1,24 @@
+---
+- name: Password field redaction
+  hosts: webservers
+  gather_facts: false
+  vars:
+    ansible_ssh_pass: "secret_ssh_pass"
+    ansible_become_pass: "secret_become"
+    api_key: "secret_api_key"
+    secret_key: "secret_key_value"
+    access_token: "secret_token"
+    private_key: "secret_private_key"
+    passenger_version: "6.0.2"
+    bypass_proxy: "allowed_value"
+  tasks:
+    - name: Show all vars
+      ansible.builtin.debug:
+        msg: |
+          ssh_pass={{ ansible_ssh_pass }}
+          become_pass={{ ansible_become_pass }}
+          api_key={{ api_key }}
+          secret_key={{ secret_key }}
+          token={{ access_token }}
+          passenger={{ passenger_version }}
+          bypass={{ bypass_proxy }}

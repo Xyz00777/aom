@@ -1,0 +1,8 @@
+---
+- name: SSH password test
+  hosts: webservers
+  gather_facts: false
+  tasks:
+    - name: Run with SSH
+      ansible.builtin.debug:
+        msg: "SSH test"

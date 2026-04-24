@@ -1,0 +1,20 @@
+---
+- name: Setup webservers
+  hosts: mixed
+  gather_facts: false
+  tasks:
+    - name: Install common packages
+      ansible.builtin.debug:
+        msg: "installed"
+
+    - name: Configure firewall
+      ansible.builtin.shell: |
+        if [ "$(hostname)" = "fail-host" ]; then exit 1; fi
+        echo "configured"
+      changed_when: true
+      when: inventory_hostname != "skip-host"
+      ignore_errors: true
+
+    - name: Deploy application
+      ansible.builtin.debug:
+        msg: "deployed"

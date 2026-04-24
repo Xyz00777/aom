@@ -1,0 +1,7 @@
+---
+- name: Long-running playbook
+  hosts: webservers
+  gather_facts: false
+  tasks:
+    - name: Slow task
+      ansible.builtin.shell: sleep 60

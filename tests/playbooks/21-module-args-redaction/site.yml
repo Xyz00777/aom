@@ -1,0 +1,21 @@
+---
+- name: Module args redaction
+  hosts: webservers
+  gather_facts: false
+  tasks:
+    - name: Module with password arg
+      ansible.builtin.uri:
+        url: "https://httpbin.org/get"
+        user: "admin"
+        password: "s3cret"
+        method: GET
+        status_code: 200
+      ignore_errors: true
+
+    - name: Shell with env password
+      ansible.builtin.shell: |
+        echo "testing module_args redaction"
+      environment:
+        DB_PASSWORD: "supersecret"
+        API_TOKEN: "tok_12345"
+      changed_when: false

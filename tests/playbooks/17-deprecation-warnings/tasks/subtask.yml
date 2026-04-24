@@ -1,0 +1,4 @@
+---
+- name: Subtask
+  ansible.builtin.debug:
+    msg: "subtask ran"

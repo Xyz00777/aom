@@ -1,0 +1,6 @@
+---
+- name: Role grouping test
+  hosts: webservers
+  gather_facts: false
+  roles:
+    - role: nginx
