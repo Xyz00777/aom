@@ -6,6 +6,6 @@
     - name: Old-style include
       ansible.builtin.include_tasks: tasks/subtask.yml
 
-    - name: Deprecated param usage
+    - name: Command with changed_when
       ansible.builtin.command: echo test
-      warn: true
+      changed_when: false

@@ -1,1 +1,5 @@
 ---
+- name: Empty playbook
+  hosts: localhost
+  gather_facts: false
+  tasks: []
