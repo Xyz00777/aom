@@ -1,7 +1,7 @@
 {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
 {"_event": "v2_playbook_on_play_start", "_timestamp": "2026-04-20T10:00:01Z", "play": {"id": "play-uuid-1", "name": "Configure servers"}}
 {"_event": "v2_playbook_on_task_start", "_timestamp": "2026-04-20T10:00:02Z", "task": {"id": "task-uuid-1", "name": "Install dependencies"}, "play": {"id": "play-uuid-1"}}
-{"_event": "v2_runner_on_ok", "_timestamp": "2026-04-20T10:00:10Z", "task": {"id": "task-uuid-1", "name": "Install dependencies"}, "hosts": {"server1": {"ok": true, "changed": false}}}
+{"_event": "v2_runner_on_ok", "_timestamp": "2026-04-20T10:00:10Z", "task": {"id": "task-uuid-1", "name": "Install dependencies"}, "play": {"id": "play-uuid-1"}, "hosts": {"server1": {"ok": true, "changed": false}}}
 {"_event": "v2_playbook_on_task_start", "_timestamp": "2026-04-20T10:00:15Z", "task": {"id": "task-uuid-2", "name": "Configure application"}, "play": {"id": "play-uuid-1"}}
-{"_event": "v2_runner_on_failed", "_timestamp": "2026-04-20T10:00:20Z", "task": {"id": "task-uuid-2", "name": "Configure application"}, "hosts": {"server1": {"failed": true, "msg": "Configuration file syntax error at line 42"}}}
+{"_event": "v2_runner_on_failed", "_timestamp": "2026-04-20T10:00:20Z", "task": {"id": "task-uuid-2", "name": "Configure application"}, "play": {"id": "play-uuid-1"}, "hosts": {"server1": {"failed": true, "msg": "Configuration file syntax error at line 42"}}}
 {"_event": "v2_playbook_on_stats", "_timestamp": "2026-04-20T10:01:00Z", "stats": {"server1": {"ok": 1, "changed": 0, "failures": 1, "skipped": 0, "unreachable": 0, "rescued": 0, "ignored": 0}}, "custom_stats": {}, "global_custom_stats": {}}
