@@ -311,6 +311,14 @@ def cleanup_old_sessions(
         if not session_path.is_dir():
             continue
 
+        # mtime fallback for directories without a usable meta.json. Using
+        # datetime.now() here would assign every fallback session the same
+        # microsecond, making the eventual sort order non-deterministic
+        # whenever many fallbacks coexist (TC-228 used to fail for this
+        # reason). The directory mtime is set at creation and updated on
+        # writes, which is good enough to order by recency.
+        fallback_time = datetime.fromtimestamp(session_path.stat().st_mtime, tz=timezone.utc)
+
         meta_file = session_path / "meta.json"
         if meta_file.exists():
             try:
@@ -320,10 +328,10 @@ def cleanup_old_sessions(
                 if start_time_str:
                     start_time = datetime.fromisoformat(start_time_str.replace("Z", "+00:00"))
                     sessions.append((session_path, start_time, meta))
+                    continue
             except json.JSONDecodeError, ValueError:
-                sessions.append((session_path, datetime.now(timezone.utc), {}))
-        else:
-            sessions.append((session_path, datetime.now(timezone.utc), {}))
+                pass
+        sessions.append((session_path, fallback_time, {}))
 
     sessions.sort(key=lambda x: x[1], reverse=True)
 
