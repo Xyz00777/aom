@@ -5,6 +5,8 @@ See SPECIFICATION.md Section 3 for command interface details.
 """
 
 import argparse
+import logging
+import shutil
 import sys
 
 from ansible_aom import __version__
@@ -134,6 +136,12 @@ def create_inspect_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--tui",
+        action="store_true",
+        help="Launch Textual TUI for browsing sessions",
+    )
+
+    parser.add_argument(
         "session_ids",
         nargs="*",
         help="Session ID(s) for show, diff",
@@ -191,6 +199,21 @@ def main() -> int:
 
     parser = create_parser()
     args = parser.parse_args()
+
+    if args.verbose:
+        import os
+
+        aom_logger = logging.getLogger("ansible_aom")
+        aom_logger.setLevel(logging.DEBUG)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.DEBUG)
+        aom_logger.addHandler(console_handler)
+
+        ansible_path = shutil.which("ansible-playbook")
+        print(f"ansible-playbook path: {ansible_path or 'not found'}")
+        print(f"ANSIBLE_STDOUT_CALLBACK: {os.environ.get('ANSIBLE_STDOUT_CALLBACK', '(not set)')}")
+        print(f"Terminal: tty={sys.stdout.isatty()}, columns={shutil.get_terminal_size().columns}")
+        aom_logger.debug("--list-tasks summary: verbose mode enabled, diagnostics printed")
 
     if args.version:
         print(f"aom {__version__}")

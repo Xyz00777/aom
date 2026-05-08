@@ -15,6 +15,7 @@ from ansible_aom.core.models import (
     PlayRunState,
     RunState,
     Status,
+    TaskDefinition,
     TaskRunState,
 )
 
@@ -1188,6 +1189,542 @@ class TestStatsMissingHosts:
         )
 
         assert "task-uuid-2" in run_state.plays["play-uuid-1"].tasks
+
+
+# ==============================================================================
+# TC-076: _handle_v2_playbook_on_handler_task_start Delegates to task_start
+# ==============================================================================
+
+
+class TestHandlerTaskStart:
+    """Tests for v2_playbook_on_handler_task_start delegating to task_start (TC-076)."""
+
+    def test_handler_task_start_delegates_to_task_start(self) -> None:
+        """TC-076: handler_task_start calls _handle_v2_playbook_on_task_start."""
+        run_state = RunState(playbook="test.yml")
+        handler_event = {
+            "_event": "v2_playbook_on_handler_task_start",
+            "_timestamp": "2026-04-20T10:00:02Z",
+            "task": {"id": "handler-uuid-1", "name": "Restart nginx"},
+            "play": {"id": "play-uuid-1"},
+        }
+
+        with patch.object(run_state, "_handle_v2_playbook_on_task_start") as mock_task_start:
+            run_state.handle_event(handler_event)
+            mock_task_start.assert_called_once()
+            call_args = mock_task_start.call_args
+            assert call_args[0][0] == handler_event
+
+    def test_handler_task_start_creates_task_in_play(self) -> None:
+        """TC-076: handler_task_start creates a TaskRunState just like task_start."""
+        run_state = RunState(playbook="test.yml")
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "play-uuid-1", "name": "Setup"},
+            }
+        )
+
+        # Send handler task start event
+        handler_event = {
+            "_event": "v2_playbook_on_handler_task_start",
+            "_timestamp": "2026-04-20T10:00:02Z",
+            "task": {"id": "handler-uuid-1", "name": "Restart nginx"},
+            "play": {"id": "play-uuid-1"},
+        }
+        run_state.handle_event(handler_event)
+
+        assert "handler-uuid-1" in run_state.plays["play-uuid-1"].tasks
+        task = run_state.plays["play-uuid-1"].tasks["handler-uuid-1"]
+        assert task.name == "Restart nginx"
+
+    def test_handler_task_start_sets_linear_strategy(self) -> None:
+        """TC-076: handler_task_start sets linear strategy like task_start."""
+        run_state = RunState(playbook="test.yml")
+
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "play-uuid-1", "name": "Setup"},
+            }
+        )
+
+        handler_event = {
+            "_event": "v2_playbook_on_handler_task_start",
+            "_timestamp": "2026-04-20T10:00:02Z",
+            "task": {"id": "handler-uuid-1", "name": "Restart nginx"},
+            "play": {"id": "play-uuid-1"},
+        }
+        run_state.handle_event(handler_event)
+
+        play = run_state.plays["play-uuid-1"]
+        assert play.detected_strategy == "linear"
+
+
+# ==============================================================================
+# TC-085: Timestamp Display - Local Timezone Conversion
+# ==============================================================================
+
+
+class TestTimestampLocalTimezone:
+    """Tests for UTC timestamp conversion to local timezone (TC-085)."""
+
+    def test_utc_timestamp_parsed_with_timezone(self) -> None:
+        """TC-085: _parse_timestamp returns timezone-aware datetime from UTC string."""
+        from ansible_aom.core.models import _parse_timestamp
+
+        event = {"_timestamp": "2026-04-20T15:30:00Z"}
+        result = _parse_timestamp(event)
+        assert result.tzinfo is not None
+
+    def test_utc_timestamp_converted_to_local_timezone(self) -> None:
+        """TC-085: UTC timestamp can be converted to local timezone via astimezone()."""
+        from ansible_aom.core.models import _parse_timestamp
+
+        event = {"_timestamp": "2026-04-20T15:30:00Z"}
+        result = _parse_timestamp(event)
+        local_ts = result.astimezone()
+        assert local_ts.tzinfo is not None
+        assert result.timestamp() == local_ts.timestamp()
+
+    def test_utc_z_suffix_parsed_correctly(self) -> None:
+        """TC-085: 'Z' suffix in timestamps is handled as UTC."""
+        from ansible_aom.core.models import _parse_timestamp
+
+        event_z = {"_timestamp": "2026-04-20T10:00:00Z"}
+        event_offset = {"_timestamp": "2026-04-20T10:00:00+00:00"}
+        result_z = _parse_timestamp(event_z)
+        result_offset = _parse_timestamp(event_offset)
+        assert result_z == result_offset
+
+    def test_utc_timestamp_without_z(self) -> None:
+        """TC-085: Timestamps without Z still parse as UTC if +00:00."""
+        from ansible_aom.core.models import _parse_timestamp
+
+        event = {"_timestamp": "2026-04-20T10:00:00+00:00"}
+        result = _parse_timestamp(event)
+        assert result.year == 2026
+        assert result.month == 4
+        assert result.day == 20
+
+    @pytest.mark.parametrize(
+        "ts_str,expected_hour",
+        [
+            ("2026-04-20T00:00:00Z", 0),
+            ("2026-04-20T12:30:45Z", 12),
+            ("2026-04-20T23:59:59Z", 23),
+        ],
+    )
+    def test_various_utc_timestamps(self, ts_str: str, expected_hour: int) -> None:
+        """TC-085: Various UTC timestamp strings parse correctly."""
+        from ansible_aom.core.models import _parse_timestamp
+
+        event = {"_timestamp": ts_str}
+        result = _parse_timestamp(event)
+        assert result.hour == expected_hour
+
+    def test_local_timezone_preserves_instant(self) -> None:
+        """TC-085: fromisoformat().astimezone() preserves UTC instant."""
+        from ansible_aom.core.models import _parse_timestamp
+
+        event = {"_timestamp": "2026-04-20T10:00:00Z"}
+        utc_ts = _parse_timestamp(event)
+        local_ts = utc_ts.astimezone()
+        # Both represent the same instant regardless of timezone
+        assert abs(utc_ts.timestamp() - local_ts.timestamp()) < 0.001
+
+
+# ==============================================================================
+# TC-086: Elapsed Time Calculation - HH:MM:SS format including 24+ hours
+# ==============================================================================
+
+
+class TestElapsedTimeFormat:
+    """Tests for elapsed time formatting as H:MM:SS (TC-086)."""
+
+    def test_format_status_bar_elapsed_under_one_minute(self) -> None:
+        """TC-086: Elapsed time under 1 minute formats as 0:00:XX."""
+        from ansible_aom.compact.renderer import format_status_bar
+
+        result = format_status_bar(
+            playbook="site.yml",
+            hosts_completed=1,
+            hosts_total=5,
+            warnings=0,
+            deprecations=0,
+            elapsed_seconds=45,
+        )
+        assert "0:00:45" in result
+
+    def test_format_status_bar_elapsed_over_one_minute(self) -> None:
+        """TC-086: Elapsed time over 1 minute formats as 0:MM:SS."""
+        from ansible_aom.compact.renderer import format_status_bar
+
+        result = format_status_bar(
+            playbook="site.yml",
+            hosts_completed=3,
+            hosts_total=10,
+            warnings=0,
+            deprecations=0,
+            elapsed_seconds=323,
+        )
+        assert "0:05:23" in result
+
+    def test_format_status_bar_elapsed_over_one_hour(self) -> None:
+        """TC-086: Elapsed time over 1 hour formats as H:MM:SS."""
+        from ansible_aom.compact.renderer import format_status_bar
+
+        result = format_status_bar(
+            playbook="site.yml",
+            hosts_completed=5,
+            hosts_total=10,
+            warnings=0,
+            deprecations=0,
+            elapsed_seconds=3725,
+        )
+        assert "1:02:05" in result
+
+    def test_format_status_bar_elapsed_24_plus_hours(self) -> None:
+        """TC-086: Elapsed time over 24 hours formats correctly (no day rollover)."""
+        from ansible_aom.compact.renderer import format_status_bar
+
+        # 25 hours, 30 minutes, 10 seconds = 91810 seconds
+        result = format_status_bar(
+            playbook="site.yml",
+            hosts_completed=10,
+            hosts_total=10,
+            warnings=0,
+            deprecations=0,
+            elapsed_seconds=91810,
+        )
+        assert "25:30:10" in result
+
+    def test_format_status_bar_elapsed_zero(self) -> None:
+        """TC-086: Zero elapsed time formats as 0:00:00."""
+        from ansible_aom.compact.renderer import format_status_bar
+
+        result = format_status_bar(
+            playbook="site.yml",
+            hosts_completed=0,
+            hosts_total=10,
+            warnings=0,
+            deprecations=0,
+            elapsed_seconds=0,
+        )
+        assert "0:00:00" in result
+
+    @pytest.mark.parametrize(
+        "seconds,expected",
+        [
+            (0, "0:00:00"),
+            (1, "0:00:01"),
+            (59, "0:00:59"),
+            (60, "0:01:00"),
+            (3599, "0:59:59"),
+            (3600, "1:00:00"),
+            (86399, "23:59:59"),
+            (86400, "24:00:00"),
+            (90000, "25:00:00"),
+            (100000, "27:46:40"),
+        ],
+    )
+    def test_format_status_bar_elapsed_various_durations(self, seconds: int, expected: str) -> None:
+        """TC-086: Various elapsed durations format as H:MM:SS."""
+        from ansible_aom.compact.renderer import format_status_bar
+
+        result = format_status_bar(
+            playbook="test.yml",
+            hosts_completed=1,
+            hosts_total=1,
+            warnings=0,
+            deprecations=0,
+            elapsed_seconds=seconds,
+        )
+        assert expected in result
+
+    def test_format_status_bar_elapsed_float_seconds(self) -> None:
+        """TC-086: Float seconds are truncated (not rounded) to integer."""
+        from ansible_aom.compact.renderer import format_status_bar
+
+        result = format_status_bar(
+            playbook="site.yml",
+            hosts_completed=1,
+            hosts_total=1,
+            warnings=0,
+            deprecations=0,
+            elapsed_seconds=90.9,
+        )
+        # 90.9 truncated to 90 = 0:01:30
+        assert "0:01:30" in result
+
+
+# ==============================================================================
+# TC-091, TC-092, TC-093: Task Matching Algorithm Tests
+# ==============================================================================
+
+
+class TestTaskMatchingAlgorithm:
+    """Strengthened tests for task matching logic (TC-091, TC-092, TC-093)."""
+
+    def test_uuid_match_identifies_correct_task(self) -> None:
+        """TC-091: Matching by UUID finds the exact task."""
+        tasks = [
+            TaskDefinition(
+                name="Install nginx",
+                role="nginx",
+                tags=["web"],
+                play_id="1",
+                play_order=0,
+                task_order=0,
+                uuid="uuid-aaa-111",
+            ),
+            TaskDefinition(
+                name="Configure nginx",
+                role="nginx",
+                tags=["web"],
+                play_id="1",
+                play_order=0,
+                task_order=1,
+                uuid="uuid-bbb-222",
+            ),
+        ]
+        # Simulate UUID matching
+        match_uuid = "uuid-bbb-222"
+        matched = next((t for t in tasks if t.uuid == match_uuid), None)
+        assert matched is not None
+        assert matched.name == "Configure nginx"
+        assert matched.uuid == "uuid-bbb-222"
+
+    def test_uuid_match_is_stronger_than_path_or_name(self) -> None:
+        """TC-091: UUID match takes precedence over path and name matches."""
+        tasks = [
+            TaskDefinition(
+                name="Install nginx",
+                role="nginx",
+                tags=["web"],
+                play_id="1",
+                play_order=0,
+                task_order=0,
+                uuid="uuid-unique-111",
+                path="roles/nginx/tasks/main.yml:10",
+            ),
+            TaskDefinition(
+                name="Install nginx",  # Same name as above
+                role="nginx",
+                tags=["web"],
+                play_id="1",
+                play_order=0,
+                task_order=1,
+                uuid="uuid-unique-222",
+                path="roles/nginx/tasks/main.yml:10",  # Same path as above
+            ),
+        ]
+        # UUID match uniquely identifies
+        match_uuid = "uuid-unique-222"
+        matched = next((t for t in tasks if t.uuid == match_uuid), None)
+        assert matched is not None
+        assert matched.task_order == 1
+
+    def test_path_match_identifies_task_when_no_uuid(self) -> None:
+        """TC-092: Matching by file:line path works when UUID is unavailable."""
+        tasks = [
+            TaskDefinition(
+                name="Install nginx",
+                role="nginx",
+                tags=["web"],
+                play_id="1",
+                play_order=0,
+                task_order=0,
+                path="roles/nginx/tasks/main.yml:10",
+            ),
+            TaskDefinition(
+                name="Configure nginx",
+                role="nginx",
+                tags=["web"],
+                play_id="1",
+                play_order=0,
+                task_order=1,
+                path="roles/nginx/tasks/main.yml:25",
+            ),
+        ]
+        # Path uniquely identifies even without UUID
+        match_path = "roles/nginx/tasks/main.yml:25"
+        matched = next((t for t in tasks if t.path == match_path), None)
+        assert matched is not None
+        assert matched.name == "Configure nginx"
+
+    def test_path_match_format_file_colon_line(self) -> None:
+        """TC-092: Path matching uses file:line format from JSONL."""
+        task = TaskDefinition(
+            name="Install nginx",
+            role="nginx",
+            tags=["web"],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+            path="site.yml:42",
+        )
+        # Path format is "file:line_number"
+        assert ":" in task.path
+        file_part, line_part = task.path.rsplit(":", 1)
+        assert file_part == "site.yml"
+        assert line_part == "42"
+
+    def test_sequential_name_match_when_no_uuid_or_path(self) -> None:
+        """TC-093: Fallback matching uses play_order + task_order + name."""
+        tasks = [
+            TaskDefinition(
+                name="Install nginx",
+                role="nginx",
+                tags=["web"],
+                play_id="1",
+                play_order=0,
+                task_order=0,
+            ),
+            TaskDefinition(
+                name="Configure nginx",
+                role="nginx",
+                tags=["web"],
+                play_id="1",
+                play_order=0,
+                task_order=1,
+            ),
+        ]
+        # Match by play_order + task_order + name (no uuid, no path)
+        match_play_order = 0
+        match_task_order = 1
+        match_name = "Configure nginx"
+        matched = next(
+            (
+                t
+                for t in tasks
+                if t.play_order == match_play_order
+                and t.task_order == match_task_order
+                and t.name == match_name
+            ),
+            None,
+        )
+        assert matched is not None
+        assert matched.name == "Configure nginx"
+        assert matched.task_order == 1
+
+    def test_matching_priority_uuid_over_path(self) -> None:
+        """TC-091 > TC-092: UUID match is tried before path match."""
+        # Task with both UUID and path set
+        task = TaskDefinition(
+            name="Install nginx",
+            role="nginx",
+            tags=["web"],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+            uuid="uuid-abc-123",
+            path="roles/nginx/tasks/main.yml:10",
+        )
+        # If UUID is present, use UUID matching
+        assert task.uuid is not None
+        assert task.uuid == "uuid-abc-123"
+        # If UUID is None, fall back to path
+        task_no_uuid = TaskDefinition(
+            name="Install nginx",
+            role="nginx",
+            tags=["web"],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+            path="roles/nginx/tasks/main.yml:10",
+        )
+        assert task_no_uuid.uuid is None
+        assert task_no_uuid.path is not None
+
+    def test_matching_falls_back_through_levels(self) -> None:
+        """TC-091 > TC-092 > TC-093: Matching priority order."""
+        # Create tasks with different levels of identity
+        task_with_uuid = TaskDefinition(
+            name="Install nginx",
+            role="nginx",
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+            uuid="uuid-aaa",
+            path="roles/nginx/tasks/main.yml:10",
+        )
+        task_with_path = TaskDefinition(
+            name="Configure nginx",
+            role="nginx",
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=1,
+            path="roles/nginx/tasks/main.yml:25",
+        )
+        task_with_name_only = TaskDefinition(
+            name="Start nginx",
+            role="nginx",
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=2,
+        )
+
+        # Simulate matching priority
+        all_tasks = [task_with_uuid, task_with_path, task_with_name_only]
+
+        # Level 1: UUID match
+        uuid_match = next((t for t in all_tasks if t.uuid == "uuid-aaa"), None)
+        assert uuid_match is not None
+        assert uuid_match.name == "Install nginx"
+
+        # Level 2: Path match (when UUID not available)
+        path_match = next((t for t in all_tasks if t.path == "roles/nginx/tasks/main.yml:25"), None)
+        assert path_match is not None
+        assert path_match.name == "Configure nginx"
+
+        # Level 3: Sequential name match
+        name_match = next(
+            (
+                t
+                for t in all_tasks
+                if t.name == "Start nginx" and t.play_order == 0 and t.task_order == 2
+            ),
+            None,
+        )
+        assert name_match is not None
+        assert name_match.name == "Start nginx"
+
+    def test_sequential_match_disambiguates_by_order(self) -> None:
+        """TC-093: Sequential match uses play_order and task_order to disambiguate."""
+        # Two tasks with same name but different order
+        task_a = TaskDefinition(
+            name="Restart service",
+            role="app",
+            tags=["restart"],
+            play_id="1",
+            play_order=0,
+            task_order=3,
+        )
+        task_b = TaskDefinition(
+            name="Restart service",
+            role="app",
+            tags=["restart"],
+            play_id="1",
+            play_order=0,
+            task_order=7,
+        )
+        # Same name, different order
+        assert task_a.name == task_b.name
+        assert task_a.play_order == task_b.play_order
+        assert task_a.task_order != task_b.task_order
+
+        # Can disambiguate by task_order
+        matched = next(
+            (t for t in [task_a, task_b] if t.name == "Restart service" and t.task_order == 7),
+            None,
+        )
+        assert matched is task_b
 
 
 # ==============================================================================

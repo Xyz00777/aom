@@ -1,0 +1,24 @@
+---
+# ansible-lint config for AOM test playbooks
+# These playbooks are intentionally minimal test fixtures for a monitoring tool,
+# not production roles. Rules are lenient accordingly.
+
+schema: basic
+
+offline: true
+
+warn_list:
+  - name[missing]
+  - name[casing]
+  - name[template]
+  - var-naming[no-role-prefix]
+
+skip_list:
+  - no-changed-when       # test tasks use debug/command intentionally
+  - no-handler             # test playbooks don't need handler patterns
+  - risky-shell-pipe       # test shell tasks are intentionally simple
+  - command-instead-of-shell  # test tasks favor simplicity over best practice
+  - command-instead-of-module  # test tasks use command for predictability
+
+exclude_paths:
+  - tests/playbooks/32-large-playbook/  # generated playbook

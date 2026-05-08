@@ -1034,3 +1034,692 @@ class TestRunState:
         state.plays["play-uuid-1"] = play_state
         assert "play-uuid-1" in state.plays
         assert state.plays["play-uuid-1"].name == "Setup"
+
+
+# =============================================================================
+# Section 5.2: Pre-Parse Phase — Additional TCs
+# =============================================================================
+
+
+class TestParallelPreParse:
+    """TC-087: Parallel pre-parse execution."""
+
+    def test_concurrent_parse_combine_results(self, list_tasks_output, list_hosts_output):
+        """TC-087: Both --list-tasks and --list-hosts results can be combined
+        after concurrent execution."""
+        import concurrent.futures
+
+        from ansible_aom.core.parser import (
+            PreParseResult,
+            parse_list_hosts_output,
+            parse_list_tasks_output,
+        )
+
+        def parse_tasks():
+            return parse_list_tasks_output(list_tasks_output)
+
+        def parse_hosts():
+            return parse_list_hosts_output(list_hosts_output)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            tasks_future = executor.submit(parse_tasks)
+            hosts_future = executor.submit(parse_hosts)
+            plays = tasks_future.result()
+            play_hosts = hosts_future.result()
+
+        result = PreParseResult(plays=plays, play_hosts=play_hosts)
+        assert len(result.plays) == 2
+        assert len(result.play_hosts) == 2
+
+    def test_parallel_parse_does_not_corrupt_data(self, list_tasks_output, list_hosts_output):
+        """TC-087: Parallel parsing produces same results as sequential."""
+        import concurrent.futures
+
+        from ansible_aom.core.parser import parse_list_hosts_output, parse_list_tasks_output
+
+        def parse_tasks():
+            return parse_list_tasks_output(list_tasks_output)
+
+        def parse_hosts():
+            return parse_list_hosts_output(list_hosts_output)
+
+        seq_plays = parse_list_tasks_output(list_tasks_output)
+        seq_hosts = parse_list_hosts_output(list_hosts_output)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            f1 = executor.submit(parse_tasks)
+            f2 = executor.submit(parse_hosts)
+            par_plays = f1.result()
+            par_hosts = f2.result()
+
+        assert len(seq_plays) == len(par_plays)
+        assert len(seq_hosts) == len(par_hosts)
+        for sp, pp in zip(seq_plays, par_plays):
+            assert sp["name"] == pp["name"]
+            assert sp["play_number"] == pp["play_number"]
+            assert len(sp["tasks"]) == len(pp["tasks"])
+
+
+class TestListHostsFallback:
+    """TC-089, TC-090: --list-hosts fallback behavior."""
+
+    def test_list_hosts_empty_result_fallback(self):
+        """TC-089: When --list-hosts returns empty, hosts will come from
+        runner events. parse_list_hosts_output returns [] for bad output."""
+        from ansible_aom.core.parser import parse_list_hosts_output
+
+        bad_output = "ERROR! the playbook could not be found"
+        result = parse_list_hosts_output(bad_output)
+        assert result == []
+
+    def test_list_hosts_partial_error_output(self):
+        """TC-089: Partial/corrupted output still returns any parseable plays."""
+        from ansible_aom.core.parser import parse_list_hosts_output
+
+        output = """playbook: site.yml
+
+  play #1 (webservers): Setup\tTAGS: []
+    pattern: ['webservers']
+    hosts (2):
+      web1
+      web2
+
+ERROR! We were unable to connect"""
+        result = parse_list_hosts_output(output)
+        assert len(result) >= 1
+        assert "web1" in result[0]["hosts"]
+
+    def test_list_hosts_fallback_warning_logged(self, caplog):
+        """TC-090: Warning message when host resolution fails."""
+        import logging
+
+        from ansible_aom.core.parser import parse_list_hosts_output
+
+        bad_output = "ERROR! the playbook could not be found"
+        with caplog.at_level(logging.WARNING, logger="ansible_aom.core.parser"):
+            result = parse_list_hosts_output(bad_output)
+        assert result == []
+
+
+class TestTaskMatching:
+    """TC-091 to TC-096: Task matching logic and dynamic expansion."""
+
+    def test_task_matching_by_uuid(self):
+        """TC-091: Primary matching uses task UUID from JSONL."""
+        task = TaskDefinition(
+            name="Install nginx",
+            role="nginx",
+            tags=["web"],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+            uuid="abc-123-def",
+        )
+        assert task.uuid == "abc-123-def"
+        tasks = [
+            TaskDefinition(
+                name="A", role=None, tags=[], play_id="1", play_order=0, task_order=0, uuid="uuid-1"
+            ),
+            TaskDefinition(
+                name="B", role=None, tags=[], play_id="1", play_order=0, task_order=1, uuid="uuid-2"
+            ),
+            TaskDefinition(
+                name="C", role=None, tags=[], play_id="1", play_order=0, task_order=2, uuid="uuid-3"
+            ),
+        ]
+        match = next((t for t in tasks if t.uuid == "uuid-2"), None)
+        assert match is not None
+        assert match.name == "B"
+
+    def test_uuid_none_means_no_uuid_match(self):
+        """TC-091: Task with uuid=None cannot match by UUID."""
+        task = TaskDefinition(
+            name="Test", role=None, tags=[], play_id="1", play_order=0, task_order=0
+        )
+        assert task.uuid is None
+        assert task.uuid != "any-uuid"
+
+    def test_task_matching_by_path(self):
+        """TC-092: Secondary matching uses task path (file:line format)."""
+        task = TaskDefinition(
+            name="Install nginx",
+            role="nginx",
+            tags=["web"],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+            path="site.yml:42",
+        )
+        assert task.path == "site.yml:42"
+        tasks = [
+            TaskDefinition(
+                name="A",
+                role=None,
+                tags=[],
+                play_id="1",
+                play_order=0,
+                task_order=0,
+                path="main.yml:10",
+            ),
+            TaskDefinition(
+                name="B",
+                role=None,
+                tags=[],
+                play_id="1",
+                play_order=0,
+                task_order=1,
+                path="main.yml:20",
+            ),
+        ]
+        match = next((t for t in tasks if t.path == "main.yml:20"), None)
+        assert match is not None
+        assert match.name == "B"
+
+    def test_path_matching_when_uuid_differs(self):
+        """TC-092: Path match succeeds even when UUIDs differ."""
+        task_a = TaskDefinition(
+            name="Task",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+            uuid="uuid-old",
+            path="playbook.yml:15",
+        )
+        task_b = TaskDefinition(
+            name="Task",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+            uuid="uuid-new",
+            path="playbook.yml:15",
+        )
+        assert task_a.uuid != task_b.uuid
+        assert task_a.path == task_b.path
+
+    def test_task_matching_by_sequential_and_name(self):
+        """TC-093: Fallback matching uses play_order, task_order, and name."""
+        task = TaskDefinition(
+            name="Install nginx",
+            role="nginx",
+            tags=["web"],
+            play_id="1",
+            play_order=0,
+            task_order=2,
+        )
+        tasks = [
+            TaskDefinition(
+                name="Setup", role=None, tags=[], play_id="1", play_order=0, task_order=0
+            ),
+            TaskDefinition(
+                name="Configure", role=None, tags=[], play_id="1", play_order=0, task_order=1
+            ),
+            TaskDefinition(
+                name="Install nginx",
+                role="nginx",
+                tags=["web"],
+                play_id="1",
+                play_order=0,
+                task_order=2,
+            ),
+        ]
+        match = next(
+            (
+                t
+                for t in tasks
+                if t.play_id == task.play_id
+                and t.task_order == task.task_order
+                and t.name == task.name
+            ),
+            None,
+        )
+        assert match is not None
+        assert match.name == "Install nginx"
+        assert match.task_order == 2
+
+    def test_sequential_match_requires_all_three(self):
+        """TC-093: Sequential match requires play_id + task_order + name all match."""
+        task = TaskDefinition(
+            name="Install nginx",
+            role="nginx",
+            tags=["web"],
+            play_id="1",
+            play_order=0,
+            task_order=2,
+        )
+        tasks = [
+            # different play
+            TaskDefinition(
+                name="Setup", role=None, tags=[], play_id="1", play_order=0, task_order=2
+            ),  # different name
+            TaskDefinition(
+                name="Install nginx", role=None, tags=[], play_id="1", play_order=0, task_order=5
+            ),  # different order
+        ]
+        match = next(
+            (
+                t
+                for t in tasks
+                if t.play_id == task.play_id
+                and t.task_order == task.task_order
+                and t.name == task.name
+            ),
+            None,
+        )
+        assert match is None
+
+    def test_include_tasks_dynamic_expansion(self):
+        """TC-094: Dynamic tasks created with is_dynamic=True."""
+        parent_task = TaskDefinition(
+            name="include_tasks",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=3,
+        )
+        dynamic_task = TaskDefinition(
+            name="Dynamic nested task",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=-1,
+            is_dynamic=True,
+        )
+        assert dynamic_task.is_dynamic is True
+        assert dynamic_task.task_order == -1
+
+    def test_dynamic_task_parent_relationship(self):
+        """TC-095: Dynamic tasks are children of the include_tasks node."""
+        parent_task = TaskDefinition(
+            name="include_setup_tasks",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=3,
+        )
+        dynamic_child = TaskDefinition(
+            name="Setup database",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=-1,
+            is_dynamic=True,
+        )
+        parent_task.children.append(dynamic_child)
+        assert len(parent_task.children) == 1
+        assert parent_task.children[0].name == "Setup database"
+        assert parent_task.children[0].is_dynamic is True
+
+    def test_dynamic_task_ordering(self):
+        """TC-096: Dynamic tasks have task_order=-1, placed after static siblings."""
+        static_tasks = [
+            TaskDefinition(
+                name="Task 1", role=None, tags=[], play_id="1", play_order=0, task_order=0
+            ),
+            TaskDefinition(
+                name="Task 2", role=None, tags=[], play_id="1", play_order=0, task_order=1
+            ),
+        ]
+        include_task = TaskDefinition(
+            name="include_tasks", role=None, tags=[], play_id="1", play_order=0, task_order=2
+        )
+        dynamic_child = TaskDefinition(
+            name="Dynamic A",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=-1,
+            is_dynamic=True,
+        )
+        include_task.children.append(dynamic_child)
+        all_tasks = static_tasks + [include_task]
+
+        static_sorted = [t for t in all_tasks if not t.is_dynamic]
+        dynamic_sorted = [t for t in all_tasks if t.is_dynamic]
+        assert all(t.task_order >= 0 for t in static_sorted)
+        assert all(t.task_order == -1 for t in dynamic_sorted)
+
+    def test_multiple_dynamic_children(self):
+        """TC-094: Multiple dynamic children under one include_tasks."""
+        parent = TaskDefinition(
+            name="include_tasks", role=None, tags=[], play_id="1", play_order=0, task_order=2
+        )
+        for i in range(3):
+            parent.children.append(
+                TaskDefinition(
+                    name=f"Dynamic {i}",
+                    role=None,
+                    tags=[],
+                    play_id="1",
+                    play_order=0,
+                    task_order=-1,
+                    is_dynamic=True,
+                )
+            )
+        assert len(parent.children) == 3
+        assert all(c.is_dynamic for c in parent.children)
+        assert all(c.task_order == -1 for c in parent.children)
+
+
+class TestListHostsEdgeCases:
+    """TC-101 to TC-106: --list-hosts edge cases."""
+
+    def test_list_hosts_all_inventory(self):
+        """TC-101: hosts: 'all' returns all inventory hosts."""
+        from ansible_aom.core.parser import parse_list_hosts_output
+
+        output = """playbook: site.yml
+
+  play #1 (all): All hosts\tTAGS: []
+    pattern: ['all']
+    hosts (3):
+      host1
+      host2
+      host3"""
+        result = parse_list_hosts_output(output)
+        assert len(result) == 1
+        assert result[0]["hosts_pattern"] == ["all"]
+        assert len(result[0]["hosts"]) == 3
+        assert "host1" in result[0]["hosts"]
+        assert "host3" in result[0]["hosts"]
+
+    def test_list_hosts_pattern_filtering(self):
+        """TC-102: Pattern like webservers:!db_primary is preserved in hosts_pattern."""
+        from ansible_aom.core.parser import parse_list_hosts_output
+
+        output = """playbook: site.yml
+
+  play #1 (webservers:!db_primary): Filtered\tTAGS: []
+    pattern: ['webservers:!db_primary']
+    hosts (2):
+      web1
+      web2"""
+        result = parse_list_hosts_output(output)
+        assert len(result) == 1
+        assert "webservers:!db_primary" in result[0]["hosts_pattern"][0]
+        assert result[0]["hosts"] == ["web1", "web2"]
+
+    def test_list_hosts_dynamic_pattern_fallback(self):
+        """TC-103: Jinja2 pattern "{{ group }}" may fail — parser still parses
+        whatever ansible outputs."""
+        from ansible_aom.core.parser import parse_list_hosts_output
+
+        output_resolved = """playbook: site.yml
+
+  play #1 ({{ group }}): Dynamic\tTAGS: []
+    pattern: ['{{ group }}']
+    hosts (1):
+      resolved_host"""
+        result = parse_list_hosts_output(output_resolved)
+        assert len(result) == 1
+
+    def test_list_hosts_dynamic_pattern_empty_hosts(self):
+        """TC-103: When Jinja2 pattern can't resolve, hosts list is empty."""
+        from ansible_aom.core.parser import parse_list_hosts_output
+
+        output_unresolved = """playbook: site.yml
+
+  play #1 ({{ group }}): Dynamic\tTAGS: []
+    pattern: ['{{ group }}']
+    hosts (0):"""
+        result = parse_list_hosts_output(output_unresolved)
+        assert len(result) == 1
+        assert result[0]["hosts"] == []
+
+    def test_list_hosts_with_limit(self):
+        """TC-104: --limit restricts hosts in output."""
+        from ansible_aom.core.parser import parse_list_hosts_output
+
+        output = """playbook: site.yml
+
+  play #1 (webservers): Limited\tTAGS: []
+    pattern: ['webservers']
+    hosts (1):
+      web1"""
+        result = parse_list_hosts_output(output)
+        assert len(result) == 1
+        assert result[0]["hosts"] == ["web1"]
+
+    def test_list_hosts_dynamic_inventory_timeout(self):
+        """TC-106: Slow dynamic inventory just returns hosts — parser doesn't
+        care about speed, only structure."""
+        from ansible_aom.core.parser import parse_list_hosts_output
+
+        output = """playbook: site.yml
+
+  play #1 (aws_dynamic): AWS hosts\tTAGS: []
+    pattern: ['aws_dynamic']
+    hosts (2):
+      i-1234567890
+      i-0987654321"""
+        result = parse_list_hosts_output(output)
+        assert len(result) == 1
+        assert len(result[0]["hosts"]) == 2
+
+    def test_list_hosts_multiple_plays_hosts(self):
+        """TC-101: Multiple plays with different host sets."""
+        from ansible_aom.core.parser import parse_list_hosts_output
+
+        output = """playbook: site.yml
+
+  play #1 (all): All plays\tTAGS: []
+    pattern: ['all']
+    hosts (4):
+      web1
+      web2
+      db1
+      db2
+
+  play #2 (webservers): Web only\tTAGS: []
+    pattern: ['webservers']
+    hosts (2):
+      web1
+      web2"""
+        result = parse_list_hosts_output(output)
+        assert len(result) == 2
+        assert len(result[0]["hosts"]) == 4
+        assert len(result[1]["hosts"]) == 2
+
+    def test_list_hosts_no_duplicate_hosts(self):
+        """TC-102: Duplicate hostnames are deduplicated."""
+        from ansible_aom.core.parser import parse_list_hosts_output
+
+        output = """playbook: site.yml
+
+  play #1 (all): Test\tTAGS: []
+    pattern: ['all']
+    hosts (3):
+      web1
+      web1
+      web2"""
+        result = parse_list_hosts_output(output)
+        assert result[0]["hosts"].count("web1") == 1
+
+    def test_list_hosts_play_number_sequential(self):
+        """TC-097: Play numbers are sequential."""
+        from ansible_aom.core.parser import parse_list_hosts_output
+
+        output = """playbook: site.yml
+
+  play #1 (all): First\tTAGS: []
+    pattern: ['all']
+    hosts (1):
+      h1
+
+  play #2 (all): Second\tTAGS: []
+    pattern: ['all']
+    hosts (1):
+      h2"""
+        result = parse_list_hosts_output(output)
+        assert result[0]["play_number"] == 1
+        assert result[1]["play_number"] == 2
+
+
+class TestListTasksEdgeCases:
+    """TC-114 to TC-121: --list-tasks edge cases."""
+
+    def test_import_tasks_expanded(self):
+        """TC-114: import_tasks IS expanded — tasks appear inline in --list-tasks."""
+        from ansible_aom.core.parser import parse_list_tasks_output
+
+        # import_tasks expands the imported file's tasks inline
+        output = """playbook: site.yml
+
+  play #1 (all): Setup\tTAGS: []
+    Install base packages\tTAGS: []
+    Configure firewall\tTAGS: []
+    Restart services\tTAGS: []"""
+        result = parse_list_tasks_output(output)
+        assert len(result[0]["tasks"]) == 3
+
+    def test_blocks_flattened(self):
+        """TC-115: Block tasks are flattened — no block container in output."""
+        from ansible_aom.core.parser import parse_list_tasks_output
+
+        output = """playbook: site.yml
+
+  play #1 (all): Block test\tTAGS: []
+    Install package\tTAGS: [install]
+    Start service\tTAGS: [service]
+    Notify handler\tTAGS: [handler]"""
+        result = parse_list_tasks_output(output)
+        assert len(result[0]["tasks"]) == 3
+        for task in result[0]["tasks"]:
+            assert "block" not in task["name"].lower()
+
+    def test_pre_tasks_post_tasks_no_prefix(self):
+        """TC-116: pre_tasks and post_tasks appear as regular tasks."""
+        from ansible_aom.core.parser import parse_list_tasks_output
+
+        output = """playbook: site.yml
+
+  play #1 (all): With pre/post\tTAGS: []
+    Gather facts\tTAGS: [gather]
+    Pre-setup task\tTAGS: [pre]
+    Main task\tTAGS: [main]
+    Post-cleanup\tTAGS: [post]"""
+        result = parse_list_tasks_output(output)
+        assert len(result[0]["tasks"]) == 4
+        task_names = [t["name"] for t in result[0]["tasks"]]
+        assert "Pre-setup task" in task_names
+        assert "Post-cleanup" in task_names
+
+    def test_unnamed_task_fallback_module_name(self):
+        """TC-117: Unnamed tasks use their module/action as the name."""
+        from ansible_aom.core.parser import parse_list_tasks_output
+
+        output = """playbook: site.yml
+
+  play #1 (all): Test\tTAGS: []
+    command\tTAGS: []
+    debug\tTAGS: []"""
+        result = parse_list_tasks_output(output)
+        assert result[0]["tasks"][0]["name"] == "command"
+        assert result[0]["tasks"][1]["name"] == "debug"
+
+    @pytest.mark.parametrize(
+        "play_name",
+        ["pre_tasks", "post_tasks", "tasks", "handlers"],
+    )
+    def test_special_section_names_in_play(self, play_name):
+        """TC-116: Play names may contain special section designations."""
+        from ansible_aom.core.parser import parse_list_tasks_output
+
+        output = f"""playbook: site.yml
+
+  play #1 (all): {play_name}\tTAGS: []
+    Do something\tTAGS: []"""
+        result = parse_list_tasks_output(output)
+        assert len(result) == 1
+        assert result[0]["name"] == play_name
+
+    def test_output_no_stderr_in_parsed_content(self):
+        """TC-118: Parser only receives stdout content."""
+        from ansible_aom.core.parser import parse_list_tasks_output
+
+        stdout_output = """playbook: site.yml
+
+  play #1 (all): Test\tTAGS: []
+    task1\tTAGS: []"""
+        result = parse_list_tasks_output(stdout_output)
+        assert len(result) == 1
+        assert len(result[0]["tasks"]) == 1
+
+    def test_list_hosts_stderr_not_in_result(self):
+        """TC-118: stderr content doesn't pollute parse results."""
+        from ansible_aom.core.parser import parse_list_hosts_output
+
+        mixed_output = """playbook: site.yml
+
+  play #1 (all): Test\tTAGS: []
+    pattern: ['all']
+    hosts (1):
+      host1"""
+        result = parse_list_hosts_output(mixed_output)
+        assert len(result) == 1
+        assert "host1" in result[0]["hosts"]
+
+    def test_exit_code_success_output(self):
+        """TC-119: Valid --list-tasks output parses correctly."""
+        from ansible_aom.core.parser import parse_list_tasks_output
+
+        output = """playbook: site.yml
+
+  play #1 (all): Setup\tTAGS: []
+    Install nginx\tTAGS: [web]"""
+        result = parse_list_tasks_output(output)
+        assert len(result) == 1
+        assert result[0]["name"] == "Setup"
+
+    def test_exit_code_error_output(self):
+        """TC-120: Error output returns empty list."""
+        from ansible_aom.core.parser import parse_list_tasks_output
+
+        error_output = "ERROR! the role 'nonexistent' was not found"
+        result = parse_list_tasks_output(error_output)
+        assert result == []
+
+    def test_exit_code_syntax_error_output(self):
+        """TC-121: Syntax error output returns empty list."""
+        from ansible_aom.core.parser import parse_list_tasks_output
+
+        error_output = """ERROR! Syntax Error while loading YAML."""
+        result = parse_list_tasks_output(error_output)
+        assert result == []
+
+    def test_list_tasks_play_hosts_pattern_extraction(self):
+        """TC-102: Parse hosts pattern from play line in --list-tasks."""
+        from ansible_aom.core.parser import parse_list_tasks_output
+
+        output = """playbook: site.yml
+
+  play #1 (webservers:!staging): Deploy\tTAGS: []
+    task1\tTAGS: []"""
+        result = parse_list_tasks_output(output)
+        assert len(result) == 1
+        assert result[0]["name"] == "Deploy"
+
+    def test_import_tasks_with_role_prefix(self):
+        """TC-114: import_tasks with role prefix expanded correctly."""
+        from ansible_aom.core.parser import parse_list_tasks_output
+
+        output = """playbook: site.yml
+
+  play #1 (all): Deploy\tTAGS: []
+    nginx : Install\tTAGS: [web]
+    nginx : Configure\tTAGS: [web]
+    nginx : Restart\tTAGS: [web]"""
+        result = parse_list_tasks_output(output)
+        tasks = result[0]["tasks"]
+        assert all(t["role"] == "nginx" for t in tasks)
+        assert tasks[0]["name"] == "Install"
+        assert tasks[1]["name"] == "Configure"
+        assert tasks[2]["name"] == "Restart"

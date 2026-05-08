@@ -18,9 +18,17 @@ ENV/
 # Testing
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .tox/
 .nox/
+
+# Environment / secrets
+.env
+*.env
+
+# Logs
+*.log
 
 # IDE
 .idea/

@@ -6,9 +6,10 @@ must satisfy, enabling the shared core to work with either backend.
 See SPECIFICATION.md Section 2.3 for Renderer Protocol definition.
 """
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
+@runtime_checkable
 class Renderer(Protocol):
     """Protocol that both CompactRenderer and AOMApp satisfy."""
 

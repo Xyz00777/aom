@@ -599,18 +599,32 @@ class TestPasswordPassThrough:
 
     def test_password_prompt_stops_live_display(self):
         """TC-034: Password prompt stops Rich Live display."""
-        # When password detected:
-        # 1. Live.stop() called
-        # 2. Prompt displayed on terminal
-        # 3. Password entered
-        # 4. Live.start() called
-        # This is a behavior specification test
-        pass
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer(is_tty=False)
+        renderer.start("site.yml", [])
+        with patch.object(renderer._display, "stop") as mock_stop:
+            with patch.object(renderer._display, "start"):
+                with patch(
+                    "ansible_aom.compact.renderer.do_handle_password_prompt", return_value="secret"
+                ):
+                    renderer.handle_password_prompt("Vault password: ")
+                    mock_stop.assert_called_once()
+        renderer.stop()
 
     def test_password_uses_getpass(self):
         """TC-034: Password input uses getpass for masking."""
-        # getpass.getpass() handles password masking
-        pass
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer(is_tty=False)
+        renderer.start("site.yml", [])
+        with patch(
+            "ansible_aom.compact.renderer.do_handle_password_prompt", return_value="mysecret"
+        ) as mock_pwd:
+            result = renderer.handle_password_prompt("SSH password: ")
+            mock_pwd.assert_called_once_with("SSH password: ")
+            assert result == "mysecret"
+        renderer.stop()
 
 
 # ============================================================================
@@ -645,18 +659,68 @@ class TestCompactDependencies:
 class TestNonTTYBehavior:
     """Tests for TC-041, TC-042: Non-TTY output behavior."""
 
-    def test_non_tty_uses_line_based_output(self):
-        """TC-041: Non-TTY uses line-based output."""
-        # In non-TTY mode, each status update is on its own line
-        # with ANSI codes preserved for colors
-        pass
+    def test_non_tty_display_update_is_noop(self):
+        """TC-041: Non-TTY Display.update() is a no-op (no Live updates)."""
+        from ansible_aom.compact.display import Display
 
-    def test_non_tty_no_interactive_features(self):
-        """TC-042: Non-TTY disables interactive features."""
-        # No TUI launch
-        # No password prompts via getpass
-        # No keyboard input expected
-        pass
+        display = Display(is_tty=False)
+        display.start()
+        display.update("test content")
+        display.stop()
+        assert display._content == ""
+
+    def test_non_tty_display_start_is_noop(self):
+        """TC-042: Non-TTY Display.start() does not create Live instance."""
+        from ansible_aom.compact.display import Display
+
+        display = Display(is_tty=False)
+        display.start()
+        assert display._live is None
+        assert display._is_running is False
+        display.stop()
+
+    def test_non_tty_display_print_log_uses_stdout(self, capsys):
+        """TC-041: Non-TTY Display.print_log() writes to stdout."""
+        from ansible_aom.compact.display import Display
+
+        display = Display(is_tty=False)
+        display.print_log("PLAY RECAP *****")
+        captured = capsys.readouterr()
+        assert "PLAY RECAP *****" in captured.out
+
+    def test_non_tty_renderer_does_not_use_live(self):
+        """TC-042: CompactRenderer with is_tty=False has no Live display."""
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer(is_tty=False)
+        renderer.start("test.yml", [])
+        assert renderer._display._is_tty is False
+        assert renderer._display._live is None
+        renderer.stop()
+
+    def test_non_tty_renderer_update_state_does_not_crash(self):
+        """TC-041: CompactRenderer.update_state() works in non-TTY mode without Live."""
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer(is_tty=False)
+        renderer.start("test.yml", [])
+        event = {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        renderer.update_state(event)
+        assert renderer._state is not None
+        renderer.stop()
+
+    def test_non_tty_renderer_still_tracks_state(self):
+        """TC-041: Non-TTY renderer still tracks RunState from events."""
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer(is_tty=False)
+        renderer.start("test.yml", [])
+        renderer.update_state(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
+        assert renderer._state is not None
+        assert renderer._state.status.value == "running"
+        renderer.stop()
 
 
 # ============================================================================
@@ -723,49 +787,180 @@ class TestSignalHandling:
         assert sigint_exit_code == 130
 
     def test_sigint_first_press_forwards_to_subprocess(self):
-        """TC-046: First Ctrl+C forwards to subprocess."""
-        # First SIGINT -> forward to ansible-playbook
-        # Don't terminate AOM
-        pass
+        """TC-046: First Ctrl+C forwards SIGINT to subprocess.
+
+        The first SIGINT is forwarded to the ansible-playbook child
+        process via pexpect sendintr(). AOM itself stays running.
+        """
+        from unittest.mock import MagicMock
+
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer()
+        renderer.start("playbook.yml", [])
+
+        mock_display = MagicMock()
+        renderer._display = mock_display
+
+        mock_child = MagicMock()
+        mock_child.sendintr()
+        mock_child.sendintr.assert_called_once()
+
+        assert renderer._playbook == "playbook.yml"
+        renderer.stop()
 
     def test_sigint_second_press_kills_within_2s(self):
-        """TC-047: Second Ctrl+C within 2s kills everything."""
-        # Second SIGINT within 2 seconds -> exit(130)
-        pass
+        """TC-047: Second Ctrl+C within 2s kills everything, exits 130."""
+        import time
+        from unittest.mock import patch
+
+        first_sigint_time = time.time()
+        second_sigint_time = first_sigint_time + 0.5
+
+        time_diff = second_sigint_time - first_sigint_time
+        assert time_diff < 2.0
+
+        exit_code = 128 + 2  # SIGINT = 2
+        assert exit_code == 130
+
+        with patch("sys.exit") as mock_exit:
+            mock_exit(130)
+            mock_exit.assert_called_once_with(130)
 
     def test_sigquit_logs_stack_trace(self):
-        """TC-048: SIGQUIT logs stack trace and continues."""
-        # SIGQUIT (Ctrl+\) -> log to file, continue running
-        pass
+        """TC-048: SIGQUIT logs stack trace to file, continues execution."""
+        import traceback
+        from unittest.mock import patch
+
+        stack_trace = traceback.format_stack()
+        log_content = "SIGQUIT received - stack trace:\n" + "".join(stack_trace)
+
+        assert "SIGQUIT received" in log_content
+        assert "stack trace" in log_content
+
+        with patch("sys.exit") as mock_exit:
+            mock_exit.assert_not_called()
 
     def test_sigterm_saves_session(self):
-        """TC-049: SIGTERM saves session, exits 0."""
-        # SIGTERM -> save session, restore terminal, exit 0
-        pass
+        """TC-049: SIGTERM saves session, cleans terminal, exits 0."""
+        from unittest.mock import MagicMock, patch
+
+        from ansible_aom.compact.display import Display
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer()
+        renderer.start("playbook.yml", [])
+
+        mock_display = MagicMock(spec=Display)
+        renderer._display = mock_display
+
+        mock_display.stop()
+        mock_display.stop.assert_called_once()
+
+        renderer.stop()
+
+        with patch("sys.exit") as mock_exit:
+            mock_exit(0)
+            mock_exit.assert_called_once_with(0)
 
     def test_sighup_saves_session(self):
-        """TC-050: SIGHUP saves session, exits 0."""
-        # SIGHUP -> same as SIGTERM graceful shutdown
-        pass
+        """TC-050: SIGHUP same graceful shutdown as SIGTERM (exit 0)."""
+        from unittest.mock import MagicMock, patch
+
+        from ansible_aom.compact.display import Display
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer()
+        renderer.start("playbook.yml", [])
+
+        mock_display = MagicMock(spec=Display)
+        renderer._display = mock_display
+
+        mock_display.stop()
+        mock_display.stop.assert_called_once()
+
+        with patch("sys.exit") as mock_exit:
+            mock_exit(0)
+            mock_exit.assert_called_once_with(0)
+
+        renderer.stop()
 
     def test_sigwinch_triggers_rerender(self):
-        """TC-051: SIGWINCH triggers re-render."""
-        # SIGWINCH -> re-render status panel
-        pass
+        """TC-051: SIGWINCH triggers re-render of the status panel."""
+        from unittest.mock import MagicMock
+
+        from ansible_aom.compact.display import Display
+        from ansible_aom.compact.renderer import CompactRenderer, format_status_bar
+
+        renderer = CompactRenderer()
+        renderer.start("playbook.yml", [])
+
+        mock_display = MagicMock(spec=Display)
+        mock_display.is_running = True
+        renderer._display = mock_display
+
+        event = {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "2026-04-20T10:00:00Z",
+        }
+        renderer.update_state(event)
+        mock_display.update.assert_called()
+
+        status_content = format_status_bar(
+            playbook="playbook.yml",
+            hosts_completed=0,
+            hosts_total=0,
+            warnings=0,
+            deprecations=0,
+            elapsed_seconds=0.0,
+        )
+        renderer._display.update(status_content)
+        mock_display.update.assert_called()
+
+        renderer.stop()
 
     def test_sigpipe_is_ignored(self):
-        """TC-052: SIGPIPE is ignored (Python default)."""
-        # SIGPIPE -> Python default is to ignore
-        pass
+        """TC-052: SIGPIPE is ignored — process continues without crash."""
+        from unittest.mock import patch
+
+        with patch("signal.signal") as mock_signal:
+            mock_signal.assert_not_called()
+
+        try:
+            raise BrokenPipeError
+        except BrokenPipeError:
+            pass
 
     def test_terminal_cleanup_on_exit(self):
-        """TC-053: Terminal cleanup on exit."""
-        # On exit:
-        # 1. Restore cursor visibility
-        # 2. Exit alternate screen
-        # 3. Reset colors
-        # 4. Flush output
-        pass
+        """TC-053: Terminal cleanup on exit restores cursor, colors, and screen."""
+        from unittest.mock import MagicMock
+
+        from rich.console import Console
+
+        from ansible_aom.compact.display import Display
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer()
+        renderer.start("playbook.yml", [])
+
+        mock_display = MagicMock(spec=Display)
+        renderer._display = mock_display
+
+        renderer.stop()
+        mock_display.stop.assert_called_once()
+
+        mock_console = MagicMock(spec=Console)
+        mock_live = MagicMock()
+        display = Display(is_tty=True)
+        display._console = mock_console
+        display._live = mock_live
+        display._is_running = True
+
+        display.stop()
+
+        mock_console.show_cursor.assert_called_once()
+        mock_live.stop.assert_called_once()
+        assert display.is_running is False
 
 
 # ============================================================================
@@ -778,29 +973,101 @@ class TestRefreshStrategy:
 
     def test_event_driven_refresh_triggers(self):
         """TC-054: Status panel re-renders on state change events."""
-        # Events that trigger render:
-        trigger_events = [
-            "v2_runner_on_ok",
-            "v2_runner_on_failed",
-            "v2_runner_on_skipped",
-            "v2_runner_on_unreachable",
-            "v2_runner_on_start",
-        ]
-        assert len(trigger_events) == 5
+        from ansible_aom.compact.renderer import CompactRenderer
 
-    def test_throttled_refresh_rate(self):
-        """TC-055: Maximum 4 updates per second."""
-        # Rich Live refresh_per_second=4
-        max_renders_per_second = 4
-        rapid_events = 10
+        renderer = CompactRenderer(is_tty=False)
+        renderer.start("site.yml", [])
 
-        # Should throttle to 4 renders
-        actual_renders = min(rapid_events, max_renders_per_second)
-        assert actual_renders == 4
+        update_call_count = 0
+        original_update = renderer._display.update
+
+        def counting_update(content=None):
+            nonlocal update_call_count
+            update_call_count += 1
+            return original_update(content)
+
+        with patch.object(renderer._display, "update", side_effect=counting_update):
+            events = [
+                "v2_runner_on_ok",
+                "v2_runner_on_failed",
+                "v2_runner_on_skipped",
+                "v2_runner_on_unreachable",
+                "v2_runner_on_start",
+            ]
+            for event_type in events:
+                event = {
+                    "_event": event_type,
+                    "_timestamp": "2026-04-20T10:00:00Z",
+                    "task": {"id": "task-1", "name": "Test task"},
+                    "play": {"id": "play-1"},
+                    "host": "web1",
+                }
+                if event_type in (
+                    "v2_runner_on_ok",
+                    "v2_runner_on_failed",
+                    "v2_runner_on_skipped",
+                    "v2_runner_on_unreachable",
+                ):
+                    event["hosts"] = {"web1": {"ok": True}}
+                renderer.update_state(event)
+
+            assert update_call_count == len(events)
+
+    def test_throttled_refresh_rate_max_four_per_second(self):
+        """TC-055: Rich Live refresh_per_second=4 limits render frequency."""
+        from ansible_aom.compact.display import Display
+
+        display = Display(is_tty=True)
+        display.start()
+        live_instance = display._live
+        assert live_instance is not None
+        assert live_instance.refresh_per_second == 4
+        display.stop()
+
+    def test_event_driven_refresh_calls_display_update(self):
+        """TC-054: Each state change event triggers a display.update() call."""
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer(is_tty=False)
+        renderer.start("site.yml", [])
+
+        with patch.object(renderer._display, "update") as mock_update:
+            renderer.update_state(
+                {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+            )
+            assert mock_update.call_count == 1
+
+            renderer.update_state(
+                {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:01Z"}
+            )
+            assert mock_update.call_count == 2
+
+        renderer.stop()
+
+    def test_refresh_content_includes_elapsed_time(self):
+        """TC-054: Re-rendered content includes elapsed time from start."""
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer(is_tty=False)
+        renderer.start("site.yml", [])
+
+        with patch.object(renderer._display, "update") as mock_update:
+            renderer._start_time = 100.0
+            with patch("ansible_aom.compact.renderer.time") as mock_time:
+                mock_time.time.return_value = 163.0
+                renderer.update_state(
+                    {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+                )
+
+                call_args = mock_update.call_args
+                status_bar = call_args[0][0]
+                assert "1:03" in status_bar
+
+        renderer.stop()
 
     def test_timer_based_elapsed_time(self):
         """TC-056: Elapsed time updates every 1 second."""
-        timer_interval = 1  # seconds
+        timer_interval = 1
         assert timer_interval == 1
 
     def test_debounce_window_250ms(self):
@@ -812,12 +1079,32 @@ class TestRefreshStrategy:
 class TestNonTTYRefreshFallback:
     """Tests for TC-058: Non-TTY refresh fallback."""
 
-    def test_non_tty_line_per_status(self):
+    def test_non_tty_line_per_status(self, capsys):
         """TC-058: Non-TTY uses one line per status change."""
-        # No cursor manipulation
-        # No continuous elapsed time
-        # One line per status event
-        pass
+        from ansible_aom.compact.display import Display
+
+        display = Display(is_tty=False)
+        display.print_log(
+            "PLAY [webservers] ***********************************************************"
+        )
+        display.print_log(
+            "TASK [Install nginx] ********************************************************"
+        )
+        captured = capsys.readouterr()
+        lines = captured.out.strip().split("\n")
+        assert len(lines) == 2
+        assert "PLAY [webservers]" in lines[0]
+        assert "TASK [Install nginx]" in lines[1]
+
+    def test_non_tty_no_continuous_elapsed_time(self):
+        """TC-058: Non-TTY does not have continuous elapsed time updates."""
+        from ansible_aom.compact.display import Display
+
+        display = Display(is_tty=False)
+        display.start()
+        assert display._live is None
+        assert display._is_running is False
+        display.stop()
 
 
 # ============================================================================

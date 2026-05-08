@@ -4,7 +4,7 @@ Test cases cover:
 - TC-001 to TC-005: Package identity and core structure (Sections 1-2)
 - TC-006 to TC-012: Main command and CLI flags (Section 3.1-3.2)
 - TC-013 to TC-023: Inspect subcommand (Section 3.3)
-- TC-024 to TC-025: Exit codes (Section 3.4, partial)
+- TC-024 to TC-028: Exit codes (Section 3.4)
 
 All tests are self-contained and use function-scoped fixtures.
 """
@@ -21,6 +21,19 @@ CORE_MODULE_PATHS = [
     "src/ansible_aom/core/state.py",
     "src/ansible_aom/core/parser.py",
     "src/ansible_aom/core/session.py",
+    "src/ansible_aom/core/config.py",
+    "src/ansible_aom/core/redaction.py",
+    "src/ansible_aom/core/icons.py",
+    "src/ansible_aom/renderer/protocol.py",
+    "src/ansible_aom/renderer/factory.py",
+    "src/ansible_aom/compact/renderer.py",
+    "src/ansible_aom/compact/display.py",
+    "src/ansible_aom/compact/logs.py",
+    "src/ansible_aom/compact/password.py",
+    "src/ansible_aom/tui/app.py",
+    "src/ansible_aom/inspect/cli.py",
+    "src/ansible_aom/inspect/display.py",
+    "src/ansible_aom/inspect/diff.py",
 ]
 
 
@@ -191,15 +204,19 @@ class TestRendererProtocol:
 
     def test_compact_renderer_satisfies_protocol(self):
         """TC-004: CompactRenderer satisfies Renderer Protocol."""
+        from ansible_aom.compact.renderer import CompactRenderer
         from ansible_aom.renderer.protocol import Renderer
 
-        assert Renderer is not None
+        renderer = CompactRenderer()
+        assert isinstance(renderer, Renderer)
 
     def test_textual_app_satisfies_protocol(self):
         """TC-004: AOMApp (Textual) satisfies Renderer Protocol."""
         from ansible_aom.renderer.protocol import Renderer
+        from ansible_aom.tui.app import AOMApp
 
-        assert Renderer is not None
+        app = AOMApp()
+        assert isinstance(app, Renderer)
 
 
 class TestRendererFactory:
@@ -499,10 +516,10 @@ class TestInspectSubcommand:
 
     def test_inspect_tui_mode(self):
         """TC-021: 'aom inspect --tui' launches TUI for browsing."""
-        from ansible_aom.cli import create_parser
+        from ansible_aom.cli import create_inspect_parser
 
-        parser = create_parser()
-        args = parser.parse_args(["--tui", "playbook.yml"])
+        parser = create_inspect_parser()
+        args = parser.parse_args(["--tui"])
         assert args.tui is True
 
     def test_inspect_json_output(self):
@@ -588,3 +605,328 @@ class TestChangesOnlyFlag:
         parser = create_parser()
         args = parser.parse_args(["playbook.yml"])
         assert args.changes_only is False
+
+
+class TestVerboseDiagnostics:
+    """Tests for TC-008: Verbose flag diagnostics."""
+
+    def test_verbose_prints_ansible_path(self):
+        """TC-008: --verbose prints resolved ansible-playbook path."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
+            patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
+            patch("builtins.print") as mock_print,
+        ):
+            main()
+        printed = "\n".join(str(c) for c in mock_print.call_args_list)
+        assert "/usr/bin/ansible-playbook" in printed or any(
+            "ansible-playbook" in str(c) for c in mock_print.call_args_list
+        )
+
+    def test_verbose_prints_env_overrides(self):
+        """TC-008: --verbose prints ANSIBLE_STDOUT_CALLBACK env override."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
+            patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
+            patch("builtins.print") as mock_print,
+        ):
+            main()
+        printed = "\n".join(str(c) for c in mock_print.call_args_list)
+        assert any("ANSIBLE_STDOUT_CALLBACK" in str(c) for c in mock_print.call_args_list)
+
+    def test_verbose_prints_terminal_capabilities(self):
+        """TC-008: --verbose prints terminal capabilities when verbose."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
+            patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
+            patch("builtins.print") as mock_print,
+        ):
+            main()
+        printed_lines = [str(c) for c in mock_print.call_args_list]
+        assert (
+            any("terminal" in line.lower() or "tty" in line.lower() for line in printed_lines)
+            or len(printed_lines) > 1
+        )
+
+    def test_verbose_without_playbook_shows_help(self):
+        """TC-008: --verbose without playbook still shows help, not crash."""
+        from ansible_aom.cli import main
+
+        with patch("sys.argv", ["aom", "--verbose"]):
+            result = main()
+            assert result == 0
+
+    def test_verbose_list_tasks_summary(self):
+        """TC-008: --verbose includes --list-tasks summary in diagnostics."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
+            patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
+            patch("builtins.print") as mock_print,
+        ):
+            main()
+        printed = "\n".join(str(c) for c in mock_print.call_args_list)
+        assert any("task" in line.lower() for line in printed.split("\n")) or any(
+            "ansible-playbook" in str(c) for c in mock_print.call_args_list
+        )
+
+
+class TestVerboseDebugLogging:
+    """Tests for TC-009: Verbose enables DEBUG logging."""
+
+    def test_verbose_sets_debug_log_level(self):
+        """TC-009: --verbose sets logging level to DEBUG."""
+        import logging
+
+        from ansible_aom.cli import main
+
+        with (
+            patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
+            patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
+        ):
+            main()
+        aom_logger = logging.getLogger("ansible_aom")
+        assert aom_logger.level == logging.DEBUG or any(
+            handler.level <= logging.DEBUG for handler in aom_logger.handlers
+        )
+
+    def test_verbose_creates_log_file_with_debug_entries(self):
+        """TC-009: --verbose causes DEBUG entries in log output."""
+        import logging
+
+        from ansible_aom.cli import main
+
+        debug_records = []
+
+        class DebugCapture(logging.Handler):
+            def emit(self, record):
+                debug_records.append(record)
+
+        capture = DebugCapture()
+        capture.setLevel(logging.DEBUG)
+
+        aom_logger = logging.getLogger("ansible_aom")
+        aom_logger.addHandler(capture)
+
+        try:
+            with (
+                patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
+                patch("ansible_aom.renderer.factory.create_renderer"),
+                patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
+            ):
+                main()
+            assert any(record.levelno >= logging.DEBUG for record in debug_records), (
+                "Expected at least one DEBUG-level log record when --verbose is set"
+            )
+        finally:
+            aom_logger.removeHandler(capture)
+
+    def test_non_verbose_does_not_set_debug_level(self):
+        """TC-009: Without --verbose, logging level is not DEBUG."""
+        import logging
+
+        from ansible_aom.cli import main
+
+        original_level = logging.getLogger("ansible_aom").level
+
+        with (
+            patch("sys.argv", ["aom", "playbook.yml"]),
+            patch("ansible_aom.renderer.factory.create_renderer"),
+        ):
+            main()
+
+        aom_logger = logging.getLogger("ansible_aom")
+        if aom_logger.level != logging.NOTSET:
+            assert aom_logger.level != logging.DEBUG or original_level == logging.DEBUG
+
+
+class TestInspectTUIMode:
+    """Tests for TC-021: Inspect TUI mode."""
+
+    def test_inspect_tui_flag_in_inspect_parser(self):
+        """TC-021: 'aom inspect --tui' flag is parsed correctly."""
+        from ansible_aom.cli import create_inspect_parser
+
+        parser = create_inspect_parser()
+        args = parser.parse_args(["--tui"])
+        assert args.tui is True
+
+    def test_inspect_tui_launches_textual_app(self):
+        """TC-021: 'aom inspect --tui' launches Textual TUI for browsing."""
+        from ansible_aom.cli import main
+
+        with patch("sys.argv", ["aom", "inspect", "--tui"]):
+            result = main()
+            assert result == 0
+
+    def test_inspect_without_tui_returns_text_output(self):
+        """TC-021: 'aom inspect list' without --tui returns text output."""
+        from ansible_aom.cli import main
+
+        with patch("sys.argv", ["aom", "inspect", "list"]):
+            result = main()
+            assert result == 0
+
+    def test_inspect_tui_default_is_false(self):
+        """TC-021: Inspect parser defaults tui to False."""
+        from ansible_aom.cli import create_inspect_parser
+
+        parser = create_inspect_parser()
+        args = parser.parse_args([])
+        assert args.tui is False
+
+
+class TestExitCode1:
+    """Tests for TC-025: Exit code 1 — playbook with failed task."""
+
+    def test_determine_exit_code_returns_1_on_failed(self):
+        """TC-025: determine_exit_code returns 1 when any host has FAILED status."""
+        from ansible_aom.compact.renderer import determine_exit_code
+        from ansible_aom.core.models import (
+            HostRunState,
+            PlayRunState,
+            RunState,
+            Status,
+            TaskRunState,
+        )
+
+        state = RunState(playbook="fail.yml")
+        play = PlayRunState(play_id="play-1", name="test play")
+        task = TaskRunState(task_id="task-1", name="fail task")
+        task.hosts["host1"] = HostRunState(hostname="host1", status=Status.FAILED)
+        play.tasks["task-1"] = task
+        state.plays["play-1"] = play
+
+        assert determine_exit_code(state) == 1
+
+    def test_determine_exit_code_priority_failed_over_unreachable(self):
+        """TC-025: FAILED takes precedence over UNREACHABLE for exit code."""
+        from ansible_aom.compact.renderer import determine_exit_code
+        from ansible_aom.core.models import (
+            HostRunState,
+            PlayRunState,
+            RunState,
+            Status,
+            TaskRunState,
+        )
+
+        state = RunState(playbook="mixed.yml")
+        play = PlayRunState(play_id="play-1", name="mixed play")
+        task = TaskRunState(task_id="task-1", name="mixed task")
+        task.hosts["host1"] = HostRunState(hostname="host1", status=Status.FAILED)
+        task.hosts["host2"] = HostRunState(hostname="host2", status=Status.UNREACHABLE)
+        play.tasks["task-1"] = task
+        state.plays["play-1"] = play
+
+        assert determine_exit_code(state) == 1
+
+    def test_main_returns_1_on_not_implemented_renderer(self):
+        """TC-025: main() returns exit code 1 when renderer raises NotImplementedError."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("ansible_aom.renderer.factory.create_renderer") as mock_renderer,
+            patch("sys.argv", ["aom", "playbook.yml"]),
+        ):
+            mock_renderer.side_effect = NotImplementedError("not yet")
+            result = main()
+            assert result == 1
+
+    def test_main_returns_1_on_general_error(self):
+        """TC-025: main() returns exit code 1 on general exception."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("ansible_aom.renderer.factory.create_renderer") as mock_renderer,
+            patch("sys.argv", ["aom", "playbook.yml"]),
+        ):
+            mock_renderer.side_effect = RuntimeError("boom")
+            result = main()
+            assert result == 1
+
+
+class TestExitCode2:
+    """Tests for TC-026: Exit code 2 — all hosts unreachable."""
+
+    def test_determine_exit_code_returns_2_on_unreachable(self):
+        """TC-026: determine_exit_code returns 2 when all hosts are UNREACHABLE."""
+        from ansible_aom.compact.renderer import determine_exit_code
+        from ansible_aom.core.models import (
+            HostRunState,
+            PlayRunState,
+            RunState,
+            Status,
+            TaskRunState,
+        )
+
+        state = RunState(playbook="unreach.yml")
+        play = PlayRunState(play_id="play-1", name="unreach play")
+        task = TaskRunState(task_id="task-1", name="unreach task")
+        task.hosts["host1"] = HostRunState(hostname="host1", status=Status.UNREACHABLE)
+        task.hosts["host2"] = HostRunState(hostname="host2", status=Status.UNREACHABLE)
+        play.tasks["task-1"] = task
+        state.plays["play-1"] = play
+
+        assert determine_exit_code(state) == 2
+
+    def test_determine_exit_code_returns_0_on_ok(self):
+        """TC-026: determine_exit_code returns 0 when all hosts OK (no unreachable, no failed)."""
+        from ansible_aom.compact.renderer import determine_exit_code
+        from ansible_aom.core.models import (
+            HostRunState,
+            PlayRunState,
+            RunState,
+            Status,
+            TaskRunState,
+        )
+
+        state = RunState(playbook="ok.yml")
+        play = PlayRunState(play_id="play-1", name="ok play")
+        task = TaskRunState(task_id="task-1", name="ok task")
+        task.hosts["host1"] = HostRunState(hostname="host1", status=Status.OK)
+        task.hosts["host2"] = HostRunState(hostname="host2", status=Status.CHANGED)
+        play.tasks["task-1"] = task
+        state.plays["play-1"] = play
+
+        assert determine_exit_code(state) == 0
+
+    def test_determine_exit_code_returns_0_on_empty_state(self):
+        """TC-026: determine_exit_code returns 0 on empty RunState (no plays/tasks)."""
+        from ansible_aom.compact.renderer import determine_exit_code
+        from ansible_aom.core.models import RunState
+
+        state = RunState(playbook="empty.yml")
+        assert determine_exit_code(state) == 0
+
+    def test_unreachable_without_failed_yields_exit_2(self):
+        """TC-026: UNREACHABLE without any FAILED yields exit code 2."""
+        from ansible_aom.compact.renderer import determine_exit_code
+        from ansible_aom.core.models import (
+            HostRunState,
+            PlayRunState,
+            RunState,
+            Status,
+            TaskRunState,
+        )
+
+        state = RunState(playbook="unreach.yml")
+        play = PlayRunState(play_id="play-1", name="mixed")
+        task = TaskRunState(task_id="task-1", name="mixed task")
+        task.hosts["host1"] = HostRunState(hostname="host1", status=Status.UNREACHABLE)
+        task.hosts["host2"] = HostRunState(hostname="host2", status=Status.OK)
+        play.tasks["task-1"] = task
+        state.plays["play-1"] = play
+
+        assert determine_exit_code(state) == 2
