@@ -219,3 +219,64 @@ RichLog's `write()` method accepts `scroll_end` parameter - pass `scroll_end=sel
 - **TC-146** (TUI modal): 6 tests — suspend() context, prompt suffix, return values, error handling, synchronous nature
 - **TC-147** (Password masking): 5 tests — getpass masking in both modes, Renderer Protocol interface
 - **TC-148** (Timeout default): 9 tests — DEFAULT_PASSWORD_TIMEOUT=60, type checks, timeout constant availability
+
+## 2026-05-08 nom-style Display Backend Swap (branch: feat/nom-compact-renderer)
+
+### What changed
+
+- **`compact/display.py`**: replaced `rich.live.Live` with direct stdout
+  ANSI cursor positioning + DEC mode 2026 (synchronized output). Public
+  API (`start`/`stop`/`update`/`print_log`/`clear`, `is_running`, `is_tty`)
+  is preserved so `CompactRenderer` needs no changes. Each frame is wrapped
+  in BSU (`\x1b[?2026h`) / ESU (`\x1b[?2026l`) so multi-line redraws apply
+  atomically without flicker.
+- **250 ms refresh throttle ported.** `Display.update()` records the
+  monotonic timestamp of each emitted frame and skips writes that fall
+  inside the window — rapid bursts coalesce to the latest content.
+  `print_log()` bypasses the throttle (logs are informational) but resets
+  the throttle clock since the status is redrawn as part of the same frame.
+- **`compact/renderer.py::handle_completion`**: now prints the final
+  summary on stdout when `is_tty=False`. Closes PQ6 — without this, a
+  piped run produced zero final-state output because `Display.update()`
+  is a no-op in non-TTY mode.
+- **`core/session.py::cleanup_old_sessions`**: was using `datetime.now()`
+  as the fallback sort key for sessions without `meta.json`, giving every
+  fallback the same microsecond and producing nondeterministic order
+  (TC-228 was flaky for this reason). Now uses directory `mtime`. Also
+  fixed `except json.JSONDecodeError, ValueError:` — Python 3 parses that
+  as Py2-style "catch only `JSONDecodeError`, bind to local `ValueError`"
+  and silently shadows the builtin name inside the block; replaced with
+  the parenthesised tuple form.
+
+### Test impact
+
+- Suite: **1583 passed, 0 failed, 6 skipped** (was 1579/1/6).
+- Added `tests/compact/test_display_ansi.py` (2 tests): asserts BSU/ESU
+  presence in TTY output and absence in non-TTY output.
+- Rewrote 5 tests in `tests/integration/test_compact_renderer.py` that
+  asserted Rich Live implementation details (`_live`, `_console.show_cursor`,
+  `live.refresh_per_second`) to assert observable behaviour: non-TTY
+  produces no ANSI, `stop()` emits the show-cursor sequence, throttle
+  coalesces frames within 250 ms.
+- Added one PQ6 test asserting non-TTY `handle_completion` prints the
+  final summary as plain text.
+
+### Still open after this branch
+
+- **Runner integration** — `cli.py:222–240` is still a stub that prints
+  `"Running playbook: …"` and returns 0 without actually invoking
+  `ansible-playbook`. The renderer + parser + state machine are wired
+  internally but nothing drives them from a real PTY stream. The
+  `services/runner.py` described in `new-spec/learnings.md` does not
+  exist in `src/`. **This is the next major slice and was deliberately
+  left for a separate effort.**
+- **`_row_count()` is approximate** — no width-aware wrapping. Long
+  status lines that wrap will under-count rows; redraws after wrapping
+  will leave artefacts. Tracked under "cursor-position fidelity" in
+  follow-ups.
+- **Terminal resize (SIGWINCH)** is not handled.
+- **ASCII fallback for non-Unicode terminals** — `core/icons.py` has the
+  mapping but the new `Display` doesn't switch on it.
+- **Visual smoke test** was not run end-to-end; CI/non-TTY tests pass
+  but a real terminal run-through wasn't possible from the implementing
+  environment. Required before declaring the renderer done.
