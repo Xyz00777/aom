@@ -143,6 +143,7 @@ class RunState:
     start_time: datetime | None = None
     end_time: datetime | None = None
     status: Status = Status.PENDING
+    _current_play_id: str | None = field(default=None, init=False, repr=False)
 
     def handle_event(self, event: dict[str, Any]) -> None:
         """Process a JSONL event and update state."""
@@ -180,6 +181,12 @@ class RunState:
         play_id = play_data.get("id", "")
         play_name = play_data.get("name", "")
 
+        self._current_play_id = play_id
+
+        if self.start_time is None:
+            self.start_time = ts
+            self.status = Status.RUNNING
+
         if play_id in self.plays:
             self.plays[play_id].name = play_name
         else:
@@ -189,11 +196,22 @@ class RunState:
                 status=Status.RUNNING,
             )
 
+    def _resolve_play_id(self, event: dict[str, Any]) -> str:
+        """Resolve play_id from event or _current_play_id.
+
+        ansible-core >=2.20 omits the 'play' field from runner/task events,
+        so we fall back to the play_id tracked from the most recent
+        v2_playbook_on_play_start event.
+        """
+        play_data = event.get("play")
+        if play_data and isinstance(play_data, dict):
+            return play_data.get("id", "")
+        return self._current_play_id or ""
+
     def _handle_v2_playbook_on_task_start(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_playbook_on_task_start event."""
         task_data = event.get("task", {})
-        play_data = event.get("play", {})
-        play_id = play_data.get("id", "")
+        play_id = self._resolve_play_id(event)
         task_id = task_data.get("id", "")
         task_name = task_data.get("name", "")
 
@@ -225,11 +243,10 @@ class RunState:
     def _handle_v2_runner_on_start(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_start event."""
         task_data = event.get("task", {})
-        play_data = event.get("play", {})
         _hostname = event.get("host", "")
         task_id = task_data.get("id", "")
         task_name = task_data.get("name", "")
-        play_id = play_data.get("id", "")
+        play_id = self._resolve_play_id(event)
 
         if play_id not in self.plays:
             self.plays[play_id] = PlayRunState(
@@ -257,10 +274,9 @@ class RunState:
     def _handle_v2_runner_on_ok(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_ok event."""
         task_data = event.get("task", {})
-        play_data = event.get("play", {})
         hosts_data = event.get("hosts", {})
         task_id = task_data.get("id", "")
-        play_id = play_data.get("id", "")
+        play_id = self._resolve_play_id(event)
 
         if play_id not in self.plays:
             return
@@ -283,10 +299,9 @@ class RunState:
     def _handle_v2_runner_on_failed(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_failed event."""
         task_data = event.get("task", {})
-        play_data = event.get("play", {})
         hosts_data = event.get("hosts", {})
         task_id = task_data.get("id", "")
-        play_id = play_data.get("id", "")
+        play_id = self._resolve_play_id(event)
 
         if play_id not in self.plays:
             return
@@ -326,10 +341,9 @@ class RunState:
     def _handle_v2_runner_on_skipped(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_skipped event."""
         task_data = event.get("task", {})
-        play_data = event.get("play", {})
         hosts_data = event.get("hosts", {})
         task_id = task_data.get("id", "")
-        play_id = play_data.get("id", "")
+        play_id = self._resolve_play_id(event)
 
         if play_id not in self.plays:
             return
@@ -350,10 +364,9 @@ class RunState:
     def _handle_v2_runner_on_unreachable(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_unreachable event."""
         task_data = event.get("task", {})
-        play_data = event.get("play", {})
         hosts_data = event.get("hosts", {})
         task_id = task_data.get("id", "")
-        play_id = play_data.get("id", "")
+        play_id = self._resolve_play_id(event)
 
         if play_id not in self.plays:
             return

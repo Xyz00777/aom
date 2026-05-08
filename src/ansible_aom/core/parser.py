@@ -175,12 +175,23 @@ class PtyStreamParser:
         self._plaintext_lines.append(line)
 
     def _is_jsonl_start_event(self, line: str) -> bool:
-        """Check if line is a v2_playbook_on_start event."""
+        """Check if line is a JSONL start event.
+
+        Accepts both v2_playbook_on_start (ansible-core <2.20) and
+        v2_playbook_on_play_start (ansible-core >=2.20, which no longer
+        emits v2_playbook_on_start).
+        """
         if not line.startswith("{"):
             return False
         try:
             data = json.loads(line)
-            return bool(data.get("_event") == "v2_playbook_on_start")
+            return bool(
+                data.get("_event")
+                in (
+                    "v2_playbook_on_start",
+                    "v2_playbook_on_play_start",
+                )
+            )
         except json.JSONDecodeError:
             return False
 
