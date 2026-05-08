@@ -1,24 +1,38 @@
-"""Display logic for compact mode.
+"""Display logic for compact mode — nom-style fixed-bottom status panel.
 
-Rich Live display implementation for compact mode.
-See SPECIFICATION.md Section 4.1 for rendering details.
-
-TDD: Tests defined in tests/integration/test_compact_renderer.py.
+Renders directly to stdout using ANSI cursor positioning and DEC mode 2026
+(synchronized output) — no Rich Live, no alternate screen buffer. This gives
+a true nom-style "logs scroll above, status fixed at bottom" experience
+without flicker. See SPECIFICATION.md Section 4.1 and
+.sisyphus/notepads/new-spec/open-questions.md "Summary of nom-Style Compact
+View Research".
 """
 
 from __future__ import annotations
 
-from rich.console import Console
-from rich.live import Live
+import sys
 
 # Terminal size constants (SPECIFICATION.md Section 4.4)
 MINIMUM_LINES = 24
 MINIMUM_COLUMNS = 80
 
+# DEC mode 2026 — Synchronized Output. Wrapping a frame between BSU/ESU
+# tells the terminal to buffer the bytes and apply them atomically, so
+# multi-line redraws never produce a torn frame. Terminals that don't
+# implement 2026 ignore the codes silently.
+_BSU = "\x1b[?2026h"
+_ESU = "\x1b[?2026l"
 
-def check_terminal_size(
-    lines: int | None = None, columns: int | None = None
-) -> tuple[bool, str]:
+_HIDE_CURSOR = "\x1b[?25l"
+_SHOW_CURSOR = "\x1b[?25h"
+# Erase from cursor to end of screen. Used to wipe the previous status
+# block before redrawing.
+_CLEAR_TO_EOS = "\x1b[J"
+# Move cursor up N lines, column 1.
+_CURSOR_UP_FMT = "\x1b[{n}F"
+
+
+def check_terminal_size(lines: int | None = None, columns: int | None = None) -> tuple[bool, str]:
     """Check if terminal meets minimum size requirements.
 
     Args:
@@ -38,7 +52,6 @@ def check_terminal_size(
         >>> "Terminal too small" in msg
         True
     """
-    # Auto-detect if not provided
     if lines is None or columns is None:
         try:
             import shutil
@@ -49,7 +62,6 @@ def check_terminal_size(
             if columns is None:
                 columns = detected_columns
         except Exception:
-            # Fallback to defaults if detection fails
             if lines is None:
                 lines = 24
             if columns is None:
@@ -66,17 +78,16 @@ def check_terminal_size(
 
 
 class Display:
-    """Manages Rich Live display for compact mode.
+    """Manages the nom-style compact display.
 
-    Handles terminal rendering for compact mode including:
-    - Rich Live updates at 4 FPS
-    - Log output above the status panel
-    - Terminal size handling
-    - Non-TTY fallback
+    Owns stdout for the duration of the run. The status panel is drawn
+    at the cursor and stays "anchored" by tracking how many lines it
+    occupies — every redraw rewinds that many lines, clears, and writes
+    the new content. Log lines are printed by first wiping the status
+    block, writing the log, then re-emitting the status below it.
 
-    Attributes:
-        MINIMUM_LINES: Minimum terminal lines required (24)
-        MINIMUM_COLUMNS: Minimum terminal columns required (80)
+    Public API is intentionally identical to the previous Rich Live
+    implementation so callers (CompactRenderer) don't need to change.
     """
 
     MINIMUM_LINES = MINIMUM_LINES
@@ -86,134 +97,116 @@ class Display:
         """Initialize the display manager.
 
         Args:
-            is_tty: Whether stdout is a TTY. If False, disable interactive features.
+            is_tty: Whether stdout is a TTY. If False, all positioning
+                and synchronization codes are suppressed and updates
+                become no-ops; log lines still print as plain text.
         """
         self._is_tty = is_tty
         self._is_running = False
         self._content = ""
-        self._live: Live | None = None
-        self._console: Console | None = None
+        # Number of terminal rows the current status block occupies.
+        # 0 means nothing is currently drawn that needs to be cleared.
+        self._status_rows = 0
 
     def start(self) -> None:
-        """Start the Rich Live display context.
-
-        Initializes terminal state (hides cursor if TTY).
-        Creates Rich Live instance with refresh_per_second=4.
-
-        Non-TTY Behavior:
-            This is a no-op when is_tty=False.
-        """
+        """Begin owning the bottom of the terminal."""
         if not self._is_tty:
             return
-
-        # Create console for this display
-        self._console = Console(
-            force_terminal=True,
-            force_interactive=False,
-            legacy_windows=False,
-        )
-
-        # Create Live display with 4 FPS refresh (SPECIFICATION.md Section 4.3)
-        self._live = Live(
-            "",  # Initial content
-            console=self._console,
-            refresh_per_second=4,
-            vertical_overflow="ellipsis",
-            auto_refresh=True,
-        )
-        self._live.start()
+        sys.stdout.write(_HIDE_CURSOR)
+        sys.stdout.flush()
         self._is_running = True
 
     def stop(self) -> None:
-        """Stop the Rich Live display and restore terminal state.
-
-        Restores terminal state:
-        - Shows cursor (if hidden)
-        - Resets colors and styles
-        - Flushes output
-
-        Non-TTY Behavior:
-            This is a no-op when is_tty=False.
-        """
+        """Erase the status block and release the terminal."""
         if not self._is_tty:
             return
-
-        if self._live is not None:
-            self._live.stop()
-            self._live = None
-
+        # Wipe whatever status block is currently visible so the user's
+        # shell prompt doesn't appear on top of leftover content.
+        frame = _BSU + self._rewind_status() + _CLEAR_TO_EOS + _SHOW_CURSOR + _ESU
+        sys.stdout.write(frame)
+        sys.stdout.flush()
         self._is_running = False
-
-        # Reset console output - show cursor
-        if self._console is not None:
-            self._console.show_cursor()
+        self._status_rows = 0
 
     def update(self, content: str | None = None) -> None:
-        """Update the display content.
+        """Redraw the status block with new content.
 
-        If content is None, refresh with current content.
-
-        Args:
-            content: New content to display in the status panel.
-                     If None, uses current content.
-
-        Non-TTY Behavior:
-            This is a no-op when is_tty=False (line-by-line output instead).
+        If content is None, the current content is re-rendered (useful
+        after a terminal resize, though resize handling is out of scope
+        for this slice).
         """
         if not self._is_tty:
             return
-
         if content is not None:
             self._content = content
+        if not self._is_running:
+            return
 
-        if self._live is not None and self._is_running:
-            self._live.update(self._content)
+        rendered = self._content
+        new_rows = _row_count(rendered)
+        frame = _BSU + self._rewind_status() + _CLEAR_TO_EOS + rendered + _ESU
+        sys.stdout.write(frame)
+        sys.stdout.flush()
+        self._status_rows = new_rows
 
     def print_log(self, message: str) -> None:
-        """Print a log line ABOVE the live display.
+        """Print a log line above the status block.
 
-        Uses live.console.print() to output above the status panel.
-        The message passes through Rich markup for color support.
-
-        Args:
-            message: Log line to print (may contain Rich markup).
-
-        Non-TTY Behavior:
-            Writes to stdout without Rich formatting.
+        Wipes the status, writes the log line, then re-renders the
+        status. The whole operation is a single synchronized frame so
+        the user never sees an intermediate state.
         """
         if not self._is_tty:
-            # Non-TTY: Plain output without formatting
             print(message)
             return
 
-        if self._console is not None and self._live is not None:
-            # Print above the live display using the live's console
-            self._live.console.print(message)
+        # Ensure the log line ends with exactly one newline so the
+        # following status rendering starts on a fresh row.
+        log = message if message.endswith("\n") else message + "\n"
+        rendered = self._content
+        new_rows = _row_count(rendered)
+        frame = _BSU + self._rewind_status() + _CLEAR_TO_EOS + log + rendered + _ESU
+        sys.stdout.write(frame)
+        sys.stdout.flush()
+        self._status_rows = new_rows
 
     def clear(self) -> None:
-        """Clear the display content and reset internal state.
-
-        Clears the status panel content and resets internal buffers.
-        Does not stop the live display (use stop() for that).
-        """
+        """Erase the status content (but leave the display running)."""
         self._content = ""
-        if self._live is not None and self._is_running:
-            self._live.update("")
+        if not self._is_tty or not self._is_running:
+            return
+        frame = _BSU + self._rewind_status() + _CLEAR_TO_EOS + _ESU
+        sys.stdout.write(frame)
+        sys.stdout.flush()
+        self._status_rows = 0
 
     @property
     def is_running(self) -> bool:
-        """Check if the display is currently running.
-
-        Returns:
-            True if start() was called and stop() not yet called.
-        """
         return self._is_running
 
     @property
     def is_tty(self) -> bool:
-        """Check if the display is in TTY mode.
-
-        Returns:
-            True if output is a TTY, False for piped/redirected output.
-        """
         return self._is_tty
+
+    def _rewind_status(self) -> str:
+        """Cursor sequence to move back to the top of the status block."""
+        if self._status_rows == 0:
+            return ""
+        return _CURSOR_UP_FMT.format(n=self._status_rows)
+
+
+def _row_count(text: str) -> int:
+    """How many terminal rows `text` occupies after it's written.
+
+    Counts newlines as row separators. A trailing newline pushes the
+    cursor down to a new row, so it contributes a row too. The empty
+    string occupies zero rows. This is an approximation — long lines
+    that wrap will undercount, but that's acceptable until we add real
+    width-aware wrapping.
+    """
+    if not text:
+        return 0
+    rows = text.count("\n")
+    if not text.endswith("\n"):
+        rows += 1
+    return rows
