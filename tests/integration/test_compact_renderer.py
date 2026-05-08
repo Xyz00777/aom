@@ -1012,11 +1012,6 @@ class TestRefreshStrategy:
 
             assert update_call_count == len(events)
 
-    @pytest.mark.xfail(
-        reason="Throttle not yet ported from Rich Live to direct ANSI backend; "
-        "see follow-up task on feat/nom-compact-renderer.",
-        strict=True,
-    )
     def test_throttled_refresh_rate_max_four_per_second(self, capsys):
         """TC-055: Updates within 250ms of the last write are coalesced."""
         import time

@@ -11,10 +11,16 @@ View Research".
 from __future__ import annotations
 
 import sys
+import time
 
 # Terminal size constants (SPECIFICATION.md Section 4.4)
 MINIMUM_LINES = 24
 MINIMUM_COLUMNS = 80
+
+# Maximum status redraws per second. Bursts of state events get coalesced
+# into the most-recent content; the next eligible update flushes whatever
+# the latest state happens to be. Matches Rich Live's old refresh_per_second=4.
+_THROTTLE_INTERVAL_S = 0.25
 
 # DEC mode 2026 — Synchronized Output. Wrapping a frame between BSU/ESU
 # tells the terminal to buffer the bytes and apply them atomically, so
@@ -107,6 +113,10 @@ class Display:
         # Number of terminal rows the current status block occupies.
         # 0 means nothing is currently drawn that needs to be cleared.
         self._status_rows = 0
+        # Monotonic timestamp of the last status frame written to stdout.
+        # 0.0 means we've never written, so the first update goes through
+        # without waiting for the throttle window.
+        self._last_update_time = 0.0
 
     def start(self) -> None:
         """Begin owning the bottom of the terminal."""
@@ -131,9 +141,10 @@ class Display:
     def update(self, content: str | None = None) -> None:
         """Redraw the status block with new content.
 
-        If content is None, the current content is re-rendered (useful
-        after a terminal resize, though resize handling is out of scope
-        for this slice).
+        Updates within _THROTTLE_INTERVAL_S of the last write are coalesced:
+        the new content is stored but no frame is emitted. The next eligible
+        call will render whatever the latest content is. If content is None,
+        the current content is re-rendered.
         """
         if not self._is_tty:
             return
@@ -142,12 +153,17 @@ class Display:
         if not self._is_running:
             return
 
+        now = time.monotonic()
+        if self._last_update_time and (now - self._last_update_time) < _THROTTLE_INTERVAL_S:
+            return
+
         rendered = self._content
         new_rows = _row_count(rendered)
         frame = _BSU + self._rewind_status() + _CLEAR_TO_EOS + rendered + _ESU
         sys.stdout.write(frame)
         sys.stdout.flush()
         self._status_rows = new_rows
+        self._last_update_time = now
 
     def print_log(self, message: str) -> None:
         """Print a log line above the status block.
@@ -169,6 +185,9 @@ class Display:
         sys.stdout.write(frame)
         sys.stdout.flush()
         self._status_rows = new_rows
+        # The status was just redrawn as part of this frame, so reset the
+        # throttle clock — the next update() should compete from "now".
+        self._last_update_time = time.monotonic()
 
     def clear(self) -> None:
         """Erase the status content (but leave the display running)."""
