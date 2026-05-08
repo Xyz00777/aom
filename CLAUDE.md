@@ -73,6 +73,8 @@ inspect/
   diff.py                    # Diff two sessions
 ```
 
+> **Note**: `.aom/` is a gitignored runtime directory where session artifacts are written — it is NOT source code. See `core/session.py` for the writer logic.
+
 ## Data Flow
 
 ```
@@ -220,6 +222,28 @@ Every module in `ansible_aom/core/` should be designed as a reusable library, no
 - Terminal minimum is 24×80. Check and show clear error, don't crash.
 - The `task.path` field format in JSONL is `"file.yml:line_number"`.
 
+## Project Notes (`.sisyphus/`)
+
+The `.sisyphus/` directory contains project state, research, and implementation notes. It is tracked in git. **Always check these before making architectural decisions** — they capture context that would otherwise be lost between sessions.
+
+### Notepads Structure (`.sisyphus/notepads/`)
+
+| Path | Content |
+|------|---------|
+| `research/decisions.md` | Pre-implementation research decisions (e.g., licensing: MIT is safe because we shell out to ansible-core, never import it) |
+| `new-spec/cli-tui-implementation.md` | CLI/TUI rendering research: Rich Console patterns, Click vs Typer, TTY detection, nom-style fixed-bottom panel design, Textual readonly viewer patterns, open questions (PQ1–PQ6) |
+| `new-spec/open-questions.md` | Deep research on `nom` (nix-output-monitor) as design reference: visual layout, summary table, tree rendering, ANSI cursor manipulation, adaptive display |
+| `new-spec/learnings.md` | PTY stream parsing: mixed JSONL + plaintext, password prompt detection, phase-aware state machine, pexpect integration patterns |
+| `implementation/decisions.md` | Implementation execution order and parallelization plan (Group A/B/C dependencies) |
+| `implementation/issues.md` | Known potential issues (Rich Live lifecycle, signal handling, TUI stubs, pexpect mocking) |
+| `implementation/INTEGRATION_TEST_PLAN.md` | 12 integration test playbooks covering all JSONL event types, state transitions, edge cases, exit codes |
+| `implementation/learnings.md` | Session-by-session implementation notes: stub status, test contracts, AOMApp wiring, widget patterns, mock paths for password tests |
+| `impl-gaps/learnings.md` | Gaps between spec and current code: redaction API design, CLI exit code behavior, missing POSIX callback tests, host resolution tests |
+
+### Test Fixtures (`.sisyphus/test-fixtures/`)
+
+Integration test playbooks for running against real `ansible-playbook`: `simple.yml`, `multi_play.yml`, `multi_hosts.yml`, `unreachable.yml`, `with_role.yml`, `with_include.yml`, `with_import.yml`, `with_block.yml`, `with_pre_post.yml`, `syntax_error.yml`, `missing_role.yml`, `no_name.yml`, plus `roles/test_role/`. These are separate from `tests/playbooks/` (unit test fixtures used by pytest).
+
 ## Key Files to Know About
 
 | File | Why |
@@ -230,3 +254,5 @@ Every module in `ansible_aom/core/` should be designed as a reusable library, no
 | `pyproject.toml` | Dependencies, mypy overrides, pytest config |
 | `flake.nix` | Nix dev shell + package build |
 | `.pre-commit-config.yaml` | Pre-commit hook pipeline |
+| `.sisyphus/notepads/` | Project notes — decisions, research, implementation state, open questions |
+| `.sisyphus/test-fixtures/` | Integration test playbooks for real ansible-playbook runs |

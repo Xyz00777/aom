@@ -1,0 +1,13 @@
+---
+- name: Playbook with import_tasks
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Task before import
+      debug:
+        msg: "Before"
+    - name: Import other tasks
+      import_tasks: imported_tasks.yml
+    - name: Task after import
+      debug:
+        msg: "After"

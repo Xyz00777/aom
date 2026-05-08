@@ -1,0 +1,10 @@
+---
+- name: Broken playbook
+  hosts: localhost
+  tasks:
+    - name: Good task
+      debug:
+        msg: "OK"
+    - name: Broken task
+      debug
+        msg: "bad syntax - missing colon"

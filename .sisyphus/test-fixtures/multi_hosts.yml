@@ -1,0 +1,8 @@
+---
+- name: Play with multiple host patterns
+  hosts: webservers:dbservers
+  gather_facts: false
+  tasks:
+    - name: Multi host task
+      debug:
+        msg: "Multi"
