@@ -44,7 +44,6 @@ htmlcov/
 
 # Ruff
 .ruff_cache/
-.sisyphus/
 
 # AOM session artifacts (runtime)
 .aom/
