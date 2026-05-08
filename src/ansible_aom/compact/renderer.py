@@ -351,6 +351,13 @@ class CompactRenderer:
         # Update display one final time
         self._display.update(final_status)
 
+        # Non-TTY mode (pipes, CI) suppresses every Display.update() call
+        # because there's no panel to anchor at the bottom — but the user
+        # still wants the final-state line in their log. Print it once
+        # here as plain text. PQ6 in new-spec/open-questions.md.
+        if not self._display.is_tty:
+            print(final_status)
+
         # Stop the display
         self._display.stop()
 

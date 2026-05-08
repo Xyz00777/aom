@@ -537,6 +537,26 @@ class TestCompactRendererHandleCompletion:
         # Should not raise
         renderer.handle_completion(0, "completed")
 
+    def test_non_tty_completion_prints_final_summary(self, capsys):
+        """PQ6: non-TTY emits the final status summary on completion.
+
+        In TTY mode the summary is part of the live status panel; in non-TTY
+        (pipes, CI logs) the panel is suppressed entirely, so the run would
+        produce no final-state line at all unless we print it explicitly here.
+        """
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer(is_tty=False)
+        renderer.start("playbook.yml", [])
+        capsys.readouterr()  # discard anything from start()
+
+        renderer.handle_completion(0, "completed")
+
+        out = capsys.readouterr().out
+        assert "playbook.yml" in out, f"final summary missing playbook name: {out!r}"
+        assert "●" in out, f"final summary missing completion indicator: {out!r}"
+        assert "\x1b[" not in out, f"non-TTY must not emit ANSI: {out!r}"
+
 
 class TestCompactRendererStop:
     """Tests for CompactRenderer.stop() method."""
