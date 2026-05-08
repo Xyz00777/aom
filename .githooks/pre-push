@@ -4,4 +4,4 @@
 set -e
 
 echo "[pre-push] running pre-commit pre-push checks..."
-uv run pre-commit run --hook-stage push "$@"
+uv run pre-commit run --hook-stage push
