@@ -261,22 +261,89 @@ RichLog's `write()` method accepts `scroll_end` parameter - pass `scroll_end=sel
 - Added one PQ6 test asserting non-TTY `handle_completion` prints the
   final summary as plain text.
 
+## 2026-05-10 Runner Implementation (same branch)
+
+### What changed
+
+- **New `src/ansible_aom/runner.py`** — `run_playbook(playbook, args, renderer)`
+  spawns `ansible-playbook` via `pexpect.spawn` with `ANSIBLE_STDOUT_CALLBACK=ansible.posix.jsonl`,
+  reads the PTY line-by-line using `child.expect([newline, EOF, TIMEOUT, *PASSWORD_PATTERNS])`,
+  feeds JSONL lines to the existing `PtyStreamParser`, and pumps emitted
+  events into the renderer via `update_state`.
+- **Password prompts are matched at the pexpect layer**, not in the parser.
+  Live PTY prompts (`Vault password: `) have no trailing newline so they
+  never reach the parser's line-oriented `feed_line`. The runner round-trips
+  through `renderer.handle_password_prompt(prompt)` and writes the result
+  back to the child via `child.sendline`.
+- **Lifecycle ownership** — `renderer.start` before spawn,
+  `handle_completion(exit_code, state)` on exit, `renderer.stop` in a
+  `finally`. Spawn-time failures (`ExceptionPexpect`/`FileNotFoundError`/
+  `OSError`) → exit 127, state="crashed". `KeyboardInterrupt` →
+  `child.sendintr() + close(force=True)` → exit 130.
+- **`cli.py` rewired** to call `run_playbook` instead of the previous stub.
+  Renderer constructed with `is_tty=sys.stdout.isatty()` so the PQ6
+  non-TTY summary path activates correctly under pipes.
+
+### Test impact
+
+- New `tests/integration/test_runner.py` — 4 tests covering happy path,
+  event forwarding, non-zero exit → state="failed", missing executable →
+  exit 127 + state="crashed". Tests substitute a fake "ansible-playbook"
+  built from `python -c "..."` that emits canned JSONL — exercises the
+  real spawn/expect loop without needing Ansible to be installed.
+- Updated TC-027 in `tests/unit/test_cli.py` — used to patch
+  `create_renderer.side_effect = FileNotFoundError`; now patches
+  `runner.run_playbook` because that's where the FileNotFound handling
+  lives.
+- Suite: **1587 passed, 0 failed, 6 skipped** (was 1583/0/6).
+
+### End-to-end smoke
+
+```
+$ uv run aom .sisyphus/test-fixtures/simple.yml -i localhost, -c local
+.sisyphus/test-fixtures/simple.yml │ 1/1 hosts │ 0:00:00 ●
+$ echo $?
+0
+
+$ uv run aom .sisyphus/test-fixtures/syntax_error.yml -i localhost, -c local
+.sisyphus/test-fixtures/syntax_error.yml │ 0/0 hosts │ 0:00:00 ✖
+$ echo $?
+4
+```
+
+### Quirk noted
+
+Python 3.14 parses `except A, B, C:` as the same `ast.Tuple` as
+`except (A, B, C):` — i.e. it now means "catch any of these three", not
+the Py2 "catch A and bind to local B" semantics. Ruff format takes the
+parens away and accepts the parens-less form as canonical. **The fix in
+`session.py` (commit a4bd140) was about clarity, not a bug** — both
+forms catch the tuple correctly under 3.14. The session.py file got
+re-formatted by ruff after the commit so the parens may be gone again
+on disk. Worth deciding as a project: keep parens for portability to
+older Pythons or accept ruff's preference. Project is currently 3.14-only
+(`requires-python = ">=3.14"`), so ruff's preference is harmless here.
+
 ### Still open after this branch
 
-- **Runner integration** — `cli.py:222–240` is still a stub that prints
-  `"Running playbook: …"` and returns 0 without actually invoking
-  `ansible-playbook`. The renderer + parser + state machine are wired
-  internally but nothing drives them from a real PTY stream. The
-  `services/runner.py` described in `new-spec/learnings.md` does not
-  exist in `src/`. **This is the next major slice and was deliberately
-  left for a separate effort.**
+- **Pre-flight `--list-tasks` / `--list-hosts`** — runner skips them.
+  The renderer therefore can't show full task tree or resolved-hosts
+  list at startup; it builds state purely from JSONL events as they
+  arrive. ARCHITECTURE.md's data flow diagram describes parallel
+  pre-flight that doesn't exist yet.
+- **Warning surfacing** — the parser detects `[WARNING]:` /
+  `[DEPRECATION WARNING]:` lines and stores them in `parser.warnings`,
+  but the runner doesn't forward to `renderer.add_warning`. Doing so
+  cleanly requires adding `add_warning` to the `Renderer` Protocol so
+  TUI can implement it too — that's a Protocol-design slice.
 - **`_row_count()` is approximate** — no width-aware wrapping. Long
-  status lines that wrap will under-count rows; redraws after wrapping
-  will leave artefacts. Tracked under "cursor-position fidelity" in
-  follow-ups.
+  status lines that wrap will under-count rows; redraws will leave
+  artefacts. Tracked under "cursor-position fidelity".
 - **Terminal resize (SIGWINCH)** is not handled.
 - **ASCII fallback for non-Unicode terminals** — `core/icons.py` has the
   mapping but the new `Display` doesn't switch on it.
-- **Visual smoke test** was not run end-to-end; CI/non-TTY tests pass
-  but a real terminal run-through wasn't possible from the implementing
-  environment. Required before declaring the renderer done.
+- **TIMEOUT branch in runner is a no-op** — a future slice should wake
+  the renderer here for elapsed-time ticks during long-running tasks.
+- **Visual TTY smoke test** still not done — pipe-mode end-to-end works
+  but a real terminal run-through is needed to confirm the panel
+  anchors correctly with logs scrolling above.
