@@ -229,6 +229,12 @@ class CompactRenderer:
         if self._state is None:
             return
 
+        # Stream the event as a log line above the status panel BEFORE
+        # mutating state — keeps the visual story "what happened, then
+        # the panel reflects it". Throttling on the panel update means
+        # the panel may visibly trail the logs, which matches nom.
+        self._emit_event_log(event)
+
         # Update RunState with the event
         self._state.handle_event(event)
 
@@ -371,3 +377,34 @@ class CompactRenderer:
         """
         self._display.stop()
         self._state = None
+
+    def _emit_event_log(self, event: dict) -> None:
+        """Print one nom-style log line for a JSONL event.
+
+        Stats events are intentionally silent — the live panel and the
+        final-summary print already cover what they would say. Unknown
+        event types are silent too: the panel still updates from state,
+        we just don't add to the log noise.
+        """
+        name = event.get("_event")
+        if name == "v2_playbook_on_play_start":
+            play_name = event.get("play", {}).get("name", "") or "(unnamed)"
+            self._display.print_log(f"\nPLAY [{play_name}] " + "*" * 50)
+        elif name == "v2_playbook_on_task_start":
+            task_name = event.get("task", {}).get("name", "") or "(unnamed)"
+            self._display.print_log(f"\nTASK [{task_name}] " + "*" * 50)
+        elif name == "v2_runner_on_ok":
+            for host, result in event.get("hosts", {}).items():
+                verb = "changed" if result.get("changed") else "ok"
+                self._display.print_log(f"{verb}: [{host}]")
+        elif name == "v2_runner_on_failed":
+            for host, result in event.get("hosts", {}).items():
+                msg = result.get("msg", "") or ""
+                self._display.print_log(f"fatal: [{host}]: FAILED! => {msg}")
+        elif name == "v2_runner_on_unreachable":
+            for host, result in event.get("hosts", {}).items():
+                msg = result.get("msg", "") or ""
+                self._display.print_log(f"fatal: [{host}]: UNREACHABLE! => {msg}")
+        elif name == "v2_runner_on_skipped":
+            for host in event.get("hosts", {}):
+                self._display.print_log(f"skipping: [{host}]")

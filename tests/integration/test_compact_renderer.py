@@ -537,6 +537,92 @@ class TestCompactRendererHandleCompletion:
         # Should not raise
         renderer.handle_completion(0, "completed")
 
+    def test_update_state_streams_log_lines_for_significant_events(self):
+        """Each significant JSONL event must produce a log line above the panel.
+
+        Without this, fast playbooks render only as a flickering panel — the
+        user has no visibility into what tasks ran or what they did. The
+        contract is: PLAY/TASK headers, per-host result lines, no logging
+        for stats (the panel already shows that). Specific format is
+        intentionally loose here — we only assert the relevant identifying
+        substrings appear in the right order.
+        """
+        from unittest.mock import MagicMock
+
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer(is_tty=True)
+        renderer._display = MagicMock(is_tty=True)
+        renderer.start("playbook.yml", [])
+
+        events = [
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-10T13:00:00Z",
+                "play": {"name": "Simple play", "id": "p1"},
+                "tasks": [],
+            },
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-10T13:00:00Z",
+                "task": {"name": "First task", "id": "t1", "path": "f.yml:1"},
+                "hosts": {},
+            },
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-10T13:00:00Z",
+                "task": {"name": "First task", "id": "t1", "path": "f.yml:1"},
+                "hosts": {"localhost": {"changed": False, "msg": "Hello"}},
+            },
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-10T13:00:00Z",
+                "task": {"name": "First task", "id": "t1", "path": "f.yml:1"},
+                "hosts": {"web1": {"changed": True, "msg": "Updated"}},
+            },
+            {
+                "_event": "v2_runner_on_failed",
+                "_timestamp": "2026-05-10T13:00:00Z",
+                "task": {"name": "First task", "id": "t1", "path": "f.yml:1"},
+                "hosts": {"db1": {"msg": "boom"}},
+            },
+            {
+                "_event": "v2_playbook_on_stats",
+                "_timestamp": "2026-05-10T13:00:00Z",
+                "stats": {"localhost": {"ok": 1, "changed": 0, "failures": 0}},
+            },
+        ]
+        for event in events:
+            renderer.update_state(event)
+
+        log_calls = [c.args[0] for c in renderer._display.print_log.call_args_list]
+        joined = "\n".join(log_calls)
+
+        assert any("PLAY" in line and "Simple play" in line for line in log_calls), (
+            f"play_start must emit a PLAY [name] header line, got: {log_calls}"
+        )
+        assert any("TASK" in line and "First task" in line for line in log_calls), (
+            f"task_start must emit a TASK [name] header line, got: {log_calls}"
+        )
+        # ok with changed=False
+        assert any("ok:" in line and "localhost" in line for line in log_calls), (
+            f"runner_on_ok with changed=False must emit ok: [host], got: {log_calls}"
+        )
+        # ok with changed=True
+        assert any("changed:" in line and "web1" in line for line in log_calls), (
+            f"runner_on_ok with changed=True must emit changed: [host], got: {log_calls}"
+        )
+        # failed
+        assert any("fatal:" in line and "db1" in line for line in log_calls), (
+            f"runner_on_failed must emit fatal: [host], got: {log_calls}"
+        )
+        # stats event must NOT produce a log line — the panel already
+        # shows aggregated stats and the final-summary print covers it.
+        assert "PLAY RECAP" not in joined, (
+            f"v2_playbook_on_stats should not emit a PLAY RECAP log; "
+            f"the final-summary print handles that. Got: {log_calls}"
+        )
+
     def test_tty_completion_persists_final_summary_after_panel_clear(self, capsys):
         """TTY completion leaves the final summary visible after stop() clears the panel.
 
