@@ -126,3 +126,79 @@ class TestRunnerCommandNotFound:
         # State should be 'crashed' for a missing executable, not 'failed' —
         # the playbook never got a chance to run.
         assert completion_args.args[1] == "crashed"
+
+
+class TestRunnerPreflight:
+    """Runner calls run_preflight before spawning and forwards its result."""
+
+    def test_run_playbook_calls_preflight_and_forwards_definitions(self) -> None:
+        from ansible_aom.runner import run_playbook
+
+        captured_defs: list = []
+
+        class StubRenderer:
+            def start(self, playbook: str, args: list[str]) -> None: ...
+            def set_definitions(self, definitions: list) -> None:
+                captured_defs.extend(definitions)
+            def update_state(self, event: dict) -> None: ...
+            def handle_password_prompt(self, prompt: str) -> str:
+                return ""
+            def handle_completion(self, exit_code: int, state: str) -> None: ...
+            def stop(self) -> None: ...
+
+        fake_pre_result = MagicMock()
+        fake_pre_result.definitions = ["DEF1", "DEF2"]
+        fake_pre_result.errors = []
+
+        cmd, args = _fake_ansible_command(
+            [{"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-08T10:00:01Z"}],
+            exit_code=0,
+        )
+
+        with (
+            patch(
+                "ansible_aom.runner.run_preflight",
+                return_value=fake_pre_result,
+            ),
+            patch("ansible_aom.runner._build_command", return_value=(cmd, args)),
+        ):
+            exit_code = run_playbook("playbook.yml", [], StubRenderer())
+
+        assert exit_code == 0
+        assert captured_defs == ["DEF1", "DEF2"]
+
+    def test_run_playbook_forwards_preflight_errors_as_warnings(self) -> None:
+        from ansible_aom.runner import run_playbook
+
+        received_warnings: list[tuple[str, bool]] = []
+
+        class StubRenderer:
+            def start(self, playbook: str, args: list[str]) -> None: ...
+            def set_definitions(self, definitions: list) -> None: ...
+            def add_warning(self, message: str, is_deprecation: bool = False) -> None:
+                received_warnings.append((message, is_deprecation))
+            def update_state(self, event: dict) -> None: ...
+            def handle_password_prompt(self, prompt: str) -> str:
+                return ""
+            def handle_completion(self, exit_code: int, state: str) -> None: ...
+            def stop(self) -> None: ...
+
+        fake_pre_result = MagicMock()
+        fake_pre_result.definitions = []
+        fake_pre_result.errors = ["--list-hosts failed (exit 1): nope"]
+
+        cmd, args = _fake_ansible_command(
+            [{"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-08T10:00:01Z"}],
+            exit_code=0,
+        )
+
+        with (
+            patch(
+                "ansible_aom.runner.run_preflight",
+                return_value=fake_pre_result,
+            ),
+            patch("ansible_aom.runner._build_command", return_value=(cmd, args)),
+        ):
+            run_playbook("playbook.yml", [], StubRenderer())
+
+        assert any("--list-hosts failed" in msg for msg, _ in received_warnings)

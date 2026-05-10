@@ -23,6 +23,7 @@ import pexpect
 
 from ansible_aom.core.models import WarningType
 from ansible_aom.core.parser import PtyStreamParser
+from ansible_aom.core.preflight import run_preflight
 from ansible_aom.renderer.protocol import Renderer
 
 # Same patterns the parser uses for replay-time detection. They appear
@@ -68,6 +69,19 @@ def run_playbook(
 
     parser = PtyStreamParser()
     renderer.start(playbook, ansible_args)
+
+    # Preflight: --list-tasks + --list-hosts in parallel before spawning
+    # the JSONL run so the renderer can show plays/tasks/host count from
+    # the very first frame. Failures are non-fatal — surfaced as warnings.
+    pre_result = run_preflight(playbook=playbook, ansible_args=ansible_args)
+    set_definitions = getattr(renderer, "set_definitions", None)
+    if callable(set_definitions):
+        set_definitions(pre_result.definitions)
+    if pre_result.errors:
+        add_warning = getattr(renderer, "add_warning", None)
+        if callable(add_warning):
+            for err in pre_result.errors:
+                add_warning(err, False)
 
     child: pexpect.spawn | None = None
     try:
