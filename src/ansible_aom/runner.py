@@ -78,9 +78,29 @@ def run_playbook(
     if callable(set_definitions):
         set_definitions(pre_result.definitions)
     if pre_result.errors:
+        # Two surfaces: print the full message above the panel so the user
+        # can actually read it (a syntax error blob is much more useful than
+        # a single line "list-tasks failed (exit 4)"), AND bump the warning
+        # counter so the panel reflects the failure.
+        #
+        # Dedupe by the trailing message (after the "--list-foo failed: "
+        # prefix): syntax errors usually fail BOTH preflight subprocesses
+        # with the same underlying YAML diagnostic, and printing it twice
+        # is just noise.
+        print_log = getattr(renderer, "print_log", None)
         add_warning = getattr(renderer, "add_warning", None)
-        if callable(add_warning):
-            for err in pre_result.errors:
+        seen_bodies: set[str] = set()
+        for err in pre_result.errors:
+            _, _, body = err.partition(": ")
+            key = body or err
+            if key in seen_bodies:
+                if callable(add_warning):
+                    add_warning(err, False)
+                continue
+            seen_bodies.add(key)
+            if callable(print_log):
+                print_log(err)
+            if callable(add_warning):
                 add_warning(err, False)
 
     child: pexpect.spawn | None = None

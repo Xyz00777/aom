@@ -15,6 +15,7 @@ This module has two responsibilities, split by purity:
 
 from __future__ import annotations
 
+import os
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
@@ -29,9 +30,20 @@ from ansible_aom.core.parser import (
 _PREFLIGHT_TIMEOUT_S = 30.0
 
 
-def assemble_definitions(
-    *, plays: list[dict], play_hosts: list[dict]
-) -> list[PlayDefinition]:
+def _preflight_env() -> dict[str, str]:
+    """Environment for preflight subprocesses.
+
+    `ANSIBLE_NOCOLOR=1` forces ansible-playbook to emit plain stderr even
+    when the subprocess has no TTY. Without it, ansible suppresses error
+    output to stderr entirely on non-interactive runs, which would leave
+    us with empty `(no stderr)` messages for syntax errors and similar.
+    """
+    env = os.environ.copy()
+    env["ANSIBLE_NOCOLOR"] = "1"
+    return env
+
+
+def assemble_definitions(*, plays: list[dict], play_hosts: list[dict]) -> list[PlayDefinition]:
     """Build PlayDefinition objects from parsed --list-tasks / --list-hosts dicts.
 
     Args:
@@ -99,6 +111,7 @@ def _spawn_one(
             text=True,
             timeout=_PREFLIGHT_TIMEOUT_S,
             check=False,
+            env=_preflight_env(),
         )
     except FileNotFoundError as exc:
         return 127, "", f"executable not found: {exc}"

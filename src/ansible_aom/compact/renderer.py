@@ -385,6 +385,15 @@ class CompactRenderer:
             # Restart display after password prompt
             self._display.start()
 
+    def print_log(self, message: str) -> None:
+        """Print a log line above the status panel.
+
+        Thin pass-through to the Display. Used by the runner to surface
+        preflight errors verbatim — these are too important to hide
+        behind just a counter.
+        """
+        self._display.print_log(message)
+
     def add_warning(self, message: str, is_deprecation: bool = False) -> None:
         """Add a warning or deprecation detected from PTY stream.
 

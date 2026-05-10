@@ -6,9 +6,7 @@ from ansible_aom.core.models import PlayDefinition, RoleGroupDefinition, TaskDef
 
 
 def _td(name: str, role: str | None = None) -> TaskDefinition:
-    return TaskDefinition(
-        name=name, role=role, tags=[], play_id="1", play_order=1, task_order=0
-    )
+    return TaskDefinition(name=name, role=role, tags=[], play_id="1", play_order=1, task_order=0)
 
 
 def test_format_preflight_summary_empty_returns_none():

@@ -74,9 +74,7 @@ def test_run_preflight_executable_not_found_records_error(tmp_path: Path) -> Non
 
     assert result.definitions == []
     assert result.plays == []
-    assert any(
-        "not found" in err.lower() or "no such" in err.lower() for err in result.errors
-    )
+    assert any("not found" in err.lower() or "no such" in err.lower() for err in result.errors)
 
 
 def test_run_preflight_list_hosts_failure_yields_definitions_without_resolved_hosts(
@@ -101,6 +99,31 @@ def test_run_preflight_list_hosts_failure_yields_definitions_without_resolved_ho
     assert len(result.definitions) == 2
     assert result.definitions[0].resolved_hosts == []
     assert any("--list-hosts" in err for err in result.errors)
+
+
+def test_run_preflight_sets_ansible_nocolor_env(tmp_path: Path) -> None:
+    """ANSIBLE_NOCOLOR=1 must be set so ansible-playbook emits stderr without colours.
+
+    Without this, ansible suppresses error output entirely when stderr
+    is not a TTY (which is always the case for our captured subprocess).
+    """
+    log = tmp_path / "env.log"
+    script = tmp_path / "ansible-playbook"
+    body = (
+        f"#!{sys.executable}\n"
+        "import os\n"
+        f"open({str(log)!r}, 'a').write(os.environ.get('ANSIBLE_NOCOLOR', '<unset>') + chr(10))\n"
+        "import sys; sys.exit(0)\n"
+    )
+    script.write_text(body)
+    script.chmod(0o755)
+
+    from ansible_aom.core.preflight import run_preflight
+
+    run_preflight(playbook="site.yml", ansible_args=[], executable=str(script))
+
+    lines = log.read_text().splitlines()
+    assert lines == ["1", "1"]
 
 
 def test_run_preflight_passes_ansible_args(tmp_path: Path) -> None:

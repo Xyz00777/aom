@@ -78,9 +78,7 @@ def test_assemble_definitions_invokes_role_grouping():
         {
             "play_number": 1,
             "name": "Bulk role",
-            "tasks": [
-                {"name": f"step {i}", "role": "bigrole", "tags": []} for i in range(6)
-            ],
+            "tasks": [{"name": f"step {i}", "role": "bigrole", "tags": []} for i in range(6)],
         }
     ]
     defs = assemble_definitions(plays=plays, play_hosts=[])
