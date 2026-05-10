@@ -6,10 +6,51 @@ See SPECIFICATION.md Section 3 for command interface details.
 
 import argparse
 import logging
+import os
 import shutil
 import sys
 
 from ansible_aom import __version__
+
+# Files we'll auto-discover as inventory when the user doesn't pass -i.
+# Order is preference order — `inventory.ini` wins over `hosts` because
+# the former is more specific to ansible's conventions.
+_DEFAULT_INVENTORY_NAMES = (
+    "inventory.ini",
+    "inventory.yml",
+    "inventory.yaml",
+    "inventory",
+    "hosts.ini",
+    "hosts.yml",
+    "hosts.yaml",
+    "hosts",
+)
+
+# All flags ansible-playbook accepts for specifying inventory; if the user
+# already supplied any of these we leave their args alone.
+_INVENTORY_FLAGS = ("-i", "--inventory", "--inventory-file")
+
+
+def detect_default_inventory() -> str | None:
+    """Return the first conventional inventory file found in CWD, or None."""
+    for name in _DEFAULT_INVENTORY_NAMES:
+        if os.path.isfile(name):
+            return name
+    return None
+
+
+def ensure_inventory_arg(ansible_args: list[str]) -> list[str]:
+    """If no -i/--inventory flag is set, prepend one pointing at the default file.
+
+    A no-op when the user already supplied an inventory or no default exists.
+    Returns the (possibly modified) args list — never mutates the input.
+    """
+    if any(arg in _INVENTORY_FLAGS or arg.startswith("--inventory=") for arg in ansible_args):
+        return ansible_args
+    default = detect_default_inventory()
+    if default is None:
+        return ansible_args
+    return ["-i", default, *ansible_args]
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -223,9 +264,11 @@ def main() -> int:
         from ansible_aom.renderer.factory import create_renderer
         from ansible_aom.runner import run_playbook
 
+        ansible_args = ensure_inventory_arg(args.ansible_args)
+
         try:
             renderer = create_renderer(tui_mode=args.tui, is_tty=sys.stdout.isatty())
-            return run_playbook(args.playbook, args.ansible_args, renderer)
+            return run_playbook(args.playbook, ansible_args, renderer)
         except KeyboardInterrupt:
             # The runner installs its own KeyboardInterrupt handling, but
             # an interrupt during renderer construction can still bubble up.
