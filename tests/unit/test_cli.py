@@ -257,12 +257,14 @@ class TestRendererFactory:
         renderer = create_renderer()
         assert hasattr(renderer, "start")
 
-    def test_factory_passes_kwargs_to_renderer(self):
-        """TC-005: Factory passes kwargs to renderer constructor."""
+    def test_factory_forwards_is_tty_to_compact_renderer(self):
+        """create_renderer(is_tty=False) constructs a non-TTY CompactRenderer."""
+        from ansible_aom.compact.renderer import CompactRenderer
         from ansible_aom.renderer.factory import create_renderer
 
-        renderer = create_renderer(verbose=True, playbook="test.yml")
-        assert renderer is not None
+        renderer = create_renderer(tui_mode=False, is_tty=False)
+        assert isinstance(renderer, CompactRenderer)
+        assert renderer._display.is_tty is False
 
 
 class TestBasicCLIInvocation:

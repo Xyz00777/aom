@@ -242,19 +242,14 @@ class CompactRenderer:
         _start_time: Timestamp when rendering started.
     """
 
-    def __init__(self, **kwargs: object) -> None:
+    def __init__(self, is_tty: bool = True) -> None:
         """Initialize the compact renderer.
 
         Args:
-            **kwargs: Additional configuration options.
-                - is_tty: Whether stdout is a TTY (default: True).
+            is_tty: Whether stdout is a TTY. Non-TTY mode disables ANSI
+                cursor control and prints log lines as plain text.
         """
-        is_tty = kwargs.get("is_tty", True)
-        if isinstance(is_tty, bool):
-            self._display = Display(is_tty=is_tty)
-        else:
-            self._display = Display(is_tty=True)
-
+        self._display = Display(is_tty=is_tty)
         self._state: RunState | None = None
         self._playbook: str = ""
         self._args: list[str] = []
