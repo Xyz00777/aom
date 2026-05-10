@@ -536,3 +536,120 @@ open" list.
   unknown task UUIDs arrive.
 - **`_row_count()` width-aware wrapping**, **SIGWINCH**, **ASCII
   fallback wiring** (unchanged).
+
+## 2026-05-10 Pre-flight summary + error visibility (same branch)
+
+Two follow-up polish slices on top of the preflight orchestration:
+
+### What changed (slice 1: startup tree preview)
+
+- **`compact/renderer.py::format_preflight_summary`** — pure formatter
+  that turns the `list[PlayDefinition]` from preflight into a one-shot
+  startup summary, one line per play:
+
+  ```
+  PLAY [Setup web servers] (webservers, 2 hosts, 3 tasks)
+  PLAY [Setup database]    (dbservers, 1 host, 2 tasks)
+  ```
+
+  RoleGroupDefinition entries contribute their inner task count, not
+  1. Pluralisation handled (1 host vs N hosts). Returns None for empty
+  input so the caller can skip the print.
+- **`compact/renderer.py::CompactRenderer.set_definitions`** — calls
+  `_display.print_log()` with the formatted summary so it lands above
+  the status panel in TTY mode and as plain text in pipe mode.
+
+### What changed (slice 2: error visibility + NOCOLOR)
+
+- **`core/preflight.py::_preflight_env`** — sets `ANSIBLE_NOCOLOR=1`
+  in the subprocess environment. ansible-playbook otherwise suppresses
+  stderr entirely when stderr is not a TTY (which is always the case
+  for our captured subprocess), leaving us with empty `(no stderr)`
+  messages for syntax errors. With NOCOLOR set, the actual YAML
+  diagnostic — line, column, source-context lines — comes through.
+- **`compact/renderer.py::CompactRenderer.print_log`** — thin
+  pass-through to `Display.print_log()`. Lets the runner surface
+  important messages above the panel without going through the
+  warning-counter aggregation.
+- **`runner.py::run_playbook`** — preflight errors now have two
+  surfaces: full message via `renderer.print_log()` (so the user can
+  actually read the YAML diagnostic), and counter bump via
+  `add_warning()` (so the panel reflects the failure). Identical
+  error bodies from `--list-tasks` and `--list-hosts` are deduped
+  for the print path; the counter still bumps for both since both
+  subprocesses really did fail.
+
+### Test impact
+
+- Suite: **1622 passed, 0 failed, 6 skipped** (was 1611/0/6, +11 new
+  tests).
+- `tests/compact/test_preflight_summary.py` — 6 tests: empty input,
+  single play, multi-play, pluralisation, role-group task counting,
+  no-resolved-hosts fallback.
+- `tests/compact/test_renderer_set_definitions.py` — 2 added tests
+  for the print-log behaviour.
+- `tests/integration/test_preflight_runner.py` — 1 added test
+  asserting `ANSIBLE_NOCOLOR=1` is set in subprocess env.
+- `tests/integration/test_runner.py::TestRunnerPreflight` — 2 added
+  tests: `print_log` called for preflight errors, dedup on identical
+  bodies vs distinct bodies.
+
+### End-to-end smoke (pipe mode)
+
+```
+$ uv run aom .sisyphus/test-fixtures/simple.yml -i localhost, -c local
+PLAY [Simple test playbook] (localhost, 1 host, 3 tasks)
+
+PLAY [Simple test playbook] *********...
+TASK [First task] *********...
+ok: [localhost]
+TASK [Second task with tags] *********...
+ok: [localhost]
+TASK [Third task] *********...
+ok: [localhost]
+.sisyphus/test-fixtures/simple.yml │ 1/1 hosts │ ⚠ 1 │ ✱ 1 │ 0:00:00 ●
+
+$ uv run aom .sisyphus/test-fixtures/syntax_error.yml -i localhost, -c local
+--list-tasks failed (exit 4): [ERROR]: YAML parsing failed: While scanning a simple key could not find expected ':'.
+Origin: /Users/felix/Coding/ansible-aom/.sisyphus/test-fixtures/syntax_error.yml:10:12
+
+ 8     - name: Broken task
+ 9       debug
+10         msg: "bad syntax - missing colon"
+              ^ column 12
+.sisyphus/test-fixtures/syntax_error.yml │ 0/0 hosts │ ⚠ 2 │ 0:00:00 ✖
+$ echo $?
+4
+```
+
+The syntax_error case used to be empty-log + exit 4 — now shows the
+full ansible diagnostic above the panel, deduped to one print, with
+the counter still showing `⚠ 2` since both preflight subprocesses
+genuinely failed.
+
+### Quirk noted: `ANSIBLE_NOCOLOR` vs `ANSIBLE_FORCE_COLOR`
+
+ansible-playbook's TTY-detection-driven output has three modes:
+- TTY stderr → coloured output
+- non-TTY stderr (default) → suppressed entirely
+- non-TTY stderr + `ANSIBLE_NOCOLOR=1` → plain output
+- non-TTY stderr + `ANSIBLE_FORCE_COLOR=1` → coloured output
+
+We use NOCOLOR rather than FORCE_COLOR + strip — saves us an ANSI-strip
+pass and there's no benefit to colouring output we're going to wrap in
+our own format string anyway.
+
+### Still open after this slice
+
+- **Task progress in status bar** — currently `X/Y hosts` only. Adding
+  `task: M/N` would use preflight's static count, but include_tasks
+  inflates the dynamic count. Probably wants a "tasks done" tally
+  rather than a fraction.
+- **TUI preflight integration**, **`include_tasks` dynamic
+  expansion**, **width-aware row count**, **SIGWINCH**, **ASCII
+  fallback** — all unchanged from before.
+- **Renderer Protocol cleanup** — `print_log` joins `tick`/`add_warning`
+  as getattr-guarded on the runner side. All four (incl. preflight's
+  `set_definitions`) want to be required Protocol methods once the TUI
+  is wired through `runner.run_playbook`, so no more stringly-typed
+  attribute lookups.
