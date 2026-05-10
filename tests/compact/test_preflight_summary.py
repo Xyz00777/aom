@@ -131,3 +131,100 @@ def test_format_preflight_summary_handles_no_resolved_hosts():
     assert summary is not None
     # Falls back to showing the host pattern
     assert "unknown" in summary or "0 hosts" in summary
+
+
+def _td_tagged(name: str, tags: list[str]) -> TaskDefinition:
+    return TaskDefinition(name=name, role=None, tags=tags, play_id="1", play_order=1, task_order=0)
+
+
+def test_collect_tags_unique_sorted_across_plays():
+    from ansible_aom.compact.renderer import collect_tags
+
+    defs = [
+        PlayDefinition(
+            id="1",
+            name="A",
+            hosts="all",
+            resolved_hosts=["h1"],
+            tasks=[_td_tagged("t1", ["deploy", "restart"]), _td_tagged("t2", ["deploy"])],
+        ),
+        PlayDefinition(
+            id="2",
+            name="B",
+            hosts="db",
+            resolved_hosts=["d1"],
+            tasks=[_td_tagged("t3", ["install", "deploy"])],
+        ),
+    ]
+    assert collect_tags(defs) == ["deploy", "install", "restart"]
+
+
+def test_collect_tags_empty_when_no_tags():
+    from ansible_aom.compact.renderer import collect_tags
+
+    defs = [
+        PlayDefinition(
+            id="1",
+            name="A",
+            hosts="all",
+            resolved_hosts=["h1"],
+            tasks=[_td_tagged("t1", []), _td_tagged("t2", [])],
+        )
+    ]
+    assert collect_tags(defs) == []
+
+
+def test_collect_tags_handles_role_group_definition():
+    from ansible_aom.compact.renderer import collect_tags
+
+    defs = [
+        PlayDefinition(
+            id="1",
+            name="Bulk",
+            hosts="all",
+            resolved_hosts=["h1"],
+            tasks=[
+                RoleGroupDefinition(
+                    role="webrole",
+                    tasks=[_td_tagged("inner", ["webrole", "configure"])],
+                )
+            ],
+        )
+    ]
+    assert collect_tags(defs) == ["configure", "webrole"]
+
+
+def test_format_preflight_summary_appends_tag_line_when_tags_present():
+    from ansible_aom.compact.renderer import format_preflight_summary
+
+    defs = [
+        PlayDefinition(
+            id="1",
+            name="A",
+            hosts="all",
+            resolved_hosts=["h1"],
+            tasks=[_td_tagged("t1", ["deploy", "restart"])],
+        )
+    ]
+
+    summary = format_preflight_summary(defs)
+    assert summary is not None
+    assert "Tags: deploy, restart" in summary
+
+
+def test_format_preflight_summary_omits_tag_line_when_no_tags():
+    from ansible_aom.compact.renderer import format_preflight_summary
+
+    defs = [
+        PlayDefinition(
+            id="1",
+            name="A",
+            hosts="all",
+            resolved_hosts=["h1"],
+            tasks=[_td_tagged("t1", [])],
+        )
+    ]
+
+    summary = format_preflight_summary(defs)
+    assert summary is not None
+    assert "Tags:" not in summary

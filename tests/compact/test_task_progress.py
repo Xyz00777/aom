@@ -97,16 +97,22 @@ def test_count_total_tasks_empty():
     assert count_total_tasks([]) == 0
 
 
-def test_count_completed_tasks_counts_only_terminal_tasks():
+def test_count_completed_tasks_counts_tasks_with_host_results():
+    """A task counts as complete once any host has reported a result.
+
+    Mirrors the real flow: ``_handle_v2_runner_on_ok`` populates
+    ``task.hosts``; tasks announced but not yet executed have empty hosts.
+    """
     state = RunState(playbook="site.yml")
     play = PlayRunState(play_id="1", name="web")
 
-    done_ok = TaskRunState(task_id="t1", name="done-ok", status=Status.OK)
+    done_ok = TaskRunState(task_id="t1", name="done-ok")
     done_ok.hosts["w1"] = HostRunState(hostname="w1", status=Status.OK)
 
-    done_failed = TaskRunState(task_id="t2", name="done-failed", status=Status.FAILED)
+    done_failed = TaskRunState(task_id="t2", name="done-failed")
     done_failed.hosts["w1"] = HostRunState(hostname="w1", status=Status.FAILED)
 
+    # Announced but no host events yet — in flight, should NOT count.
     running = TaskRunState(task_id="t3", name="running", status=Status.RUNNING)
     pending = TaskRunState(task_id="t4", name="pending", status=Status.PENDING)
 
@@ -119,22 +125,26 @@ def test_count_completed_tasks_counts_only_terminal_tasks():
     assert count_completed_tasks(state) == 2
 
 
-def test_count_completed_tasks_treats_skipped_and_unreachable_as_done():
+def test_count_completed_tasks_counts_skipped_and_unreachable_results():
+    """Skipped / unreachable / changed host results all count as task completion."""
     state = RunState(playbook="site.yml")
     play = PlayRunState(play_id="1", name="web")
 
-    skipped = TaskRunState(task_id="t1", name="skipped", status=Status.SKIPPED)
-    unreachable = TaskRunState(task_id="t2", name="unreachable", status=Status.UNREACHABLE)
-    completed = TaskRunState(task_id="t3", name="completed", status=Status.COMPLETED)
-    changed = TaskRunState(task_id="t4", name="changed", status=Status.CHANGED)
+    skipped = TaskRunState(task_id="t1", name="skipped")
+    skipped.hosts["w1"] = HostRunState(hostname="w1", status=Status.SKIPPED)
+
+    unreachable = TaskRunState(task_id="t2", name="unreachable")
+    unreachable.hosts["w1"] = HostRunState(hostname="w1", status=Status.UNREACHABLE)
+
+    changed = TaskRunState(task_id="t3", name="changed")
+    changed.hosts["w1"] = HostRunState(hostname="w1", status=Status.CHANGED)
 
     play.tasks["t1"] = skipped
     play.tasks["t2"] = unreachable
-    play.tasks["t3"] = completed
-    play.tasks["t4"] = changed
+    play.tasks["t3"] = changed
     state.plays["1"] = play
 
-    assert count_completed_tasks(state) == 4
+    assert count_completed_tasks(state) == 3
 
 
 def test_count_completed_tasks_empty_state():

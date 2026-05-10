@@ -150,29 +150,46 @@ def count_total_tasks(definitions: list[PlayDefinition]) -> int:
     return sum(_count_tasks(play) for play in definitions)
 
 
-# Statuses considered "done" for task-progress accounting. RUNNING and
-# PENDING are explicitly excluded — a task is in flight until every host
-# has produced a terminal result.
-_TASK_DONE_STATUSES = frozenset(
-    {
-        Status.OK,
-        Status.CHANGED,
-        Status.FAILED,
-        Status.SKIPPED,
-        Status.UNREACHABLE,
-        Status.COMPLETED,
-    }
-)
-
-
 def count_completed_tasks(state: RunState) -> int:
-    """Count tasks across all plays whose status has reached a terminal value."""
+    """Count tasks across all plays that have produced at least one host result.
+
+    The state machine populates ``TaskRunState.hosts`` only when a
+    ``v2_runner_on_*`` event fires (ok / failed / skipped / unreachable),
+    so a task with a non-empty ``hosts`` dict has finished execution from
+    the perspective of every host that reported. Tasks that have only
+    been *announced* (``v2_playbook_on_task_start``) but produced no
+    results yet keep ``hosts`` empty and don't count — that's the
+    in-flight state we want to exclude.
+
+    For the status bar this is a monotonic, ansible-faithful progress
+    signal: linear-strategy plays advance one task at a time, so the
+    previous task's host results land before the next task starts.
+    Multi-host free-strategy plays can briefly over-count by one, which
+    is acceptable for a coarse indicator.
+    """
     total = 0
     for play in state.plays.values():
         for task in play.tasks.values():
-            if task.status in _TASK_DONE_STATUSES:
+            if task.hosts:
                 total += 1
     return total
+
+
+def collect_tags(definitions: list[PlayDefinition]) -> list[str]:
+    """Unique tags across every leaf TaskDefinition, alphabetically sorted.
+
+    Used for the startup tag preview line. Expands ``RoleGroupDefinition``
+    entries so tags inside role groups still surface.
+    """
+    seen: set[str] = set()
+    for play in definitions:
+        for entry in play.tasks:
+            if isinstance(entry, RoleGroupDefinition):
+                for task in entry.tasks:
+                    seen.update(task.tags)
+            else:
+                seen.update(entry.tags)
+    return sorted(seen)
 
 
 def format_preflight_summary(definitions: list[PlayDefinition]) -> str | None:
@@ -207,6 +224,10 @@ def format_preflight_summary(definitions: list[PlayDefinition]) -> str | None:
         task_part = f"{task_count} task" + ("s" if task_count != 1 else "")
 
         lines.append(f"PLAY [{play.name}] ({host_part}, {task_part})")
+
+    tags = collect_tags(definitions)
+    if tags:
+        lines.append(f"Tags: {', '.join(tags)}")
 
     return "\n".join(lines)
 
