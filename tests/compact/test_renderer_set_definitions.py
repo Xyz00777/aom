@@ -76,6 +76,30 @@ def test_set_definitions_with_empty_list_keeps_zero_hosts(capsys):
     assert "0/0 hosts" in captured.out
 
 
+def test_set_definitions_prints_summary_above_status_panel(capsys):
+    """The startup summary lands above the status panel via print_log."""
+    renderer = CompactRenderer(is_tty=False)
+    renderer.start("site.yml", [])
+
+    renderer.set_definitions(_build_definitions())
+
+    captured = capsys.readouterr()
+    # Summary lines appear in stdout (non-TTY path prints them as plain text)
+    assert "PLAY [Web setup]" in captured.out
+    assert "PLAY [DB setup]" in captured.out
+
+
+def test_set_definitions_with_empty_list_emits_no_summary(capsys):
+    """Empty preflight result should not print a stray header."""
+    renderer = CompactRenderer(is_tty=False)
+    renderer.start("site.yml", [])
+
+    renderer.set_definitions([])
+
+    captured = capsys.readouterr()
+    assert "PLAY [" not in captured.out
+
+
 def test_set_definitions_unions_hosts_across_plays(capsys):
     """Hosts that appear in multiple plays count once each."""
     renderer = CompactRenderer(is_tty=False)

@@ -272,14 +272,21 @@ class CompactRenderer:
         self._display.update(status_bar)
 
     def set_definitions(self, definitions: list) -> None:
-        """Store preflight definitions and recompute the initial status bar.
+        """Store preflight definitions and emit the startup summary.
 
-        The host count in the status bar is the union of every play's
-        resolved_hosts. We compute it once here so the user sees `0/N hosts`
-        from the very first frame instead of `0/0 hosts` until JSONL
-        events start filling in hosts incrementally.
+        Two effects:
+        1. The status bar's host count switches from `0/0` to `0/N` from
+           the next frame onwards, using the union of every play's
+           resolved_hosts as the denominator.
+        2. A one-shot startup summary (PLAY/host/task counts per play)
+           is printed above the status panel, mirroring nom's preview.
         """
         self._definitions = list(definitions)
+
+        summary = format_preflight_summary(self._definitions)
+        if summary is not None:
+            self._display.print_log(summary)
+
         if self._state is None:
             return
         self._render_status_bar()
