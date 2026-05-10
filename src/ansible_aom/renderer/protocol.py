@@ -42,3 +42,30 @@ class Renderer(Protocol):
     def stop(self) -> None:
         """Stop rendering and clean up."""
         ...
+
+    def add_warning(self, message: str, is_deprecation: bool = False) -> None:
+        """Surface a warning or deprecation to the user.
+
+        Implementations are expected to make the message visible (above
+        the panel, in a dedicated panel, etc.) and bump any visible
+        counter. Renderers that don't have a visible UI may treat this
+        as a no-op.
+        """
+        ...
+
+    def print_log(self, message: str) -> None:
+        """Print a log line above the live panel.
+
+        Implementations may render directly to stdout, log to a file,
+        or no-op for headless renderers.
+        """
+        ...
+
+    def tick(self) -> None:
+        """Refresh time-based UI elements during quiet periods.
+
+        Called by the runner when no output has been received for a
+        timeout window. Renderers that show elapsed time use this to
+        keep the clock moving; renderers with their own loop may no-op.
+        """
+        ...

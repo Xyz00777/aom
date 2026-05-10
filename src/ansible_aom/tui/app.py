@@ -70,6 +70,18 @@ class AOMApp(App[None]):
         """
         return None
 
+    def add_warning(self, message: str, is_deprecation: bool = False) -> None:
+        """Renderer Protocol — no-op. TUI surfaces warnings via RunState today."""
+        return None
+
+    def print_log(self, message: str) -> None:
+        """Renderer Protocol — no-op. TUI renders its own panels, no scrolling log."""
+        return None
+
+    def tick(self) -> None:
+        """Renderer Protocol — no-op. Textual has its own clock."""
+        return None
+
     def update_state(self, event: dict) -> None:
         """Handle a new JSONL event.
 

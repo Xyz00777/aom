@@ -74,17 +74,12 @@ def run_playbook(
     # the JSONL run so the renderer can show plays/tasks/host count from
     # the very first frame. Failures are non-fatal — surfaced as warnings.
     pre_result = run_preflight(playbook=playbook, ansible_args=ansible_args)
-    set_definitions = getattr(renderer, "set_definitions", None)
-    if callable(set_definitions):
-        set_definitions(pre_result.definitions)
-    if pre_result.errors:
-        # add_warning prints the message above the panel AND bumps the
-        # counter. The renderer's own dedupe handles repeats so it's safe
-        # to forward every error here without extra filtering.
-        add_warning = getattr(renderer, "add_warning", None)
-        if callable(add_warning):
-            for err in pre_result.errors:
-                add_warning(err, False)
+    renderer.set_definitions(pre_result.definitions)
+    # add_warning prints the message above the panel AND bumps the counter.
+    # The renderer's own dedupe handles repeats so it's safe to forward
+    # every error here without extra filtering.
+    for err in pre_result.errors:
+        renderer.add_warning(err, False)
 
     child: pexpect.spawn | None = None
     try:
@@ -157,13 +152,9 @@ def _drive(
         elif idx == timeout_idx:
             # No output yet — perfectly normal during long-running tasks.
             # Wake the renderer so the elapsed-time counter keeps moving
-            # even when ansible is silent. tick() is optional on the
-            # Renderer Protocol; renderers that don't implement it
-            # (currently the TUI) just don't get periodic refreshes,
-            # which is fine because they have their own clock.
-            tick = getattr(renderer, "tick", None)
-            if callable(tick):
-                tick()
+            # even when ansible is silent. Renderers with their own clock
+            # (TUI) implement tick() as a no-op.
+            renderer.tick()
             continue
         else:
             # Password prompt fired. Build the prompt text from the
@@ -194,18 +185,12 @@ def _feed(line: str, parser: PtyStreamParser, renderer: Renderer) -> None:
 
     Warnings (`[WARNING]:` / `[DEPRECATION WARNING]:` lines from ansible)
     are detected by the parser's plaintext path but never reach the
-    renderer through the JSONL event flow. Drain them here and forward
-    via `add_warning` if the renderer supports it (CompactRenderer does;
-    the TUI may not, hence the getattr guard).
+    renderer through the JSONL event flow — drain them and forward via
+    `add_warning` (renderers without a visible warning surface implement
+    it as a no-op).
     """
     for event in parser.feed_line(line):
         renderer.update_state(event)
 
-    drained = parser.drain_warnings()
-    if not drained:
-        return
-    add_warning = getattr(renderer, "add_warning", None)
-    if not callable(add_warning):
-        return
-    for warning in drained:
-        add_warning(warning.message, warning.type == WarningType.DEPRECATION)
+    for warning in parser.drain_warnings():
+        renderer.add_warning(warning.message, warning.type == WarningType.DEPRECATION)
