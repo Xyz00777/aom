@@ -870,3 +870,65 @@ Larger / blocked: 9-14 unchanged from yesterday.
 `runner.py:117` is `except pexpect.exceptions.ExceptionPexpect, FileNotFoundError, OSError:`
 — Python 3.14 happily parses this as `except (A, B, C):` (tuple
 expression as the test). It's valid 3.x; not a bug; just unusual.
+
+---
+
+## 2026-05-10 (third pass) — Protocol promotion, kwargs cleanup, duplicate-playbook detection
+
+User asked: "continue roadmap. simplify code & usage where possible."
+
+Three more slices delivered (1661 passing, 6 skipped).
+
+### 1. Promote optional Protocol methods to required (#1)
+`print_log`, `add_warning`, `tick` were getattr-guarded throughout
+`runner.py`. Adding no-op stubs to AOMApp lets us drop all four
+guards (the fourth being `set_definitions`, which was already on the
+Protocol but still guarded). Net: 4 `getattr(...)` lookups gone, the
+Protocol is now an honest contract, and the runner reads top-down
+without lookup-then-call dances.
+
+### 2. Drop **kwargs from CompactRenderer + factory
+`CompactRenderer.__init__(**kwargs)` only ever read `is_tty`. The
+factory blindly forwarded kwargs, which would have crashed for
+TUI mode if anything other than `is_tty` was passed. Replaced with
+explicit `is_tty: bool = True` parameters on both. The
+`test_factory_passes_kwargs_to_renderer` test was renamed to
+`test_factory_forwards_is_tty_to_compact_renderer` and tightened
+to assert the actual contract (Display.is_tty matches the request).
+
+### 3. Detect duplicate playbook positional (#3 from yesterday's roadmap, repurposed)
+Direct response to the user's reproducer (`aom site.yml ... site.yml`).
+`detect_duplicate_playbook(playbook, ansible_args)` checks if the
+positional appears (path-normalised) anywhere in ansible_args. Main
+exits 2 with a one-line message before touching pexpect. The
+trim-stderr work from earlier still catches the case where the user's
+typo is something other than an exact path repeat.
+
+Bonus tidy: dropped a redundant local `import os` from the verbose
+branch in `cli.py` (`os` is now imported at module scope for
+`detect_default_inventory`).
+
+### Remaining roadmap
+
+Quick wins:
+- (#4) Better empty-aom output — minor; argparse help is fine
+- (#3-original) `--check` / `--diff` first-class flags — works already
+  via REMAINDER; first-class makes them tab-completable and visible
+  in `--help` but is not strictly a simplification
+
+Feature-shaped: 5, 6, 8 unchanged.
+
+Larger / blocked: 9-14 unchanged.
+
+### Quirks noted but not addressed
+
+- `runner.py:95` `except A, B, C:` — Python 3.x parses this as
+  `except (A, B, C):` (tuple expression as the except test). Valid,
+  unusual, would normally write with parens.
+- `cli.py` exposes `--changes-only` at the top level but no run-path
+  code reads it. It's only meaningful for `aom inspect diff`.
+  Removing or moving it is a separate cleanup with test churn.
+- `aom inspect list` / `aom inspect diff` / etc. print stub messages
+  ("Listing sessions...") that look successful but are vapourware —
+  session recording isn't wired. Worth a clear "not implemented" exit
+  in a future cleanup pass.
