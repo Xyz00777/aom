@@ -116,6 +116,4 @@ class TestRewindCorrectness:
         out = buf.getvalue()
         # The whole flow must never emit CSI 1 F — that would clobber
         # the line above (the user's command in their shell).
-        assert "\x1b[1F" not in out, (
-            f"print_log emitted CSI 1 F after a 1-row status:\n{out!r}"
-        )
+        assert "\x1b[1F" not in out, f"print_log emitted CSI 1 F after a 1-row status:\n{out!r}"

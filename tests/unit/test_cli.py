@@ -440,105 +440,48 @@ class TestAnsibleOptionsPassthrough:
 
 
 class TestInspectSubcommand:
-    """Tests for TC-013 to TC-023: Inspect Subcommand."""
+    """Tests for TC-013 to TC-023: Inspect Subcommand dispatch.
 
-    def test_inspect_subcommand_exists(self):
-        """TC-013: 'inspect' subcommand exists."""
-        from ansible_aom.cli import create_inspect_parser
+    The top-level CLI strips the ``inspect`` token and delegates to
+    ``ansible_aom.inspect.cli.main``. These tests pin the dispatch contract;
+    behaviour of each subcommand is exercised by tests/integration/test_inspect.py.
+    """
 
-        parser = create_inspect_parser()
-        args = parser.parse_args([])
-        assert args.inspect_action == "list"
+    def test_inspect_dispatches_to_inspect_main_with_remaining_argv(self):
+        """TC-013: 'aom inspect list' forwards ['list'] to inspect.cli.main."""
+        from ansible_aom.cli import main
 
-    def test_inspect_list_subcommand(self):
-        """TC-013: 'aom inspect list' lists all sessions."""
-        from ansible_aom.cli import create_inspect_parser
+        with patch("ansible_aom.inspect.cli.main", return_value=0) as mock_main:
+            with patch("sys.argv", ["aom", "inspect", "list"]):
+                result = main()
+                assert result == 0
+                mock_main.assert_called_once_with(["list"])
 
-        parser = create_inspect_parser()
-        args = parser.parse_args(["list"])
-        assert args.inspect_action == "list"
+    def test_inspect_forwards_subcommand_flags(self):
+        """TC-015/TC-016/TC-022: flags after the subcommand reach inspect.cli.main."""
+        from ansible_aom.cli import main
 
-    def test_inspect_show_session(self):
-        """TC-014: 'aom inspect <session-id>' shows session summary."""
-        from ansible_aom.cli import create_inspect_parser
+        with patch("ansible_aom.inspect.cli.main", return_value=0) as mock_main:
+            with patch("sys.argv", ["aom", "inspect", "show", "id1", "--failed", "--json"]):
+                main()
+                mock_main.assert_called_once_with(["show", "id1", "--failed", "--json"])
 
-        parser = create_inspect_parser()
-        args = parser.parse_args(["session-123"])
-        assert args.inspect_action == "session-123"
+    def test_inspect_forwards_diff_subcommand(self):
+        """TC-019: 'aom inspect diff id1 id2' forwards args verbatim."""
+        from ansible_aom.cli import main
 
-    def test_inspect_filter_failed(self):
-        """TC-015: 'aom inspect <id> --failed' shows failed tasks."""
-        from ansible_aom.cli import create_inspect_parser
+        with patch("ansible_aom.inspect.cli.main", return_value=0) as mock_main:
+            with patch("sys.argv", ["aom", "inspect", "diff", "id1", "id2"]):
+                main()
+                mock_main.assert_called_once_with(["diff", "id1", "id2"])
 
-        parser = create_inspect_parser()
-        args = parser.parse_args(["session-123", "--failed"])
-        assert args.failed is True
+    def test_inspect_propagates_exit_code(self):
+        """Exit code from inspect.cli.main flows back through the dispatcher."""
+        from ansible_aom.cli import main
 
-    def test_inspect_filter_host(self):
-        """TC-016: 'aom inspect <id> --host <name>' filters by host."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["session-123", "--host", "web1"])
-        assert args.host == "web1"
-
-    def test_inspect_tree_view(self):
-        """TC-017: 'aom inspect <id> --tree' shows task tree."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["session-123", "--tree"])
-        assert args.tree is True
-
-    def test_inspect_export_artifact(self):
-        """TC-018: 'aom inspect <id> --export' creates .aom file."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["session-123", "--export"])
-        assert args.export is True
-
-    def test_inspect_diff_sessions(self):
-        """TC-019: 'aom inspect diff <id1> <id2>' compares sessions."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["diff", "id1", "id2"])
-        assert args.inspect_action == "diff"
-        assert args.session_ids == ["id1", "id2"]
-
-    def test_inspect_prune_sessions(self):
-        """TC-020: 'aom inspect prune --days 30' removes old sessions."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["prune", "--days", "30"])
-        assert args.inspect_action == "prune"
-        assert args.days == 30
-
-    def test_inspect_tui_mode(self):
-        """TC-021: 'aom inspect --tui' launches TUI for browsing."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["--tui"])
-        assert args.tui is True
-
-    def test_inspect_json_output(self):
-        """TC-022: 'aom inspect <id> --json' outputs JSON."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["session-123", "--json"])
-        assert args.json is True
-
-    def test_inspect_jsonl_output(self):
-        """TC-023: 'aom inspect <id> --jsonl' outputs raw events."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["session-123", "--jsonl"])
-        assert args.jsonl is True
+        with patch("ansible_aom.inspect.cli.main", return_value=2):
+            with patch("sys.argv", ["aom", "inspect", "show", "missing"]):
+                assert main() == 2
 
 
 class TestExitCodes:
@@ -593,26 +536,6 @@ class TestExitCodes:
         with patch("sys.argv", ["aom", "--version"]):
             result = main()
             assert isinstance(result, int)
-
-
-class TestChangesOnlyFlag:
-    """Tests for --changes-only flag."""
-
-    def test_changes_only_flag_exists(self):
-        """--changes-only flag exists."""
-        from ansible_aom.cli import create_parser
-
-        parser = create_parser()
-        args = parser.parse_args(["--changes-only", "playbook.yml"])
-        assert args.changes_only is True
-
-    def test_changes_only_defaults_false(self):
-        """--changes-only defaults to False."""
-        from ansible_aom.cli import create_parser
-
-        parser = create_parser()
-        args = parser.parse_args(["playbook.yml"])
-        assert args.changes_only is False
 
 
 class TestVerboseDiagnostics:
@@ -758,42 +681,6 @@ class TestVerboseDebugLogging:
         aom_logger = logging.getLogger("ansible_aom")
         if aom_logger.level != logging.NOTSET:
             assert aom_logger.level != logging.DEBUG or original_level == logging.DEBUG
-
-
-class TestInspectTUIMode:
-    """Tests for TC-021: Inspect TUI mode."""
-
-    def test_inspect_tui_flag_in_inspect_parser(self):
-        """TC-021: 'aom inspect --tui' flag is parsed correctly."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["--tui"])
-        assert args.tui is True
-
-    def test_inspect_tui_launches_textual_app(self):
-        """TC-021: 'aom inspect --tui' launches Textual TUI for browsing."""
-        from ansible_aom.cli import main
-
-        with patch("sys.argv", ["aom", "inspect", "--tui"]):
-            result = main()
-            assert result == 0
-
-    def test_inspect_without_tui_returns_text_output(self):
-        """TC-021: 'aom inspect list' without --tui returns text output."""
-        from ansible_aom.cli import main
-
-        with patch("sys.argv", ["aom", "inspect", "list"]):
-            result = main()
-            assert result == 0
-
-    def test_inspect_tui_default_is_false(self):
-        """TC-021: Inspect parser defaults tui to False."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args([])
-        assert args.tui is False
 
 
 class TestExitCode1:

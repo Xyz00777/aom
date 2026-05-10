@@ -187,8 +187,14 @@ def _filter_by_host(session: dict, hostname: str) -> dict:
     return result
 
 
-def main() -> int:
-    """CLI entry point for inspect commands."""
+def main(argv: list[str] | None = None) -> int:
+    """CLI entry point for inspect commands.
+
+    Args:
+        argv: Argument list. If None, parses from sys.argv. The top-level
+            ``aom inspect ...`` dispatcher passes ``sys.argv[2:]`` so the
+            ``inspect`` token is consumed before this parser runs.
+    """
     parser = argparse.ArgumentParser(description="Inspect AOM sessions")
     subparsers = parser.add_subparsers(dest="command", help="Subcommand")
 
@@ -224,7 +230,7 @@ def main() -> int:
         "--days", type=int, default=30, help="Remove sessions older than N days"
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.command == "list":
         if getattr(args, "jsonl", False):
