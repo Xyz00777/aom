@@ -12,6 +12,12 @@ Phases:
 import json
 import logging
 import re
+
+# CSI SGR (Select Graphic Rendition) sequences — what colour codes look
+# like in raw terminal output. Strip these before pattern-matching log
+# lines so warnings whose [WARNING]: prefix is wrapped in colour escapes
+# still anchor against the WARNING_PATTERNS regexes.
+_ANSI_SGR_RE = re.compile(r"\x1b\[[0-9;]*m")
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, auto
@@ -154,9 +160,17 @@ class PtyStreamParser:
         return []
 
     def _handle_plaintext(self, line: str) -> None:
-        """Classify and handle non-JSON lines from PTY stream."""
+        """Classify and handle non-JSON lines from PTY stream.
+
+        Real ansible-playbook output is colorised — warnings come through
+        wrapped in SGR escape sequences (e.g. ``\\x1b[1;35m[WARNING]:``).
+        Strip them before pattern-matching so the WARNING_PATTERNS regexes
+        (anchored at line start) still match, and store the stripped form
+        so downstream UI doesn't have to re-strip.
+        """
+        clean = _ANSI_SGR_RE.sub("", line)
         for pattern in self.WARNING_PATTERNS:
-            if re.match(pattern, line):
+            if re.match(pattern, clean):
                 warning_type = WarningType.WARNING
                 if "DEPRECATION" in pattern:
                     warning_type = WarningType.DEPRECATION
@@ -166,7 +180,7 @@ class PtyStreamParser:
                 self._warnings.append(
                     WarningEntry(
                         type=warning_type,
-                        message=line,
+                        message=clean,
                         timestamp=datetime.now(),
                     )
                 )
@@ -228,6 +242,17 @@ class PtyStreamParser:
     @property
     def warnings(self) -> list[WarningEntry]:
         return self._warnings
+
+    def drain_warnings(self) -> list[WarningEntry]:
+        """Return all warnings detected since the last drain and reset.
+
+        Lets the caller (typically the runner) forward newly-seen warnings
+        to the renderer without having to track an index. The internal
+        list is replaced — `self.warnings` is empty afterward.
+        """
+        drained = self._warnings
+        self._warnings = []
+        return drained
 
     @property
     def recap_lines(self) -> list[str]:

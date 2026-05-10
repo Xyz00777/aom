@@ -21,6 +21,7 @@ from typing import Any
 
 import pexpect
 
+from ansible_aom.core.models import WarningType
 from ansible_aom.core.parser import PtyStreamParser
 from ansible_aom.renderer.protocol import Renderer
 
@@ -172,6 +173,22 @@ def _flush_pending(child: pexpect.spawn, parser: PtyStreamParser, renderer: Rend
 
 
 def _feed(line: str, parser: PtyStreamParser, renderer: Renderer) -> None:
-    """Feed one line to the parser and forward emitted events."""
+    """Feed one line to the parser and forward emitted events + warnings.
+
+    Warnings (`[WARNING]:` / `[DEPRECATION WARNING]:` lines from ansible)
+    are detected by the parser's plaintext path but never reach the
+    renderer through the JSONL event flow. Drain them here and forward
+    via `add_warning` if the renderer supports it (CompactRenderer does;
+    the TUI may not, hence the getattr guard).
+    """
     for event in parser.feed_line(line):
         renderer.update_state(event)
+
+    drained = parser.drain_warnings()
+    if not drained:
+        return
+    add_warning = getattr(renderer, "add_warning", None)
+    if not callable(add_warning):
+        return
+    for warning in drained:
+        add_warning(warning.message, warning.type == WarningType.DEPRECATION)

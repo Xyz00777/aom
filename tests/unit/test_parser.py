@@ -1723,3 +1723,53 @@ class TestListTasksEdgeCases:
         assert tasks[0]["name"] == "Install"
         assert tasks[1]["name"] == "Configure"
         assert tasks[2]["name"] == "Restart"
+
+
+class TestWarningDetectionThroughAnsiPrefix:
+    """Real ansible-playbook prefixes warnings with ANSI color codes —
+    e.g. \\x1b[1;35m[WARNING]:\\x1b[0m. The parser must classify them
+    as warnings anyway so the panel's ⚠ counter stays accurate.
+    """
+
+    def test_ansi_prefixed_warning_is_classified(self):
+        from ansible_aom.core.models import WarningType
+        from ansible_aom.core.parser import PtyStreamParser
+
+        parser = PtyStreamParser()
+        line = "\x1b[1;35m[WARNING]: example warning\x1b[0m"
+        parser.feed_line(line + "\n")
+
+        assert len(parser.warnings) == 1
+        assert parser.warnings[0].type == WarningType.WARNING
+        # ANSI codes should be stripped from the stored message so
+        # downstream UI doesn't have to re-strip.
+        assert "\x1b[" not in parser.warnings[0].message
+        assert "[WARNING]: example warning" in parser.warnings[0].message
+
+    def test_ansi_prefixed_deprecation_is_classified(self):
+        from ansible_aom.core.models import WarningType
+        from ansible_aom.core.parser import PtyStreamParser
+
+        parser = PtyStreamParser()
+        line = "\x1b[0;35m[DEPRECATION WARNING]: old API\x1b[0m"
+        parser.feed_line(line + "\n")
+
+        assert len(parser.warnings) == 1
+        assert parser.warnings[0].type == WarningType.DEPRECATION
+        assert "\x1b[" not in parser.warnings[0].message
+
+    def test_plain_warning_still_classified(self):
+        """Backwards-compat: warnings without ANSI prefix still match."""
+        from ansible_aom.core.parser import PtyStreamParser
+
+        parser = PtyStreamParser()
+        parser.feed_line("[WARNING]: bare warning\n")
+        assert len(parser.warnings) == 1
+
+    def test_non_warning_text_with_ansi_passes_through(self):
+        """ANSI-coloured non-warning text must NOT be misclassified."""
+        from ansible_aom.core.parser import PtyStreamParser
+
+        parser = PtyStreamParser()
+        parser.feed_line("\x1b[31msome random colored text\x1b[0m\n")
+        assert parser.warnings == []
