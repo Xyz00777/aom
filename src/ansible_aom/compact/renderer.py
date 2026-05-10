@@ -164,6 +164,29 @@ def format_preflight_summary(definitions: list[PlayDefinition]) -> str | None:
     return "\n".join(lines)
 
 
+def format_failure_recap(state: RunState) -> list[str]:
+    """Build per-failure lines naming the host and task that went wrong.
+
+    Returns one line per (host, task) pair that ended in FAILED or
+    UNREACHABLE. Empty list when nothing failed — handle_completion uses
+    that as a signal to suppress the recap section entirely.
+
+    Format::
+
+        FAILED: web2 — install nginx
+        UNREACHABLE: db1 — gather facts
+    """
+    lines: list[str] = []
+    for play in state.plays.values():
+        for task in play.tasks.values():
+            for hostname, host_state in task.hosts.items():
+                if host_state.status == Status.FAILED:
+                    lines.append(f"FAILED: {hostname} — {task.name}")
+                elif host_state.status == Status.UNREACHABLE:
+                    lines.append(f"UNREACHABLE: {hostname} — {task.name}")
+    return lines
+
+
 def determine_exit_code(state: RunState) -> int:
     """Determine exit code from RunState.
 
@@ -495,6 +518,14 @@ class CompactRenderer:
         # way to see who succeeded vs who failed at a glance.
         for line in self._format_per_host_lines():
             print(f"  {line}")
+
+        # On a non-clean exit, also list which (host, task) pairs failed.
+        # The aggregate counts answer "did it work?"; the recap answers
+        # "what do I need to look at?". Skipped on success — there's
+        # nothing to list and the clutter would be misleading.
+        if exit_code != 0 and self._state is not None:
+            for line in format_failure_recap(self._state):
+                print(f"  {line}")
 
     def _format_per_host_lines(self) -> list[str]:
         """Build one summary line per host, ordered by first-seen.
