@@ -798,3 +798,75 @@ Ranked rough notes; pick which are worth a slice:
     + parameter threading.
 14. **Session recording** — write `.aom/<session_id>/` with raw JSONL,
     state snapshot, diagnostics. Enables `aom inspect`.
+
+---
+
+## 2026-05-10 (later) — Argparse-wall trim, recap-style summary, inventory auto-detect
+
+User reported (verbatim):
+> `uv run aom .sisyphus/test-fixtures/simple.yml -i localhost -c local
+> .sisyphus/test-fixtures/simple.yml`
+> ... `ansible-playbook: error: unrecognized arguments: ...` followed
+> by ~200 lines of `--help` text dumped twice into the panel.
+
+Three slices delivered, all TDD, all green (1656 passing, 6 skipped).
+
+### 1. Trim argparse help wall from preflight stderr
+`core/preflight._trim_stderr()` extracts only lines matching
+`^[\w.-]+:\s*error:\s*.+` from stderr; falls back to the first 5
+non-empty lines when no marker is present. Drops the redundant
+`print_log` path in `runner.py` — `add_warning` already prints + bumps
+counter, so the two-surface dance produced doubled output.
+
+Net effect on the user's command above: from ~200 lines of help text
+to two clean lines:
+```
+[WARNING] --list-tasks failed (exit 2): ansible-playbook: error: unrecognized arguments: ...
+[WARNING] --list-hosts failed (exit 2): ansible-playbook: error: unrecognized arguments: ...
+```
+
+Tests: `test_preflight.py` (5 new `_trim_stderr` cases) +
+`test_preflight_runner.py` (1 new integration). Two old runner
+tests pinning `print_log`-side dedupe deleted; replaced by single
+`test_run_playbook_forwards_every_preflight_error_to_add_warning`.
+
+### 2. Failure recap on completion
+New `format_failure_recap(state)` in `compact/renderer.py` returns one
+line per (host, task) pair that ended FAILED or UNREACHABLE.
+`handle_completion` calls it after the per-host summary block, gated on
+`exit_code != 0`. Visual: indented under the status line, mirrors
+the per-host summary's two-space indent.
+
+Roadmap item #7 from yesterday — checked off.
+
+### 3. Inventory auto-detect (CLI)
+`cli.detect_default_inventory()` walks a preference-ordered tuple of
+conventional names (`inventory.ini` → `.yml`/.yaml → `inventory` →
+`hosts.ini` → `hosts.yml`/.yaml → `hosts`). `ensure_inventory_arg()`
+prepends `-i <path>` to ansible_args iff none of `-i`,
+`--inventory`, `--inventory-file`, `--inventory=...` is present AND a
+candidate file exists in CWD.
+
+Roadmap item #2 — checked off.
+
+### What's still open
+
+Quick wins remaining:
+- (#1) Promote optional Protocol methods (`print_log`, `add_warning`,
+  `tick`, `set_definitions`) to required. Now that all CompactRenderer
+  call sites use them, AOMApp just needs no-op stubs.
+- (#3) `--check`/`--diff` first-class flags
+- (#4) Better empty-aom output
+
+Feature-shaped:
+- (#5) Task progress in status bar — use preflight task count as denom
+- (#6) Verbose passthrough — `-v` collision needs renaming
+- (#8) Tag preview in preflight summary
+
+Larger / blocked: 9-14 unchanged from yesterday.
+
+### One quirk noted (not fixed)
+
+`runner.py:117` is `except pexpect.exceptions.ExceptionPexpect, FileNotFoundError, OSError:`
+— Python 3.14 happily parses this as `except (A, B, C):` (tuple
+expression as the test). It's valid 3.x; not a bug; just unusual.
