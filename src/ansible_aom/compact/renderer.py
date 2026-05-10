@@ -475,6 +475,50 @@ class CompactRenderer:
         # the only output Display ever produces (PQ6).
         print(final_status)
 
+        # Per-host breakdown underneath. With one host this is barely
+        # different from the aggregate, but with N hosts it's the only
+        # way to see who succeeded vs who failed at a glance.
+        for line in self._format_per_host_lines():
+            print(f"  {line}")
+
+    def _format_per_host_lines(self) -> list[str]:
+        """Build one summary line per host, ordered by first-seen.
+
+        Aggregates per-host status counts across every task in every
+        play, then renders each host through `format_host_summary`.
+        Returns an empty list when no hosts have any state — keeps the
+        completion output clean in preflight-only-failure scenarios.
+        """
+        if self._state is None:
+            return []
+
+        host_counts: dict[str, dict[str, int]] = {}
+        for play in self._state.plays.values():
+            for task in play.tasks.values():
+                for hostname, host_state in task.hosts.items():
+                    counts = host_counts.setdefault(
+                        hostname, {"ok": 0, "changed": 0, "failed": 0, "unreachable": 0}
+                    )
+                    if host_state.status == Status.OK:
+                        counts["ok"] += 1
+                    elif host_state.status == Status.CHANGED:
+                        counts["changed"] += 1
+                    elif host_state.status == Status.FAILED:
+                        counts["failed"] += 1
+                    elif host_state.status == Status.UNREACHABLE:
+                        counts["unreachable"] += 1
+
+        return [
+            format_host_summary(
+                hostname=hostname,
+                ok=counts["ok"],
+                changed=counts["changed"],
+                failed=counts["failed"],
+                unreachable=counts["unreachable"],
+            )
+            for hostname, counts in host_counts.items()
+        ]
+
     def stop(self) -> None:
         """Stop rendering and clean up resources.
 
