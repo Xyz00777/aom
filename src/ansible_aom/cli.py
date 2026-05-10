@@ -88,12 +88,6 @@ Examples:
     )
 
     parser.add_argument(
-        "--version",
-        action="store_true",
-        help="Show version and exit",
-    )
-
-    parser.add_argument(
         "--tui",
         action="store_true",
         help="Launch full multi-panel TUI instead of compact view",
@@ -157,10 +151,6 @@ def main() -> int:
         print(f"Terminal: tty={sys.stdout.isatty()}, columns={shutil.get_terminal_size().columns}")
         aom_logger.debug("--list-tasks summary: verbose mode enabled, diagnostics printed")
 
-    if args.version:
-        print(f"aom {__version__}")
-        return 0
-
     if args.playbook:
         from ansible_aom.renderer.factory import create_renderer
         from ansible_aom.runner import run_playbook
@@ -183,9 +173,6 @@ def main() -> int:
             # an interrupt during renderer construction can still bubble up.
             print("Cancelled by user", file=sys.stderr)
             return 130
-        except NotImplementedError:
-            print("Renderer not yet implemented", file=sys.stderr)
-            return 1
         except Exception as e:
             print(f"Error: {e}", file=sys.stderr)
             return 1
