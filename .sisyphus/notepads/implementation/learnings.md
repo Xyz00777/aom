@@ -982,10 +982,45 @@ five-arg callers keep their current output. Wired into both the live
 `_render_status_bar` (event + tick) and the final
 `handle_completion` frame.
 
+### 5. Tag preview + task-count fix (roadmap #8 + adjacent bug)
+
+**Tag preview.** `format_preflight_summary` now appends `Tags: a, b, c`
+when preflight `--list-tasks` produces any tags. Helper
+`collect_tags(definitions)` returns the sorted unique set, expanding
+`RoleGroupDefinition` entries so tags from inside roles surface. Line
+suppressed when no task carries a tag (e.g. plain "always" defaults).
+
+**Task-count fix surfaced by the live test of #8.** The previous
+`count_completed_tasks` matched `TaskRunState.status` against terminal
+values, but the state machine never moves task.status past
+PENDING/RUNNING — only `task.hosts` gets populated, by the
+`v2_runner_on_*` handlers. Result: `0/3 tasks` on a 3-task success
+run. Switched to "task has at least one host result"; monotonic and
+ansible-faithful for linear strategy. The dead `_TASK_DONE_STATUSES`
+frozenset got removed with the change. Updated tests to use realistic
+state shape (host entries instead of fictional task.status
+transitions).
+
+### 6. ASCII fallback for non-UTF8 terminals (roadmap #13)
+
+`STATUS_ICONS_ASCII` already lived in `core/icons.py` (with TC-377
+unit tests) but was never reachable from the renderer; on `LANG=C`
+consoles `│ ⚠ ✱ ● ◆ ✖` rendered as `?` / mojibake. Added
+`is_unicode_terminal()` (returns False unless `sys.stdout.encoding`
+contains "utf"), `ascii_mode: bool = False` on `format_status_bar`
+and `format_host_summary`, plus a per-instance `_ascii_mode`
+auto-detected in `CompactRenderer.__init__`. ASCII mode swaps
+separator → `|`, warning → `!`, deprecation → `*`, status icons →
+`STATUS_ICONS_ASCII`, completion glyphs → `* / X`. Threaded through
+every status-bar render + the final indicator + the per-host summary.
+Smoke-tested with `PYTHONIOENCODING=ascii`.
+
 ### Remaining roadmap
 
 Feature-shaped: 6 (verbose passthrough — friction: AOM's `-v`
 shadows ansible-playbook's `-v` when placed before the playbook
-arg), 8 (tag preview).
+arg).
 
-Larger / blocked: 9-14 unchanged.
+Larger / blocked: 9 (TUI end-to-end), 11 (include_tasks dynamic
+expansion), 12 (SIGWINCH/width-aware row count), 14 (session
+recording).
