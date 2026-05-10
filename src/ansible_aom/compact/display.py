@@ -208,10 +208,24 @@ class Display:
         return self._is_tty
 
     def _rewind_status(self) -> str:
-        """Cursor sequence to move back to the top of the status block."""
+        """Cursor sequence to move back to the start of the status block.
+
+        After writing an N-row status (no trailing newline), the cursor
+        sits on the LAST row of the block. To get back to the first row
+        and column 1 we need to move up N-1 lines, then to col 1.
+
+        N = 1: cursor is already on the right row → just `\\r`.
+        N > 1: `CSI (N-1) F` (cursor previous line, N-1 up + col 1).
+
+        Using `CSI N F` for N=1 was a bug: it moved up onto the line
+        above the status, which is the user's shell command line.
+        The subsequent `CSI J` then wiped that command line.
+        """
         if self._status_rows == 0:
             return ""
-        return _CURSOR_UP_FMT.format(n=self._status_rows)
+        if self._status_rows == 1:
+            return "\r"
+        return _CURSOR_UP_FMT.format(n=self._status_rows - 1)
 
 
 def _row_count(text: str) -> int:
