@@ -12,12 +12,6 @@ Phases:
 import json
 import logging
 import re
-
-# CSI SGR (Select Graphic Rendition) sequences — what colour codes look
-# like in raw terminal output. Strip these before pattern-matching log
-# lines so warnings whose [WARNING]: prefix is wrapped in colour escapes
-# still anchor against the WARNING_PATTERNS regexes.
-_ANSI_SGR_RE = re.compile(r"\x1b\[[0-9;]*m")
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, auto
@@ -26,6 +20,12 @@ from typing import Callable
 from ansible_aom.core.models import RoleGroupDefinition, WarningEntry, WarningType
 
 logger = logging.getLogger(__name__)
+
+# CSI SGR (Select Graphic Rendition) sequences — what colour codes look
+# like in raw terminal output. Strip these before pattern-matching log
+# lines so warnings whose [WARNING]: prefix is wrapped in colour escapes
+# still anchor against the WARNING_PATTERNS regexes.
+_ANSI_SGR_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 class StreamPhase(Enum):
