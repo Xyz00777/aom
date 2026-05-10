@@ -12,12 +12,17 @@ Phases:
 import json
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from typing import Callable
 
-from ansible_aom.core.models import RoleGroupDefinition, WarningEntry, WarningType
+from ansible_aom.core.models import (
+    PlayDefinition,
+    RoleGroupDefinition,
+    WarningEntry,
+    WarningType,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -277,6 +282,8 @@ class PreParseResult:
 
     plays: list[dict]
     play_hosts: list[dict]
+    definitions: list[PlayDefinition] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 def parse_list_hosts_output(output: str) -> list[dict]:
