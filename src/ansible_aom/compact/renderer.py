@@ -12,7 +12,12 @@ from typing import TYPE_CHECKING
 from ansible_aom.compact.display import Display
 from ansible_aom.compact.password import handle_password_prompt as do_handle_password_prompt
 from ansible_aom.core.icons import STATUS_ICONS
-from ansible_aom.core.models import RunState, Status
+from ansible_aom.core.models import (
+    PlayDefinition,
+    RoleGroupDefinition,
+    RunState,
+    Status,
+)
 
 if TYPE_CHECKING:
     pass
@@ -110,6 +115,53 @@ def format_host_summary(
         parts.append(f"{icon} {unreachable} unreachable")
 
     return " ".join(parts)
+
+
+def _count_tasks(play: PlayDefinition) -> int:
+    """Count leaf TaskDefinitions in a play, expanding any RoleGroupDefinition."""
+    total = 0
+    for entry in play.tasks:
+        if isinstance(entry, RoleGroupDefinition):
+            total += len(entry.tasks)
+        else:
+            total += 1
+    return total
+
+
+def format_preflight_summary(definitions: list[PlayDefinition]) -> str | None:
+    """Render a one-shot startup summary of plays/tasks/hosts from preflight.
+
+    Printed once before any JSONL events flow, giving the user a sense
+    of what's about to run — nom-style. Returns None for an empty list
+    so the renderer can skip emitting it.
+
+    Format::
+
+        PLAY [Setup web servers] (webservers, 2 hosts, 3 tasks)
+        PLAY [Setup database]    (dbservers, 1 host, 2 tasks)
+
+    The bracketed name comes from the play's `name`. Host count uses
+    `resolved_hosts` when populated; falls back to the raw `hosts`
+    pattern when --list-hosts failed for that play.
+    """
+    if not definitions:
+        return None
+
+    lines: list[str] = []
+    for play in definitions:
+        host_count = len(play.resolved_hosts)
+        task_count = _count_tasks(play)
+
+        if host_count > 0:
+            host_part = f"{play.hosts}, {host_count} host" + ("s" if host_count != 1 else "")
+        else:
+            host_part = play.hosts or "0 hosts"
+
+        task_part = f"{task_count} task" + ("s" if task_count != 1 else "")
+
+        lines.append(f"PLAY [{play.name}] ({host_part}, {task_part})")
+
+    return "\n".join(lines)
 
 
 def determine_exit_code(state: RunState) -> int:
