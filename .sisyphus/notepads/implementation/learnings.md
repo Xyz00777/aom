@@ -422,3 +422,117 @@ The `⚠ 1 │ ✱ 1` confirms the warning + deprecation that ansible-core
 - **Visual TTY smoke** — please re-run interactively now that streaming
   logs + final-summary persistence are in. Should look like nom: logs
   scrolling, panel anchored, summary survives at the cursor on exit.
+
+## 2026-05-10 Pre-flight `--list-tasks` / `--list-hosts` (same branch)
+
+The major slice that was open after the TTY UX work — runner now does
+parallel pre-flight before the JSONL spawn so the renderer has plays,
+tasks, and resolved hosts from the very first frame instead of building
+state purely from JSONL events as they arrive. Plan in
+`docs/superpowers/plans/2026-05-10-preflight-listing.md`.
+
+### What changed
+
+- **New `core/preflight.py`** — split by purity per the ABSTRACT rule
+  in CLAUDE.md:
+  - `assemble_definitions(plays=, play_hosts=)` — pure mapping from raw
+    parsed dicts (output of existing `parse_list_tasks_output` /
+    `parse_list_hosts_output`) to `list[PlayDefinition]` with
+    `TaskDefinition` children, applies `group_roles` for 5+-task role
+    collapses, stitches `resolved_hosts` in by `play_number`. No I/O.
+  - `run_preflight(playbook=, ansible_args=, executable=...)` — spawns
+    `ansible-playbook --list-tasks` and `--list-hosts` concurrently in
+    a `ThreadPoolExecutor` (max_workers=2) with a 30s timeout each.
+    Subprocess errors (FileNotFoundError → 127, PermissionError → 126,
+    TimeoutExpired → 124, OSError → 1) become entries in
+    `PreParseResult.errors` rather than exceptions. Whichever
+    subprocess succeeded still contributes its data.
+- **`core/parser.py::PreParseResult`** — extended with two optional
+  fields: `definitions: list[PlayDefinition]` and `errors: list[str]`.
+  Defaults to empty so existing call sites keep working.
+- **`renderer/protocol.py::Renderer`** — new required Protocol method
+  `set_definitions(definitions: list)`. Called once between `start()`
+  and the first `update_state()`. Annotated as `list` (not
+  `list[PlayDefinition]`) to keep the Protocol free of model imports;
+  `runtime_checkable` only verifies presence anyway.
+- **`compact/renderer.py::CompactRenderer`** — new `_definitions: list`
+  attribute and `set_definitions()` method that recomputes the status
+  bar. The host count is now `max(len(host_statuses_from_jsonl),
+  len(union of resolved_hosts))` — preflight seeds the denominator
+  from frame zero, JSONL takes over once events arrive. Same union
+  logic applied to `handle_completion()`.
+- **`tui/app.py::AOMApp.set_definitions`** — no-op for now. The TUI
+  builds its tree from RunState; preflight wiring there is a separate
+  slice once the TUI moves under `runner.run_playbook`.
+- **`runner.py::run_playbook`** — calls `run_preflight()` after
+  `renderer.start()` and before the `pexpect.spawn` block. Pushes
+  `pre_result.definitions` through `renderer.set_definitions` (getattr-
+  guarded) and forwards each `pre_result.errors` entry through
+  `renderer.add_warning(err, False)`.
+
+### Test impact
+
+- Suite: **1611 passed, 0 failed, 6 skipped** (was 1594/0/6, +17 new
+  tests).
+- `tests/unit/test_preflight.py` — 6 tests: PreParseResult shape,
+  empty-input handling, missing host data, role grouping invocation,
+  basic combination from existing fixtures.
+- `tests/integration/test_preflight_runner.py` — 4 tests using a fake
+  Python `ansible-playbook` shim (same trick as `test_runner.py`):
+  parallel-execution success, FileNotFoundError → error entry,
+  --list-hosts failure isolated from --list-tasks success, ansible_args
+  forwarded to both invocations.
+- `tests/compact/test_renderer_set_definitions.py` — 5 tests:
+  storage, hosts_total seeding, pre-start safety, empty-list handling,
+  union across plays.
+- `tests/integration/test_runner.py::TestRunnerPreflight` — 2 tests for
+  the wiring: definitions forwarded to renderer, errors forwarded as
+  warnings.
+
+### End-to-end smoke (pipe mode)
+
+```
+$ uv run aom .sisyphus/test-fixtures/simple.yml -i localhost, -c local
+PLAY [Simple test playbook] *********...
+TASK [First task] *********...
+ok: [localhost]
+TASK [Second task with tags] *********...
+ok: [localhost]
+TASK [Third task] *********...
+ok: [localhost]
+.sisyphus/test-fixtures/simple.yml │ 1/1 hosts │ ⚠ 1 │ ✱ 1 │ 0:00:00 ●
+$ echo $?
+0
+
+$ uv run aom .sisyphus/test-fixtures/syntax_error.yml -i localhost, -c local
+.sisyphus/test-fixtures/syntax_error.yml │ 0/0 hosts │ ⚠ 2 │ 0:00:00 ✖
+$ echo $?
+4
+```
+
+The `⚠ 2` on `syntax_error.yml` is preflight's two failures (one each
+from `--list-tasks` and `--list-hosts`) bubbling up via `add_warning` —
+this is new diagnostic surface that didn't exist before. Closes the
+"empty log on syntax error" gap noted in the previous session's "still
+open" list.
+
+### Still open after this slice
+
+- **Task tree rendering** — preflight now hands the renderer a full
+  `list[PlayDefinition]` with tasks, but the compact renderer only uses
+  it to seed `hosts_total`. Drawing the actual tree (preview before
+  run, progress during run) is a follow-up slice and depends on the
+  width-aware `_row_count()` work since a multi-line panel will hit
+  the wrap-counting bug.
+- **TUI preflight integration** — `AOMApp.set_definitions` is a no-op.
+  Should populate `TaskTree` widget once the TUI moves under
+  `runner.run_playbook`.
+- **Unicode warning escape** — same warning text is now emitted twice
+  in some cases (once from preflight stderr, once from JSONL stderr).
+  Worth deduping if it produces noisy `⚠` counts in the wild.
+- **`include_tasks` dynamic expansion** — TC-094 / TC-095 still
+  unimplemented. Definitions from preflight are static; runtime needs
+  to graft dynamic tasks under their `include_tasks` parent when
+  unknown task UUIDs arrive.
+- **`_row_count()` width-aware wrapping**, **SIGWINCH**, **ASCII
+  fallback wiring** (unchanged).
