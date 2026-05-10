@@ -559,14 +559,20 @@ class TestExitCodes:
             assert result == 0
 
     def test_exit_code_127_for_missing_ansible(self):
-        """TC-027: Exit code 127 when ansible-playbook not found."""
+        """TC-027: Exit code 127 when ansible-playbook not found.
+
+        The runner is responsible for detecting the missing executable and
+        returning 127 cleanly (its own tests cover the pexpect spawn-failure
+        path); here we just assert that whatever exit code the runner
+        returns is propagated through main().
+        """
         from ansible_aom.cli import main
 
-        with patch("ansible_aom.renderer.factory.create_renderer") as mock_renderer:
-            mock_renderer.side_effect = FileNotFoundError("ansible-playbook")
+        with patch("ansible_aom.runner.run_playbook", return_value=127) as mock_run:
             with patch("sys.argv", ["aom", "playbook.yml"]):
                 result = main()
                 assert result == 127
+                mock_run.assert_called_once()
 
     def test_exit_code_130_for_sigint(self):
         """TC-028: Exit code 130 for user cancelled (Ctrl+C)."""

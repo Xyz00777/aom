@@ -221,19 +221,18 @@ def main() -> int:
 
     if args.playbook:
         from ansible_aom.renderer.factory import create_renderer
+        from ansible_aom.runner import run_playbook
 
         try:
-            create_renderer(tui_mode=args.tui)
-            print(f"Running playbook: {args.playbook}")
-            return 0
-        except FileNotFoundError:
-            print("Error: ansible-playbook not found", file=sys.stderr)
-            return 127
+            renderer = create_renderer(tui_mode=args.tui, is_tty=sys.stdout.isatty())
+            return run_playbook(args.playbook, args.ansible_args, renderer)
         except KeyboardInterrupt:
+            # The runner installs its own KeyboardInterrupt handling, but
+            # an interrupt during renderer construction can still bubble up.
             print("Cancelled by user", file=sys.stderr)
             return 130
         except NotImplementedError:
-            print("Renderer not yet implemented")
+            print("Renderer not yet implemented", file=sys.stderr)
             return 1
         except Exception as e:
             print(f"Error: {e}", file=sys.stderr)
