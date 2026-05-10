@@ -653,3 +653,148 @@ our own format string anyway.
   `set_definitions`) want to be required Protocol methods once the TUI
   is wired through `runner.run_playbook`, so no more stringly-typed
   attribute lookups.
+
+## 2026-05-10 TTY rewind bug + UX polish (same branch)
+
+User reported: "terminal clearing may also affect the currently/last
+displayed command line that started aom" (interactive fish smoke).
+True bug, plus three UX polish items in the same session.
+
+### Bug fix: status rewind erased the command line above
+
+`Display._rewind_status()` returned `CSI N F` for an N-row status, where
+`F` is "cursor previous line" — it moves UP N lines and to col 1. After
+writing an N-row status with no trailing newline, the cursor is on the
+LAST row of the block; to get back to the FIRST row needs N-1 lines up.
+For N=1 it needs no vertical movement at all, just `\r`.
+
+The old code over-rewound by one line. With the typical 1-row status
+the rewind landed on the user's shell command line; the subsequent
+`CSI J` (clear-to-EOS) wiped it. Every redraw repeated the damage.
+
+Fix in `compact/display.py::_rewind_status`:
+- N = 0: return `""` (unchanged — nothing drawn yet)
+- N = 1: return `"\r"` (cursor already on the right row)
+- N > 1: return `CSI (N-1) F`
+
+Tests in `tests/compact/test_display_ansi.py::TestRewindCorrectness`
+pin three cases: 1-row uses `\r`, multi-row uses `CSI (N-1) F`, the
+print_log-after-update flow never emits `CSI 1 F` (the bug signature).
+
+### UX polish 1: per-host summary on completion
+
+`format_host_summary()` had been sitting in `compact/renderer.py` with
+its own unit tests but no caller. Now `handle_completion` aggregates
+per-host status counts across every task in every play and prints
+one indented line per host underneath the aggregate status:
+
+```
+.sisyphus/test-fixtures/simple.yml │ 1/1 hosts │ ⚠ 1 │ ✱ 1 │ 0:00:00 ●
+  localhost: ● 3 ok
+```
+
+With one host this barely differs from the aggregate; with N hosts
+it's the only way to see who succeeded vs who failed at a glance.
+Empty-state-safe — preflight-only-failure runs don't get a stray
+hosts block.
+
+### UX polish 2: warnings now visible, not just counted
+
+`⚠ 1` on the panel was opaque — the user had no way to know whether
+the warning was a benign deprecation notice or something they should
+act on. `CompactRenderer.add_warning` now prints each unique warning
+message via `Display.print_log` AND bumps the counter (as before).
+
+Repeated identical messages (e.g. the same deprecation firing
+per-host on a many-host run) print once but each still contributes
+to the counter — `_seen_warning_messages: set[str]` tracks the
+prints. The parser keeps the raw `[WARNING]: ...` /
+`[DEPRECATION WARNING]: ...` prefix on the message, so we print
+as-is when the message already starts with `[`, and add our own
+`[WARNING]` / `[DEPRECATION]` prefix only when it's absent.
+
+### Test impact
+
+- Suite: **1633 passed, 0 failed, 6 skipped** (was 1622/0/6, +11 new
+  tests this session).
+- `tests/compact/test_display_ansi.py` — 3 new tests for rewind
+  correctness.
+- `tests/compact/test_completion_summary.py` — 3 new tests covering
+  per-host breakdown, indent, empty-state safety.
+- `tests/compact/test_warning_visibility.py` — 5 new tests covering
+  print-with-message, prefix classification, counter still bumps,
+  dedupe of repeats, distinct messages each print.
+
+### End-to-end smoke (pipe mode)
+
+```
+$ uv run aom .sisyphus/test-fixtures/simple.yml -i localhost, -c local
+PLAY [Simple test playbook] (localhost, 1 host, 3 tasks)
+[WARNING]: Deprecation warnings can be disabled by setting `deprecation_warnings=False` in ansible.cfg.
+[DEPRECATION WARNING]: Importing 'to_text' from 'ansible.module_utils._text' is deprecated. ...
+
+PLAY [Simple test playbook] *********...
+TASK [First task] *********...
+ok: [localhost]
+TASK [Second task with tags] *********...
+ok: [localhost]
+TASK [Third task] *********...
+ok: [localhost]
+.sisyphus/test-fixtures/simple.yml │ 1/1 hosts │ ⚠ 1 │ ✱ 1 │ 0:00:00 ●
+  localhost: ● 3 ok
+```
+
+### Feature roadmap (open question for next session)
+
+User asked: "what other features would be useful? how can we make
+usage as easy and simple as possible, with sane defaults?"
+
+Ranked rough notes; pick which are worth a slice:
+
+**Smaller / quick wins:**
+1. **Promote getattr-guarded methods to required Protocol** —
+   `print_log`, `add_warning`, `tick`, `set_definitions` are all on
+   CompactRenderer; AOMApp can implement no-op or sensible. Removes
+   the stringly-typed lookups in `runner.py`.
+2. **Auto-detect `./inventory.ini`** — if no `-i` flag and the file
+   exists in cwd, default to it. ansible.cfg-driven users won't be
+   affected because they have an explicit setting.
+3. **`--check` / `--diff` first-class flags** — currently passable as
+   REMAINDER args. Promoting to first-class lets aom remember and
+   replay them.
+4. **Better `aom` (no-args) output** — current help is verbose;
+   could lead with a single Usage line.
+
+**Medium / feature-shaped:**
+5. **Task progress in status bar** — `tasks: M/N` uses preflight's
+   static count for N. Caveat: include_tasks inflates the dynamic
+   count past N. Could show "tasks: M" without denominator, or use
+   "tasks: M of ~N" to signal the soft estimate.
+6. **Verbose passthrough** — repeated `-v` (`-vvv`) maps to
+   ansible-playbook's verbosity. Mildly tricky because aom's own `-v`
+   currently means "diagnostics-on", not passthrough.
+7. **Recap-style failure summary** — when something failed, list the
+   failed task name + host + first message line at the bottom, above
+   the per-host summary. Right now the user has to scroll up through
+   the log to find the fatal line.
+8. **Tag preview** — preflight summary could include "tags: [foo, bar]"
+   per play, so the user can sanity-check before passing `--tags`.
+
+**Large / blocked:**
+9. **TUI end-to-end** — currently broken. AOMApp uses `app.run()` for
+   its own event loop; runner calls `update_state()` from a different
+   loop. Needs `call_from_thread` plumbing or a different model where
+   the runner drives Textual's loop.
+10. **`aom inspect` subcommands** — list/show/diff/prune are stubs.
+    Spec describes session artifacts in `.aom/` but the writer isn't
+    wired in.
+11. **`include_tasks` dynamic expansion** — TC-094/TC-095. Need to
+    graft TaskDefinition(is_dynamic=True, task_order=-1) under the
+    parent include_tasks node when unknown task UUIDs appear.
+12. **SIGWINCH + width-aware `_row_count()`** — robustness for tall
+    panels with wrapping, terminal resize. Currently theoretical.
+13. **ASCII fallback** — `core/icons.STATUS_ICONS_ASCII` exists; the
+    renderer hard-codes Unicode. Need a `supports_unicode()` detector
+    + parameter threading.
+14. **Session recording** — write `.aom/<session_id>/` with raw JSONL,
+    state snapshot, diagnostics. Enables `aom inspect`.
