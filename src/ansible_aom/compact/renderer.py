@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from ansible_aom.compact.display import Display
 from ansible_aom.compact.password import handle_password_prompt as do_handle_password_prompt
-from ansible_aom.core.icons import STATUS_ICONS
+from ansible_aom.core.icons import STATUS_ICONS, STATUS_ICONS_ASCII, is_unicode_terminal
 from ansible_aom.core.models import (
     PlayDefinition,
     RoleGroupDefinition,
@@ -37,6 +37,7 @@ def format_status_bar(
     elapsed_seconds: float,
     tasks_completed: int = 0,
     tasks_total: int = 0,
+    ascii_mode: bool = False,
 ) -> str:
     """Format the status bar for compact mode display.
 
@@ -67,6 +68,10 @@ def format_status_bar(
     elapsed_s = elapsed_int % 60
     elapsed_str = f"{elapsed_h}:{elapsed_m:02d}:{elapsed_s:02d}"
 
+    sep = "|" if ascii_mode else "│"
+    warn_glyph = "!" if ascii_mode else "⚠"
+    deprec_glyph = "*" if ascii_mode else "✱"
+
     parts = [
         playbook,
         f"{hosts_completed}/{hosts_total} hosts",
@@ -76,13 +81,13 @@ def format_status_bar(
         parts.append(f"{tasks_completed}/{tasks_total} tasks")
 
     if warnings > 0:
-        parts.append(f"⚠ {warnings}")
+        parts.append(f"{warn_glyph} {warnings}")
     if deprecations > 0:
-        parts.append(f"✱ {deprecations}")
+        parts.append(f"{deprec_glyph} {deprecations}")
 
     parts.append(elapsed_str)
 
-    return " │ ".join(parts)
+    return f" {sep} ".join(parts)
 
 
 def format_host_summary(
@@ -91,6 +96,7 @@ def format_host_summary(
     changed: int,
     failed: int,
     unreachable: int,
+    ascii_mode: bool = False,
 ) -> str:
     """Format a host summary line with status icons.
 
@@ -110,20 +116,17 @@ def format_host_summary(
         >>> format_host_summary("web1", 12, 3, 0, 0)
         'web1: ● 12 ok ◆ 3 changed'
     """
+    icons = STATUS_ICONS_ASCII if ascii_mode else STATUS_ICONS
     parts = [f"{hostname}:"]
 
     if ok > 0:
-        icon = STATUS_ICONS[Status.OK]
-        parts.append(f"{icon} {ok} ok")
+        parts.append(f"{icons[Status.OK]} {ok} ok")
     if changed > 0:
-        icon = STATUS_ICONS[Status.CHANGED]
-        parts.append(f"{icon} {changed} changed")
+        parts.append(f"{icons[Status.CHANGED]} {changed} changed")
     if failed > 0:
-        icon = STATUS_ICONS[Status.FAILED]
-        parts.append(f"{icon} {failed} failed")
+        parts.append(f"{icons[Status.FAILED]} {failed} failed")
     if unreachable > 0:
-        icon = STATUS_ICONS[Status.UNREACHABLE]
-        parts.append(f"{icon} {unreachable} unreachable")
+        parts.append(f"{icons[Status.UNREACHABLE]} {unreachable} unreachable")
 
     return " ".join(parts)
 
@@ -326,6 +329,7 @@ class CompactRenderer:
         self._deprecations_count: int = 0
         self._definitions: list = []
         self._seen_warning_messages: set[str] = set()
+        self._ascii_mode: bool = not is_unicode_terminal()
 
     def start(self, playbook: str, args: list[str]) -> None:
         """Start rendering a playbook run.
@@ -355,6 +359,7 @@ class CompactRenderer:
             warnings=0,
             deprecations=0,
             elapsed_seconds=0.0,
+            ascii_mode=self._ascii_mode,
         )
         self._display.update(status_bar)
 
@@ -448,6 +453,7 @@ class CompactRenderer:
             elapsed_seconds=elapsed,
             tasks_completed=count_completed_tasks(self._state),
             tasks_total=count_total_tasks(self._definitions),
+            ascii_mode=self._ascii_mode,
         )
         self._display.update(status_bar)
 
@@ -557,14 +563,14 @@ class CompactRenderer:
             elapsed_seconds=elapsed,
             tasks_completed=tasks_completed,
             tasks_total=tasks_total,
+            ascii_mode=self._ascii_mode,
         )
 
         # Add final state indicator
-        state_indicator = {
-            "completed": "●",
-            "failed": "✖",
-            "crashed": "✖",
-        }.get(state, "?")
+        if self._ascii_mode:
+            state_indicator = {"completed": "*", "failed": "X", "crashed": "X"}.get(state, "?")
+        else:
+            state_indicator = {"completed": "●", "failed": "✖", "crashed": "✖"}.get(state, "?")
 
         final_status = f"{status_bar} {state_indicator}"
 
@@ -631,6 +637,7 @@ class CompactRenderer:
                 changed=counts["changed"],
                 failed=counts["failed"],
                 unreachable=counts["unreachable"],
+                ascii_mode=self._ascii_mode,
             )
             for hostname, counts in host_counts.items()
         ]
