@@ -238,27 +238,40 @@ class CompactRenderer:
         # Update RunState with the event
         self._state.handle_event(event)
 
-        # Calculate current statistics from state
-        hosts_completed = 0
-        hosts_total = 0
+        # Refresh the status panel with current state + elapsed time.
+        self._render_status_bar()
 
-        # Count hosts and states from RunState
+    def tick(self) -> None:
+        """Refresh the status panel without processing an event.
+
+        The runner calls this during quiet periods (no PTY output for a
+        timeout window) so the elapsed-time counter keeps moving even
+        when ansible isn't emitting any events. Display throttling means
+        rapid ticks coalesce; calling every 0.5s is fine.
+        """
+        if self._state is None:
+            return
+        self._render_status_bar()
+
+    def _render_status_bar(self) -> None:
+        """Compute and push the current status bar to the display."""
+        if self._state is None:
+            return
+
         host_statuses: dict[str, Status] = {}
-
         for play in self._state.plays.values():
             for task in play.tasks.values():
                 for hostname, host_state in task.hosts.items():
                     host_statuses[hostname] = host_state.status
 
         hosts_total = len(host_statuses)
-        for status in host_statuses.values():
-            if status in (Status.OK, Status.CHANGED, Status.SKIPPED, Status.COMPLETED):
-                hosts_completed += 1
+        hosts_completed = sum(
+            1
+            for s in host_statuses.values()
+            if s in (Status.OK, Status.CHANGED, Status.SKIPPED, Status.COMPLETED)
+        )
 
-        # Calculate elapsed time
         elapsed = time.time() - self._start_time
-
-        # Format and update status bar
         status_bar = format_status_bar(
             playbook=self._playbook,
             hosts_completed=hosts_completed,

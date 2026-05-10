@@ -537,6 +537,31 @@ class TestCompactRendererHandleCompletion:
         # Should not raise
         renderer.handle_completion(0, "completed")
 
+    def test_tick_refreshes_status_bar_without_an_event(self):
+        """tick() lets the runner refresh elapsed time during quiet periods.
+
+        Without it the status panel freezes on the last event — for a
+        long-running task with no JSONL output the elapsed counter would
+        appear stuck. tick must (a) update the display with a fresh
+        status bar and (b) NOT call print_log (it's a panel-only refresh).
+        """
+        from unittest.mock import MagicMock
+
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer(is_tty=True)
+        renderer._display = MagicMock(is_tty=True)
+        renderer.start("playbook.yml", [])
+        renderer._display.reset_mock()
+
+        renderer.tick()
+
+        renderer._display.update.assert_called()
+        # Status bar should at least mention the playbook name.
+        rendered = renderer._display.update.call_args.args[0]
+        assert "playbook.yml" in rendered
+        renderer._display.print_log.assert_not_called()
+
     def test_update_state_streams_log_lines_for_significant_events(self):
         """Each significant JSONL event must produce a log line above the panel.
 

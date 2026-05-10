@@ -138,8 +138,14 @@ def _drive(
             break
         elif idx == timeout_idx:
             # No output yet — perfectly normal during long-running tasks.
-            # A future slice can wake the renderer here for elapsed-time
-            # ticks; for now we just keep waiting.
+            # Wake the renderer so the elapsed-time counter keeps moving
+            # even when ansible is silent. tick() is optional on the
+            # Renderer Protocol; renderers that don't implement it
+            # (currently the TUI) just don't get periodic refreshes,
+            # which is fine because they have their own clock.
+            tick = getattr(renderer, "tick", None)
+            if callable(tick):
+                tick()
             continue
         else:
             # Password prompt fired. Build the prompt text from the
