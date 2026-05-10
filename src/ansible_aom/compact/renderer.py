@@ -239,6 +239,7 @@ class CompactRenderer:
         self._warnings_count: int = 0
         self._deprecations_count: int = 0
         self._definitions: list = []
+        self._seen_warning_messages: set[str] = set()
 
     def start(self, playbook: str, args: list[str]) -> None:
         """Start rendering a playbook run.
@@ -397,8 +398,11 @@ class CompactRenderer:
     def add_warning(self, message: str, is_deprecation: bool = False) -> None:
         """Add a warning or deprecation detected from PTY stream.
 
-        Called by the PTY stream handler when it detects warning patterns
-        in stderr lines (warnings are not emitted as JSONL events).
+        Bumps the counter AND prints the message above the panel so the
+        user can see what the warning is about — `⚠ 1` on its own is
+        opaque. Repeated identical messages (e.g. the same deprecation
+        firing per-host on a many-host run) are deduped to one print
+        but still each contribute to the counter.
 
         Args:
             message: The warning message text.
@@ -408,6 +412,17 @@ class CompactRenderer:
             self._deprecations_count += 1
         else:
             self._warnings_count += 1
+
+        if message in self._seen_warning_messages:
+            return
+        self._seen_warning_messages.add(message)
+        # The parser keeps the raw `[WARNING]: ...` / `[DEPRECATION WARNING]: ...`
+        # prefix on the message. Don't double it up.
+        if message.startswith("["):
+            self._display.print_log(message)
+        else:
+            prefix = "DEPRECATION" if is_deprecation else "WARNING"
+            self._display.print_log(f"[{prefix}] {message}")
 
     def handle_completion(self, exit_code: int, state: str) -> None:
         """Handle playbook completion (success/failure/crash).
