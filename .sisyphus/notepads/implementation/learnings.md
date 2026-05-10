@@ -924,11 +924,68 @@ Larger / blocked: 9-14 unchanged.
 
 - `runner.py:95` `except A, B, C:` — Python 3.x parses this as
   `except (A, B, C):` (tuple expression as the except test). Valid,
-  unusual, would normally write with parens.
-- `cli.py` exposes `--changes-only` at the top level but no run-path
-  code reads it. It's only meaningful for `aom inspect diff`.
-  Removing or moving it is a separate cleanup with test churn.
-- `aom inspect list` / `aom inspect diff` / etc. print stub messages
-  ("Listing sessions...") that look successful but are vapourware —
-  session recording isn't wired. Worth a clear "not implemented" exit
-  in a future cleanup pass.
+  unusual, would normally write with parens. Same shape exists at
+  `core/models.py:132`.
+
+---
+
+## 2026-05-10 — CLI cleanups + task progress segment
+
+### 1. Drop dead `--changes-only` top-level flag
+`args.changes_only` was parsed but never read in `main()` or the
+runner. The useful instance lives on `aom inspect diff`. Removed the
+parser arg + the two pinning unit tests.
+
+### 2. Wire `aom inspect …` to the real implementation
+The top-level CLI had a parallel stub parser (`create_inspect_parser`)
+and `handle_inspect` that printed misleading lines like "Listing
+sessions..." while a real implementation in
+`src/ansible_aom/inspect/cli.py` already covers list / show / diff /
+prune end-to-end. Refactored `inspect.cli.main` to accept an explicit
+`argv: list[str] | None` so the dispatcher can pass `sys.argv[2:]`
+(stripping the `inspect` token before the inspect parser sees it).
+
+Replaced the stub-pinning `TestInspectSubcommand` parser tests (11
+cases) with four dispatch tests that mock `inspect.cli.main` and
+assert (a) the forwarded argv slice and (b) propagated exit code.
+Real subcommand behaviour is already covered by
+`tests/integration/test_inspect.py`. Deleted the
+`TestInspectTUIMode` block — those four tests pinned fictional stub
+behaviour that returned 0 for `aom inspect --tui`.
+
+### 3. Drop dead `--version` arg + `NotImplementedError` catch
+`main()` short-circuits on `--version in sys.argv` before parse_args
+runs, so the parser-level `--version` arg and the `if args.version`
+block were unreachable. Also removed `except NotImplementedError`
+from the runner-call try-block — nothing in src/ raises it any more
+(runner and AOMApp are both fully implemented), and the catch-all
+`except Exception` already returns the same exit code 1.
+
+### 4. Task progress segment in the status bar (roadmap #5)
+Status bar now reads
+`site.yml │ 3/10 hosts │ 5/47 tasks │ 0:01:23` whenever preflight
+gives us a static task count. Without this segment, on a 50-task
+playbook the user can't tell if they're 10% or 90% through the run.
+
+Two pure helpers in `compact/renderer.py`:
+- `count_total_tasks(definitions)` sums leaf TaskDefinitions across
+  plays, expanding `RoleGroupDefinition` entries to their inner tasks.
+- `count_completed_tasks(state)` counts task entries whose status is
+  in `{OK, CHANGED, FAILED, SKIPPED, UNREACHABLE, COMPLETED}`. RUNNING
+  is explicitly excluded — a task is in flight until every host has a
+  terminal result.
+
+`format_status_bar` gains optional `tasks_completed`/`tasks_total`
+params. The segment is omitted entirely when `tasks_total == 0`, so
+playbooks with only `include_tasks` (no static count) and existing
+five-arg callers keep their current output. Wired into both the live
+`_render_status_bar` (event + tick) and the final
+`handle_completion` frame.
+
+### Remaining roadmap
+
+Feature-shaped: 6 (verbose passthrough — friction: AOM's `-v`
+shadows ansible-playbook's `-v` when placed before the playbook
+arg), 8 (tag preview).
+
+Larger / blocked: 9-14 unchanged.
