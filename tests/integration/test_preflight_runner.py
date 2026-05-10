@@ -126,6 +126,33 @@ def test_run_preflight_sets_ansible_nocolor_env(tmp_path: Path) -> None:
     assert lines == ["1", "1"]
 
 
+def test_run_preflight_trims_argparse_help_wall_from_error(tmp_path: Path) -> None:
+    """When ansible-playbook fails with an argparse error, only the error line surfaces."""
+    from ansible_aom.core.preflight import run_preflight
+
+    fake_stderr = (
+        "usage: ansible-playbook [-h] [--version]\n"
+        "                        playbook [playbook ...]\n"
+        "ansible-playbook: error: unrecognized arguments: extra.yml\n"
+        "\n"
+        "usage: ansible-playbook [-h] [--version]\n"
+        "Runs Ansible playbooks, executing the defined tasks on the targeted hosts.\n"
+        "  -h, --help            show this help message and exit\n"
+    )
+    script = tmp_path / "ansible-playbook"
+    body = f"#!{sys.executable}\nimport sys\nsys.stderr.write({fake_stderr!r})\nsys.exit(2)\n"
+    script.write_text(body)
+    script.chmod(0o755)
+
+    result = run_preflight(playbook="site.yml", ansible_args=[], executable=str(script))
+
+    joined = "\n".join(result.errors)
+    assert "unrecognized arguments: extra.yml" in joined
+    assert "show this help message" not in joined
+    assert "positional arguments" not in joined
+    assert "Runs Ansible playbooks" not in joined
+
+
 def test_run_preflight_passes_ansible_args(tmp_path: Path) -> None:
     """Args like -i inventory.ini must reach both subprocess invocations."""
     from ansible_aom.core.preflight import run_preflight

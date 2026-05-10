@@ -207,19 +207,23 @@ class TestRunnerPreflight:
 
         assert any("--list-hosts failed" in msg for msg, _ in received_warnings)
 
-    def test_run_playbook_prints_preflight_errors_above_panel(self) -> None:
-        """Preflight errors are too important to hide behind a counter — print them."""
+    def test_run_playbook_forwards_every_preflight_error_to_add_warning(self) -> None:
+        """Each error → an add_warning call, even when they share a body.
+
+        The counter must reflect the true number of failed subprocesses; the
+        renderer is responsible for deciding how many lines to actually print
+        (it dedupes repeated message text on its own).
+        """
         from ansible_aom.runner import run_playbook
 
-        printed: list[str] = []
+        received: list[str] = []
 
         class StubRenderer:
             def start(self, playbook: str, args: list[str]) -> None: ...
             def set_definitions(self, definitions: list) -> None: ...
-            def print_log(self, message: str) -> None:
-                printed.append(message)
+            def add_warning(self, message: str, is_deprecation: bool = False) -> None:
+                received.append(message)
 
-            def add_warning(self, message: str, is_deprecation: bool = False) -> None: ...
             def update_state(self, event: dict) -> None: ...
             def handle_password_prompt(self, prompt: str) -> str:
                 return ""
@@ -240,58 +244,9 @@ class TestRunnerPreflight:
         )
 
         with (
-            patch(
-                "ansible_aom.runner.run_preflight",
-                return_value=fake_pre_result,
-            ),
+            patch("ansible_aom.runner.run_preflight", return_value=fake_pre_result),
             patch("ansible_aom.runner._build_command", return_value=(cmd, args)),
         ):
             run_playbook("playbook.yml", [], StubRenderer())
 
-        # Both errors share the same body — dedupe to one print, but both
-        # still bump the warning counter (asserted via the previous test).
-        assert len(printed) == 1
-        assert "YAML parsing failed" in printed[0]
-
-    def test_run_playbook_prints_distinct_preflight_errors_separately(self) -> None:
-        """When preflight errors have different bodies, all of them are printed."""
-        from ansible_aom.runner import run_playbook
-
-        printed: list[str] = []
-
-        class StubRenderer:
-            def start(self, playbook: str, args: list[str]) -> None: ...
-            def set_definitions(self, definitions: list) -> None: ...
-            def print_log(self, message: str) -> None:
-                printed.append(message)
-
-            def add_warning(self, message: str, is_deprecation: bool = False) -> None: ...
-            def update_state(self, event: dict) -> None: ...
-            def handle_password_prompt(self, prompt: str) -> str:
-                return ""
-
-            def handle_completion(self, exit_code: int, state: str) -> None: ...
-            def stop(self) -> None: ...
-
-        fake_pre_result = MagicMock()
-        fake_pre_result.definitions = []
-        fake_pre_result.errors = [
-            "--list-tasks failed (exit 4): YAML parsing failed",
-            "--list-hosts failed (exit 1): something else entirely",
-        ]
-
-        cmd, args = _fake_ansible_command(
-            [{"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-08T10:00:01Z"}],
-            exit_code=0,
-        )
-
-        with (
-            patch(
-                "ansible_aom.runner.run_preflight",
-                return_value=fake_pre_result,
-            ),
-            patch("ansible_aom.runner._build_command", return_value=(cmd, args)),
-        ):
-            run_playbook("playbook.yml", [], StubRenderer())
-
-        assert len(printed) == 2
+        assert len(received) == 2

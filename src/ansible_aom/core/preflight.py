@@ -16,6 +16,7 @@ This module has two responsibilities, split by purity:
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
@@ -28,6 +29,37 @@ from ansible_aom.core.parser import (
 )
 
 _PREFLIGHT_TIMEOUT_S = 30.0
+
+# When ansible-playbook gets bad args, argparse dumps `usage:`, the error line,
+# then the full `--help` text again to stderr. Keep only the actual error.
+_ARGPARSE_ERROR_RE = re.compile(r"^[\w.-]+:\s*error:\s*.+", re.MULTILINE)
+_FALLBACK_LINE_LIMIT = 5
+
+
+def _trim_stderr(stderr: str) -> str:
+    """Reduce ansible-playbook stderr to the diagnostic lines worth showing.
+
+    Argparse-style failures emit the full --help text — wiping it from the
+    panel keeps the output readable. If we can't find an explicit `error:`
+    marker, fall back to the first few non-empty lines.
+    """
+    if not stderr or not stderr.strip():
+        return ""
+    matches = _ARGPARSE_ERROR_RE.findall(stderr)
+    if matches:
+        # Dedupe while preserving order — argparse repeats the same error
+        # under each usage block sometimes.
+        seen: set[str] = set()
+        unique: list[str] = []
+        for line in matches:
+            line = line.rstrip()
+            if line in seen:
+                continue
+            seen.add(line)
+            unique.append(line)
+        return "\n".join(unique)
+    lines = [line.rstrip() for line in stderr.splitlines() if line.strip()]
+    return "\n".join(lines[:_FALLBACK_LINE_LIMIT])
 
 
 def _preflight_env() -> dict[str, str]:
@@ -150,11 +182,11 @@ def run_preflight(
 
     if tasks_rc != 0:
         errors.append(
-            f"--list-tasks failed (exit {tasks_rc}): {tasks_stderr.strip() or '(no stderr)'}"
+            f"--list-tasks failed (exit {tasks_rc}): {_trim_stderr(tasks_stderr) or '(no stderr)'}"
         )
     if hosts_rc != 0:
         errors.append(
-            f"--list-hosts failed (exit {hosts_rc}): {hosts_stderr.strip() or '(no stderr)'}"
+            f"--list-hosts failed (exit {hosts_rc}): {_trim_stderr(hosts_stderr) or '(no stderr)'}"
         )
 
     plays = parse_list_tasks_output(tasks_stdout) if tasks_rc == 0 else []

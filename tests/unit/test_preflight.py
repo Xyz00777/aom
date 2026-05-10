@@ -69,6 +69,66 @@ def test_assemble_definitions_missing_host_data_yields_empty_resolved_hosts():
     assert defs[0].resolved_hosts == []
 
 
+def test_trim_stderr_returns_short_message_unchanged():
+    from ansible_aom.core.preflight import _trim_stderr
+
+    assert _trim_stderr("syntax error in foo.yml") == "syntax error in foo.yml"
+
+
+def test_trim_stderr_extracts_only_error_line_from_argparse_wall():
+    """ansible-playbook on bad args dumps usage + error + full --help. Keep only error."""
+    from ansible_aom.core.preflight import _trim_stderr
+
+    stderr = """usage: ansible-playbook [-h] [--version] [-v]
+                        playbook [playbook ...]
+ansible-playbook: error: unrecognized arguments: extra.yml
+
+usage: ansible-playbook [-h] [--version] [-v]
+                        playbook [playbook ...]
+
+Runs Ansible playbooks, executing the defined tasks on the targeted hosts.
+
+positional arguments:
+  playbook              Playbook(s)
+
+options:
+  -h, --help            show this help message and exit
+  ... many many lines ...
+"""
+    trimmed = _trim_stderr(stderr)
+    assert "ansible-playbook: error: unrecognized arguments: extra.yml" in trimmed
+    assert "usage:" not in trimmed
+    assert "positional arguments" not in trimmed
+    assert "show this help message" not in trimmed
+
+
+def test_trim_stderr_handles_multiple_error_lines():
+    from ansible_aom.core.preflight import _trim_stderr
+
+    stderr = "ansible-playbook: error: first problem\nansible-playbook: error: second problem\n"
+    trimmed = _trim_stderr(stderr)
+    assert "first problem" in trimmed
+    assert "second problem" in trimmed
+
+
+def test_trim_stderr_falls_back_to_first_lines_without_error_marker():
+    """When there's no `: error:` marker, keep the first few non-empty lines, capped."""
+    from ansible_aom.core.preflight import _trim_stderr
+
+    stderr = (
+        "ERROR! couldn't resolve module/action 'foo'\n\nThe error appears to be in '/tmp/x.yml'."
+    )
+    trimmed = _trim_stderr(stderr)
+    assert "ERROR! couldn't resolve" in trimmed
+
+
+def test_trim_stderr_empty_returns_empty():
+    from ansible_aom.core.preflight import _trim_stderr
+
+    assert _trim_stderr("") == ""
+    assert _trim_stderr("   \n\n  ") == ""
+
+
 def test_assemble_definitions_invokes_role_grouping():
     """5+ consecutive same-role tasks collapse into a RoleGroupDefinition."""
     from ansible_aom.core.models import RoleGroupDefinition
