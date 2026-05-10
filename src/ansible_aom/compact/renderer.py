@@ -186,6 +186,7 @@ class CompactRenderer:
         self._start_time: float = 0.0
         self._warnings_count: int = 0
         self._deprecations_count: int = 0
+        self._definitions: list = []
 
     def start(self, playbook: str, args: list[str]) -> None:
         """Start rendering a playbook run.
@@ -217,6 +218,19 @@ class CompactRenderer:
             elapsed_seconds=0.0,
         )
         self._display.update(status_bar)
+
+    def set_definitions(self, definitions: list) -> None:
+        """Store preflight definitions and recompute the initial status bar.
+
+        The host count in the status bar is the union of every play's
+        resolved_hosts. We compute it once here so the user sees `0/N hosts`
+        from the very first frame instead of `0/0 hosts` until JSONL
+        events start filling in hosts incrementally.
+        """
+        self._definitions = list(definitions)
+        if self._state is None:
+            return
+        self._render_status_bar()
 
     def update_state(self, event: dict) -> None:
         """Handle a new JSONL event.
@@ -264,7 +278,14 @@ class CompactRenderer:
                 for hostname, host_state in task.hosts.items():
                     host_statuses[hostname] = host_state.status
 
-        hosts_total = len(host_statuses)
+        # Prefer the preflight-resolved host count when JSONL hasn't yet
+        # filled in any host states, so the user sees `0/N hosts` from
+        # the first frame instead of `0/0 hosts`.
+        preflight_hosts: set[str] = set()
+        for play_def in self._definitions:
+            preflight_hosts.update(play_def.resolved_hosts)
+        hosts_total = max(len(host_statuses), len(preflight_hosts))
+
         hosts_completed = sum(
             1
             for s in host_statuses.values()
@@ -343,7 +364,11 @@ class CompactRenderer:
                     for hostname, host_state in task.hosts.items():
                         host_statuses[hostname] = host_state.status
 
-            hosts_total = len(host_statuses)
+            preflight_hosts: set[str] = set()
+            for play_def in self._definitions:
+                preflight_hosts.update(play_def.resolved_hosts)
+            hosts_total = max(len(host_statuses), len(preflight_hosts))
+
             for status in host_statuses.values():
                 if status in (Status.OK, Status.CHANGED, Status.SKIPPED, Status.COMPLETED):
                     hosts_completed += 1

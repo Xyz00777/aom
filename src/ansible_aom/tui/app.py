@@ -62,6 +62,14 @@ class AOMApp(App[None]):
         # Set app title to playbook name for display
         self.title = playbook
 
+    def set_definitions(self, definitions: list) -> None:
+        """Receive preflight definitions.
+
+        TUI builds its tree from RunState today, so this is a no-op for now.
+        Once the TUI consumes definitions directly, populate the task tree here.
+        """
+        return None
+
     def update_state(self, event: dict) -> None:
         """Handle a new JSONL event.
 

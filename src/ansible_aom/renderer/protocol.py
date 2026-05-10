@@ -17,6 +17,16 @@ class Renderer(Protocol):
         """Start rendering a playbook run."""
         ...
 
+    def set_definitions(self, definitions: list) -> None:
+        """Receive pre-flight playbook definitions (plays/tasks/hosts).
+
+        Called once between start() and the first update_state(). Renderers
+        use this to seed the task tree and total host count before any
+        JSONL events arrive. May receive an empty list when preflight
+        failed; renderers must tolerate that.
+        """
+        ...
+
     def update_state(self, event: dict) -> None:
         """Handle a new JSONL event."""
         ...
