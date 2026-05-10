@@ -537,6 +537,32 @@ class TestCompactRendererHandleCompletion:
         # Should not raise
         renderer.handle_completion(0, "completed")
 
+    def test_tty_completion_persists_final_summary_after_panel_clear(self, capsys):
+        """TTY completion leaves the final summary visible after stop() clears the panel.
+
+        Regression: the previous implementation called Display.update(final_status)
+        followed by Display.stop(), which wipes the panel. For fast-finishing
+        playbooks the user saw the panel flash and then the screen go blank —
+        no record of the run. The final summary must end up OUTSIDE any
+        DEC-2026 frame so the panel-clear sequence cannot erase it.
+        """
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer(is_tty=True)
+        renderer.start("playbook.yml", [])
+        capsys.readouterr()  # discard start() output
+
+        renderer.handle_completion(0, "completed")
+
+        out = capsys.readouterr().out
+        # Anything emitted after the last ESU (\x1b[?2026l) is plain text
+        # that the panel-clear sequence cannot have erased.
+        post_frame = out.rsplit("\x1b[?2026l", 1)[-1]
+        assert "playbook.yml" in post_frame, (
+            f"final summary missing after last frame: {post_frame!r}"
+        )
+        assert "●" in post_frame, f"completion indicator missing: {post_frame!r}"
+
     def test_non_tty_completion_prints_final_summary(self, capsys):
         """PQ6: non-TTY emits the final status summary on completion.
 

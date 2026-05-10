@@ -348,18 +348,20 @@ class CompactRenderer:
 
         final_status = f"{status_bar} {state_indicator}"
 
-        # Update display one final time
+        # Last in-panel update — visible briefly during stop() in TTY mode,
+        # a no-op in non-TTY. Throttling can swallow this; the print() below
+        # is what guarantees the final state survives.
         self._display.update(final_status)
 
-        # Non-TTY mode (pipes, CI) suppresses every Display.update() call
-        # because there's no panel to anchor at the bottom — but the user
-        # still wants the final-state line in their log. Print it once
-        # here as plain text. PQ6 in new-spec/open-questions.md.
-        if not self._display.is_tty:
-            print(final_status)
-
-        # Stop the display
+        # Wipe the panel and release the cursor.
         self._display.stop()
+
+        # Print the final summary OUTSIDE any DEC-2026 frame so the panel
+        # clear above can't erase it. In TTY mode this lands at the cursor
+        # position the panel used to occupy, leaving the user with the run
+        # outcome as the last visible line. In non-TTY (pipes, CI) it's
+        # the only output Display ever produces (PQ6).
+        print(final_status)
 
     def stop(self) -> None:
         """Stop rendering and clean up resources.
