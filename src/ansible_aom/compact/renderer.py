@@ -35,6 +35,8 @@ def format_status_bar(
     warnings: int,
     deprecations: int,
     elapsed_seconds: float,
+    tasks_completed: int = 0,
+    tasks_total: int = 0,
 ) -> str:
     """Format the status bar for compact mode display.
 
@@ -45,9 +47,15 @@ def format_status_bar(
         warnings: Number of warnings encountered.
         deprecations: Number of deprecations encountered.
         elapsed_seconds: Elapsed time in seconds.
+        tasks_completed: Tasks past PENDING/RUNNING. Suppressed when 0.
+        tasks_total: Total tasks from preflight. Segment is omitted when 0
+            (no preflight definitions, or only dynamic include_tasks).
 
     Returns:
-        Formatted status bar string: "playbook │ X/Y hosts │ ⚠ N ✱ N │ H:MM:SS"
+        Formatted status bar string. Task segment included only when
+        ``tasks_total > 0``::
+
+            "playbook │ X/Y hosts │ A/B tasks │ ⚠ N ✱ N │ H:MM:SS"
 
     Example:
         >>> format_status_bar("site.yml", 3, 10, 2, 1, 323)
@@ -63,6 +71,9 @@ def format_status_bar(
         playbook,
         f"{hosts_completed}/{hosts_total} hosts",
     ]
+
+    if tasks_total > 0:
+        parts.append(f"{tasks_completed}/{tasks_total} tasks")
 
     if warnings > 0:
         parts.append(f"⚠ {warnings}")
@@ -125,6 +136,42 @@ def _count_tasks(play: PlayDefinition) -> int:
             total += len(entry.tasks)
         else:
             total += 1
+    return total
+
+
+def count_total_tasks(definitions: list[PlayDefinition]) -> int:
+    """Sum of leaf tasks across all preflight play definitions.
+
+    Used for the status bar's `X/Y tasks` segment. Returns 0 for an empty
+    list, which the renderer treats as "no preflight data — suppress the
+    segment". Dynamic ``include_tasks`` are not counted (they aren't
+    expanded by ``--list-tasks``); ``import_tasks`` are.
+    """
+    return sum(_count_tasks(play) for play in definitions)
+
+
+# Statuses considered "done" for task-progress accounting. RUNNING and
+# PENDING are explicitly excluded — a task is in flight until every host
+# has produced a terminal result.
+_TASK_DONE_STATUSES = frozenset(
+    {
+        Status.OK,
+        Status.CHANGED,
+        Status.FAILED,
+        Status.SKIPPED,
+        Status.UNREACHABLE,
+        Status.COMPLETED,
+    }
+)
+
+
+def count_completed_tasks(state: RunState) -> int:
+    """Count tasks across all plays whose status has reached a terminal value."""
+    total = 0
+    for play in state.plays.values():
+        for task in play.tasks.values():
+            if task.status in _TASK_DONE_STATUSES:
+                total += 1
     return total
 
 
@@ -378,6 +425,8 @@ class CompactRenderer:
             warnings=self._warnings_count,
             deprecations=self._deprecations_count,
             elapsed_seconds=elapsed,
+            tasks_completed=count_completed_tasks(self._state),
+            tasks_total=count_total_tasks(self._definitions),
         )
         self._display.update(status_bar)
 
@@ -474,6 +523,9 @@ class CompactRenderer:
                 if status in (Status.OK, Status.CHANGED, Status.SKIPPED, Status.COMPLETED):
                     hosts_completed += 1
 
+        tasks_total = count_total_tasks(self._definitions)
+        tasks_completed = count_completed_tasks(self._state) if self._state else 0
+
         # Format final status bar
         status_bar = format_status_bar(
             playbook=self._playbook,
@@ -482,6 +534,8 @@ class CompactRenderer:
             warnings=self._warnings_count,
             deprecations=self._deprecations_count,
             elapsed_seconds=elapsed,
+            tasks_completed=tasks_completed,
+            tasks_total=tasks_total,
         )
 
         # Add final state indicator
