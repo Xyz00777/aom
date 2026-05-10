@@ -39,6 +39,19 @@ def detect_default_inventory() -> str | None:
     return None
 
 
+def detect_duplicate_playbook(playbook: str, ansible_args: list[str]) -> bool:
+    """True if `playbook` appears (path-normalised) in `ansible_args`.
+
+    Catches the easy typo where the user types
+    `aom site.yml -i inv.ini site.yml` — the trailing copy lands in
+    ansible_args via argparse REMAINDER, ansible-playbook then dies
+    with an unhelpful argparse error. Surfacing it earlier saves the
+    user a confused moment.
+    """
+    target = os.path.normpath(playbook)
+    return any(os.path.normpath(arg) == target for arg in ansible_args)
+
+
 def ensure_inventory_arg(ansible_args: list[str]) -> list[str]:
     """If no -i/--inventory flag is set, prepend one pointing at the default file.
 
@@ -242,8 +255,6 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.verbose:
-        import os
-
         aom_logger = logging.getLogger("ansible_aom")
         aom_logger.setLevel(logging.DEBUG)
         console_handler = logging.StreamHandler()
@@ -263,6 +274,14 @@ def main() -> int:
     if args.playbook:
         from ansible_aom.renderer.factory import create_renderer
         from ansible_aom.runner import run_playbook
+
+        if detect_duplicate_playbook(args.playbook, args.ansible_args):
+            print(
+                f"aom: '{args.playbook}' appears twice on the command line — "
+                "drop the trailing duplicate.",
+                file=sys.stderr,
+            )
+            return 2
 
         ansible_args = ensure_inventory_arg(args.ansible_args)
 
