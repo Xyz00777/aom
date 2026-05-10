@@ -10,6 +10,7 @@ View Research".
 
 from __future__ import annotations
 
+import shutil
 import sys
 import time
 
@@ -158,7 +159,7 @@ class Display:
             return
 
         rendered = self._content
-        new_rows = _row_count(rendered)
+        new_rows = _row_count(rendered, _terminal_width())
         frame = _BSU + self._rewind_status() + _CLEAR_TO_EOS + rendered + _ESU
         sys.stdout.write(frame)
         sys.stdout.flush()
@@ -180,7 +181,7 @@ class Display:
         # following status rendering starts on a fresh row.
         log = message if message.endswith("\n") else message + "\n"
         rendered = self._content
-        new_rows = _row_count(rendered)
+        new_rows = _row_count(rendered, _terminal_width())
         frame = _BSU + self._rewind_status() + _CLEAR_TO_EOS + log + rendered + _ESU
         sys.stdout.write(frame)
         sys.stdout.flush()
@@ -228,18 +229,49 @@ class Display:
         return _CURSOR_UP_FMT.format(n=self._status_rows - 1)
 
 
-def _row_count(text: str) -> int:
-    """How many terminal rows `text` occupies after it's written.
+def _terminal_width() -> int:
+    """Current terminal width in columns, with a sensible fallback.
 
-    Counts newlines as row separators. A trailing newline pushes the
-    cursor down to a new row, so it contributes a row too. The empty
-    string occupies zero rows. This is an approximation — long lines
-    that wrap will undercount, but that's acceptable until we add real
-    width-aware wrapping.
+    Queried fresh on every render so that resizing the terminal mid-run
+    (SIGWINCH) is picked up by the next redraw without needing an
+    explicit signal handler. ``shutil.get_terminal_size`` reads the
+    underlying TIOCGWINSZ ioctl, which the kernel keeps current.
+    """
+    return shutil.get_terminal_size((80, 24)).columns
+
+
+def _row_count(text: str, width: int) -> int:
+    """How many terminal rows `text` occupies at the given terminal `width`.
+
+    Each logical line consumes ``ceil(len(line) / width)`` rows because
+    the terminal wraps at the right margin. A trailing newline doesn't
+    contribute a row — the cursor sits at the start of the next line
+    but nothing has been rendered there yet. The empty string is zero
+    rows.
+
+    Width-awareness is what makes the rewind step correct on narrow
+    terminals: with the previous newline-only counter, a status bar
+    that wrapped from 1 logical line into 2 rendered rows would only
+    rewind by 1, leaving stale half-bar visible on the next redraw.
+
+    Note: ``len()`` undercounts East Asian wide chars (emoji, CJK) —
+    those occupy two columns each but Python counts them as one. Status
+    bar content is BMP punctuation and ASCII, so this approximation is
+    safe for the AOM call sites; revisit if we ever push wide content
+    through ``Display.update()``.
     """
     if not text:
         return 0
-    rows = text.count("\n")
-    if not text.endswith("\n"):
-        rows += 1
+    lines = text.split("\n")
+    # A trailing newline produces an empty final element ("abc\n" -> ["abc", ""]).
+    # That empty trailing line is "where the cursor sits next", not a rendered row.
+    if lines[-1] == "":
+        lines = lines[:-1]
+    rows = 0
+    for line in lines:
+        if not line:
+            rows += 1
+        else:
+            # ceil(len / width); the -1/+1 dance avoids importing math.
+            rows += (len(line) - 1) // width + 1
     return rows
