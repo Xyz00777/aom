@@ -57,10 +57,10 @@ def handle_password_prompt(
     try:
         sys.stdout.write("\033[999;0H\n")
         sys.stdout.flush()
-    except (OSError, AttributeError):
+    except OSError, AttributeError:
         pass  # Non-TTY environment
 
     try:
         return getpass.getpass(prompt_text)
-    except (EOFError, KeyboardInterrupt, OSError):
+    except EOFError, KeyboardInterrupt, OSError:
         return ""
