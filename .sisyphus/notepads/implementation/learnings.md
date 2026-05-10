@@ -1015,12 +1015,41 @@ separator → `|`, warning → `!`, deprecation → `*`, status icons →
 every status-bar render + the final indicator + the per-host summary.
 Smoke-tested with `PYTHONIOENCODING=ascii`.
 
+### 7. Width-aware row count + SIGWINCH self-heal (roadmap #12)
+
+`_row_count` was newline-only — a status bar that wrapped at the
+right margin counted as 1 row but rendered as 2+, so subsequent
+rewinds left stale half-bars on screen. Fixed:
+
+- `_row_count(text, width)` sums `ceil(len(line) / width)` per logical
+  line. Trailing `"\n"` no longer counts (the cursor sits at start of
+  the next row but nothing renders there).
+- New `_terminal_width()` calls `shutil.get_terminal_size()` on every
+  render. The kernel keeps TIOCGWINSZ current per SIGWINCH, so resize
+  is picked up on the next `update()` / `print_log()` without an
+  explicit signal handler.
+- 12 unit tests for the row count math + 1 integration test pinning
+  that `Display.update` records the wrapped count from the live
+  terminal width (monkeypatched to 20 cols).
+
+Approximation kept: `len()` undercounts East Asian wide chars (emoji,
+CJK). Documented in the docstring; safe at every current call site
+(status bar content is BMP punctuation + ASCII).
+
+### 8. Drop -v alias for ansible passthrough (roadmap #6)
+
+AOM's `--verbose` previously had a `-v` short alias that shadowed
+ansible-playbook's own `-v` / `-vv` / `-vvv` verbosity ramp. `aom
+site.yml -v` activated AOM debug instead of ansible verbosity.
+
+Dropped the `-v` alias. `--verbose` (long form only) stays for AOM
+diagnostics. Bare `-v` after the playbook now flows through REMAINDER
+to ansible-playbook unchanged. Help epilog updated to document the
+convention. Single test rewritten from "verbose accepts -v" to "-v
+after the playbook leaves args.verbose False and lands in
+ansible_args".
+
 ### Remaining roadmap
 
-Feature-shaped: 6 (verbose passthrough — friction: AOM's `-v`
-shadows ansible-playbook's `-v` when placed before the playbook
-arg).
-
 Larger / blocked: 9 (TUI end-to-end), 11 (include_tasks dynamic
-expansion), 12 (SIGWINCH/width-aware row count), 14 (session
-recording).
+expansion), 14 (session recording).
