@@ -335,13 +335,21 @@ class TestVerboseFlag:
         args = parser.parse_args(["--verbose", "playbook.yml"])
         assert args.verbose is True
 
-    def test_verbose_flag_short_form(self):
-        """TC-008: -v flag works."""
+    def test_short_v_does_not_set_aom_verbose(self):
+        """The bare ``-v`` is reserved for ansible-playbook passthrough.
+
+        AOM's own debug flag is ``--verbose`` (long form only). When the
+        user writes ``aom playbook.yml -v`` the ``-v`` lands in
+        ``ansible_args`` via REMAINDER and reaches ansible-playbook —
+        which is what they want, since that's how ansible's verbosity
+        ramp works.
+        """
         from ansible_aom.cli import create_parser
 
         parser = create_parser()
-        args = parser.parse_args(["-v", "playbook.yml"])
-        assert args.verbose is True
+        args = parser.parse_args(["playbook.yml", "-v"])
+        assert args.verbose is False
+        assert "-v" in args.ansible_args
 
     def test_verbose_flag_defaults_false(self):
         """TC-008: Verbose defaults to False."""

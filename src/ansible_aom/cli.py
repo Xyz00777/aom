@@ -80,10 +80,15 @@ def create_parser() -> argparse.ArgumentParser:
 Examples:
   aom playbook.yml                      Run playbook with compact view
   aom --tui playbook.yml                Run playbook with full TUI
-  aom playbook.yml -i inventory.ini     Pass options to ansible-playbook
+  aom playbook.yml -i inv.ini -v        Flags after the playbook are forwarded
+  aom playbook.yml -vvv --tags=deploy   …including ansible-playbook's own -v / -vv / -vvv
   aom inspect list                      List all recorded sessions
   aom inspect <session-id>              Show session summary
   aom inspect diff <id1> <id2>          Compare two sessions
+
+Note: AOM's own debug flag is --verbose (long form only). The short
+-v is reserved for ansible-playbook so `aom site.yml -v` raises
+ansible verbosity, not AOM verbosity.
         """,
     )
 
@@ -94,10 +99,9 @@ Examples:
     )
 
     parser.add_argument(
-        "-v",
         "--verbose",
         action="store_true",
-        help="Print pre-execution diagnostics and enable DEBUG logging",
+        help="Print AOM pre-execution diagnostics and enable DEBUG logging",
     )
 
     parser.add_argument(
