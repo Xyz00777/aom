@@ -327,23 +327,98 @@ older Pythons or accept ruff's preference. Project is currently 3.14-only
 ### Still open after this branch
 
 - **Pre-flight `--list-tasks` / `--list-hosts`** — runner skips them.
-  The renderer therefore can't show full task tree or resolved-hosts
+  The renderer therefore can't show the full task tree or resolved-hosts
   list at startup; it builds state purely from JSONL events as they
-  arrive. ARCHITECTURE.md's data flow diagram describes parallel
-  pre-flight that doesn't exist yet.
-- **Warning surfacing** — the parser detects `[WARNING]:` /
-  `[DEPRECATION WARNING]:` lines and stores them in `parser.warnings`,
-  but the runner doesn't forward to `renderer.add_warning`. Doing so
-  cleanly requires adding `add_warning` to the `Renderer` Protocol so
-  TUI can implement it too — that's a Protocol-design slice.
+  arrive. ARCHITECTURE.md's data-flow diagram describes parallel
+  pre-flight that still doesn't exist yet. **Next major slice.**
 - **`_row_count()` is approximate** — no width-aware wrapping. Long
   status lines that wrap will under-count rows; redraws will leave
-  artefacts. Tracked under "cursor-position fidelity".
+  artefacts. Currently the panel is single-line, so this is theoretical.
 - **Terminal resize (SIGWINCH)** is not handled.
-- **ASCII fallback for non-Unicode terminals** — `core/icons.py` has the
-  mapping but the new `Display` doesn't switch on it.
-- **TIMEOUT branch in runner is a no-op** — a future slice should wake
-  the renderer here for elapsed-time ticks during long-running tasks.
-- **Visual TTY smoke test** still not done — pipe-mode end-to-end works
-  but a real terminal run-through is needed to confirm the panel
-  anchors correctly with logs scrolling above.
+- **ASCII fallback for non-Unicode terminals** — `core/icons.py` has
+  the mapping (`STATUS_ICONS_ASCII`) but the renderer hard-codes the
+  Unicode forms in `format_status_bar` and `handle_completion`. Needs
+  a `supports_unicode()` detector + icon-set parameter threading.
+
+## 2026-05-10 TTY UX fixes + nom-style streaming logs (same branch)
+
+Triggered by an interactive smoke test from the user: "starts and
+immediately terminates and clears". Diagnosed as four coupled gaps —
+the panel cleared on stop with no record left, no streaming task output
+during the run, no elapsed-time updates during quiet periods, and the
+warnings counter stuck at zero because of an ANSI-prefix mismatch.
+
+### What changed
+
+- **`compact/renderer.py::handle_completion`**: moved the final-summary
+  `print()` outside the `if not is_tty` guard and put it AFTER `stop()`.
+  In TTY mode this lands at the cursor position the panel used to occupy,
+  leaving the run outcome as the last visible line; in non-TTY it's the
+  only output Display ever produces (PQ6 still satisfied).
+- **`compact/renderer.py::_emit_event_log`**: new helper called from
+  `update_state` that prints a nom-style log line above the status panel
+  for each significant event (PLAY, TASK headers, ok/changed/fatal/
+  skipping per host). v2_playbook_on_stats stays silent — the panel and
+  the final summary already cover that. Throttling on the panel update
+  means the panel may visibly trail the logs, which matches nom.
+- **`compact/renderer.py::tick`**: new public method that re-renders
+  the status bar without processing an event. Extracted the status-bar
+  computation into `_render_status_bar()` so both `update_state` and
+  `tick` share it. The runner's TIMEOUT branch calls `tick()` via
+  `getattr` so renderers without it (TUI) are silently skipped.
+- **`core/parser.py::_handle_plaintext`**: strip CSI SGR escapes
+  before matching `WARNING_PATTERNS`. Real ansible-playbook prints
+  `\x1b[1;35m[WARNING]:\x1b[0m...` and the `^\[WARNING\]:` anchor
+  never matched through the colour escape. Store the cleaned message
+  so downstream UI doesn't need to re-strip.
+- **`core/parser.py::drain_warnings`**: returns and clears the warnings
+  list in one call, so the runner can forward newly-detected warnings
+  without tracking an index.
+- **`runner.py::_feed`**: after each `feed_line`, drain warnings and
+  forward via `renderer.add_warning(message, is_deprecation)` if the
+  renderer implements it (getattr-guarded).
+
+### Test impact
+
+- Suite: **1594 passed, 0 failed, 6 skipped** (was 1587/0/6).
+- New tests cover: TTY final-summary persistence, log-line emission for
+  every significant event type, `tick()` panel-only refresh, ANSI-
+  prefixed warning classification (with backwards-compat for plain form
+  and a negative case for non-warning ANSI text).
+
+### End-to-end smoke (pipe mode)
+
+```
+$ uv run aom .sisyphus/test-fixtures/simple.yml -i localhost, -c local
+
+PLAY [Simple test playbook] *********...
+TASK [First task] *********...
+ok: [localhost]
+TASK [Second task with tags] *********...
+ok: [localhost]
+TASK [Third task] *********...
+ok: [localhost]
+.sisyphus/test-fixtures/simple.yml │ 1/1 hosts │ ⚠ 1 │ ✱ 1 │ 0:00:00 ●
+```
+
+The `⚠ 1 │ ✱ 1` confirms the warning + deprecation that ansible-core
+2.20 emits at startup are now reaching the panel.
+
+### Still open after these fixes
+
+- **Pre-flight `--list-tasks` / `--list-hosts`** (unchanged — next major
+  slice). The renderer can't show the task tree at startup yet.
+- **`_row_count()` width-aware wrapping**, **SIGWINCH**, **ASCII
+  fallback wiring** (unchanged).
+- **Stderr-only diagnostics** — pexpect.spawn merges stderr into the
+  pty, so warnings come through; but ansible-playbook's syntax-error
+  diagnostics go to stderr in a way that doesn't always reach our
+  parser (the syntax_error.yml smoke shows exit 4 with an empty log).
+  Worth investigating once pre-flight is in.
+- **Renderer Protocol gaps** — `tick`/`add_warning` are getattr-guarded
+  on the runner side. Once the TUI is wired through `runner.run_playbook`
+  (rather than its current `app.run()` path), we should promote both to
+  the Protocol so calls aren't optional.
+- **Visual TTY smoke** — please re-run interactively now that streaming
+  logs + final-summary persistence are in. Should look like nom: logs
+  scrolling, panel anchored, summary survives at the cursor on exit.
