@@ -16,7 +16,9 @@ the moment one fires.
 
 from __future__ import annotations
 
+import logging
 import os
+from pathlib import Path
 from typing import Any
 
 import pexpect
@@ -24,7 +26,66 @@ import pexpect
 from ansible_aom.core.models import WarningType
 from ansible_aom.core.parser import PtyStreamParser
 from ansible_aom.core.preflight import run_preflight
+from ansible_aom.core.session import SessionManager
 from ansible_aom.renderer.protocol import Renderer
+
+logger = logging.getLogger(__name__)
+
+
+def _default_session_dir() -> Path:
+    """Spec-standard location for live session directories.
+
+    Mirrors the default that ``aom inspect`` falls back to so a run
+    recorded here is immediately findable by ``aom inspect list`` /
+    ``aom inspect show`` without any flag plumbing.
+    """
+    return Path.home() / ".local" / "state" / "aom" / "sessions"
+
+
+class _SessionSink:
+    """Best-effort wrapper around SessionManager for runtime recording.
+
+    Disk errors at session start/write/end are swallowed and logged —
+    recording is observability, not control flow. A run that can't open
+    its session directory still completes normally; the inspect-side
+    catches up next time.
+    """
+
+    def __init__(self, session_dir: Path, playbook: str) -> None:
+        self._manager: SessionManager | None = None
+        self._session_id: str | None = None
+        try:
+            session_dir.mkdir(parents=True, exist_ok=True)
+            manager = SessionManager(session_dir=session_dir, playbook=playbook)
+            self._session_id = manager.start_session(playbook)
+            self._manager = manager
+        except OSError as exc:
+            logger.debug("session recording disabled (start failed): %s", exc)
+
+    def record_event(self, event: dict) -> None:
+        if self._manager is None or self._session_id is None:
+            return
+        try:
+            self._manager.record_event(self._session_id, event)
+        except OSError as exc:
+            logger.debug("session event write failed: %s", exc)
+
+    def record_stderr(self, line: str) -> None:
+        if self._manager is None or self._session_id is None:
+            return
+        try:
+            self._manager.record_stderr(self._session_id, line)
+        except OSError as exc:
+            logger.debug("session stderr write failed: %s", exc)
+
+    def end(self, status: str) -> None:
+        if self._manager is None or self._session_id is None:
+            return
+        try:
+            self._manager.end_session(self._session_id, status)
+        except OSError as exc:
+            logger.debug("session end failed: %s", exc)
+
 
 # Same patterns the parser uses for replay-time detection. They appear
 # here because we need pexpect to recognise them mid-line in the PTY
@@ -56,12 +117,18 @@ def run_playbook(
     ansible_args: list[str],
     renderer: Renderer,
     timeout: float = _DEFAULT_TIMEOUT_S,
+    session_dir: Path | None = None,
 ) -> int:
     """Run a playbook through the renderer; return the subprocess exit code.
 
     The renderer's lifecycle is fully owned here: `start` is called before
     the spawn, `handle_completion` after the subprocess exits (or fails to
     start), and `stop` always runs in a finally block.
+
+    Session recording writes a new directory under ``session_dir`` (or
+    the spec default ``~/.local/state/aom/sessions/`` when None) so
+    ``aom inspect`` can replay the run. Recording is best-effort —
+    disk errors are logged but never abort the run.
     """
     executable, args = _build_command(playbook, ansible_args)
     env = os.environ.copy()
@@ -69,6 +136,8 @@ def run_playbook(
 
     parser = PtyStreamParser()
     renderer.start(playbook, ansible_args)
+
+    sink = _SessionSink(session_dir or _default_session_dir(), playbook)
 
     # Preflight: --list-tasks + --list-hosts in parallel before spawning
     # the JSONL run so the renderer can show plays/tasks/host count from
@@ -80,6 +149,7 @@ def run_playbook(
     # every error here without extra filtering.
     for err in pre_result.errors:
         renderer.add_warning(err, False)
+        sink.record_stderr(err)
 
     child: pexpect.spawn | None = None
     try:
@@ -94,11 +164,13 @@ def run_playbook(
             )
         except pexpect.exceptions.ExceptionPexpect, FileNotFoundError, OSError:
             # Command not found / not executable — surface as 127.
+            sink.end("crashed")
             renderer.handle_completion(127, "crashed")
             return 127
 
-        exit_code = _drive(child, parser, renderer, timeout)
+        exit_code = _drive(child, parser, renderer, timeout, sink)
         state = "completed" if exit_code == 0 else "failed"
+        sink.end(state)
         renderer.handle_completion(exit_code, state)
         return exit_code
 
@@ -111,6 +183,7 @@ def run_playbook(
                 child.close(force=True)
             except Exception:
                 pass
+        sink.end("crashed")
         renderer.handle_completion(130, "crashed")
         return 130
     finally:
@@ -122,6 +195,7 @@ def _drive(
     parser: PtyStreamParser,
     renderer: Renderer,
     timeout: float,
+    sink: _SessionSink,
 ) -> int:
     """Read the PTY until EOF, feeding lines to the parser/renderer."""
     # We expect either a newline (terminating a complete line), EOF
@@ -140,14 +214,14 @@ def _drive(
         try:
             idx = child.expect(patterns, timeout=timeout)
         except pexpect.exceptions.EOF:
-            _flush_pending(child, parser, renderer)
+            _flush_pending(child, parser, renderer, sink)
             break
 
         if idx == newline_idx:
             line = (child.before or "") + (child.after or "")
-            _feed(line, parser, renderer)
+            _feed(line, parser, renderer, sink)
         elif idx == eof_idx:
-            _flush_pending(child, parser, renderer)
+            _flush_pending(child, parser, renderer, sink)
             break
         elif idx == timeout_idx:
             # No output yet — perfectly normal during long-running tasks.
@@ -168,7 +242,12 @@ def _drive(
     return child.exitstatus if child.exitstatus is not None else (child.signalstatus or 1)
 
 
-def _flush_pending(child: pexpect.spawn, parser: PtyStreamParser, renderer: Renderer) -> None:
+def _flush_pending(
+    child: pexpect.spawn,
+    parser: PtyStreamParser,
+    renderer: Renderer,
+    sink: _SessionSink,
+) -> None:
     """Drain any final bytes left in the buffer when the subprocess ends.
 
     EOF often arrives without a trailing newline — pexpect leaves the last
@@ -177,10 +256,10 @@ def _flush_pending(child: pexpect.spawn, parser: PtyStreamParser, renderer: Rend
     """
     leftover = child.before or ""
     if leftover.strip():
-        _feed(leftover, parser, renderer)
+        _feed(leftover, parser, renderer, sink)
 
 
-def _feed(line: str, parser: PtyStreamParser, renderer: Renderer) -> None:
+def _feed(line: str, parser: PtyStreamParser, renderer: Renderer, sink: _SessionSink) -> None:
     """Feed one line to the parser and forward emitted events + warnings.
 
     Warnings (`[WARNING]:` / `[DEPRECATION WARNING]:` lines from ansible)
@@ -188,9 +267,14 @@ def _feed(line: str, parser: PtyStreamParser, renderer: Renderer) -> None:
     renderer through the JSONL event flow — drain them and forward via
     `add_warning` (renderers without a visible warning surface implement
     it as a no-op).
+
+    Each parsed event is mirrored to the session sink so a later
+    ``aom inspect show`` can replay the exact JSONL the run saw.
     """
     for event in parser.feed_line(line):
+        sink.record_event(event)
         renderer.update_state(event)
 
     for warning in parser.drain_warnings():
+        sink.record_stderr(warning.message)
         renderer.add_warning(warning.message, warning.type == WarningType.DEPRECATION)
