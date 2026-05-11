@@ -42,19 +42,38 @@ class StreamPhase(Enum):
 
 
 class JsonLineStream:
-    """Parses JSON lines from a mixed JSON/plaintext stream."""
+    """Parses JSON lines from a mixed JSON/plaintext stream.
+
+    Pexpect can split a JSONL event across two reads on a slow link or a
+    very long ``msg`` payload. To avoid dropping both halves, a partial
+    line that looks like JSON (starts with ``{`` but fails to parse) is
+    stashed in ``_carry`` and prepended to the next ``feed_line`` input.
+    The carry is hard-capped at ``_CARRY_LIMIT`` bytes — past that we
+    assume the stream is wedged and drop rather than grow without bound.
+    """
+
+    # 1 MB. Real ansible events are usually <10 KB; a single event larger
+    # than this is almost certainly a bug or a pathological host output.
+    _CARRY_LIMIT = 1_000_000
 
     def __init__(self) -> None:
         self._non_json_handler: Callable[[str], None] | None = None
+        self._carry: str = ""
 
     def feed_line(self, line: str) -> list[dict]:
         """Parse a line and return zero or more JSON events.
 
         Returns empty list for:
         - Empty lines
-        - Invalid JSON
+        - Invalid JSON (stored as carry if line started with ``{``)
         - JSON without _event field
         """
+        # Prepend any pending partial from a previous call so a JSONL
+        # event split across two reads is rejoined.
+        if self._carry:
+            line = self._carry + line
+            self._carry = ""
+
         line = line.strip()
         if not line:
             return []
@@ -67,7 +86,13 @@ class JsonLineStream:
         try:
             data = json.loads(line)
         except json.JSONDecodeError:
-            logger.warning("Invalid JSON line: %s", line[:100])
+            # Stash as carry if there's room, otherwise drop. Without
+            # the cap a runaway/garbage stream would grow ``_carry``
+            # without bound.
+            if len(line) <= self._CARRY_LIMIT:
+                self._carry = line
+                return []
+            logger.warning("Invalid JSON line (carry overflow, dropped): %s", line[:100])
             if self._non_json_handler:
                 self._non_json_handler(line)
             return []

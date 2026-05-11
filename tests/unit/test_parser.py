@@ -205,6 +205,56 @@ class TestJsonLineStreamBasics:
         assert len(non_json_calls) == 2
 
 
+class TestJsonLineStreamCarryBuffer:
+    """R1: PTY can split a JSONL event across reads. The first half on its
+    own is unparseable JSON; the parser must stash it and rejoin with the
+    next chunk instead of dropping both halves."""
+
+    def test_two_chunk_join_yields_full_event(self):
+        """Half a JSONL line then the rest should yield one event."""
+        parser = JsonLineStream()
+        assert parser.feed_line('{"_event":"v2_runner_on_ok","hosts":{"web1":{"msg":"hel') == []
+        result = parser.feed_line('lo"}}}')
+        assert len(result) == 1
+        assert result[0]["_event"] == "v2_runner_on_ok"
+        assert result[0]["hosts"]["web1"]["msg"] == "hello"
+
+    def test_many_small_chunks_join(self):
+        """A 100-chunk slow-drip split still yields exactly one event."""
+        full = '{"_event":"v2_playbook_on_start","msg":"' + ("x" * 200) + '"}'
+        parser = JsonLineStream()
+        chunk_size = max(1, len(full) // 100)
+        events: list[dict] = []
+        for i in range(0, len(full), chunk_size):
+            events.extend(parser.feed_line(full[i : i + chunk_size]))
+        assert len(events) == 1
+        assert events[0]["_event"] == "v2_playbook_on_start"
+
+    def test_carry_buffer_overflow_drops_without_raising(self):
+        """One pathologically large partial event is dropped, not OOM'd,
+        and a subsequent well-formed line parses cleanly."""
+        parser = JsonLineStream()
+        # First chunk is a partial JSON that's already larger than the
+        # 1 MB cap. Storing it as carry would be unbounded growth — the
+        # parser must drop it.
+        oversized = '{"_event":"x","msg":"' + ("a" * 1_100_000)
+        assert parser.feed_line(oversized) == []
+        # After the drop, the carry must be empty so the next line is
+        # parsed standalone.
+        result = parser.feed_line('{"_event":"v2_playbook_on_start"}')
+        assert len(result) == 1
+        assert result[0]["_event"] == "v2_playbook_on_start"
+
+    def test_well_formed_line_does_not_use_carry(self):
+        """Sanity: a normal line in one go bypasses the carry path."""
+        parser = JsonLineStream()
+        result = parser.feed_line('{"_event":"v2_playbook_on_start"}')
+        assert len(result) == 1
+        # And a subsequent line still parses fine.
+        result2 = parser.feed_line('{"_event":"v2_runner_on_ok","hosts":{}}')
+        assert len(result2) == 1
+
+
 class TestPtyStreamParserPhases:
     """TC-128 to TC-142: PTY stream phase transitions."""
 
