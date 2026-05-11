@@ -1193,3 +1193,110 @@ Larger / blocked: 9 (TUI end-to-end). That's the last one and the
 hardest — AOMApp's `app.run()` event loop versus the runner's pexpect
 loop need either `call_from_thread` plumbing or a model where the
 runner drives Textual's loop instead of owning its own.
+
+---
+
+## 2026-05-11 (third pass) — TUI end-to-end wiring (roadmap #9)
+
+The architectural collision that blocked this: `cli.py` was calling
+`run_playbook(playbook, args, aom_app)`, which runs a pexpect loop
+synchronously. Textual's own `app.run()` was never invoked, so the
+TUI rendered nothing. The fix flips ownership: in TUI mode, Textual
+drives, and pexpect runs in a Textual worker.
+
+### What landed
+
+`AOMApp` now accepts `playbook`, `ansible_args`, and an optional
+`session_dir` in its constructor; the no-arg form keeps working so
+the protocol smoke tests (and the pre-existing
+`tests/compact/test_password.py::TestTUIModePasswordModal` suite)
+don't break. The app owns a `RunState` and exposes read-only
+properties for every piece of state widgets need:
+
+- `run_state` (mutated by `update_state` → `state.handle_event`)
+- `exit_code`, `final_state` (set by `handle_completion`)
+- `warnings_count`, `deprecations_count`, `log_lines`
+
+`on_mount()` pushes `MainScreen` and — when constructed with a
+playbook — kicks off `run_worker(self._run_playbook_worker,
+thread=True, exclusive=True)`. The worker calls `run_playbook(self...
+self)`, which drives the existing pexpect loop and hits the
+Renderer-Protocol callbacks on `self`. Mutations to plain Python
+state (`_run_state`, counters, log lines) are intentionally direct;
+any visible widget refresh that depends on them is the widget's
+responsibility to schedule via `call_from_thread`.
+
+Two behavioural changes worth noting:
+
+1. **`stop()` is now a no-op.** The legacy `self.exit()` here tore
+   the UI down the instant the runner returned, leaving the user
+   staring at a blank terminal. Now Textual's loop keeps spinning;
+   the user quits with `q` (which is already wired via
+   `action_quit`).
+2. **`handle_completion` only records state.** It never exits the
+   app, for the same reason.
+
+### CLI wiring
+
+`cli.py` now branches on `args.tui` before touching renderers:
+
+- `_run_compact(playbook, args)` — the old synchronous path,
+  unchanged in behaviour.
+- `_run_tui(playbook, args)` — constructs `AOMApp(playbook=...,
+  ansible_args=...)` and calls `app.run()`. After the loop returns
+  (user quit, or completion + manual q), `app.exit_code` becomes the
+  process exit code; `None` (user quit mid-run) → 1.
+
+The KeyboardInterrupt + generic-Exception guards from the old code
+are still there, just split across the two helpers.
+
+### Tests
+
+`tests/tui/test_app_end_to_end.py` (9 cases):
+1. Construction with playbook+args (and the no-arg default still
+   works).
+2. `start()` resets a fresh `RunState`.
+3. `update_state` mutates `run_state.plays`.
+4. `handle_completion` stores `exit_code` + `final_state`.
+5. `set_definitions` lands on `run_state.definitions`.
+6. `add_warning` bumps the right counter (warning vs deprecation).
+7. `print_log` appends to `log_lines` in order.
+8. **Pilot-driven worker test:** `app.run_test()` actually mounts
+   the app, patches `run_playbook` to a recording stub, and asserts
+   the worker fires with `renderer is app`, the right playbook
+   path, args, and `session_dir`, and that completion lands.
+
+`tests/unit/test_cli_tui_launch.py` (4 cases):
+1. `aom --tui site.yml` calls `app.run()`, never the legacy
+   `run_playbook`.
+2. `app.exit_code` propagates as the process exit code.
+3. `exit_code=None` (user quit) → cli returns 1.
+4. Compact mode still calls `run_playbook` + `create_renderer` —
+   no regression.
+
+Full suite: 1710 passed, 6 skipped (up from 1697 — exactly the 13
+new tests).
+
+### Open caveats
+
+- Widgets don't yet **react** to state mutations. The plumbing is
+  there (state is owned by the app, the worker can mutate it
+  safely), but `MainScreen.update_from_state()` is only called from
+  the existing inert paths. A follow-up should wire reactive
+  attributes or periodic refreshes via `app.set_interval(...)` so
+  the panels actually update during a run. That's UI work, not loop
+  architecture, so it can land as its own slice once someone runs
+  the TUI for real and decides what should pulse.
+- `handle_password_prompt` still uses `with self.suspend(): getpass...`
+  — that's the same surface
+  `tests/compact/test_password.py::TestTUIModePasswordModal` covers,
+  and it works correctly from the worker thread because `suspend()`
+  is already designed to be reentrant from foreign threads.
+- The `runner.py:95` tuple-expression `except` still parses fine
+  but reads unusually. Untouched.
+
+### Roadmap complete
+
+All 14 items shipped. The remaining `.sisyphus/notepads/` items
+(TC-094/095/096 dynamic-task ordering tests, session-recording
+cleanup policy review) are tidy-up work, not blocking features.
