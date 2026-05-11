@@ -106,6 +106,12 @@ Session recording:
   disk errors are logged but never abort the run. Use `aom inspect`
   to replay past runs; `aom inspect prune` to clean up.
 
+Debugging:
+  AOM_TRACE=1 aom site.yml  — dumps every pexpect loop transition to
+  stderr (TIMEOUT branches, newline matches, buffer contents). Useful
+  when an interactive prompt doesn't seem to fire — share the trace
+  output and the bytes AOM is receiving become obvious.
+
 File locations:
   Sessions:    ~/.local/state/aom/sessions/<uuidv7>/
   Config:      ~/.config/aom/config.yaml (optional)

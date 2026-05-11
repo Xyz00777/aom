@@ -584,13 +584,29 @@ class CompactRenderer:
             ascii_mode=self._ascii_mode,
         )
 
-        # Add final state indicator
+        # Add final state indicator with a label so the user can
+        # distinguish a clean exit (●) from a failure (✖ failed),
+        # a user-initiated Ctrl+C (✖ cancelled, exit 130), or a
+        # mid-run crash (✖ crashed). Without the label, every
+        # non-zero exit looked identical and gave the user no clue
+        # whether the playbook or AOM was to blame.
         if self._ascii_mode:
-            state_indicator = {"completed": "*", "failed": "X", "crashed": "X"}.get(state, "?")
+            icon = {"completed": "*", "failed": "X", "crashed": "X"}.get(state, "?")
         else:
-            state_indicator = {"completed": "●", "failed": "✖", "crashed": "✖"}.get(state, "?")
+            icon = {"completed": "●", "failed": "✖", "crashed": "✖"}.get(state, "?")
 
-        final_status = f"{status_bar} {state_indicator}"
+        if state == "completed":
+            label = ""
+        elif state == "crashed" and exit_code == 130:
+            label = " cancelled by user"
+        elif state == "crashed" and exit_code == 127:
+            label = " ansible-playbook not found"
+        elif state == "crashed":
+            label = " crashed"
+        else:
+            label = " failed"
+
+        final_status = f"{status_bar} {icon}{label}"
 
         # Last in-panel update — visible briefly during stop() in TTY mode,
         # a no-op in non-TTY. Throttling can swallow this; the print() below

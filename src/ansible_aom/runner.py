@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -132,6 +133,25 @@ _STALL_FLUSH_TIMEOUTS: int = 6  # ~3s at the default 0.5s timeout
 _STALL_HINT_TIMEOUTS: int = 4  # ~2s at the default 0.5s timeout
 
 _DEFAULT_TIMEOUT_S = 0.5
+
+# When set to a truthy value, write a per-loop trace of the runner's
+# pexpect activity to stderr. Used to debug "AOM didn't see the
+# prompt" reports — every TIMEOUT branch logs ``buffer=...
+# before=... prior=...`` so we can tell whether pexpect is buffering
+# the data, returning empty, or something else.
+_TRACE_ENV_VAR = "AOM_TRACE"
+
+
+def _trace_enabled() -> bool:
+    return bool(os.environ.get(_TRACE_ENV_VAR))
+
+
+def _trace(label: str, **fields: object) -> None:
+    if not _trace_enabled():
+        return
+    parts = " ".join(f"{k}={v!r}" for k, v in fields.items())
+    sys.stderr.write(f"[aom-trace] {label} {parts}\n")
+    sys.stderr.flush()
 
 
 _VARS_PROMPT_RE = re.compile(r"^\s*\[[^\]\n]+\]\s*(\([^)]*\))?\s*:\s*$", re.MULTILINE)
@@ -332,9 +352,11 @@ def _drive(
 
         if idx == newline_idx:
             line = (child.before or "") + (child.after or "")
+            _trace("newline", line=line[:200])
             _feed(line, parser, renderer, sink)
             stall_count = 0
         elif idx == eof_idx:
+            _trace("eof", leftover=(child.before or "")[:200])
             _flush_pending(child, parser, renderer, sink)
             break
         elif idx == timeout_idx:
@@ -346,6 +368,13 @@ def _drive(
             # header line was already consumed before the prompt's
             # TIMEOUT fired.
             prior = parser.plaintext_lines[-1] if parser.plaintext_lines else None
+            _trace(
+                "timeout",
+                stall_count=stall_count,
+                buffer=(getattr(child, "buffer", "") or "")[:200],
+                before=(getattr(child, "before", "") or "")[:200],
+                prior=(prior or "")[:120],
+            )
             stall_count = _handle_timeout_branch(child, renderer, sink, stall_count, prior)
             continue
         else:
@@ -353,6 +382,7 @@ def _drive(
             # pre-match content (which may contain prior plaintext we
             # haven't routed yet) and the matched prompt itself.
             prompt = (child.before or "") + (child.after or "")
+            _trace("password-pattern", prompt=prompt[:200])
             password = renderer.handle_password_prompt(prompt)
             child.sendline(password)
             stall_count = 0
