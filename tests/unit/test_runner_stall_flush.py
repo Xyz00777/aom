@@ -15,6 +15,7 @@ from unittest.mock import MagicMock
 
 from ansible_aom.runner import (
     _STALL_FLUSH_TIMEOUTS,
+    _STALL_HINT_TIMEOUTS,
     _handle_timeout_branch,
     _looks_like_interactive_prompt,
 )
@@ -224,3 +225,45 @@ class TestHighConfidencePromptPath:
 
         # Empty string forwarded so pause accepts "continue".
         assert child.sent_lines == [""]
+
+    def test_prompt_path_emits_visible_breadcrumb(self) -> None:
+        """A detected prompt prints a [aom] hint so the user sees what's happening."""
+        child = _FakeChild(buffer_value="[pause]\nPress Enter: ")
+        renderer = MagicMock()
+        renderer.handle_interactive_prompt.return_value = ""
+        sink = _FakeSink()
+
+        _handle_timeout_branch(child, renderer, sink, stall_count=0)
+
+        printed = [c.args[0] for c in renderer.print_log.call_args_list]
+        assert any("[aom]" in line and "prompt" in line for line in printed), printed
+
+
+class TestStallHintBeforeFlush:
+    """Earlier visible hint before the flush threshold."""
+
+    def test_hint_fires_at_hint_threshold(self) -> None:
+        child = _FakeChild(buffer_value="some slow output still happening")
+        renderer = MagicMock()
+        sink = _FakeSink()
+
+        # Going IN at one-less-than-hint so the increment lands on it.
+        _handle_timeout_branch(child, renderer, sink, stall_count=_STALL_HINT_TIMEOUTS - 1)
+
+        printed = [c.args[0] for c in renderer.print_log.call_args_list]
+        assert any("[aom]" in line and "waiting" in line for line in printed)
+        # Buffer untouched — flush comes later.
+        assert child.buffer == "some slow output still happening"
+        renderer.handle_interactive_prompt.assert_not_called()
+
+    def test_hint_only_fires_once(self) -> None:
+        """Subsequent timeouts past the hint threshold don't repeat it."""
+        child = _FakeChild(buffer_value="slow")
+        renderer = MagicMock()
+        sink = _FakeSink()
+
+        # Already past the hint threshold; increment goes further past.
+        _handle_timeout_branch(child, renderer, sink, stall_count=_STALL_HINT_TIMEOUTS + 1)
+
+        printed = [c.args[0] for c in renderer.print_log.call_args_list]
+        assert not any("waiting" in line for line in printed), printed

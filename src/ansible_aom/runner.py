@@ -122,7 +122,14 @@ _INTERACTIVE_PROMPT_MARKERS: tuple[str, ...] = (
 # detection flushes the unread buffer to the log so the user can at
 # least see what was being held. Never blocks for input — see
 # `.sisyphus/notepads/plans/interactive-prompts.md` for the rationale.
-_STALL_FLUSH_TIMEOUTS: int = 20  # ~10s at the default 0.5s timeout
+_STALL_FLUSH_TIMEOUTS: int = 6  # ~3s at the default 0.5s timeout
+
+# Earlier hint: when the child has been silent with a non-empty buffer
+# for this many consecutive timeouts, surface a one-time "[aom] waiting
+# on output…" breadcrumb so the user knows AOM is alive and watching.
+# Set strictly less than _STALL_FLUSH_TIMEOUTS so the hint always
+# precedes the flush.
+_STALL_HINT_TIMEOUTS: int = 4  # ~2s at the default 0.5s timeout
 
 _DEFAULT_TIMEOUT_S = 0.5
 
@@ -414,10 +421,19 @@ def _handle_timeout_branch(
     what happened. Flushing alone is recoverable: if output eventually
     arrives it just appears underneath.
     """
-    pending = _peek_unread(child)
+    # `child.buffer` is the documented unread accumulator. In some
+    # pexpect builds or weird timing windows the data lands in
+    # `child.before` instead (it's the "what was read before this
+    # match" field), so fall back when buffer is empty.
+    pending = _peek_unread(child) or (getattr(child, "before", "") or "")
 
     if pending and _looks_like_interactive_prompt(pending, prior_plaintext):
-        prompt_text = _consume_unread(child)
+        prompt_text = _consume_unread(child) or pending
+        # Loud breadcrumb so users can SEE that detection fired even
+        # without --verbose. Goes to print_log (which renders above
+        # the live panel) rather than stderr so it's visible in TTY
+        # and pipe modes uniformly.
+        renderer.print_log("[aom] detected interactive prompt — respond below:")
         logger.debug(
             "interactive prompt detected (len=%d, prior=%r)",
             len(prompt_text),
@@ -442,10 +458,17 @@ def _handle_timeout_branch(
 
     if pending:
         stall_count += 1
+        # One-time "waiting" hint before the actual flush so the user
+        # knows AOM is alive, not just silently spinning.
+        if stall_count == _STALL_HINT_TIMEOUTS:
+            renderer.print_log(
+                f"[aom] waiting on ansible-playbook output ({len(pending)} bytes held)…"
+            )
         if stall_count >= _STALL_FLUSH_TIMEOUTS:
             # Flush-only: surface the held content so the user sees
             # *something*. Never block.
-            flushed = _consume_unread(child)
+            flushed = _consume_unread(child) or pending
+            renderer.print_log("[aom] flushing held output (heuristic didn't recognise as prompt):")
             for line in flushed.splitlines():
                 if line.strip():
                     renderer.print_log(line)
