@@ -914,7 +914,7 @@ class CompactRenderer:
             if ts.endswith("Z"):
                 ts = ts[:-1] + "+00:00"
             return datetime.fromisoformat(ts).timestamp()
-        except (ValueError, TypeError, AttributeError):
+        except ValueError, TypeError, AttributeError:
             return None
 
     def _format_duration(self, seconds: float) -> str:
@@ -959,9 +959,7 @@ class CompactRenderer:
         prefix = _wrap(f"[{wall}]", _DIM, self._colorize)
         cum_str = _wrap(f"(cum {self._format_duration(cum)})", _DIM, self._colorize)
         duration_str = _wrap(self._format_duration(duration), _CYAN, self._colorize)
-        self._display.print_log(
-            f"{prefix} {self._last_task_name} — {duration_str} {cum_str}"
-        )
+        self._display.print_log(f"{prefix} {self._last_task_name} — {duration_str} {cum_str}")
 
     def _flush_pending_skips(self, *, force_individual: bool) -> None:
         """Drain the per-task skipped-host buffer.
@@ -1034,9 +1032,7 @@ class CompactRenderer:
             # skipped results, collapse them; otherwise (the buffer
             # would have been drained by an earlier non-skipped
             # result), this is a no-op.
-            self._flush_pending_skips(
-                force_individual=self._current_task_had_nonskipped_result
-            )
+            self._flush_pending_skips(force_individual=self._current_task_had_nonskipped_result)
             # Reset per-task state for the task we're about to print.
             self._current_task_had_nonskipped_result = False
             # Summary for the previous task lands BEFORE the new TASK
@@ -1067,9 +1063,7 @@ class CompactRenderer:
                         _wrap(f"changed: [{host}]{suffix}", _YELLOW, self._colorize)
                     )
                 else:
-                    self._display.print_log(
-                        _wrap(f"ok: [{host}]{suffix}", _GREEN, self._colorize)
-                    )
+                    self._display.print_log(_wrap(f"ok: [{host}]{suffix}", _GREEN, self._colorize))
         elif name == "v2_runner_on_failed":
             self._flush_pending_skips(force_individual=True)
             self._current_task_had_nonskipped_result = True
@@ -1105,9 +1099,7 @@ class CompactRenderer:
         elif name == "v2_playbook_on_stats":
             # Drain the final task's skipped buffer with the same
             # mixed-vs-all-skipped rule we use at task transitions.
-            self._flush_pending_skips(
-                force_individual=self._current_task_had_nonskipped_result
-            )
+            self._flush_pending_skips(force_individual=self._current_task_had_nonskipped_result)
             self._current_task_had_nonskipped_result = False
             # Final task's summary line — same logic as the inter-task
             # case, just triggered by stats instead of the next task_start.
