@@ -280,6 +280,66 @@ class TestNewlineTerminatedPromptPath:
         assert captured.read_text() == "staging"
 
 
+class TestKeyboardInterruptDuringPromptAborts:
+    """Ctrl+C at the prompt must abort the playbook, not silently continue.
+
+    Reproduces the user-reported regression: pressing Ctrl+C at the
+    `Press Enter to continue or Ctrl+C to abort:` prompt translated to
+    an empty sendline (Enter), so pause completed successfully and the
+    rest of the playbook ran. Now KeyboardInterrupt propagates from
+    handle_interactive_prompt out through the runner's outer handler,
+    which SIGINTs the child and returns 130.
+    """
+
+    def test_ctrl_c_at_prompt_returns_130_not_zero(self, tmp_path: Path) -> None:
+        from ansible_aom.runner import run_playbook
+
+        renderer = MagicMock()
+        # Simulate Ctrl+C: the renderer's handler raises rather than
+        # returning a string. This is what the real (fixed)
+        # CompactRenderer.handle_interactive_prompt now does.
+        renderer.handle_interactive_prompt.side_effect = KeyboardInterrupt
+        captured = tmp_path / "captured.txt"
+        # A fake that emits a pause-style prompt then reads.
+        prompt = "[Confirm deployment]\r\nReally? Press Enter to continue: \r\n"
+        cmd, args = self._fake_pause_with_capture(prompt, captured)
+
+        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+            exit_code = run_playbook(
+                "playbook.yml", [], renderer, timeout=0.2, session_dir=tmp_path
+            )
+
+        # 130 = SIGINT exit code.
+        assert exit_code == 130
+        renderer.handle_interactive_prompt.assert_called_once()
+        renderer.handle_completion.assert_called_with(130, "crashed")
+        # The fake never got a chance to write its captured-input file
+        # because the child got SIGINT'd before sendline ran.
+        assert not captured.exists() or captured.read_text() == ""
+
+    def _fake_pause_with_capture(
+        self, prompt: str, captured_input_path: Path
+    ) -> tuple[str, list[str]]:
+        """Pause-style fake: emit prompt, attempt to read, write input to file."""
+        prompt_repr = repr(prompt)
+        path_repr = repr(str(captured_input_path))
+        code = textwrap.dedent(
+            f"""
+            import sys
+            sys.stdout.write({prompt_repr})
+            sys.stdout.flush()
+            try:
+                line = sys.stdin.readline().rstrip("\\r\\n")
+            except KeyboardInterrupt:
+                sys.exit(130)
+            with open({path_repr}, "w") as f:
+                f.write(line)
+            sys.exit(0)
+            """
+        )
+        return sys.executable, ["-c", code]
+
+
 class TestNoPromptNoSpuriousInteractiveCall:
     """A normal run with no prompts must NOT call handle_interactive_prompt."""
 

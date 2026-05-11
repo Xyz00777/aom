@@ -460,17 +460,41 @@ class CompactRenderer:
     def handle_interactive_prompt(self, prompt_text: str) -> str:
         """Surface a pause / vars_prompt-style prompt and capture one line.
 
-        Mirrors ``handle_password_prompt`` but uses ``input()`` instead of
-        ``getpass.getpass`` because pause and vars_prompt are not secrets —
-        echo is expected. The Rich Live panel is stopped before the prompt
-        prints so the user can actually see the captured prompt text; the
-        panel restarts in a finally block so a crashing ``input()`` never
-        leaves the terminal headless.
+        Mirrors ``handle_password_prompt`` but uses ``input()`` for an
+        echoing read — pause and vars_prompt are not secrets. The Rich
+        Live panel is stopped before the prompt prints so the user can
+        actually see the captured prompt text; the panel restarts in a
+        finally block so a crashing ``input()`` never leaves the
+        terminal headless.
+
+        Two non-obvious correctness details:
+
+        1. The prompt is written to ``sys.stdout`` explicitly via
+           ``write()+flush()`` rather than passed as ``input()``'s
+           prompt argument. CPython's ``input(prompt)`` routes the
+           prompt through ``readline`` when both stdin and stdout
+           are TTYs, and readline emits the prompt on **stderr** —
+           so a user running ``aom site.yml 2>file`` never sees the
+           prompt. Writing to stdout directly bypasses that.
+        2. ``KeyboardInterrupt`` propagates. The pause module
+           advertises "Press Enter to continue or Ctrl+C to abort" —
+           translating a Ctrl+C into a returned empty string
+           (i.e. Enter) silently reversed the abort. Now Ctrl+C
+           bubbles up to the runner's outer handler, which SIGINTs
+           the child and exits 130.
         """
+        import sys
+
         self._display.stop()
         try:
-            return input(prompt_text)
-        except EOFError, KeyboardInterrupt:
+            sys.stdout.write(prompt_text)
+            sys.stdout.flush()
+            return input()
+        except EOFError:
+            # Ctrl+D / closed stdin — treat as "user pressed Enter"
+            # so the playbook can proceed in non-interactive
+            # environments. KeyboardInterrupt is intentionally NOT
+            # caught here; see docstring.
             return ""
         finally:
             self._display.start()

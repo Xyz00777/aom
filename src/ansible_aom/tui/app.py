@@ -175,11 +175,21 @@ class AOMApp(App[None]):
         where the user expects to see what they type. ``self.suspend()``
         hands the terminal back so a normal ``input()`` works without
         Textual fighting for keystrokes.
+
+        Same correctness details as the compact renderer:
+        - prompt goes to ``sys.stdout`` explicitly (readline would
+          otherwise route ``input(prompt)``'s prompt to stderr);
+        - ``KeyboardInterrupt`` propagates so Ctrl+C at the prompt
+          aborts the run rather than silently sending Enter.
         """
+        import sys
+
         try:
             with self.suspend():
-                return input(prompt_text)
-        except EOFError, KeyboardInterrupt:
+                sys.stdout.write(prompt_text)
+                sys.stdout.flush()
+                return input()
+        except EOFError:
             return ""
 
     def handle_completion(self, exit_code: int, state: str) -> None:

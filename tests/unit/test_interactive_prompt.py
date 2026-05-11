@@ -43,8 +43,15 @@ class TestCompactRendererInteractivePrompt:
         # the prompt) and start after (so the panel comes back).
         assert call_order == ["stop", "input", "start"]
 
-    def test_surfaces_prompt_text_to_user(self) -> None:
-        """The pending prompt content the user couldn't see goes to input()."""
+    def test_surfaces_prompt_text_via_stdout_not_input_arg(self, capsys) -> None:
+        """The prompt must go to stdout directly, NOT via input(prompt).
+
+        readline (auto-loaded with stdlib) routes ``input(prompt)``'s
+        prompt to stderr when stdin/stdout are TTYs, which means
+        ``aom site.yml 2>file`` hides the prompt from the user
+        entirely. Writing to stdout via ``sys.stdout.write`` bypasses
+        readline.
+        """
         from ansible_aom.compact.renderer import CompactRenderer
 
         renderer = CompactRenderer()
@@ -55,7 +62,11 @@ class TestCompactRendererInteractivePrompt:
         ):
             renderer.handle_interactive_prompt("Deploy? Press Enter: ")
 
-        mock_input.assert_called_once_with("Deploy? Press Enter: ")
+        # input() called WITHOUT a prompt arg.
+        mock_input.assert_called_once_with()
+        # Prompt text reached stdout directly.
+        out = capsys.readouterr().out
+        assert "Deploy? Press Enter: " in out
 
     def test_returns_empty_string_on_eof(self) -> None:
         from ansible_aom.compact.renderer import CompactRenderer
@@ -68,16 +79,26 @@ class TestCompactRendererInteractivePrompt:
         ):
             assert renderer.handle_interactive_prompt("anything: ") == ""
 
-    def test_returns_empty_string_on_keyboard_interrupt(self) -> None:
+    def test_keyboard_interrupt_propagates_so_run_can_abort(self) -> None:
+        """Pause says 'Ctrl+C to abort' — Ctrl+C MUST abort, not continue.
+
+        Previously the handler caught KeyboardInterrupt and returned ""
+        (i.e. Enter), which silently turned every abort into a confirm.
+        The runner's outer KeyboardInterrupt handler now sees the
+        propagation and SIGINTs the child.
+        """
         from ansible_aom.compact.renderer import CompactRenderer
 
         renderer = CompactRenderer()
+        import pytest as _pytest
+
         with (
             patch.object(renderer._display, "stop"),
             patch.object(renderer._display, "start"),
             patch("builtins.input", side_effect=KeyboardInterrupt),
         ):
-            assert renderer.handle_interactive_prompt("anything: ") == ""
+            with _pytest.raises(KeyboardInterrupt):
+                renderer.handle_interactive_prompt("anything: ")
 
     def test_restarts_display_even_if_input_raises(self) -> None:
         """A crashing input() must not leave the panel torn down."""
@@ -128,7 +149,8 @@ class TestAOMAppInteractivePrompt:
         assert suspended is True
         assert answer == "yes"
 
-    def test_passes_prompt_to_input(self) -> None:
+    def test_writes_prompt_to_stdout_not_input_arg(self, capsys) -> None:
+        """Same readline-routes-prompt-to-stderr bug applies to the TUI path."""
         from ansible_aom.tui.app import AOMApp
 
         app = AOMApp()
@@ -137,7 +159,9 @@ class TestAOMAppInteractivePrompt:
             patch("builtins.input", return_value="") as mock_input,
         ):
             app.handle_interactive_prompt("Deploy? Press Enter: ")
-        mock_input.assert_called_once_with("Deploy? Press Enter: ")
+        mock_input.assert_called_once_with()
+        out = capsys.readouterr().out
+        assert "Deploy? Press Enter: " in out
 
     def test_returns_empty_on_eof(self) -> None:
         from ansible_aom.tui.app import AOMApp
@@ -149,15 +173,18 @@ class TestAOMAppInteractivePrompt:
         ):
             assert app.handle_interactive_prompt("x: ") == ""
 
-    def test_returns_empty_on_keyboard_interrupt(self) -> None:
+    def test_keyboard_interrupt_propagates_so_run_can_abort(self) -> None:
         from ansible_aom.tui.app import AOMApp
 
         app = AOMApp()
+        import pytest as _pytest
+
         with (
             patch.object(app, "suspend"),
             patch("builtins.input", side_effect=KeyboardInterrupt),
         ):
-            assert app.handle_interactive_prompt("x: ") == ""
+            with _pytest.raises(KeyboardInterrupt):
+                app.handle_interactive_prompt("x: ")
 
 
 class TestProtocol:
