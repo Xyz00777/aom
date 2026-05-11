@@ -6,6 +6,7 @@ See SPECIFICATION.md Section 4.1 for compact view details.
 
 from __future__ import annotations
 
+import os
 import time
 from typing import TYPE_CHECKING
 
@@ -24,6 +25,38 @@ if TYPE_CHECKING:
 
 
 # =============================================================================
+# ANSI color helpers
+# =============================================================================
+#
+# Display writes raw bytes via ``sys.stdout.write``, so we embed SGR
+# escape sequences directly rather than going through Rich's markup
+# parser. Colors are gated on ``is_tty`` and the ``NO_COLOR`` env var
+# (https://no-color.org) so non-TTY output (pipes, CI, redirected to
+# file) and users who set NO_COLOR see plain ASCII.
+
+_RESET = "\x1b[0m"
+_DIM = "\x1b[2m"
+_BOLD = "\x1b[1m"
+_GREEN = "\x1b[32m"
+_YELLOW = "\x1b[33m"
+_RED = "\x1b[31m"
+_MAGENTA = "\x1b[35m"
+_CYAN = "\x1b[36m"
+
+
+def _color_enabled(is_tty: bool) -> bool:
+    """True if we should emit SGR codes — TTY only, NO_COLOR honored."""
+    return is_tty and not os.environ.get("NO_COLOR")
+
+
+def _wrap(text: str, code: str, colorize: bool) -> str:
+    """``text`` wrapped in an SGR sequence, or plain ``text`` if not colorising."""
+    if not colorize or not text:
+        return text
+    return f"{code}{text}{_RESET}"
+
+
+# =============================================================================
 # Module-Level Formatting Functions
 # =============================================================================
 
@@ -38,6 +71,7 @@ def format_status_bar(
     tasks_completed: int = 0,
     tasks_total: int = 0,
     ascii_mode: bool = False,
+    colorize: bool = False,
 ) -> str:
     """Format the status bar for compact mode display.
 
@@ -51,6 +85,12 @@ def format_status_bar(
         tasks_completed: Tasks past PENDING/RUNNING. Suppressed when 0.
         tasks_total: Total tasks from preflight. Segment is omitted when 0
             (no preflight definitions, or only dynamic include_tasks).
+        colorize: If True, segments are wrapped in SGR escape codes —
+            playbook path dimmed, separators dimmed, completed
+            host/task counters in green, warning glyph in yellow,
+            deprecation glyph in magenta, elapsed dimmed. Off by
+            default so the function stays pure-string and snapshot
+            tests aren't disturbed.
 
     Returns:
         Formatted status bar string. Task segment included only when
@@ -68,25 +108,33 @@ def format_status_bar(
     elapsed_s = elapsed_int % 60
     elapsed_str = f"{elapsed_h}:{elapsed_m:02d}:{elapsed_s:02d}"
 
-    sep = "|" if ascii_mode else "│"
+    sep_glyph = "|" if ascii_mode else "│"
     warn_glyph = "!" if ascii_mode else "⚠"
     deprec_glyph = "*" if ascii_mode else "✱"
 
-    parts = [
-        playbook,
-        f"{hosts_completed}/{hosts_total} hosts",
-    ]
+    # Counter colouring: green only when the run is in fact complete
+    # (X==Y and at least one). Stays default otherwise to avoid
+    # nagging the user with progress hues during a normal in-flight run.
+    hosts_seg = f"{hosts_completed}/{hosts_total} hosts"
+    if hosts_total > 0 and hosts_completed == hosts_total:
+        hosts_seg = _wrap(hosts_seg, _GREEN, colorize)
+
+    parts = [_wrap(playbook, _DIM, colorize), hosts_seg]
 
     if tasks_total > 0:
-        parts.append(f"{tasks_completed}/{tasks_total} tasks")
+        tasks_seg = f"{tasks_completed}/{tasks_total} tasks"
+        if tasks_completed == tasks_total:
+            tasks_seg = _wrap(tasks_seg, _GREEN, colorize)
+        parts.append(tasks_seg)
 
     if warnings > 0:
-        parts.append(f"{warn_glyph} {warnings}")
+        parts.append(_wrap(f"{warn_glyph} {warnings}", _YELLOW, colorize))
     if deprecations > 0:
-        parts.append(f"{deprec_glyph} {deprecations}")
+        parts.append(_wrap(f"{deprec_glyph} {deprecations}", _MAGENTA, colorize))
 
-    parts.append(elapsed_str)
+    parts.append(_wrap(elapsed_str, _DIM, colorize))
 
+    sep = _wrap(sep_glyph, _DIM, colorize)
     return f" {sep} ".join(parts)
 
 
@@ -97,6 +145,7 @@ def format_host_summary(
     failed: int,
     unreachable: int,
     ascii_mode: bool = False,
+    colorize: bool = False,
 ) -> str:
     """Format a host summary line with status icons.
 
@@ -108,6 +157,11 @@ def format_host_summary(
         changed: Number of changed tasks.
         failed: Number of failed tasks.
         unreachable: Number of unreachable tasks.
+        ascii_mode: Use ASCII fallback glyphs (no Unicode).
+        colorize: Wrap each status segment in its semantic SGR
+            colour (ok=green, changed=yellow, failed=red,
+            unreachable=magenta). Hostname is dimmed. Off by
+            default to keep the function pure-string for tests.
 
     Returns:
         Formatted host summary with icons: "hostname: ● N ok, ◆ M changed, ..."
@@ -117,16 +171,18 @@ def format_host_summary(
         'web1: ● 12 ok ◆ 3 changed'
     """
     icons = STATUS_ICONS_ASCII if ascii_mode else STATUS_ICONS
-    parts = [f"{hostname}:"]
+    parts = [_wrap(f"{hostname}:", _DIM, colorize)]
 
     if ok > 0:
-        parts.append(f"{icons[Status.OK]} {ok} ok")
+        parts.append(_wrap(f"{icons[Status.OK]} {ok} ok", _GREEN, colorize))
     if changed > 0:
-        parts.append(f"{icons[Status.CHANGED]} {changed} changed")
+        parts.append(_wrap(f"{icons[Status.CHANGED]} {changed} changed", _YELLOW, colorize))
     if failed > 0:
-        parts.append(f"{icons[Status.FAILED]} {failed} failed")
+        parts.append(_wrap(f"{icons[Status.FAILED]} {failed} failed", _RED, colorize))
     if unreachable > 0:
-        parts.append(f"{icons[Status.UNREACHABLE]} {unreachable} unreachable")
+        parts.append(
+            _wrap(f"{icons[Status.UNREACHABLE]} {unreachable} unreachable", _MAGENTA, colorize)
+        )
 
     return " ".join(parts)
 
@@ -235,7 +291,7 @@ def format_preflight_summary(definitions: list[PlayDefinition]) -> str | None:
     return "\n".join(lines)
 
 
-def format_failure_recap(state: RunState) -> list[str]:
+def format_failure_recap(state: RunState, colorize: bool = False) -> list[str]:
     """Build per-failure lines naming the host and task that went wrong.
 
     Returns one line per (host, task) pair that ended in FAILED or
@@ -246,15 +302,21 @@ def format_failure_recap(state: RunState) -> list[str]:
 
         FAILED: web2 — install nginx
         UNREACHABLE: db1 — gather facts
+
+    With ``colorize=True``, the leading ``FAILED:`` / ``UNREACHABLE:``
+    label is wrapped in the same colour the host summary uses for the
+    matching count (red / magenta).
     """
     lines: list[str] = []
     for play in state.plays.values():
         for task in play.tasks.values():
             for hostname, host_state in task.hosts.items():
                 if host_state.status == Status.FAILED:
-                    lines.append(f"FAILED: {hostname} — {task.name}")
+                    label = _wrap("FAILED", _RED, colorize)
+                    lines.append(f"{label}: {hostname} — {task.name}")
                 elif host_state.status == Status.UNREACHABLE:
-                    lines.append(f"UNREACHABLE: {hostname} — {task.name}")
+                    label = _wrap("UNREACHABLE", _MAGENTA, colorize)
+                    lines.append(f"{label}: {hostname} — {task.name}")
     return lines
 
 
@@ -330,6 +392,7 @@ class CompactRenderer:
         self._definitions: list = []
         self._seen_warning_messages: set[str] = set()
         self._ascii_mode: bool = not is_unicode_terminal()
+        self._colorize: bool = _color_enabled(is_tty)
 
     def start(self, playbook: str, args: list[str]) -> None:
         """Start rendering a playbook run.
@@ -360,6 +423,7 @@ class CompactRenderer:
             deprecations=0,
             elapsed_seconds=0.0,
             ascii_mode=self._ascii_mode,
+            colorize=self._colorize,
         )
         self._display.update(status_bar)
 
@@ -454,6 +518,7 @@ class CompactRenderer:
             tasks_completed=count_completed_tasks(self._state),
             tasks_total=count_total_tasks(self._definitions),
             ascii_mode=self._ascii_mode,
+            colorize=self._colorize,
         )
         self._display.update(status_bar)
 
@@ -606,6 +671,7 @@ class CompactRenderer:
             tasks_completed=tasks_completed,
             tasks_total=tasks_total,
             ascii_mode=self._ascii_mode,
+            colorize=self._colorize,
         )
 
         # Add final state indicator with a label so the user can
@@ -621,16 +687,22 @@ class CompactRenderer:
 
         if state == "completed":
             label = ""
+            indicator_color = _GREEN
         elif state == "crashed" and exit_code == 130:
             label = " cancelled by user"
+            indicator_color = _YELLOW
         elif state == "crashed" and exit_code == 127:
             label = " ansible-playbook not found"
+            indicator_color = _RED
         elif state == "crashed":
             label = " crashed"
+            indicator_color = _RED
         else:
             label = " failed"
+            indicator_color = _RED
 
-        final_status = f"{status_bar} {icon}{label}"
+        indicator = _wrap(f"{icon}{label}", indicator_color, self._colorize)
+        final_status = f"{status_bar} {indicator}"
 
         # Last in-panel update — visible briefly during stop() in TTY mode,
         # a no-op in non-TTY. Throttling can swallow this; the print() below
@@ -658,7 +730,7 @@ class CompactRenderer:
         # "what do I need to look at?". Skipped on success — there's
         # nothing to list and the clutter would be misleading.
         if exit_code != 0 and self._state is not None:
-            for line in format_failure_recap(self._state):
+            for line in format_failure_recap(self._state, colorize=self._colorize):
                 print(f"  {line}")
 
     def _format_per_host_lines(self) -> list[str]:
@@ -696,6 +768,7 @@ class CompactRenderer:
                 failed=counts["failed"],
                 unreachable=counts["unreachable"],
                 ascii_mode=self._ascii_mode,
+                colorize=self._colorize,
             )
             for hostname, counts in host_counts.items()
         ]
