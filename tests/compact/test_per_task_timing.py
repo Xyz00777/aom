@@ -83,8 +83,7 @@ class TestInlineDuration:
         r._emit_event_log(_task_start("2026-05-11T14:10:00Z"))
         r._emit_event_log(_runner_failed("2026-05-11T14:10:01.0Z"))
         assert any(
-            "fatal: [web1] (1.0s): FAILED!" in line and "boom" in line
-            for line in _logged(r)
+            "fatal: [web1] (1.0s): FAILED!" in line and "boom" in line for line in _logged(r)
         )
 
     def test_long_duration_renders_compact(self):
@@ -125,9 +124,7 @@ class TestPreviousTaskSummary:
         logged = _logged(r)
         # Find the summary line and verify it's BEFORE the next TASK header.
         summary_indices = [i for i, line in enumerate(logged) if "First" in line and "—" in line]
-        task_header_indices = [
-            i for i, line in enumerate(logged) if "TASK [Second]" in line
-        ]
+        task_header_indices = [i for i, line in enumerate(logged) if "TASK [Second]" in line]
         assert summary_indices, f"no summary line found in {logged}"
         assert task_header_indices, f"no second TASK header in {logged}"
         assert summary_indices[0] < task_header_indices[0]

@@ -194,16 +194,12 @@ class TestPerEventLogColors:
 
     def test_ok_line_is_green(self):
         r = self._renderer()
-        r._emit_event_log(
-            {"_event": "v2_runner_on_ok", "hosts": {"web1": {"changed": False}}}
-        )
+        r._emit_event_log({"_event": "v2_runner_on_ok", "hosts": {"web1": {"changed": False}}})
         assert any(_GREEN in line and "ok: [web1]" in line for line in self._logged(r))
 
     def test_changed_line_is_yellow(self):
         r = self._renderer()
-        r._emit_event_log(
-            {"_event": "v2_runner_on_ok", "hosts": {"web1": {"changed": True}}}
-        )
+        r._emit_event_log({"_event": "v2_runner_on_ok", "hosts": {"web1": {"changed": True}}})
         logged = self._logged(r)
         assert any(_YELLOW in line and "changed: [web1]" in line for line in logged)
 
@@ -228,8 +224,7 @@ class TestPerEventLogColors:
         )
         logged = self._logged(r)
         assert any(
-            _MAGENTA in line and "UNREACHABLE" in line and "no route" in line
-            for line in logged
+            _MAGENTA in line and "UNREACHABLE" in line and "no route" in line for line in logged
         )
 
     def test_skipping_line_is_cyan(self):
@@ -246,8 +241,6 @@ class TestPerEventLogColors:
 
     def test_no_color_when_renderer_colorize_off(self):
         r = self._renderer(colorize=False)
-        r._emit_event_log(
-            {"_event": "v2_runner_on_ok", "hosts": {"web1": {"changed": False}}}
-        )
+        r._emit_event_log({"_event": "v2_runner_on_ok", "hosts": {"web1": {"changed": False}}})
         logged = self._logged(r)
         assert all("\x1b[" not in line for line in logged)

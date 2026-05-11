@@ -78,7 +78,9 @@ class TestAllSkippedCollapsing:
         logged = _logged(r)
         assert not any("skipping: [web1]" in line for line in logged)
         assert not any("skipping: [web2]" in line for line in logged)
-        assert any("2 hosts skipped" in line and "web1" in line and "web2" in line for line in logged)
+        assert any(
+            "2 hosts skipped" in line and "web1" in line and "web2" in line for line in logged
+        )
 
     def test_many_hosts_shows_count_only(self):
         r = _renderer()
