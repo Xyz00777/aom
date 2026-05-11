@@ -23,6 +23,7 @@ from ansible_aom.core.models import (
     WarningEntry,
     WarningType,
 )
+from ansible_aom.core.state import MAX_LOG_LINES
 
 logger = logging.getLogger(__name__)
 
@@ -217,6 +218,12 @@ class PtyStreamParser:
                 return
 
         self._plaintext_lines.append(line)
+        # R2: cap plaintext_lines at MAX_LOG_LINES so a long noisy run
+        # can't grow this list without bound. Drop oldest first — the
+        # tail is what's useful for "what did pexpect just see?" stall
+        # diagnostics in runner.py.
+        if len(self._plaintext_lines) > MAX_LOG_LINES:
+            del self._plaintext_lines[: len(self._plaintext_lines) - MAX_LOG_LINES]
 
     def _is_jsonl_start_event(self, line: str) -> bool:
         """Check if line is a JSONL start event.

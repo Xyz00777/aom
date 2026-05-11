@@ -56,6 +56,24 @@ def _wrap(text: str, code: str, colorize: bool) -> str:
     return f"{code}{text}{_RESET}"
 
 
+# R2: per-event ``msg`` cap for live-display lines. A task that does
+# register-then-debug on a host returning multi-MB stdout would otherwise
+# stall Rich's render thread; the full payload still lands in
+# events.jsonl, so ``aom inspect show`` can dump the untruncated form.
+_MSG_DISPLAY_CAP = 4096
+
+
+def _truncate_msg(msg: str) -> str:
+    """Cap a JSONL ``msg`` field for live display.
+
+    The suffix includes the original byte length so the user knows how
+    much was hidden — important for grep'ing the right session later.
+    """
+    if len(msg) <= _MSG_DISPLAY_CAP:
+        return msg
+    return f"{msg[:_MSG_DISPLAY_CAP]}…(truncated, {len(msg)} bytes)"
+
+
 # ansible-playbook flags worth surfacing as a status-bar chip. Each
 # entry pairs the flag aliases with the (label, colour) chip.
 _MODE_FLAGS: tuple[tuple[frozenset[str], str, str], ...] = (
@@ -1042,7 +1060,7 @@ class CompactRenderer:
             self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
             for host, result in event.get("hosts", {}).items():
-                msg = result.get("msg", "") or ""
+                msg = _truncate_msg(result.get("msg", "") or "")
                 self._display.print_log(
                     _wrap(
                         f"fatal: [{host}]{suffix}: FAILED! => {msg}",
@@ -1055,7 +1073,7 @@ class CompactRenderer:
             self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
             for host, result in event.get("hosts", {}).items():
-                msg = result.get("msg", "") or ""
+                msg = _truncate_msg(result.get("msg", "") or "")
                 self._display.print_log(
                     _wrap(
                         f"fatal: [{host}]{suffix}: UNREACHABLE! => {msg}",

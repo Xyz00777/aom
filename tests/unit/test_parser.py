@@ -255,6 +255,33 @@ class TestJsonLineStreamCarryBuffer:
         assert len(result2) == 1
 
 
+class TestPtyStreamParserPlaintextCap:
+    """R2: plaintext_lines must be bounded.
+
+    Without a cap, a long run with verbose pexpect noise (warnings, info
+    banners, prompt echoes) can grow plaintext_lines without limit. The
+    cap matches the log panel's MAX_LOG_LINES so the parser doesn't
+    accumulate more than the panel could ever display.
+    """
+
+    def test_plaintext_lines_capped_at_max_log_lines(self):
+        from ansible_aom.core.state import MAX_LOG_LINES
+
+        parser = PtyStreamParser()
+        # Push the parser past the cap. Use feed_line with non-JSON in
+        # EXECUTION phase so it routes to _handle_plaintext.
+        parser.phase = StreamPhase.EXECUTION
+        for i in range(MAX_LOG_LINES + 100):
+            parser.feed_line(f"random ansible chatter line {i}")
+        assert len(parser.plaintext_lines) == MAX_LOG_LINES
+        # The retained tail should be the *most recent* lines, not the
+        # first ones — a stuck head defeats the purpose.
+        assert "random ansible chatter line" in parser.plaintext_lines[-1]
+        last_idx = int(parser.plaintext_lines[-1].rsplit(" ", 1)[1])
+        first_idx = int(parser.plaintext_lines[0].rsplit(" ", 1)[1])
+        assert last_idx > first_idx
+
+
 class TestPtyStreamParserPhases:
     """TC-128 to TC-142: PTY stream phase transitions."""
 
