@@ -1053,3 +1053,67 @@ ansible_args".
 
 Larger / blocked: 9 (TUI end-to-end), 11 (include_tasks dynamic
 expansion), 14 (session recording).
+
+---
+
+## 2026-05-11 — include_tasks dynamic expansion (roadmap #11)
+
+TC-094 / TC-095 from TEST_SPECIFICATION.md, Section 5.2 in
+SPECIFICATION.md. Picked because it's the most contained of the three
+remaining roadmap items (#9 TUI needs cross-loop plumbing, #14 needs
+the `.aom/` writer wired in; this one is pure state-machine logic).
+
+### What landed
+
+`RunState` now grafts dynamic `TaskDefinition` nodes onto preflight
+`definitions` when a `v2_playbook_on_task_start` or `v2_runner_on_start`
+event arrives for a task name that doesn't match any preflight leaf:
+
+- New private method `RunState._graft_or_match_task(task_id, task_name)`.
+  Called from both task-start handlers (linear and free strategy).
+- Match algorithm: iterate every leaf `TaskDefinition` across all plays
+  (unwrapping `RoleGroupDefinition` for visibility), compare by name.
+  Hit → save as `_last_matched_task_def`; miss → graft as child of
+  whichever node is currently saved as the parent cursor.
+- Dynamic children inherit `play_id`, `play_order`, `role` from the
+  parent; `task_order=-1`, `is_dynamic=True`, fresh empty `tags`.
+- `_grafted_uuids: set[str]` deduplicates: a UUID arriving twice (e.g.
+  `task_start` then a later `runner_on_start` for the same task) only
+  grafts once.
+- Orphan unknown tasks (no preflight match yet) are dropped silently —
+  no spurious grafts onto an arbitrary node.
+
+Helper `_iter_leaf_task_defs(plays)` extracted at module scope as the
+pure piece. Could move to a dedicated `core/matching.py` if matching
+grows more cases (path, sequential-name fallback per TC-092/TC-093);
+single function in `models.py` is fine for now.
+
+### Tests
+
+`tests/unit/test_dynamic_expansion.py` — 8 cases, all green:
+1. Single unknown task grafted as child of last matched parent (TC-095)
+2. Dynamic task inherits play_id / play_order from parent
+3. Multiple unknown tasks accumulate under same parent (TC-094)
+4. Repeated UUID across task_start + runner_on_start doesn't duplicate
+5. Static-task arrival between dynamics resets the parent cursor
+6. Orphan unknown task before any match is dropped, no crash
+7. Grafting works through `v2_runner_on_start` (free strategy)
+8. No definitions at all → handler still safe, doesn't crash
+
+Full suite: 1691 passed, 6 skipped (no regressions; same skip count).
+
+### Open caveats
+
+- Name-collision tolerance: matching is "first leaf with that name
+  across all plays". Two static tasks with identical names in different
+  plays would set the cursor to whichever is iterated first. Live
+  ansible event order means this rarely matters in practice; if it
+  bites, add play-scoping (match within current play first).
+- The renderer doesn't yet *display* dynamic children differently —
+  preflight summary still shows the static task count. That's fine for
+  the spec ("dynamic include_tasks are not counted" — `count_total_tasks`
+  already only walks the top-level `tasks` list, not `children`).
+
+### Remaining roadmap
+
+Larger / blocked: 9 (TUI end-to-end), 14 (session recording).
