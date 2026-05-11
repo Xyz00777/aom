@@ -1117,3 +1117,79 @@ Full suite: 1691 passed, 6 skipped (no regressions; same skip count).
 ### Remaining roadmap
 
 Larger / blocked: 9 (TUI end-to-end), 14 (session recording).
+
+---
+
+## 2026-05-11 (later) — Session recording wired into runner (roadmap #14)
+
+The `SessionManager` in `core/session.py` and the `aom inspect` read
+side both existed in full; the missing piece was the runner ever
+*writing* anything. With this slice, every `run_playbook` invocation
+produces a session directory that `aom inspect list` / `show` can
+immediately replay.
+
+### Design
+
+`run_playbook` now takes an optional `session_dir: Path | None`
+defaulting to `~/.local/state/aom/sessions/` (matching the inspect-side
+default in `inspect/cli.py`). Inside, a private `_SessionSink` class
+wraps a `SessionManager`:
+
+- Constructor tries `start_session()`; OSError logs at DEBUG and
+  leaves the sink in a no-op state. Recording is observability, not
+  control flow — disk problems must never abort a real ansible run.
+- `record_event(event)` mirrors every parsed JSONL event before it
+  reaches the renderer (placed in `_feed()` between `feed_line` and
+  `renderer.update_state`, so the on-disk order matches what the
+  renderer actually saw).
+- `record_stderr(line)` captures plaintext warnings drained from the
+  parser plus the preflight error lines.
+- `end(status)` writes the final `status` / `end_time` / `duration`
+  into meta.json. Called on every exit path: clean exit, non-zero
+  exit (`failed`), exec-missing (`crashed`), and KeyboardInterrupt
+  (`crashed`).
+
+The sink is threaded through `_drive`, `_flush_pending`, and `_feed`.
+mypy caught one missed callsite (the EOF-during-expect branch in
+`_drive` was passing 3 args instead of 4) — fixed before commit.
+
+### Tests
+
+`tests/integration/test_runner_session_recording.py`, 6 cases, all
+green:
+1. Run creates `events.jsonl`, `meta.json`, `stderr.log` under
+   session_dir.
+2. Every JSONL event seen by the renderer also lands in `events.jsonl`.
+3. meta.json status = `completed` on exit 0.
+4. meta.json status = `failed` on non-zero exit.
+5. Unwritable `session_dir` (point it at a file): run still succeeds,
+   renderer.handle_completion still fires.
+6. Default state dir (`~/.local/state/aom/sessions/`) gets a session
+   when no override is passed — patched `Path.home()` to a tmp_path.
+
+Full suite: 1697 passed, 6 skipped (up from 1691; +6 = the new file).
+
+### Quirks / open items
+
+- The pre-existing `runner.py:95` `except A, B, C:` (tuple-expression
+  except) still parses fine on 3.x but is unusual. Untouched in this
+  slice.
+- `mypy` still reports the pre-existing "Returning Any from str
+  function" warning in models.py and the pexpect stubs-missing note in
+  runner.py. Neither is new.
+- `inspect/cli.py` defaults `--state-dir` to the same path the runner
+  now writes to, so `aom inspect list` works end-to-end after the
+  first recorded run with no extra wiring. We don't yet have a
+  `--no-record` opt-out — could add if disk usage becomes a concern.
+- `SessionManager.create_artifact()` is wired in core but not called
+  by the runner; the inspect-side reads from the live `events.jsonl`
+  directly, so the `.aom` artifact file is decorative for now.
+  Promotable to a post-run consolidation step if/when the cleanup
+  policy moves toward purging session dirs.
+
+### Remaining roadmap
+
+Larger / blocked: 9 (TUI end-to-end). That's the last one and the
+hardest — AOMApp's `app.run()` event loop versus the runner's pexpect
+loop need either `call_from_thread` plumbing or a model where the
+runner drives Textual's loop instead of owning its own.
