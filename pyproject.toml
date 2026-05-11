@@ -3,11 +3,14 @@
 
 [project]
 name = "ansible-aom"
-version = "0.1.0"
+version = "0.2.0"
 description = "Ansible Output Monitor - nom-style TUI for ansible-playbook"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
-authors = [{name = "Xyz00777", email = "git@paeiser.de"}]
+authors = [
+    {name = "Xyz00777", email = "git@paeiser.de"},
+    {name = "Felix Karg", email = "f.karg10@gmail.com"},
+]
 requires-python = ">=3.14"
 classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",

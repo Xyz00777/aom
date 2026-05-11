@@ -31,3 +31,17 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-push]
+
+      # Bumps pyproject.toml [project].version based on the
+      # conventional-commit type in the staged message:
+      # feat → minor, fix/refactor/perf → patch, ! / BREAKING CHANGE
+      # → major. Quietly no-ops for docs/chore/test/style and anything
+      # not matching a conventional header. The hook is best-effort —
+      # any failure leaves the original commit message intact.
+      - id: bump-version
+        name: bump-version
+        entry: scripts/bump_version.py
+        language: system
+        stages: [commit-msg]
+        always_run: true
+        pass_filenames: true
