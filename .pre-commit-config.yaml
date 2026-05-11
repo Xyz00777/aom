@@ -32,16 +32,14 @@ repos:
         always_run: true
         stages: [pre-push]
 
-      # Bumps pyproject.toml [project].version based on the
-      # conventional-commit type in the staged message:
-      # feat → minor, fix/refactor/perf → patch, ! / BREAKING CHANGE
-      # → major. Quietly no-ops for docs/chore/test/style and anything
-      # not matching a conventional header. The hook is best-effort —
-      # any failure leaves the original commit message intact.
-      - id: bump-version
-        name: bump-version
-        entry: scripts/bump_version.py
-        language: system
-        stages: [commit-msg]
-        always_run: true
-        pass_filenames: true
+      # NOTE: the version bumper is intentionally NOT registered here.
+      # pre-commit framework stashes-then-restores unstaged files
+      # around hook execution, which silently un-stages any
+      # `git add` the bumper performs — the bump would land in the
+      # NEXT commit instead of the one being written.
+      #
+      # Instead, install it as a direct git hook:
+      #     ./scripts/install-hooks.sh
+      # The bumper still runs from `scripts/bump_version.py` but bypasses
+      # the framework's stash machinery so the new version lands in the
+      # in-flight commit.
