@@ -56,6 +56,34 @@ def _wrap(text: str, code: str, colorize: bool) -> str:
     return f"{code}{text}{_RESET}"
 
 
+# ansible-playbook flags worth surfacing as a status-bar chip. Each
+# entry pairs the flag aliases with the (label, colour) chip.
+_MODE_FLAGS: tuple[tuple[frozenset[str], str, str], ...] = (
+    (frozenset({"--check", "-C"}), "DRY RUN", _YELLOW),
+    (frozenset({"--diff", "-D"}), "DIFF", _CYAN),
+)
+
+
+def _compute_mode_label(args: list[str], colorize: bool) -> str:
+    """Render the status-bar mode chip(s) from ansible-playbook args.
+
+    Multiple chips render space-joined (`DRY RUN DIFF`). Each chip is
+    colour-wrapped only if ``colorize`` is True so non-TTY consumers
+    still see the label without escape codes around it.
+
+    The detection is conservative: only literal flag aliases (no
+    ``--check=foo`` style suffixes — those don't exist for these
+    flags in ansible-playbook) so a stray substring in some other
+    arg can't trigger a false chip.
+    """
+    chips: list[str] = []
+    args_set = set(args)
+    for aliases, label, color in _MODE_FLAGS:
+        if args_set & aliases:
+            chips.append(_wrap(label, color, colorize))
+    return " ".join(chips)
+
+
 # =============================================================================
 # Module-Level Formatting Functions
 # =============================================================================
@@ -72,6 +100,7 @@ def format_status_bar(
     tasks_total: int = 0,
     ascii_mode: bool = False,
     colorize: bool = False,
+    mode_label: str = "",
 ) -> str:
     """Format the status bar for compact mode display.
 
@@ -119,7 +148,15 @@ def format_status_bar(
     if hosts_total > 0 and hosts_completed == hosts_total:
         hosts_seg = _wrap(hosts_seg, _GREEN, colorize)
 
-    parts = [_wrap(playbook, _DIM, colorize), hosts_seg]
+    parts = []
+    if mode_label:
+        # Mode chip(s) sit before the playbook path so the user sees
+        # them immediately even on a narrow terminal that truncates
+        # later segments. The caller renders the chip with its own
+        # colour (yellow for DRY RUN, cyan for DIFF) — we don't
+        # re-style here so a no-colour run gets a plain ``DRY RUN``.
+        parts.append(mode_label)
+    parts.extend([_wrap(playbook, _DIM, colorize), hosts_seg])
 
     if tasks_total > 0:
         tasks_seg = f"{tasks_completed}/{tasks_total} tasks"
@@ -401,6 +438,10 @@ class CompactRenderer:
         self._last_task_uuid: str | None = None
         self._last_task_name: str | None = None
         self._last_task_start_time: float | None = None
+        # Pre-rendered chips like ``DRY RUN`` / ``DIFF`` shown in the
+        # status bar's leftmost slot. Computed once in ``start()``
+        # from the ansible_args; never changes during a run.
+        self._mode_label: str = ""
 
     def start(self, playbook: str, args: list[str]) -> None:
         """Start rendering a playbook run.
@@ -415,6 +456,7 @@ class CompactRenderer:
         self._playbook = playbook
         self._args = args
         self._start_time = time.time()
+        self._mode_label = _compute_mode_label(args, self._colorize)
 
         # Initialize RunState
         self._state = RunState(playbook=playbook)
@@ -432,6 +474,7 @@ class CompactRenderer:
             elapsed_seconds=0.0,
             ascii_mode=self._ascii_mode,
             colorize=self._colorize,
+            mode_label=self._mode_label,
         )
         self._display.update(status_bar)
 
@@ -527,6 +570,7 @@ class CompactRenderer:
             tasks_total=count_total_tasks(self._definitions),
             ascii_mode=self._ascii_mode,
             colorize=self._colorize,
+            mode_label=self._mode_label,
         )
         self._display.update(status_bar)
 
@@ -680,6 +724,7 @@ class CompactRenderer:
             tasks_total=tasks_total,
             ascii_mode=self._ascii_mode,
             colorize=self._colorize,
+            mode_label=self._mode_label,
         )
 
         # Add final state indicator with a label so the user can
