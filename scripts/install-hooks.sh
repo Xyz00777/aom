@@ -1,21 +1,20 @@
 #!/usr/bin/env bash
 # Install AOM's git hooks. Run once after cloning.
 #
-# - prepare-commit-msg: scripts/bump_version.py, which bumps
-#   pyproject.toml's [project].version based on the conventional-commit
-#   type (feat → minor, fix/refactor/perf → patch, ! / BREAKING → major).
+# - post-commit: scripts/bump_version.py, which bumps pyproject.toml's
+#   [project].version based on the conventional-commit type
+#   (feat → minor, fix/refactor/perf → patch, ! / BREAKING → major)
+#   and amends the just-created commit to include the bump.
 #
-# Two design choices worth noting:
-#
-# 1. Direct git-hook installation rather than pre-commit framework
-#    because pre-commit stashes unstaged files around hook execution,
-#    undoing any `git add` the bumper performs.
-# 2. prepare-commit-msg rather than commit-msg because commit-msg
-#    runs after git has built the tree object for the in-flight
-#    commit — `git add` at that point updates the index but the
-#    commit is already snapshotted, so the bump lands in the NEXT
-#    commit instead of the one being written. prepare-commit-msg
-#    runs early enough that the staged change is included.
+# Design rationale: neither prepare-commit-msg nor commit-msg actually
+# lets the hook land staged changes in the commit being created.
+# git snapshots the index at the start of `git commit` and builds the
+# tree from that snapshot — staging from within a hook updates the
+# live index but the commit is already pinned. The pre-commit
+# framework's stash/restore cycle around its own pre-commit-stage
+# hooks compounds the problem. post-commit + `git commit --amend`
+# is the only timing where the bump reliably lands in the same
+# commit (the SHA changes but the message is preserved).
 
 set -euo pipefail
 
@@ -29,13 +28,15 @@ fi
 
 # Symlink rather than copy so updates to the script are picked up
 # without re-running this installer.
-ln -sf "$SCRIPT" "$HOOK_DIR/prepare-commit-msg"
+ln -sf "$SCRIPT" "$HOOK_DIR/post-commit"
 
-# Clean up any stale commit-msg symlink left over from an earlier
-# (broken) install.
-if [[ -L "$HOOK_DIR/commit-msg" ]] && [[ "$(readlink "$HOOK_DIR/commit-msg")" == "$SCRIPT" ]]; then
-    rm "$HOOK_DIR/commit-msg"
-fi
+# Clean up stale symlinks left over from earlier (broken) installs.
+for stale in commit-msg prepare-commit-msg; do
+    if [[ -L "$HOOK_DIR/$stale" ]] && [[ "$(readlink "$HOOK_DIR/$stale")" == "$SCRIPT" ]]; then
+        rm "$HOOK_DIR/$stale"
+        echo "removed stale: $HOOK_DIR/$stale"
+    fi
+done
 
-echo "installed: $HOOK_DIR/prepare-commit-msg -> $SCRIPT"
+echo "installed: $HOOK_DIR/post-commit -> $SCRIPT"
 echo "test it with: git commit --allow-empty -m 'fix: test bump'"

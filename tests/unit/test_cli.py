@@ -81,6 +81,65 @@ class TestPackageIdentity:
 
         assert __version__ == version("ansible-aom")
 
+    def test_source_hash_is_short_stable_hex(self):
+        """``source_hash()`` returns a deterministic short hex digest."""
+        from ansible_aom import source_hash
+
+        h = source_hash()
+        assert isinstance(h, str)
+        assert len(h) == 12
+        assert all(c in "0123456789abcdef" for c in h)
+        # Stable across calls (cached).
+        assert source_hash() == h
+
+    def test_source_hash_changes_when_source_changes(self, tmp_path, monkeypatch):
+        """A source-file content change must alter the hash.
+
+        Verifies the hash actually reads the files, isn't constant or
+        stubbed. Constructs a tiny fake package to avoid touching the
+        real source tree.
+        """
+        from ansible_aom import _compute_source_hash
+
+        # Bypass the cache so each call recomputes against the file content.
+        pkg = tmp_path / "ansible_aom"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text("x = 1\n")
+        (pkg / "core.py").write_text("y = 2\n")
+
+        # Patch __file__ inside the function's module so it points at
+        # our fake package. Easier: call the worker function with a
+        # custom path? It's a module-level closure on __file__, so
+        # we monkeypatch by adjusting Path() resolution. Use the same
+        # approach: write the package, then call _compute_source_hash
+        # after redirecting its __file__.
+        import ansible_aom as aom_mod
+
+        original_file = aom_mod.__file__
+        try:
+            monkeypatch.setattr(aom_mod, "__file__", str(pkg / "__init__.py"))
+            first = _compute_source_hash()
+
+            (pkg / "core.py").write_text("y = 999\n")  # change content
+            second = _compute_source_hash()
+
+            assert first != second
+        finally:
+            monkeypatch.setattr(aom_mod, "__file__", original_file)
+
+    def test_cli_version_includes_source_hash(self, capsys):
+        """``aom --version`` prints version AND source hash."""
+        from unittest.mock import patch
+
+        from ansible_aom import __version__, source_hash
+        from ansible_aom.cli import main
+
+        with patch("sys.argv", ["aom", "--version"]):
+            main()
+        captured = capsys.readouterr()
+        assert __version__ in captured.out
+        assert source_hash() in captured.out
+
 
 class TestCLIEntryPoint:
     """Tests for TC-002: CLI Entry Point Exists."""

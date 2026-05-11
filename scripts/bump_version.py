@@ -1,31 +1,39 @@
 #!/usr/bin/env python3
-"""Auto-bump pyproject.toml version based on a conventional-commit message.
+"""Auto-bump pyproject.toml version on conventional-commit messages.
 
-Wired as a ``commit-msg`` pre-commit hook (see ``.pre-commit-config.yaml``).
-The hook is invoked with the path to the commit message file. We:
+Installed as a ``post-commit`` git hook by ``scripts/install-hooks.sh``.
 
-1. Parse the first line for a conventional-commit type (``feat:``,
-   ``fix:``, ``refactor:``, ``perf:``, ``feat!:``, …) plus optional
-   ``!`` / ``BREAKING CHANGE:`` footer for major bumps.
-2. Read the current ``[project].version`` from ``pyproject.toml``.
-3. Compute the bumped version:
-   - ``BREAKING CHANGE`` / ``type!:`` → major (X+1.0.0)
-   - ``feat`` → minor (X.Y+1.0)
-   - ``fix`` / ``refactor`` / ``perf`` → patch (X.Y.Z+1)
-   - anything else (``docs``, ``chore``, ``test``, ``style``, …) → no bump
-4. Write the new version back to ``pyproject.toml``.
-5. ``git add pyproject.toml`` so the bump rides along in the same commit.
+Why post-commit and not commit-msg / prepare-commit-msg: git takes an
+index snapshot at the start of ``git commit`` and builds the commit
+tree from that snapshot, even after hooks modify the live index. Plus
+the pre-commit framework's stash/restore cycle around its own
+pre-commit-stage hooks can also undo staged changes from a custom
+commit-msg hook. The only reliable way to land a bump in the *same*
+commit that triggered it is to:
 
-Idempotent: re-running on an already-bumped commit message is a no-op
-because we never re-bump if the message lacks a recognised prefix or
-if pyproject is already past the expected version.
+1. Let the commit complete with whatever the user staged.
+2. In post-commit: detect the conventional-commit type from the
+   freshly-written HEAD message, bump pyproject + uv.lock, stage
+   them, and ``git commit --amend --no-edit`` to fold them into the
+   same commit. The SHA changes but the message is preserved.
+
+Recursion is prevented by the ``AOM_BUMP_HOOK_RUNNING`` env var the
+amend call sets — when the post-commit hook re-fires for the amend
+commit, it sees the var and exits immediately.
+
+Bump rules (conventional-commit type → semver level):
+- ``BREAKING CHANGE`` footer / ``type!:`` → major (X+1.0.0)
+- ``feat`` → minor (X.Y+1.0)
+- ``fix`` / ``refactor`` / ``perf`` → patch (X.Y.Z+1)
+- anything else (``docs``, ``chore``, ``test``, ``style``, …) → no bump
 
 Failure modes are intentionally soft — any exception logs to stderr
-and exits 0. A broken hook MUST NOT block the user's commit.
+and exits 0. A broken hook MUST NOT abort the user's workflow.
 """
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -94,24 +102,52 @@ def _bump_pyproject(pyproject: Path, level: str) -> tuple[str, str] | None:
     return old_version, new_version
 
 
+def _read_head_message(repo_root: Path) -> str:
+    """Get the message of the just-created commit (HEAD)."""
+    result = subprocess.run(
+        ["git", "log", "-1", "--format=%B"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout
+
+
 def main(argv: list[str]) -> int:
-    """Hook entry point. Argv: [script, commit_msg_file]."""
-    if len(argv) < 2:
-        return 0  # nothing to do
-    msg_path = Path(argv[1])
+    """Hook entry point.
+
+    Called as a post-commit hook (no useful argv). Reads the message
+    from ``HEAD``, bumps if appropriate, amends.
+    """
+    # Recursion guard: the `git commit --amend` below re-fires the
+    # post-commit hook. Without this, we'd infinitely re-bump.
+    if os.environ.get("AOM_BUMP_HOOK_RUNNING"):
+        return 0
+
+    repo_root = Path(__file__).resolve().parent.parent
+    pyproject = repo_root / "pyproject.toml"
+    if not pyproject.exists():
+        return 0
+
     try:
-        message = msg_path.read_text()
-    except OSError:
+        message = _read_head_message(repo_root)
+    except (subprocess.SubprocessError, FileNotFoundError):
         return 0
 
     bump = _detect_bump(message)
     if bump is None:
         return 0  # not a versioning commit type; quietly skip
 
-    repo_root = Path(__file__).resolve().parent.parent
-    pyproject = repo_root / "pyproject.toml"
-    if not pyproject.exists():
-        return 0
+    # Bail out if we're mid-rebase / mid-merge / mid-cherry-pick — an
+    # amend during those would scramble the in-flight sequencing.
+    for marker in ("REBASE_HEAD", "MERGE_HEAD", "CHERRY_PICK_HEAD", "BISECT_LOG"):
+        if (repo_root / ".git" / marker).exists():
+            sys.stderr.write(
+                f"[bump-version] skipped: .git/{marker} present — bumping "
+                "during rebase/merge/cherry-pick/bisect is unsafe\n"
+            )
+            return 0
 
     result = _bump_pyproject(pyproject, bump)
     if result is None:
@@ -137,25 +173,34 @@ def main(argv: list[str]) -> int:
         except (subprocess.SubprocessError, FileNotFoundError, OSError) as exc:
             sys.stderr.write(
                 f"[bump-version] `uv lock` failed ({exc}); uv.lock not "
-                "refreshed (run `uv lock` manually after the commit)\n"
+                "refreshed (run `uv lock` manually)\n"
             )
 
-    # Stage the changes so they land in the same commit as the user's edit.
+    # Stage and amend. AOM_BUMP_HOOK_RUNNING blocks the recursive
+    # post-commit fire from the amend itself.
     try:
         subprocess.run(
             ["git", "add", "--", *(str(p) for p in files_to_stage)],
             cwd=repo_root,
             check=True,
         )
+        env = os.environ.copy()
+        env["AOM_BUMP_HOOK_RUNNING"] = "1"
+        subprocess.run(
+            ["git", "commit", "--amend", "--no-edit", "--no-verify"],
+            cwd=repo_root,
+            env=env,
+            check=True,
+            capture_output=True,
+        )
     except (subprocess.SubprocessError, FileNotFoundError) as exc:
-        # Hook MUST NOT block commits — fall back to leaving the files
-        # modified so the user can stage them manually.
         sys.stderr.write(
-            f"[bump-version] git add failed ({exc}); pyproject left modified at {new}\n"
+            f"[bump-version] amend failed ({exc}); pyproject left at {new}, "
+            "stage and amend manually with `git commit --amend --no-edit`\n"
         )
         return 0
 
-    sys.stderr.write(f"[bump-version] {bump}: {old} -> {new}\n")
+    sys.stderr.write(f"[bump-version] {bump}: {old} -> {new} (folded into HEAD)\n")
     return 0
 
 

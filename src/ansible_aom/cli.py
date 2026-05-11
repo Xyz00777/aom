@@ -211,7 +211,17 @@ def main() -> int:
         Exit code (0 for success, non-zero for errors).
     """
     if "--version" in sys.argv:
-        print(f"aom {__version__}")
+        from ansible_aom import source_hash
+
+        # Install-time metadata version + live source-tree hash. The
+        # version comes from the installed .dist-info (snapshotted by
+        # uv/pip at install time) and can be stale for editable
+        # installs. The src hash, by contrast, is computed from the
+        # .py files Python is currently importing — so if the two
+        # don't match a known-good reference, the user can tell at a
+        # glance whether the running code matches what they think
+        # they have installed.
+        print(f"aom {__version__} ({source_hash()})")
         return 0
 
     if "--help" in sys.argv or "-h" in sys.argv:
