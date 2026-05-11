@@ -813,6 +813,14 @@ class CompactRenderer:
         final-summary print already cover what they would say. Unknown
         event types are silent too: the panel still updates from state,
         we just don't add to the log noise.
+
+        Coloring matches ansible's stock default callback so users
+        switching from raw ``ansible-playbook`` see the same per-task
+        cues — ok green, changed yellow, fatal red, unreachable
+        magenta, skipping cyan. (We synthesize these lines from JSONL
+        events; ansible's normal callback isn't running because AOM
+        forces the ``ansible.posix.jsonl`` callback for structured
+        output — hence why ansible itself isn't producing them.)
         """
         name = event.get("_event")
         if name == "v2_playbook_on_play_start":
@@ -825,16 +833,30 @@ class CompactRenderer:
             self._maybe_emit_pause_seconds_hint(task)
         elif name == "v2_runner_on_ok":
             for host, result in event.get("hosts", {}).items():
-                verb = "changed" if result.get("changed") else "ok"
-                self._display.print_log(f"{verb}: [{host}]")
+                if result.get("changed"):
+                    self._display.print_log(
+                        _wrap(f"changed: [{host}]", _YELLOW, self._colorize)
+                    )
+                else:
+                    self._display.print_log(
+                        _wrap(f"ok: [{host}]", _GREEN, self._colorize)
+                    )
         elif name == "v2_runner_on_failed":
             for host, result in event.get("hosts", {}).items():
                 msg = result.get("msg", "") or ""
-                self._display.print_log(f"fatal: [{host}]: FAILED! => {msg}")
+                self._display.print_log(
+                    _wrap(f"fatal: [{host}]: FAILED! => {msg}", _RED, self._colorize)
+                )
         elif name == "v2_runner_on_unreachable":
             for host, result in event.get("hosts", {}).items():
                 msg = result.get("msg", "") or ""
-                self._display.print_log(f"fatal: [{host}]: UNREACHABLE! => {msg}")
+                self._display.print_log(
+                    _wrap(
+                        f"fatal: [{host}]: UNREACHABLE! => {msg}",
+                        _MAGENTA,
+                        self._colorize,
+                    )
+                )
         elif name == "v2_runner_on_skipped":
             for host in event.get("hosts", {}):
-                self._display.print_log(f"skipping: [{host}]")
+                self._display.print_log(_wrap(f"skipping: [{host}]", _CYAN, self._colorize))

@@ -173,3 +173,77 @@ class TestFinalCompletionIndicator:
     def test_no_color_when_disabled(self):
         line = self._final_line(0, "completed", colorize=False)
         assert "\x1b[" not in line
+
+
+class TestPerEventLogColors:
+    """Per-task log lines (ok/changed/fatal/unreachable/skipping) carry
+    semantic colour matching ansible's stock callback. These lines are
+    synthesised by AOM from JSONL events — see _emit_event_log."""
+
+    def _renderer(self, colorize: bool = True) -> CompactRenderer:
+        from unittest.mock import MagicMock
+
+        r = CompactRenderer(is_tty=False)
+        r.start("t.yml", [])
+        r._colorize = colorize
+        r._display = MagicMock()
+        return r
+
+    def _logged(self, renderer: CompactRenderer) -> list[str]:
+        return [c.args[0] for c in renderer._display.print_log.call_args_list]
+
+    def test_ok_line_is_green(self):
+        r = self._renderer()
+        r._emit_event_log(
+            {"_event": "v2_runner_on_ok", "hosts": {"web1": {"changed": False}}}
+        )
+        assert any(_GREEN in line and "ok: [web1]" in line for line in self._logged(r))
+
+    def test_changed_line_is_yellow(self):
+        r = self._renderer()
+        r._emit_event_log(
+            {"_event": "v2_runner_on_ok", "hosts": {"web1": {"changed": True}}}
+        )
+        logged = self._logged(r)
+        assert any(_YELLOW in line and "changed: [web1]" in line for line in logged)
+
+    def test_failed_line_is_red(self):
+        r = self._renderer()
+        r._emit_event_log(
+            {
+                "_event": "v2_runner_on_failed",
+                "hosts": {"web1": {"msg": "boom"}},
+            }
+        )
+        logged = self._logged(r)
+        assert any(_RED in line and "FAILED" in line and "boom" in line for line in logged)
+
+    def test_unreachable_line_is_magenta(self):
+        r = self._renderer()
+        r._emit_event_log(
+            {
+                "_event": "v2_runner_on_unreachable",
+                "hosts": {"web1": {"msg": "no route"}},
+            }
+        )
+        logged = self._logged(r)
+        assert any(
+            _MAGENTA in line and "UNREACHABLE" in line and "no route" in line
+            for line in logged
+        )
+
+    def test_skipping_line_is_cyan(self):
+        from ansible_aom.compact.renderer import _CYAN
+
+        r = self._renderer()
+        r._emit_event_log({"_event": "v2_runner_on_skipped", "hosts": {"web1": {}}})
+        logged = self._logged(r)
+        assert any(_CYAN in line and "skipping: [web1]" in line for line in logged)
+
+    def test_no_color_when_renderer_colorize_off(self):
+        r = self._renderer(colorize=False)
+        r._emit_event_log(
+            {"_event": "v2_runner_on_ok", "hosts": {"web1": {"changed": False}}}
+        )
+        logged = self._logged(r)
+        assert all("\x1b[" not in line for line in logged)
