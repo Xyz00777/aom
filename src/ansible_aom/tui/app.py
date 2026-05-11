@@ -4,14 +4,21 @@ This module implements the Textual-based TUI renderer.
 See SPECIFICATION.md Section 4.2 for full TUI details.
 
 AOMApp satisfies the Renderer Protocol (Section 2.3) while also being
-a Textual App that provides the interactive multi-panel interface.
+a Textual App that provides the interactive multi-panel interface. To
+make the TUI work end-to-end, the app owns a worker thread that runs
+the pexpect-based playbook driver; renderer callbacks dispatched from
+that thread schedule UI updates onto Textual's event loop via
+``call_from_thread``.
 """
 
+from pathlib import Path
 from typing import Any
 
 from textual.app import App
 from textual.binding import Binding
 
+from ansible_aom.core.models import RunState
+from ansible_aom.runner import run_playbook
 from ansible_aom.tui.keybindings import KEYBINDINGS, KeyContext
 from ansible_aom.tui.widgets import DebugPanel
 
@@ -38,81 +45,121 @@ class AOMApp(App[None]):
         if action_info["context"] == KeyContext.GLOBAL
     ]
 
-    def __init__(self, **kwargs: Any) -> None:
-        """Initialize the AOMApp with internal state tracking."""
-        super().__init__(**kwargs)
-        self._playbook: str | None = None
-        self._args: list[str] = []
-        self._state: str = "IDLE"
-        self._exit_code: int | None = None
-
-    def start(self, playbook: str, args: list[str]) -> None:
-        """Start rendering a playbook run.
-
-        Initialize the TUI with playbook name and args, set app title,
-        and prepare for event processing.
+    def __init__(
+        self,
+        playbook: str | None = None,
+        ansible_args: list[str] | None = None,
+        session_dir: Path | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize the AOMApp with optional playbook context.
 
         Args:
-            playbook: Path to the playbook file.
-            args: Additional ansible-playbook arguments.
+            playbook: Path to the playbook to run when the app mounts.
+                When ``None``, the app starts idle (legacy behaviour the
+                Renderer-Protocol smoke tests still rely on).
+            ansible_args: Extra CLI args to forward to ``ansible-playbook``.
+            session_dir: Override for the session recording location.
+                ``None`` lets the runner pick the spec default
+                ``~/.local/state/aom/sessions/``.
+        """
+        super().__init__(**kwargs)
+        self._playbook: str | None = playbook
+        self._args: list[str] = list(ansible_args) if ansible_args is not None else []
+        self._session_dir: Path | None = session_dir
+        self._state: str = "IDLE"
+        self._exit_code: int | None = None
+        self._final_state: str | None = None
+        self._run_state: RunState = RunState(playbook=playbook or "")
+        self._warnings_count: int = 0
+        self._deprecations_count: int = 0
+        self._log_lines: list[str] = []
+
+    # ----- Public read-only surface for tests + widgets -----
+
+    @property
+    def playbook(self) -> str | None:
+        return self._playbook
+
+    @property
+    def ansible_args(self) -> list[str]:
+        return self._args
+
+    @property
+    def run_state(self) -> RunState:
+        return self._run_state
+
+    @property
+    def exit_code(self) -> int | None:
+        return self._exit_code
+
+    @property
+    def final_state(self) -> str | None:
+        return self._final_state
+
+    @property
+    def warnings_count(self) -> int:
+        return self._warnings_count
+
+    @property
+    def deprecations_count(self) -> int:
+        return self._deprecations_count
+
+    @property
+    def log_lines(self) -> list[str]:
+        return self._log_lines
+
+    # ----- Renderer Protocol -----
+
+    def start(self, playbook: str, args: list[str]) -> None:
+        """Renderer Protocol: enter the RUNNING state and reset state.
+
+        Called once from the runner worker before any events flow.
+        Resets the internal RunState so a re-run inside the same app
+        instance (e.g. from the rerun screen) starts clean.
         """
         self._playbook = playbook
-        self._args = list(args)  # Make a copy
+        self._args = list(args)
         self._state = "STARTING"
-        # Set app title to playbook name for display
+        self._run_state = RunState(playbook=playbook)
         self.title = playbook
 
     def set_definitions(self, definitions: list) -> None:
-        """Receive preflight definitions.
-
-        TUI builds its tree from RunState today, so this is a no-op for now.
-        Once the TUI consumes definitions directly, populate the task tree here.
-        """
-        return None
+        """Renderer Protocol: store preflight definitions on the RunState."""
+        self._run_state.definitions = list(definitions)
 
     def add_warning(self, message: str, is_deprecation: bool = False) -> None:
-        """Renderer Protocol — no-op. TUI surfaces warnings via RunState today."""
-        return None
+        """Renderer Protocol: bump counters; widgets can read them."""
+        if is_deprecation:
+            self._deprecations_count += 1
+        else:
+            self._warnings_count += 1
 
     def print_log(self, message: str) -> None:
-        """Renderer Protocol — no-op. TUI renders its own panels, no scrolling log."""
-        return None
+        """Renderer Protocol: append a line to the log buffer."""
+        self._log_lines.append(message)
 
     def tick(self) -> None:
-        """Renderer Protocol — no-op. Textual has its own clock."""
+        """Renderer Protocol: no-op. Textual has its own clock."""
         return None
 
     def update_state(self, event: dict) -> None:
-        """Handle a new JSONL event.
+        """Renderer Protocol: route the JSONL event through RunState.
 
-        Receive a JSONL event dict and route it to the appropriate handler
-        based on event type. Updates internal RunState.
-
-        Args:
-            event: JSONL event dictionary from ansible.posix.jsonl callback.
-                Includes '_event' key indicating event type.
+        Called from the runner worker thread. The mutation itself is
+        cheap and thread-safe on a plain dataclass; any visible widget
+        refresh that depends on it should be scheduled via
+        ``call_from_thread``.
         """
+        self._run_state.handle_event(event)
         event_type = event.get("_event", "")
-
-        # Route events to state updates based on type
-        # Full state machine implementation deferred to RunState integration
         if event_type == "v2_playbook_on_start":
             self._state = "RUNNING"
         elif event_type == "v2_playbook_on_stats":
             self._state = "COMPLETED"
 
     def handle_password_prompt(self, prompt_text: str) -> str:
-        """Handle a password prompt and return the password.
-
-        Show a password modal dialog (Textual ModalScreen), block until
-        user responds, and return the password. Timeout after 60 seconds.
-
-        Args:
-            prompt_text: The password prompt text to display.
-
-        Returns:
-            The password entered by the user, or empty string on timeout.
-        """
+        """Renderer Protocol: pause the TUI, read a password, resume."""
         import getpass
 
         try:
@@ -122,18 +169,15 @@ class AOMApp(App[None]):
             return ""
 
     def handle_completion(self, exit_code: int, state: str) -> None:
-        """Handle playbook completion (success/failure/crash).
+        """Renderer Protocol: stash final outcome; do not exit the app.
 
-        Update state to COMPLETED/FAILED/CRASHED based on exit code,
-        and show summary.
-
-        Args:
-            exit_code: The exit code from ansible-playbook subprocess.
-                0 = success, 1 = failure, 2 = unreachable, etc.
-            state: Final state string (e.g., "completed", "failed", "crashed").
+        Leaving the app running lets the user inspect the final state.
+        ``stop()`` is intentionally a no-op for the same reason — the
+        runner thread completes, but Textual's loop keeps spinning
+        until the user presses ``q``.
         """
         self._exit_code = exit_code
-        # Map completion state string to internal state
+        self._final_state = state
         if exit_code == 0:
             self._state = "COMPLETED"
         elif exit_code == 1:
@@ -142,22 +186,53 @@ class AOMApp(App[None]):
             self._state = "CRASHED"
 
     def stop(self) -> None:
-        """Stop rendering and clean up.
+        """Renderer Protocol: leave the TUI up so the user can see results.
 
-        Exit the Textual app gracefully, restoring terminal state.
+        The legacy implementation called ``self.exit()`` here, which
+        tore the UI down the instant the runner returned and produced
+        a blank screen. Now the app stays mounted; ``action_quit`` (q)
+        is the user-facing way out.
         """
-        self.exit()
+        return None
+
+    # ----- Worker plumbing -----
+
+    def _run_playbook_worker(self) -> None:
+        """Drive the playbook to completion from a Textual worker thread.
+
+        Lives off the main event loop so pexpect's blocking expect()
+        calls don't freeze the UI. All renderer callbacks bound to this
+        worker (start, update_state, …) mutate plain Python state on
+        ``self``; widgets that need to redraw are kicked via
+        ``call_from_thread`` from inside those callbacks.
+        """
+        if self._playbook is None:
+            return
+        try:
+            run_playbook(
+                self._playbook,
+                self._args,
+                self,
+                session_dir=self._session_dir,
+            )
+        except Exception as exc:
+            # Surface unexpected failures into final_state instead of
+            # leaving the user with a frozen UI and no explanation.
+            self._exit_code = 1
+            self._final_state = "crashed"
+            self._log_lines.append(f"[ERROR] runner crashed: {exc}")
 
     def on_mount(self) -> None:
-        """Mount the main screen when the app starts.
-
-        This is called by Textual when the app is ready to display.
-        We push the MainScreen to start the UI.
-        """
-        # Import here to avoid circular imports at module load time
+        """Mount the main screen and (if configured) start the playbook."""
         from ansible_aom.tui.screens.main import MainScreen
 
         self.push_screen(MainScreen())
+
+        # Auto-start only when constructed with a playbook target. The
+        # protocol smoke tests still build a bare AOMApp() and never
+        # call run() — they must not trigger a worker.
+        if self._playbook is not None:
+            self.run_worker(self._run_playbook_worker, thread=True, exclusive=True)
 
     async def action_quit(self) -> None:
         """Quit with confirmation per SPECIFICATION.md Section 10.

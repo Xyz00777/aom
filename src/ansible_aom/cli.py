@@ -120,6 +120,51 @@ ansible verbosity, not AOM verbosity.
     return parser
 
 
+def _run_compact(playbook: str, ansible_args: list[str]) -> int:
+    """Spawn the legacy compact renderer via ``run_playbook``.
+
+    The compact path stays synchronous: ``run_playbook`` owns the
+    pexpect loop, the renderer prints to stdout, no Textual involved.
+    """
+    from ansible_aom.renderer.factory import create_renderer
+    from ansible_aom.runner import run_playbook
+
+    try:
+        renderer = create_renderer(tui_mode=False, is_tty=sys.stdout.isatty())
+        return run_playbook(playbook, ansible_args, renderer)
+    except KeyboardInterrupt:
+        print("Cancelled by user", file=sys.stderr)
+        return 130
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def _run_tui(playbook: str, ansible_args: list[str]) -> int:
+    """Launch the Textual TUI and let it drive the runner.
+
+    AOMApp owns its own event loop (``app.run()``) and pumps the
+    pexpect runner from a worker thread. The exit code is whatever
+    ``run_playbook`` returned, reachable on ``app.exit_code`` after
+    ``app.run()`` returns. ``None`` (user quit before completion) maps
+    to exit 1 — we treat an aborted-by-quit run as non-success without
+    pretending to know the playbook's true outcome.
+    """
+    from ansible_aom.tui.app import AOMApp
+
+    try:
+        app = AOMApp(playbook=playbook, ansible_args=ansible_args)
+        app.run()
+    except KeyboardInterrupt:
+        print("Cancelled by user", file=sys.stderr)
+        return 130
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    exit_code = app.exit_code
+    return exit_code if exit_code is not None else 1
+
+
 def main() -> int:
     """Main CLI entry point.
 
@@ -156,9 +201,6 @@ def main() -> int:
         aom_logger.debug("--list-tasks summary: verbose mode enabled, diagnostics printed")
 
     if args.playbook:
-        from ansible_aom.renderer.factory import create_renderer
-        from ansible_aom.runner import run_playbook
-
         if detect_duplicate_playbook(args.playbook, args.ansible_args):
             print(
                 f"aom: '{args.playbook}' appears twice on the command line — "
@@ -169,17 +211,9 @@ def main() -> int:
 
         ansible_args = ensure_inventory_arg(args.ansible_args)
 
-        try:
-            renderer = create_renderer(tui_mode=args.tui, is_tty=sys.stdout.isatty())
-            return run_playbook(args.playbook, ansible_args, renderer)
-        except KeyboardInterrupt:
-            # The runner installs its own KeyboardInterrupt handling, but
-            # an interrupt during renderer construction can still bubble up.
-            print("Cancelled by user", file=sys.stderr)
-            return 130
-        except Exception as e:
-            print(f"Error: {e}", file=sys.stderr)
-            return 1
+        if args.tui:
+            return _run_tui(args.playbook, ansible_args)
+        return _run_compact(args.playbook, ansible_args)
 
     parser.print_help()
     return 0
