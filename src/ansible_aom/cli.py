@@ -74,21 +74,54 @@ def create_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="aom",
-        description="Ansible Output Monitor - nom-style TUI for ansible-playbook",
+        description="Ansible Output Monitor — nom-style live view for ansible-playbook.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  aom playbook.yml                      Run playbook with compact view
-  aom --tui playbook.yml                Run playbook with full TUI
+  aom playbook.yml                      Run playbook with compact view (default)
+  aom --tui playbook.yml                Run with the full multi-panel TUI
   aom playbook.yml -i inv.ini -v        Flags after the playbook are forwarded
   aom playbook.yml -vvv --tags=deploy   …including ansible-playbook's own -v / -vv / -vvv
   aom inspect list                      List all recorded sessions
-  aom inspect <session-id>              Show session summary
-  aom inspect diff <id1> <id2>          Compare two sessions
+  aom inspect <session-id>              Show one session's summary
+  aom inspect <session-id> --tree       Tree view of plays/tasks/hosts
+  aom inspect <session-id> --failed     Only the failed tasks
+  aom inspect diff <id1> <id2>          Diff two sessions
+  aom inspect prune --days 30           Delete sessions older than N days
 
-Note: AOM's own debug flag is --verbose (long form only). The short
--v is reserved for ansible-playbook so `aom site.yml -v` raises
-ansible verbosity, not AOM verbosity.
+Argument forwarding:
+  Anything after the playbook path is passed verbatim to ansible-playbook.
+  AOM never silently rewrites flags. If you pass -i / --inventory, AOM
+  leaves your inventory alone; otherwise AOM auto-detects ./inventory.ini
+  (then .yml, .yaml, hosts) and prepends -i for convenience.
+
+Verbosity:
+  AOM's own debug flag is --verbose (long form only). The short -v
+  is reserved for ansible-playbook, so `aom site.yml -v` raises
+  ansible verbosity, not AOM verbosity.
+
+Session recording:
+  Every run writes ~/.local/state/aom/sessions/<uuidv7>/ containing
+  events.jsonl, stderr.log, and meta.json. Recording is best-effort —
+  disk errors are logged but never abort the run. Use `aom inspect`
+  to replay past runs; `aom inspect prune` to clean up.
+
+File locations:
+  Sessions:    ~/.local/state/aom/sessions/<uuidv7>/
+  Config:      ~/.config/aom/config.yaml (optional)
+  Inventory:   auto-detects ./inventory.ini, ./inventory.yml,
+               ./inventory.yaml, ./inventory, ./hosts.ini, ./hosts.yml,
+               ./hosts.yaml, ./hosts (first match wins).
+
+Exit codes:
+  0   playbook completed cleanly
+  1   playbook failed, or AOM crashed
+  2   ansible-playbook reported unreachable hosts, or AOM detected
+      a CLI usage error (e.g. duplicate playbook positional)
+  127 ansible-playbook executable not found
+  130 cancelled by user (Ctrl+C)
+
+See README.md and SPECIFICATION.md in the source tree for full details.
         """,
     )
 
