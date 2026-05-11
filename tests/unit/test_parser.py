@@ -255,6 +255,45 @@ class TestJsonLineStreamCarryBuffer:
         assert len(result2) == 1
 
 
+class TestRunStateUnknownEvent:
+    """R5: unknown _event values are counted so the renderer can show a
+    one-line "(N unknown events: foo×3)" hint at completion — quieter
+    than warnings, but visible enough for future-version drift."""
+
+    def test_unknown_event_does_not_raise(self):
+        state = RunState(playbook="test.yml")
+        # Should not raise.
+        state.handle_event({"_event": "v2_playbook_on_include", "foo": "bar"})
+
+    def test_unknown_event_leaves_plays_empty(self):
+        state = RunState(playbook="test.yml")
+        state.handle_event({"_event": "v2_some_future_event"})
+        assert state.plays == {}
+
+    def test_unknown_event_increments_counter(self):
+        state = RunState(playbook="test.yml")
+        state.handle_event({"_event": "v2_playbook_on_include"})
+        state.handle_event({"_event": "v2_playbook_on_include"})
+        state.handle_event({"_event": "v2_other_new_event"})
+        assert state.unknown_events == {"v2_playbook_on_include": 2, "v2_other_new_event": 1}
+
+    def test_known_events_do_not_increment_counter(self):
+        state = RunState(playbook="test.yml")
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_start",
+                "_timestamp": "2026-04-20T10:00:00Z",
+            }
+        )
+        assert state.unknown_events == {}
+
+    def test_missing_event_field_does_not_increment(self):
+        """Events without _event are degenerate, not unknown — don't count."""
+        state = RunState(playbook="test.yml")
+        state.handle_event({"foo": "bar"})  # no _event key
+        assert state.unknown_events == {}
+
+
 class TestPtyStreamParserPlaintextCap:
     """R2: plaintext_lines must be bounded.
 

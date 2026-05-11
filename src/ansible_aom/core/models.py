@@ -163,6 +163,11 @@ class RunState:
     _current_play_id: str | None = field(default=None, init=False, repr=False)
     _last_matched_task_def: "TaskDefinition | None" = field(default=None, init=False, repr=False)
     _grafted_uuids: set[str] = field(default_factory=set, init=False, repr=False)
+    # R5: count unknown _event values so the renderer can surface a
+    # one-line "(N unknown events: foo×3)" hint at completion. Events
+    # with no _event field at all are degenerate (not "future-version
+    # drift") and aren't counted here.
+    unknown_events: dict[str, int] = field(default_factory=dict)
 
     def handle_event(self, event: dict[str, Any]) -> None:
         """Process a JSONL event and update state."""
@@ -185,7 +190,8 @@ class RunState:
         handler = handler_map.get(event_type)
         if handler:
             handler(event, ts)
-        else:
+        elif event_type:
+            self.unknown_events[event_type] = self.unknown_events.get(event_type, 0) + 1
             logger.debug(f"Unknown event type: {event_type}")
 
     def _handle_v2_playbook_on_start(self, event: dict[str, Any], ts: datetime) -> None:

@@ -811,6 +811,21 @@ class CompactRenderer:
             for line in format_failure_recap(self._state, colorize=self._colorize):
                 print(f"  {line}")
 
+        # R5: future-version-drift hint. If ansible-core (or a third-party
+        # callback) emitted any _event values we don't handle, list them
+        # so the user knows something was unhandled — easier than reading
+        # logs after the fact when a run "completed but did the wrong thing".
+        if self._state is not None and self._state.unknown_events:
+            parts = ", ".join(
+                f"{name}×{count}"
+                for name, count in sorted(
+                    self._state.unknown_events.items(),
+                    key=lambda kv: (-kv[1], kv[0]),
+                )
+            )
+            total = sum(self._state.unknown_events.values())
+            print(f"  ({total} unknown events: {parts})")
+
     def _format_per_host_lines(self) -> list[str]:
         """Build one summary line per host, ordered by first-seen.
 
