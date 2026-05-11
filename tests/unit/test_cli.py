@@ -67,6 +67,20 @@ class TestPackageIdentity:
 
         assert re.match(r"^\d+\.\d+\.\d+.*$", __version__)
 
+    def test_version_matches_installed_package_metadata(self):
+        """TC-001b: ``__version__`` must track the installed package version.
+
+        Previously a hardcoded literal in ``__init__.py`` lagged behind
+        the version in ``pyproject.toml``, so ``aom --version`` reported
+        stale info after editable reinstalls. The single source of truth
+        is now the package metadata.
+        """
+        from importlib.metadata import version
+
+        from ansible_aom import __version__
+
+        assert __version__ == version("ansible-aom")
+
 
 class TestCLIEntryPoint:
     """Tests for TC-002: CLI Entry Point Exists."""
