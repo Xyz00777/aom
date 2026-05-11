@@ -118,12 +118,38 @@ def main(argv: list[str]) -> int:
         return 0  # no version line found; silent no-op
     old, new = result
 
-    # Stage the change so it lands in the same commit as the user's edit.
+    # Refresh uv.lock so its embedded version matches the bumped
+    # pyproject. `uv lock` is fast for a pure version bump — uv only
+    # rewrites the project's own [package] entry, not the entire
+    # dependency graph. Best-effort: if uv isn't on PATH or the
+    # command fails, fall through and stage just pyproject.
+    uv_lock = repo_root / "uv.lock"
+    files_to_stage = [pyproject]
+    if uv_lock.exists():
+        try:
+            subprocess.run(
+                ["uv", "lock", "--quiet"],
+                cwd=repo_root,
+                check=True,
+                timeout=30,
+            )
+            files_to_stage.append(uv_lock)
+        except (subprocess.SubprocessError, FileNotFoundError, OSError) as exc:
+            sys.stderr.write(
+                f"[bump-version] `uv lock` failed ({exc}); uv.lock not "
+                "refreshed (run `uv lock` manually after the commit)\n"
+            )
+
+    # Stage the changes so they land in the same commit as the user's edit.
     try:
-        subprocess.run(["git", "add", str(pyproject)], cwd=repo_root, check=True)
+        subprocess.run(
+            ["git", "add", "--", *(str(p) for p in files_to_stage)],
+            cwd=repo_root,
+            check=True,
+        )
     except (subprocess.SubprocessError, FileNotFoundError) as exc:
-        # Hook MUST NOT block commits — fall back to leaving the file
-        # modified so the user can stage it manually.
+        # Hook MUST NOT block commits — fall back to leaving the files
+        # modified so the user can stage them manually.
         sys.stderr.write(
             f"[bump-version] git add failed ({exc}); pyproject left modified at {new}\n"
         )
