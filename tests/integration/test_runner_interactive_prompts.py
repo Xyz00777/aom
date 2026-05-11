@@ -142,6 +142,70 @@ class TestConfirmationPromptDetected:
         assert captured.read_text() == "y"
 
 
+class TestRealAnsiblePauseFormat:
+    """Simulate exactly what ansible.builtin.pause emits in production.
+
+    ansible decorates the pause prompt with:
+    - An ANSI SGR-coloured ``[<task name>]`` header on its own line
+    - The user's ``prompt:`` text below, also coloured, ending with
+      ``:`` then a SGR reset and no trailing newline.
+
+    Reproduces the user's reported bug:
+    ``prompt: "Deploy to {{ inventory_hostname }} ({{ env_domain }})?
+    Press Enter to continue or Ctrl+C to abort"``.
+    """
+
+    def test_full_real_ansible_pause_round_trip(self, tmp_path: Path) -> None:
+        from ansible_aom.runner import run_playbook
+
+        renderer = MagicMock()
+        renderer.handle_interactive_prompt.return_value = ""  # user pressed Enter
+        captured = tmp_path / "captured.txt"
+
+        # Mimics the bytes ansible-playbook actually writes when stdout
+        # is a TTY (which it is under pexpect): SGR around the
+        # bracketed task header AND around the prompt body, no
+        # trailing newline.
+        coloured_prompt = (
+            "\x1b[1;35m[Confirm deployment]\x1b[0m\n"
+            "\x1b[1;35mDeploy to web1 (example.com)?"
+            " Press Enter to continue or Ctrl+C to abort:\x1b[0m"
+        )
+        cmd, args = _fake_pause_prompt_command(coloured_prompt, captured)
+
+        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+            exit_code = run_playbook(
+                "playbook.yml", [], renderer, timeout=0.2, session_dir=tmp_path
+            )
+
+        assert exit_code == 0
+        renderer.handle_interactive_prompt.assert_called_once()
+        # The fake captured an empty string — the runner forwarded our
+        # "user pressed Enter" through sendline.
+        assert captured.exists()
+        assert captured.read_text() == ""
+
+    def test_custom_pause_prompt_without_press_enter_phrasing(self, tmp_path: Path) -> None:
+        """Even when the prompt text doesn't include 'Press Enter',
+        the bracketed task-name header identifies it."""
+        from ansible_aom.runner import run_playbook
+
+        renderer = MagicMock()
+        renderer.handle_interactive_prompt.return_value = "go"
+        captured = tmp_path / "captured.txt"
+        # No `Press Enter`, no `(yes/no)`, just a custom prompt — but
+        # the bracketed header + trailing colon is enough.
+        prompt = "[Confirm rollback]\nReally proceed: "
+        cmd, args = _fake_pause_prompt_command(prompt, captured)
+
+        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+            run_playbook("playbook.yml", [], renderer, timeout=0.2, session_dir=tmp_path)
+
+        renderer.handle_interactive_prompt.assert_called_once()
+        assert captured.exists()
+        assert captured.read_text() == "go"
+
+
 class TestNoPromptNoSpuriousInteractiveCall:
     """A normal run with no prompts must NOT call handle_interactive_prompt."""
 

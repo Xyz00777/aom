@@ -25,7 +25,7 @@ from typing import Any
 import pexpect
 
 from ansible_aom.core.models import WarningType
-from ansible_aom.core.parser import PtyStreamParser
+from ansible_aom.core.parser import _ANSI_SGR_RE, PtyStreamParser
 from ansible_aom.core.preflight import run_preflight
 from ansible_aom.core.session import SessionManager
 from ansible_aom.renderer.protocol import Renderer
@@ -129,8 +129,19 @@ _DEFAULT_TIMEOUT_S = 0.5
 
 _VARS_PROMPT_RE = re.compile(r"^\s*\[[^\]\n]+\]\s*(\([^)]*\))?\s*:\s*$", re.MULTILINE)
 
+# Real ansible decorates the pause prompt with a bracketed task-name
+# header on its own line, e.g. ``[Confirm deployment]\n<prompt>:``.
+# Detect that as a strong "this is a pause prompt" signal regardless
+# of the prompt text the user typed in their playbook.
+_BRACKETED_HEADER_RE = re.compile(r"^\s*\[[^\]\n]+\]\s*$", re.MULTILINE)
 
-def _looks_like_interactive_prompt(pending: str) -> bool:
+
+def _strip_ansi(text: str) -> str:
+    """Remove SGR escape sequences from `text`. Reuses the parser's regex."""
+    return _ANSI_SGR_RE.sub("", text)
+
+
+def _looks_like_interactive_prompt(pending: str, prior_plaintext: str | None = None) -> bool:
     """True if `pending` (unread PTY buffer) looks like a child waiting on stdin.
 
     High-confidence signals only:
@@ -143,6 +154,18 @@ def _looks_like_interactive_prompt(pending: str) -> bool:
         * ends in ``?`` (any question — strong signal)
         * matches the ``vars_prompt`` default ``[name]: `` /
           ``[name] (default): `` format
+        * has a bracketed header on its own line above the prompt
+          inside ``pending``
+        * ``prior_plaintext`` (the most recently consumed plaintext
+          line, ANSI-stripped) is a bracketed header on its own —
+          real ansible pause emits the header and the prompt on
+          separate lines, and the header is consumed by the
+          newline-matcher before the prompt's TIMEOUT fires.
+
+    ANSI SGR escape sequences are stripped before any of these checks.
+    ansible colorises the pause prompt by default, so the raw buffer
+    often ends in ``\\x1b[0m`` (a reset code) rather than the
+    visible ``:``.
 
     False positives still possible (e.g. a debug task ending in
     ``Installing packages:``) but rare; the cost is one spurious
@@ -150,7 +173,8 @@ def _looks_like_interactive_prompt(pending: str) -> bool:
     reading from stdin. Pure trailing-``:`` without any other signal
     is intentionally rejected — it's too common in regular log lines.
     """
-    text = pending.rstrip()
+    clean = _strip_ansi(pending)
+    text = clean.rstrip()
     if not text:
         return False
     last_char = text[-1]
@@ -158,14 +182,24 @@ def _looks_like_interactive_prompt(pending: str) -> bool:
         return False
     if last_char == "?":
         return True
-    if any(marker in pending for marker in _INTERACTIVE_PROMPT_MARKERS):
+    if any(marker in clean for marker in _INTERACTIVE_PROMPT_MARKERS):
         return True
     # vars_prompt default: the last line is ``[varname]: `` or
     # ``[varname] (default): ``. Anchor to MULTILINE start so log
     # lines that happen to contain ``[FOO]`` later don't trip it.
-    last_line = pending.splitlines()[-1] if "\n" in pending else pending
+    last_line = clean.splitlines()[-1] if "\n" in clean else clean
     if _VARS_PROMPT_RE.match(last_line):
         return True
+    # Real ansible pause output: a ``[Task name]`` header line.
+    # Either above the prompt inside the same buffer, OR consumed
+    # earlier as a separate plaintext line (newline-terminated, so
+    # pexpect routed it through ``_feed`` before TIMEOUT fired).
+    if _BRACKETED_HEADER_RE.search(clean):
+        return True
+    if prior_plaintext is not None:
+        prior_clean = _strip_ansi(prior_plaintext).strip()
+        if _BRACKETED_HEADER_RE.fullmatch(prior_clean):
+            return True
     return False
 
 
@@ -297,7 +331,15 @@ def _drive(
             _flush_pending(child, parser, renderer, sink)
             break
         elif idx == timeout_idx:
-            stall_count = _handle_timeout_branch(child, renderer, sink, stall_count)
+            # The parser's plaintext_lines accumulates every non-JSONL,
+            # non-warning line that's gone through `_feed`. The last
+            # entry is our window into "what did the child say right
+            # before going quiet?" — which lets us catch the case
+            # where ansible emits ``[Task name]\n<prompt>:`` and the
+            # header line was already consumed before the prompt's
+            # TIMEOUT fired.
+            prior = parser.plaintext_lines[-1] if parser.plaintext_lines else None
+            stall_count = _handle_timeout_branch(child, renderer, sink, stall_count, prior)
             continue
         else:
             # Password prompt fired. Build the prompt text from the
@@ -347,6 +389,7 @@ def _handle_timeout_branch(
     renderer: Renderer,
     sink: _SessionSink,
     stall_count: int,
+    prior_plaintext: str | None = None,
 ) -> int:
     """Handle a TIMEOUT in `_drive`. Return the new ``stall_count``.
 
@@ -354,7 +397,8 @@ def _handle_timeout_branch(
 
     1. **High-confidence prompt.** Unread buffer looks like the child
        is blocked on stdin (ends in ``:`` or ``?``, contains a known
-       marker). Drain the buffer, route through
+       marker, or the immediately-prior plaintext line was a
+       ``[Task name]`` header). Drain the buffer, route through
        ``renderer.handle_interactive_prompt``, forward the answer via
        ``child.sendline``. Reset stall count.
     2. **Stall safety net.** Unread buffer has been pending for
@@ -372,8 +416,13 @@ def _handle_timeout_branch(
     """
     pending = _peek_unread(child)
 
-    if pending and _looks_like_interactive_prompt(pending):
+    if pending and _looks_like_interactive_prompt(pending, prior_plaintext):
         prompt_text = _consume_unread(child)
+        logger.debug(
+            "interactive prompt detected (len=%d, prior=%r)",
+            len(prompt_text),
+            (prior_plaintext or "")[:80],
+        )
         # The captured prompt usually still has trailing whitespace from
         # the buffer; preserve it so `Press Enter: ` reads the way the
         # user would see it on a normal terminal.

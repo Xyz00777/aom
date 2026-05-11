@@ -77,6 +77,59 @@ class TestLooksLikePrompt:
         # Bracketed word followed by colon BUT with other text after isn't a prompt.
         assert _looks_like_interactive_prompt("[INFO]: starting up") is False
 
+    def test_real_ansible_pause_with_ansi_codes_is_caught(self) -> None:
+        """Real ansible colorises pause output — buffer ends in ``\\x1b[0m``.
+
+        Without ANSI stripping the trailing-char check sees ``m`` and
+        rejects. With stripping it sees ``:`` and we match either via
+        the "Press Enter" marker or the bracketed-header rule.
+        """
+        # SGR sequences around both the header and the prompt — what
+        # `ansible-playbook` emits when stdout is a TTY (it always is
+        # via pexpect).
+        prompt = (
+            "\x1b[1;35m[Confirm deployment]\x1b[0m\n"
+            "\x1b[1;35mDeploy to web1 (example.com)?"
+            " Press Enter to continue or Ctrl+C to abort:\x1b[0m"
+        )
+        assert _looks_like_interactive_prompt(prompt) is True
+
+    def test_real_ansible_pause_no_press_enter_phrasing_still_caught(self) -> None:
+        """A custom pause prompt without the canonical phrasing.
+
+        The user-provided ``prompt:`` doesn't have to mention "Press
+        Enter" — only the ansible-emitted ``[Task name]`` header
+        identifies it. The bracketed-header rule must catch it.
+        """
+        prompt = "[Confirm rollback]\nReally proceed?: "
+        # Both signals are present (trailing `?:` ends in `:`, plus the
+        # bracketed header) — `_looks_like_interactive_prompt` should
+        # accept either.
+        assert _looks_like_interactive_prompt(prompt) is True
+
+    def test_real_ansible_pause_with_plain_colon_and_header(self) -> None:
+        """Header + bare colon (no markers, no question mark) is still a prompt."""
+        prompt = "[Confirm deployment]\nProceed: "
+        assert _looks_like_interactive_prompt(prompt) is True
+
+    def test_prior_plaintext_header_catches_split_chunks(self) -> None:
+        """When the header was consumed earlier and only the prompt tail
+        sits in the buffer, the prior_plaintext signal must catch it."""
+        # The buffer alone has nothing distinctive.
+        assert _looks_like_interactive_prompt("Proceed: ") is False
+        # Same buffer, but the prior consumed line was the header.
+        assert (
+            _looks_like_interactive_prompt("Proceed: ", prior_plaintext="[Confirm deployment]")
+            is True
+        )
+
+    def test_prior_plaintext_non_header_does_not_catch(self) -> None:
+        """An ordinary log line as the prior plaintext is not a signal."""
+        assert (
+            _looks_like_interactive_prompt("Proceed: ", prior_plaintext="ok: [web1] => done")
+            is False
+        )
+
 
 class TestStallFlushDoesNotBlock:
     """Stall safety net must never call handle_interactive_prompt."""
