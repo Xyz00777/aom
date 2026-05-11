@@ -393,6 +393,14 @@ class CompactRenderer:
         self._seen_warning_messages: set[str] = set()
         self._ascii_mode: bool = not is_unicode_terminal()
         self._colorize: bool = _color_enabled(is_tty)
+        # Per-task timing: start timestamp (seconds since epoch) keyed by
+        # task UUID, plus a tiny single-entry cache of "the task we just
+        # printed a TASK header for" so the inline result lines and the
+        # post-task summary can quote the right duration.
+        self._task_start_times: dict[str, float] = {}
+        self._last_task_uuid: str | None = None
+        self._last_task_name: str | None = None
+        self._last_task_start_time: float | None = None
 
     def start(self, playbook: str, args: list[str]) -> None:
         """Start rendering a playbook run.
@@ -806,6 +814,70 @@ class CompactRenderer:
             return
         self._display.print_log(f"[pause] sleeping {seconds_num}s…")
 
+    def _event_time(self, event: dict) -> float | None:
+        """Parse ``_timestamp`` from a JSONL event into a Unix float.
+
+        Returns ``None`` when the timestamp is missing or malformed —
+        callers fall back to wall-clock or skip timing for that event.
+        """
+        ts = event.get("_timestamp")
+        if not ts:
+            return None
+        try:
+            from datetime import datetime
+
+            if ts.endswith("Z"):
+                ts = ts[:-1] + "+00:00"
+            return datetime.fromisoformat(ts).timestamp()
+        except (ValueError, TypeError, AttributeError):
+            return None
+
+    def _format_duration(self, seconds: float) -> str:
+        """Compact human duration: ``0.4s`` / ``12.3s`` / ``1m23s`` / ``1h02m``."""
+        if seconds < 60:
+            return f"{seconds:.1f}s"
+        if seconds < 3600:
+            minutes = int(seconds // 60)
+            return f"{minutes}m{int(seconds % 60):02d}s"
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        return f"{hours}h{minutes:02d}m"
+
+    def _emit_previous_task_summary(self, now: float) -> None:
+        """Print a one-line summary of the task that just finished.
+
+        Triggered right before the next task_start prints its TASK
+        header so the user sees the duration of *the previous task*
+        directly under that task's output. Format:
+
+            [HH:MM:SS] <task name> — N.Ns (cum H:MM:SS)
+
+        Where the timestamp is the wall-clock at the moment the new
+        task started (which is also when the old task ended in
+        linear strategy), ``N.Ns`` is the previous task's duration,
+        and ``cum`` is the cumulative playbook elapsed time.
+
+        Cumulative is dimmed so the per-task duration is the
+        eye-catching figure; the timestamp prefix is dimmed for the
+        same reason.
+        """
+        if self._last_task_start_time is None or self._last_task_name is None:
+            return
+        duration = now - self._last_task_start_time
+        cum = now - self._start_time
+
+        # Local-time timestamp keeps the format consistent with what
+        # users see from ansible's profile_tasks callback.
+        from datetime import datetime
+
+        wall = datetime.fromtimestamp(now).strftime("%H:%M:%S")
+        prefix = _wrap(f"[{wall}]", _DIM, self._colorize)
+        cum_str = _wrap(f"(cum {self._format_duration(cum)})", _DIM, self._colorize)
+        duration_str = _wrap(self._format_duration(duration), _CYAN, self._colorize)
+        self._display.print_log(
+            f"{prefix} {self._last_task_name} — {duration_str} {cum_str}"
+        )
+
     def _emit_event_log(self, event: dict) -> None:
         """Print one nom-style log line for a JSONL event.
 
@@ -821,38 +893,65 @@ class CompactRenderer:
         events; ansible's normal callback isn't running because AOM
         forces the ``ansible.posix.jsonl`` callback for structured
         output — hence why ansible itself isn't producing them.)
+
+        Per-host result lines also carry an inline duration in
+        parentheses (e.g. ``ok: [web1] (2.3s)``), computed as the
+        gap between the event's ``_timestamp`` and the parent task's
+        recorded start time. On the *next* task_start, a summary
+        line for the previous task lands first so the user sees how
+        long it took with a wall-clock timestamp.
         """
         name = event.get("_event")
+        event_time = self._event_time(event)
         if name == "v2_playbook_on_play_start":
             play_name = event.get("play", {}).get("name", "") or "(unnamed)"
             self._display.print_log(f"\nPLAY [{play_name}] " + "*" * 50)
         elif name == "v2_playbook_on_task_start":
             task = event.get("task", {})
             task_name = task.get("name", "") or "(unnamed)"
+            task_uuid = task.get("id", "")
+            # Summary for the previous task lands BEFORE the new TASK
+            # header — keeps it visually attached to its own output.
+            if event_time is not None:
+                self._emit_previous_task_summary(event_time)
             self._display.print_log(f"\nTASK [{task_name}] " + "*" * 50)
             self._maybe_emit_pause_seconds_hint(task)
+            # Stash timing for the inline-duration logic below and for
+            # the *next* summary line.
+            if event_time is not None:
+                self._task_start_times[task_uuid] = event_time
+                self._last_task_uuid = task_uuid
+                self._last_task_name = task_name
+                self._last_task_start_time = event_time
         elif name == "v2_runner_on_ok":
+            suffix = self._inline_duration_suffix(event, event_time)
             for host, result in event.get("hosts", {}).items():
                 if result.get("changed"):
                     self._display.print_log(
-                        _wrap(f"changed: [{host}]", _YELLOW, self._colorize)
+                        _wrap(f"changed: [{host}]{suffix}", _YELLOW, self._colorize)
                     )
                 else:
                     self._display.print_log(
-                        _wrap(f"ok: [{host}]", _GREEN, self._colorize)
+                        _wrap(f"ok: [{host}]{suffix}", _GREEN, self._colorize)
                     )
         elif name == "v2_runner_on_failed":
-            for host, result in event.get("hosts", {}).items():
-                msg = result.get("msg", "") or ""
-                self._display.print_log(
-                    _wrap(f"fatal: [{host}]: FAILED! => {msg}", _RED, self._colorize)
-                )
-        elif name == "v2_runner_on_unreachable":
+            suffix = self._inline_duration_suffix(event, event_time)
             for host, result in event.get("hosts", {}).items():
                 msg = result.get("msg", "") or ""
                 self._display.print_log(
                     _wrap(
-                        f"fatal: [{host}]: UNREACHABLE! => {msg}",
+                        f"fatal: [{host}]{suffix}: FAILED! => {msg}",
+                        _RED,
+                        self._colorize,
+                    )
+                )
+        elif name == "v2_runner_on_unreachable":
+            suffix = self._inline_duration_suffix(event, event_time)
+            for host, result in event.get("hosts", {}).items():
+                msg = result.get("msg", "") or ""
+                self._display.print_log(
+                    _wrap(
+                        f"fatal: [{host}]{suffix}: UNREACHABLE! => {msg}",
                         _MAGENTA,
                         self._colorize,
                     )
@@ -860,3 +959,31 @@ class CompactRenderer:
         elif name == "v2_runner_on_skipped":
             for host in event.get("hosts", {}):
                 self._display.print_log(_wrap(f"skipping: [{host}]", _CYAN, self._colorize))
+        elif name == "v2_playbook_on_stats":
+            # Final task's summary line — same logic as the inter-task
+            # case, just triggered by stats instead of the next task_start.
+            if event_time is not None:
+                self._emit_previous_task_summary(event_time)
+                # Clear so a subsequent run doesn't see a stale last task.
+                self._last_task_uuid = None
+                self._last_task_name = None
+                self._last_task_start_time = None
+
+    def _inline_duration_suffix(self, event: dict, event_time: float | None) -> str:
+        """Return `` (2.3s)`` for the per-host result line, or empty.
+
+        Empty when timing data is unavailable (missing ``_timestamp``,
+        no recorded task start) so the result line still renders.
+        Skipped tasks are intentionally NOT timed inline — they
+        haven't really run, the duration is meaningless.
+        """
+        if event_time is None:
+            return ""
+        task_id = event.get("task", {}).get("id", "")
+        start = self._task_start_times.get(task_id)
+        if start is None:
+            return ""
+        delta = event_time - start
+        if delta < 0:
+            return ""
+        return f" ({self._format_duration(delta)})"
