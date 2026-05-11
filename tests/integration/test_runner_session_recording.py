@@ -151,6 +151,81 @@ class TestSessionRecordingFailureModes:
         renderer.handle_completion.assert_called_once()
 
 
+class TestSessionRecordingDisableOnDiskError:
+    """R3: an OSError mid-run (disk full, FS quota, NFS hiccup) disables
+    further recording without flooding logs and surfaces a one-time
+    warning so the user sees what happened — without losing the run."""
+
+    def test_oserror_during_record_event_disables_sink_and_warns_once(
+        self, tmp_path: Path
+    ) -> None:
+        from ansible_aom.runner import run_playbook
+
+        renderer = MagicMock()
+
+        events = [
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-08T10:00:00Z"},
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-08T10:00:00Z",
+                "play": {"id": "p1", "name": "Test"},
+            },
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-08T10:00:00Z",
+                "task": {"id": "t1", "name": "t1"},
+            },
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-08T10:00:00Z",
+                "task": {"id": "t1"},
+                "hosts": {"web1": {"ok": True}},
+            },
+            {"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-08T10:00:01Z"},
+        ]
+        cmd, args = _fake_ansible_command(events, exit_code=0)
+
+        original_record = None
+        call_count = {"n": 0}
+
+        def fail_after_two(self, session_id, event):
+            call_count["n"] += 1
+            if call_count["n"] > 2:
+                raise OSError("No space left on device")
+            assert original_record is not None
+            return original_record(self, session_id, event)
+
+        from ansible_aom.core.session import SessionManager
+
+        original_record = SessionManager.record_event
+
+        with (
+            patch("ansible_aom.runner._build_command", return_value=(cmd, args)),
+            patch.object(SessionManager, "record_event", fail_after_two),
+        ):
+            exit_code = run_playbook("playbook.yml", [], renderer, session_dir=tmp_path)
+
+        # Run still completes cleanly.
+        assert exit_code == 0
+        renderer.handle_completion.assert_called_once()
+
+        # Only the first two events made it to disk.
+        session_path = next(tmp_path.iterdir())
+        recorded = _read_jsonl(session_path / "events.jsonl")
+        assert len(recorded) == 2
+
+        # Renderer warned exactly once about disabled recording.
+        warning_calls = [
+            call
+            for call in renderer.add_warning.call_args_list
+            if "session recording disabled" in str(call).lower()
+        ]
+        assert len(warning_calls) == 1, (
+            f"expected one 'session recording disabled' warning, "
+            f"got {renderer.add_warning.call_args_list}"
+        )
+
+
 class TestSessionRecordingDefaults:
     """When no session_dir is passed, the runner picks the standard state dir."""
 

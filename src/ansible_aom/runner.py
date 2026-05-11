@@ -51,11 +51,20 @@ class _SessionSink:
     recording is observability, not control flow. A run that can't open
     its session directory still completes normally; the inspect-side
     catches up next time.
+
+    R3: on the *first* write OSError after a successful start (disk fills
+    mid-run, NFS hiccup, quota exceeded), the sink disables itself —
+    subsequent calls return immediately so a 1000-events/sec stream
+    doesn't flood logs by retrying every event. The renderer gets a
+    one-time warning so the user sees recording stopped even though the
+    run kept going.
     """
 
-    def __init__(self, session_dir: Path, playbook: str) -> None:
+    def __init__(self, session_dir: Path, playbook: str, renderer: object | None = None) -> None:
         self._manager: SessionManager | None = None
         self._session_id: str | None = None
+        self._renderer = renderer
+        self._disabled = False
         try:
             session_dir.mkdir(parents=True, exist_ok=True)
             manager = SessionManager(session_dir=session_dir, playbook=playbook)
@@ -64,24 +73,42 @@ class _SessionSink:
         except OSError as exc:
             logger.debug("session recording disabled (start failed): %s", exc)
 
+    def _disable(self, reason: str) -> None:
+        """Stop recording and emit a one-time warning to the renderer.
+
+        Called from any write path that hits an OSError. After this, all
+        record_* calls return early — both as a safety against repeated
+        OSErrors on the same broken disk and to keep the runner's hot
+        path branchless.
+        """
+        if self._disabled:
+            return
+        self._disabled = True
+        if self._renderer is not None:
+            add_warning = getattr(self._renderer, "add_warning", None)
+            if callable(add_warning):
+                add_warning(f"session recording disabled (disk write failed: {reason})", False)
+
     def record_event(self, event: dict) -> None:
-        if self._manager is None or self._session_id is None:
+        if self._disabled or self._manager is None or self._session_id is None:
             return
         try:
             self._manager.record_event(self._session_id, event)
         except OSError as exc:
             logger.debug("session event write failed: %s", exc)
+            self._disable(str(exc))
 
     def record_stderr(self, line: str) -> None:
-        if self._manager is None or self._session_id is None:
+        if self._disabled or self._manager is None or self._session_id is None:
             return
         try:
             self._manager.record_stderr(self._session_id, line)
         except OSError as exc:
             logger.debug("session stderr write failed: %s", exc)
+            self._disable(str(exc))
 
     def end(self, status: str) -> None:
-        if self._manager is None or self._session_id is None:
+        if self._disabled or self._manager is None or self._session_id is None:
             return
         try:
             self._manager.end_session(self._session_id, status)
@@ -264,7 +291,7 @@ def run_playbook(
     parser = PtyStreamParser()
     renderer.start(playbook, ansible_args)
 
-    sink = _SessionSink(session_dir or _default_session_dir(), playbook)
+    sink = _SessionSink(session_dir or _default_session_dir(), playbook, renderer=renderer)
 
     # Preflight: --list-tasks + --list-hosts in parallel before spawning
     # the JSONL run so the renderer can show plays/tasks/host count from
