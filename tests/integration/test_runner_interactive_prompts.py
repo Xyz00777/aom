@@ -206,6 +206,80 @@ class TestRealAnsiblePauseFormat:
         assert captured.read_text() == "go"
 
 
+class TestNewlineTerminatedPromptPath:
+    """The variant the user actually hit in production.
+
+    ``ansible.builtin.pause`` emits its prompt with a trailing ``\\r\\n``
+    even though it's waiting on stdin. pexpect's newline matcher
+    consumes the line, ``child.buffer`` is empty when TIMEOUT fires,
+    and the prompt sits in the parser's consumed-plaintext history.
+    The runner must catch that via ``prior_plaintext``.
+    """
+
+    def _fake_newline_terminated_prompt(
+        self, prompt_with_newline: str, captured_input_path: Path
+    ) -> tuple[str, list[str]]:
+        """Fake that writes a NEWLINE-terminated prompt, then reads."""
+        prompt_repr = repr(prompt_with_newline)
+        path_repr = repr(str(captured_input_path))
+        code = textwrap.dedent(
+            f"""
+            import sys
+            sys.stdout.write({prompt_repr})
+            sys.stdout.flush()
+            line = sys.stdin.readline().rstrip("\\r\\n")
+            with open({path_repr}, "w") as f:
+                f.write(line)
+            sys.exit(0)
+            """
+        )
+        return sys.executable, ["-c", code]
+
+    def test_real_ansible_pause_newline_terminated_round_trip(self, tmp_path: Path) -> None:
+        from ansible_aom.runner import run_playbook
+
+        renderer = MagicMock()
+        renderer.handle_interactive_prompt.return_value = ""  # Enter
+        captured = tmp_path / "captured.txt"
+
+        # Real bytes ansible-playbook writes for the user's playbook:
+        # [Task name]\r\n + prompt body ending in `:\r\n`. Both lines
+        # are newline-terminated so pexpect consumes them cleanly and
+        # the unread buffer is empty when the child blocks on stdin.
+        prompt = (
+            "[Confirm deployment]\r\n"
+            "Deploy to epistree (epistree.com)?"
+            " Press Enter to continue or Ctrl+C to abort:\r\n"
+        )
+        cmd, args = self._fake_newline_terminated_prompt(prompt, captured)
+
+        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+            exit_code = run_playbook(
+                "playbook.yml", [], renderer, timeout=0.2, session_dir=tmp_path
+            )
+
+        assert exit_code == 0
+        renderer.handle_interactive_prompt.assert_called_once()
+        assert captured.exists()
+        assert captured.read_text() == ""
+
+    def test_newline_terminated_vars_prompt_round_trip(self, tmp_path: Path) -> None:
+        from ansible_aom.runner import run_playbook
+
+        renderer = MagicMock()
+        renderer.handle_interactive_prompt.return_value = "staging"
+        captured = tmp_path / "captured.txt"
+
+        prompt = "[deploy_env]: \r\n"
+        cmd, args = self._fake_newline_terminated_prompt(prompt, captured)
+
+        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+            run_playbook("playbook.yml", [], renderer, timeout=0.2, session_dir=tmp_path)
+
+        renderer.handle_interactive_prompt.assert_called_once()
+        assert captured.read_text() == "staging"
+
+
 class TestNoPromptNoSpuriousInteractiveCall:
     """A normal run with no prompts must NOT call handle_interactive_prompt."""
 

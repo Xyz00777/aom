@@ -207,7 +207,10 @@ class TestHighConfidencePromptPath:
 
         new_count = _handle_timeout_branch(child, renderer, sink, stall_count=0)
 
-        assert new_count == 0
+        # Sentinel negative value marks "prompt already fired in this
+        # silent window — don't re-fire on subsequent timeouts until a
+        # newline arrives and the caller resets to 0".
+        assert new_count == -1
         assert child.buffer == ""
         renderer.handle_interactive_prompt.assert_called_once()
         # Answer sent through sendline; sink records the interaction.
@@ -225,6 +228,95 @@ class TestHighConfidencePromptPath:
 
         # Empty string forwarded so pause accepts "continue".
         assert child.sent_lines == [""]
+
+
+class TestPriorPlaintextPromptPath:
+    """When the prompt itself arrived newline-terminated.
+
+    Real ansible.builtin.pause output (from live trace):
+        TASK [Confirm deployment] ********
+        [Confirm deployment]\\r\\n
+        Deploy to host (env)? Press Enter to continue or Ctrl+C to abort:\\r\\n
+
+    Each line ends with ``\\r\\n``, so pexpect's newline matcher
+    consumes them cleanly and ``child.buffer`` is empty when TIMEOUT
+    fires. The signal is in ``prior_plaintext`` — the most recently
+    consumed line — which contains the prompt text.
+    """
+
+    def test_prior_prompt_with_empty_buffer_fires(self) -> None:
+        child = _FakeChild(buffer_value="")
+        renderer = MagicMock()
+        renderer.handle_interactive_prompt.return_value = "yes"
+        sink = _FakeSink()
+
+        new_count = _handle_timeout_branch(
+            child,
+            renderer,
+            sink,
+            stall_count=0,
+            prior_plaintext="Deploy to web1? Press Enter to continue: ",
+        )
+
+        renderer.handle_interactive_prompt.assert_called_once()
+        # Answer forwarded to child stdin.
+        assert child.sent_lines == ["yes"]
+        # Sentinel marks the window as handled.
+        assert new_count == -1
+
+    def test_prior_non_prompt_does_not_fire(self) -> None:
+        """An ordinary log line shouldn't trigger the prompt path."""
+        child = _FakeChild(buffer_value="")
+        renderer = MagicMock()
+        sink = _FakeSink()
+
+        new_count = _handle_timeout_branch(
+            child,
+            renderer,
+            sink,
+            stall_count=0,
+            prior_plaintext="Monday 11 May 2026  13:59:14 +0200 (0:00:01.740)",
+        )
+
+        renderer.handle_interactive_prompt.assert_not_called()
+        # No state change in a quiet-with-no-prompt window.
+        assert new_count == 0
+
+
+class TestSentinelPreventsRefiring:
+    """Once a prompt has fired, subsequent timeouts in the same window
+    must not re-trigger until a newline resets the stall counter."""
+
+    def test_negative_stall_count_skips_prompt_path(self) -> None:
+        child = _FakeChild(buffer_value="[pause]\nPress Enter: ")
+        renderer = MagicMock()
+        sink = _FakeSink()
+
+        new_count = _handle_timeout_branch(
+            child, renderer, sink, stall_count=-1, prior_plaintext=None
+        )
+
+        # No prompt fired, stall_count preserved.
+        renderer.handle_interactive_prompt.assert_not_called()
+        assert new_count == -1
+        # Renderer's clock still ticks so the elapsed-time UI keeps moving.
+        renderer.tick.assert_called_once()
+
+    def test_negative_stall_count_with_prior_prompt_still_skips(self) -> None:
+        """Even if the prior line is a prompt, sentinel blocks re-firing."""
+        child = _FakeChild(buffer_value="")
+        renderer = MagicMock()
+        sink = _FakeSink()
+
+        _handle_timeout_branch(
+            child,
+            renderer,
+            sink,
+            stall_count=-1,
+            prior_plaintext="Press Enter to continue: ",
+        )
+
+        renderer.handle_interactive_prompt.assert_not_called()
 
     def test_prompt_path_emits_visible_breadcrumb(self) -> None:
         """A detected prompt prints a [aom] hint so the user sees what's happening."""

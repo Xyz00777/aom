@@ -132,7 +132,7 @@ def main(argv: list[str]) -> int:
 
     try:
         message = _read_head_message(repo_root)
-    except (subprocess.SubprocessError, FileNotFoundError):
+    except subprocess.SubprocessError, FileNotFoundError:
         return 0
 
     bump = _detect_bump(message)

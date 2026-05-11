@@ -354,6 +354,9 @@ def _drive(
             line = (child.before or "") + (child.after or "")
             _trace("newline", line=line[:200])
             _feed(line, parser, renderer, sink)
+            # Reset to 0 (not max(stall_count, 0)) — a newline always
+            # ends a silent window, including the "already-handled"
+            # window marked by negative stall_count.
             stall_count = 0
         elif idx == eof_idx:
             _trace("eof", leftover=(child.before or "")[:200])
@@ -421,6 +424,40 @@ def _consume_unread(child: pexpect.spawn) -> str:
     return pending
 
 
+def _fire_prompt(
+    child: pexpect.spawn,
+    renderer: Renderer,
+    sink: _SessionSink,
+    prompt_text: str,
+    prior_plaintext: str | None,
+) -> None:
+    """Route a captured prompt through the renderer and forward the answer.
+
+    Shared between the two detection paths (buffer-pending vs
+    prior-line). The renderer's ``handle_interactive_prompt`` is the
+    user-facing suspend/input/restart dance; we just pump the result
+    into the child via ``sendline`` and mirror both prompt and answer
+    into the session sink so ``aom inspect show`` can replay it.
+
+    A renderer crash here is fatal to the child's progress (it stays
+    blocked on stdin) — best-effort: send an empty line so pause
+    accepts "continue" rather than leaving the run wedged.
+    """
+    renderer.print_log("[aom] detected interactive prompt — respond below:")
+    logger.debug(
+        "interactive prompt detected (len=%d, prior=%r)",
+        len(prompt_text),
+        (prior_plaintext or "")[:80],
+    )
+    try:
+        answer = renderer.handle_interactive_prompt(prompt_text)
+    except Exception:
+        answer = ""
+    child.sendline(answer)
+    sink.record_stderr(prompt_text.rstrip())
+    sink.record_stderr(f"[user-input] {answer}")
+
+
 def _handle_timeout_branch(
     child: pexpect.spawn,
     renderer: Renderer,
@@ -451,40 +488,36 @@ def _handle_timeout_branch(
     what happened. Flushing alone is recoverable: if output eventually
     arrives it just appears underneath.
     """
+    # Sentinel: stall_count<0 means "this silent window already had a
+    # prompt fired; don't re-fire". Resets to 0 in the caller when a
+    # newline arrives (the child responded to our sendline).
+    if stall_count < 0:
+        renderer.tick()
+        return stall_count
+
     # `child.buffer` is the documented unread accumulator. In some
     # pexpect builds or weird timing windows the data lands in
     # `child.before` instead (it's the "what was read before this
     # match" field), so fall back when buffer is empty.
     pending = _peek_unread(child) or (getattr(child, "before", "") or "")
 
+    # Case 1: pending content directly looks like a prompt (no trailing
+    # newline so pexpect couldn't consume it via the newline matcher).
     if pending and _looks_like_interactive_prompt(pending, prior_plaintext):
         prompt_text = _consume_unread(child) or pending
-        # Loud breadcrumb so users can SEE that detection fired even
-        # without --verbose. Goes to print_log (which renders above
-        # the live panel) rather than stderr so it's visible in TTY
-        # and pipe modes uniformly.
-        renderer.print_log("[aom] detected interactive prompt — respond below:")
-        logger.debug(
-            "interactive prompt detected (len=%d, prior=%r)",
-            len(prompt_text),
-            (prior_plaintext or "")[:80],
-        )
-        # The captured prompt usually still has trailing whitespace from
-        # the buffer; preserve it so `Press Enter: ` reads the way the
-        # user would see it on a normal terminal.
-        try:
-            answer = renderer.handle_interactive_prompt(prompt_text)
-        except Exception:
-            # A renderer crash here would leave the child blocked
-            # forever. Best-effort: send empty line so the child can
-            # continue (pause accepts empty input to mean "continue").
-            answer = ""
-        child.sendline(answer)
-        # Mirror the prompt and answer into the session log so
-        # `aom inspect show` can replay the interaction.
-        sink.record_stderr(prompt_text.rstrip())
-        sink.record_stderr(f"[user-input] {answer}")
-        return 0
+        _fire_prompt(child, renderer, sink, prompt_text, prior_plaintext)
+        return -1
+
+    # Case 2: the prompt itself was newline-terminated and consumed by
+    # the newline matcher, so the unread buffer is empty even though
+    # the child is now blocked on stdin. Real ansible.builtin.pause
+    # does this — observed live: each prompt line ends in ``:\r\n``.
+    # When the most recently consumed plaintext line looks like a
+    # prompt and the child has gone silent, treat that line as the
+    # captured prompt.
+    if not pending and prior_plaintext and _looks_like_interactive_prompt(prior_plaintext):
+        _fire_prompt(child, renderer, sink, prior_plaintext, prior_plaintext)
+        return -1
 
     if pending:
         stall_count += 1
