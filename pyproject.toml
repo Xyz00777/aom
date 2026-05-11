@@ -32,6 +32,7 @@ dev = [
     "textual-dev>=0.86",
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
+    "pytest-xdist>=3.8.0",
     "pytest-textual-snapshot>=0.5",
     "pytest-cov",
     "ruff",

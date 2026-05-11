@@ -35,6 +35,22 @@ class Renderer(Protocol):
         """Handle a password prompt. Returns the password."""
         ...
 
+    def handle_interactive_prompt(self, prompt_text: str) -> str:
+        """Handle a non-password interactive prompt (pause, vars_prompt).
+
+        Unlike ``handle_password_prompt`` this does NOT suppress echo —
+        the user expects to see what they type. Renderers must:
+
+        1. Stop / suspend any live panel (so the captured prompt text
+           is visible).
+        2. Surface ``prompt_text`` to the user (whatever the child has
+           emitted with no trailing newline).
+        3. Read one line from stdin.
+        4. Restart the panel.
+        5. Return the line (or empty string on EOF / KeyboardInterrupt).
+        """
+        ...
+
     def handle_completion(self, exit_code: int, state: str) -> None:
         """Handle playbook completion (success/failure/crash)."""
         ...

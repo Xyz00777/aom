@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -100,7 +101,72 @@ _PASSWORD_PATTERNS: list[str] = [
     r"Confirm New Vault password: ",
 ]
 
+# High-confidence prompt markers. When any of these substrings appears in
+# the unread buffer during a TIMEOUT branch, we're confident the child
+# is blocked on stdin (`ansible.builtin.pause`, `vars_prompt`, common
+# yes/no confirmations). The match is substring-based rather than a
+# pexpect pattern because real prompts arrive mid-line and pexpect's
+# regex match can fire before the full prompt has buffered.
+_INTERACTIVE_PROMPT_MARKERS: tuple[str, ...] = (
+    "[pause]",
+    "Press Enter",
+    "press enter",
+    "(yes/no)",
+    "(y/n)",
+    "[y/N]",
+    "[Y/n]",
+    "[yes/no]",
+)
+
+# Number of consecutive TIMEOUTs (each `timeout` seconds) before stall
+# detection flushes the unread buffer to the log so the user can at
+# least see what was being held. Never blocks for input — see
+# `.sisyphus/notepads/plans/interactive-prompts.md` for the rationale.
+_STALL_FLUSH_TIMEOUTS: int = 20  # ~10s at the default 0.5s timeout
+
 _DEFAULT_TIMEOUT_S = 0.5
+
+
+_VARS_PROMPT_RE = re.compile(r"^\s*\[[^\]\n]+\]\s*(\([^)]*\))?\s*:\s*$", re.MULTILINE)
+
+
+def _looks_like_interactive_prompt(pending: str) -> bool:
+    """True if `pending` (unread PTY buffer) looks like a child waiting on stdin.
+
+    High-confidence signals only:
+    - non-empty
+    - last non-whitespace char is ``:`` or ``?`` (the universal "prompt
+      waiting" terminator)
+    - AND one of:
+        * contains a known marker (``[pause]``, ``Press Enter``,
+          ``(yes/no)``, …)
+        * ends in ``?`` (any question — strong signal)
+        * matches the ``vars_prompt`` default ``[name]: `` /
+          ``[name] (default): `` format
+
+    False positives still possible (e.g. a debug task ending in
+    ``Installing packages:``) but rare; the cost is one spurious
+    newline sent to the child, which is harmless when no module is
+    reading from stdin. Pure trailing-``:`` without any other signal
+    is intentionally rejected — it's too common in regular log lines.
+    """
+    text = pending.rstrip()
+    if not text:
+        return False
+    last_char = text[-1]
+    if last_char not in (":", "?"):
+        return False
+    if last_char == "?":
+        return True
+    if any(marker in pending for marker in _INTERACTIVE_PROMPT_MARKERS):
+        return True
+    # vars_prompt default: the last line is ``[varname]: `` or
+    # ``[varname] (default): ``. Anchor to MULTILINE start so log
+    # lines that happen to contain ``[FOO]`` later don't trip it.
+    last_line = pending.splitlines()[-1] if "\n" in pending else pending
+    if _VARS_PROMPT_RE.match(last_line):
+        return True
+    return False
 
 
 def _build_command(playbook: str, ansible_args: list[str]) -> tuple[str, list[str]]:
@@ -210,6 +276,12 @@ def _drive(
     eof_idx = 1
     timeout_idx = 2
 
+    # Stall tracking: count consecutive TIMEOUTs where the child has
+    # produced no newline-terminated output. Used both for the
+    # high-confidence prompt path (input forwarded) and the low-confidence
+    # safety-net (flush-only, never blocks).
+    stall_count = 0
+
     while True:
         try:
             idx = child.expect(patterns, timeout=timeout)
@@ -220,15 +292,12 @@ def _drive(
         if idx == newline_idx:
             line = (child.before or "") + (child.after or "")
             _feed(line, parser, renderer, sink)
+            stall_count = 0
         elif idx == eof_idx:
             _flush_pending(child, parser, renderer, sink)
             break
         elif idx == timeout_idx:
-            # No output yet — perfectly normal during long-running tasks.
-            # Wake the renderer so the elapsed-time counter keeps moving
-            # even when ansible is silent. Renderers with their own clock
-            # (TUI) implement tick() as a no-op.
-            renderer.tick()
+            stall_count = _handle_timeout_branch(child, renderer, sink, stall_count)
             continue
         else:
             # Password prompt fired. Build the prompt text from the
@@ -237,9 +306,105 @@ def _drive(
             prompt = (child.before or "") + (child.after or "")
             password = renderer.handle_password_prompt(prompt)
             child.sendline(password)
+            stall_count = 0
 
     child.close()
     return child.exitstatus if child.exitstatus is not None else (child.signalstatus or 1)
+
+
+def _peek_unread(child: pexpect.spawn) -> str:
+    """Return the unread PTY buffer without consuming it.
+
+    pexpect's ``buffer`` property holds whatever was read but didn't
+    match any pattern in the most recent ``expect()`` call. For a
+    newline-terminated stream the buffer is empty between events; for
+    a stalled child waiting on stdin the buffer holds the prompt text.
+    """
+    return getattr(child, "buffer", "") or ""
+
+
+def _consume_unread(child: pexpect.spawn) -> str:
+    """Read and clear the unread buffer; return whatever was there."""
+    pending = _peek_unread(child)
+    if pending:
+        # Setting buffer through the property clears it (pexpect uses a
+        # StringIO internally; the setter replaces it with a fresh one).
+        try:
+            child.buffer = ""
+        except Exception:
+            # Defensive: some pexpect versions/spawn variants don't
+            # support direct buffer assignment. Fall back to a
+            # read_nonblocking drain.
+            try:
+                child.read_nonblocking(size=len(pending), timeout=0)
+            except Exception:
+                pass
+    return pending
+
+
+def _handle_timeout_branch(
+    child: pexpect.spawn,
+    renderer: Renderer,
+    sink: _SessionSink,
+    stall_count: int,
+) -> int:
+    """Handle a TIMEOUT in `_drive`. Return the new ``stall_count``.
+
+    Three cases, in priority order:
+
+    1. **High-confidence prompt.** Unread buffer looks like the child
+       is blocked on stdin (ends in ``:`` or ``?``, contains a known
+       marker). Drain the buffer, route through
+       ``renderer.handle_interactive_prompt``, forward the answer via
+       ``child.sendline``. Reset stall count.
+    2. **Stall safety net.** Unread buffer has been pending for
+       ``_STALL_FLUSH_TIMEOUTS`` consecutive timeouts. We *don't* know
+       it's a prompt, so we never block — instead flush the content as
+       a log line so the user can at least see what's stuck. Reset stall
+       count so we don't keep re-flushing the same text.
+    3. **Quiet.** No unread buffer — the child is just slow. Tick the
+       renderer's clock and keep waiting.
+
+    The split exists because blocking input on a false-positive (a
+    genuine slow task) would lock up the run while the user wonders
+    what happened. Flushing alone is recoverable: if output eventually
+    arrives it just appears underneath.
+    """
+    pending = _peek_unread(child)
+
+    if pending and _looks_like_interactive_prompt(pending):
+        prompt_text = _consume_unread(child)
+        # The captured prompt usually still has trailing whitespace from
+        # the buffer; preserve it so `Press Enter: ` reads the way the
+        # user would see it on a normal terminal.
+        try:
+            answer = renderer.handle_interactive_prompt(prompt_text)
+        except Exception:
+            # A renderer crash here would leave the child blocked
+            # forever. Best-effort: send empty line so the child can
+            # continue (pause accepts empty input to mean "continue").
+            answer = ""
+        child.sendline(answer)
+        # Mirror the prompt and answer into the session log so
+        # `aom inspect show` can replay the interaction.
+        sink.record_stderr(prompt_text.rstrip())
+        sink.record_stderr(f"[user-input] {answer}")
+        return 0
+
+    if pending:
+        stall_count += 1
+        if stall_count >= _STALL_FLUSH_TIMEOUTS:
+            # Flush-only: surface the held content so the user sees
+            # *something*. Never block.
+            flushed = _consume_unread(child)
+            for line in flushed.splitlines():
+                if line.strip():
+                    renderer.print_log(line)
+                    sink.record_stderr(line)
+            stall_count = 0
+
+    renderer.tick()
+    return stall_count
 
 
 def _flush_pending(

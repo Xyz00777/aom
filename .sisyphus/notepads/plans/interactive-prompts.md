@@ -246,3 +246,68 @@ log line appears for a fake pause event.
 IP1 alone fixes the reported bug in ~1 hour of TDD. Suggest landing
 it first as a focused commit, then IP2 as a follow-up once we've
 seen IP1 work against the real playbook.
+
+---
+
+## Status: IP1–IP5 shipped
+
+Landed 2026-05-11 in one focused pass after the user's pause-on-deploy
+report. Implementation matches the plan with one tightening: stall
+detection (IP2) is **flush-only**, never reads stdin, so a false
+positive can never block the run. Highlights:
+
+- `Renderer Protocol` gains `handle_interactive_prompt(prompt_text)`.
+  CompactRenderer uses `display.stop` + `input()` + `display.start`
+  with a `finally` block so a crashing input never leaves the panel
+  torn down. AOMApp uses `self.suspend()` + `input()` to hand the
+  terminal back to the user.
+- `_INTERACTIVE_PROMPT_MARKERS` covers `[pause]`, `Press Enter`,
+  `(yes/no)`, `[y/N]` and variants. `_looks_like_interactive_prompt`
+  is the single gate: trailing `?` (any question) OR known marker
+  with trailing `:` OR `^[varname]: $` / `[varname] (default): $`
+  for vars_prompt's default format. Pure trailing-`:` is
+  *intentionally* rejected — too common in real log output.
+- `_handle_timeout_branch` in the runner is the new fork. High
+  confidence → drain buffer, call renderer, sendline, reset count.
+  Low confidence with sustained stall (~10s at 0.5s timeout) →
+  flush as log lines, never block. Quiet child → tick clock.
+- A crashing `handle_interactive_prompt` sends an empty line so the
+  child can continue rather than blocking forever.
+- IP5: pause-with-seconds emits `[pause] sleeping Ns…` in the
+  compact renderer's log when `v2_playbook_on_task_start` carries
+  `task.action="*pause"` + `task.args.seconds`. Tolerates string
+  serialisation of the number.
+
+Test coverage:
+- `tests/unit/test_interactive_prompt.py` — 14 cases (Protocol
+  conformance, CompactRenderer + AOMApp method behaviour, EOF /
+  KeyboardInterrupt fallthrough, panel restart on crash).
+- `tests/unit/test_runner_stall_flush.py` — 11 cases pinning the
+  heuristic and the flush-only safety net (incl. log lines
+  containing `[INFO]` are NOT treated as prompts).
+- `tests/integration/test_runner_interactive_prompts.py` — 6 cases
+  with a fake ansible-playbook that writes the captured stdin to
+  a tempfile (PTY echo makes plain stdout assertions fragile).
+- `tests/tui/test_app_end_to_end.py` — Pilot test exercising
+  `handle_interactive_prompt` from the worker thread.
+- `tests/unit/test_compact_pause_visibility.py` — 5 cases for IP5.
+
+Full suite: 1749 passing, 6 skipped (up from 1710; +39 net).
+
+### Known limitations (post-implementation)
+
+1. The runner doesn't yet **bridge user keystrokes** outside of the
+   detected prompt windows. If the user types into AOM's terminal
+   when no prompt is detected, those bytes go to AOM's stdin and
+   are never forwarded. Fine for the prompt cases (we drain stdin
+   inside `input()` when the prompt fires), problematic for
+   ambient interactive commands run by modules. Out of scope.
+2. The stall-flush prints the held content **once** when the count
+   crosses the threshold. If the child stays silent another 10s,
+   nothing new prints — the count resets. Good enough; if we ever
+   see a real "child holds output for 30s then prompts" pattern,
+   raise the threshold or print a "still waiting…" line periodic.
+3. A user typing into the terminal *before* AOM detects the prompt
+   has their bytes sitting in the OS stdin buffer; `input()` reads
+   them immediately. Considered acceptable behaviour — the user's
+   intent is to respond either way.

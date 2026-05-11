@@ -168,6 +168,20 @@ class AOMApp(App[None]):
         except EOFError, KeyboardInterrupt:
             return ""
 
+    def handle_interactive_prompt(self, prompt_text: str) -> str:
+        """Renderer Protocol: pause the TUI and read a line (with echo).
+
+        Used for ``ansible.builtin.pause`` and plain ``vars_prompt``,
+        where the user expects to see what they type. ``self.suspend()``
+        hands the terminal back so a normal ``input()`` works without
+        Textual fighting for keystrokes.
+        """
+        try:
+            with self.suspend():
+                return input(prompt_text)
+        except EOFError, KeyboardInterrupt:
+            return ""
+
     def handle_completion(self, exit_code: int, state: str) -> None:
         """Renderer Protocol: stash final outcome; do not exit the app.
 

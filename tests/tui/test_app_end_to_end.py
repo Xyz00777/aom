@@ -102,6 +102,67 @@ class TestWarningsAndLogsRoutedToState:
         ]
 
 
+class TestAOMAppInteractivePromptDuringRun:
+    """The worker thread can invoke handle_interactive_prompt safely.
+
+    Pilot mounts the real app; we patch ``input`` so the test doesn't
+    actually wait on stdin. The point is to verify the worker can call
+    ``app.handle_interactive_prompt(...)`` and get back a value without
+    deadlocking the Textual event loop.
+    """
+
+    @pytest.mark.asyncio
+    async def test_handle_interactive_prompt_returns_answer_from_worker(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from threading import Event
+
+        prompt_done = Event()
+        captured_answer: list[str] = []
+
+        def fake_run_playbook(
+            playbook: str,
+            ansible_args: list[str],
+            renderer: object,
+            timeout: float = 0.5,
+            session_dir: Path | None = None,
+        ) -> int:
+            renderer.start(playbook, ansible_args)  # type: ignore[attr-defined]
+            answer = renderer.handle_interactive_prompt("Deploy? Press Enter: ")  # type: ignore[attr-defined]
+            captured_answer.append(answer)
+            prompt_done.set()
+            renderer.handle_completion(0, "completed")  # type: ignore[attr-defined]
+            return 0
+
+        monkeypatch.setattr("ansible_aom.tui.app.run_playbook", fake_run_playbook)
+        # Patch input() globally — the worker thread will call it.
+        monkeypatch.setattr("builtins.input", lambda *_: "yes")
+
+        app = AOMApp(playbook="site.yml", ansible_args=[], session_dir=tmp_path)
+
+        # `self.suspend()` blocks waiting for a terminal handoff that
+        # never happens inside `run_test()`. Replace it with an inert
+        # context manager so the prompt path can complete.
+        class _NoopSuspend:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return None
+
+        monkeypatch.setattr(app, "suspend", lambda: _NoopSuspend())
+
+        async with app.run_test() as pilot:
+            for _ in range(50):
+                if prompt_done.is_set():
+                    break
+                await pilot.pause(0.02)
+            assert prompt_done.is_set(), "interactive prompt never completed"
+
+        assert captured_answer == ["yes"]
+        assert app.exit_code == 0
+
+
 class TestWorkerKickoff:
     """on_mount must arrange for the runner to execute in a worker thread.
 

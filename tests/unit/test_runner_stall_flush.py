@@ -1,0 +1,173 @@
+"""Tests for the stall-flush safety net (IP2).
+
+When the child produces output without a trailing newline AND no
+known prompt marker matches, the runner doesn't know whether it's a
+real prompt or just a slow task. Blocking for stdin on a false
+positive would lock the run, so the safety net is **visibility-only**:
+after N consecutive TIMEOUTs with non-empty unread buffer, flush the
+held content as a log line so the user can see what's stuck. It
+never reads from stdin in this path.
+"""
+
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+from ansible_aom.runner import (
+    _STALL_FLUSH_TIMEOUTS,
+    _handle_timeout_branch,
+    _looks_like_interactive_prompt,
+)
+
+
+class _FakeChild:
+    """Minimal pexpect-like child for unit testing the TIMEOUT branch."""
+
+    def __init__(self, buffer_value: str = "") -> None:
+        self.buffer = buffer_value
+        self.sent_lines: list[str] = []
+
+    def sendline(self, line: str) -> None:  # pragma: no cover - not used here
+        self.sent_lines.append(line)
+
+
+class _FakeSink:
+    def __init__(self) -> None:
+        self.stderr_lines: list[str] = []
+
+    def record_event(self, event: dict) -> None: ...
+    def record_stderr(self, line: str) -> None:
+        self.stderr_lines.append(line)
+
+    def end(self, status: str) -> None: ...
+
+
+class TestLooksLikePrompt:
+    """The heuristic used to gate the blocking-input path."""
+
+    def test_empty_buffer_is_not_a_prompt(self) -> None:
+        assert _looks_like_interactive_prompt("") is False
+        assert _looks_like_interactive_prompt("   \n") is False
+
+    def test_known_marker_with_colon_is_prompt(self) -> None:
+        assert _looks_like_interactive_prompt("[pause]\nPress Enter: ") is True
+        assert _looks_like_interactive_prompt("Continue? (yes/no): ") is True
+
+    def test_question_mark_alone_is_a_prompt(self) -> None:
+        assert _looks_like_interactive_prompt("Which env? ") is True
+
+    def test_trailing_colon_without_marker_is_NOT_a_prompt(self) -> None:
+        """Pure ``something:`` is too risky — many debug tasks end in colon."""
+        assert _looks_like_interactive_prompt("error:") is False
+        assert _looks_like_interactive_prompt("Installing packages:") is False
+
+    def test_no_terminator_is_not_a_prompt(self) -> None:
+        """No colon, no question mark → don't treat as prompt."""
+        assert _looks_like_interactive_prompt("Press Enter to continue") is False
+
+    def test_vars_prompt_default_format_is_caught(self) -> None:
+        """ansible vars_prompt without custom text uses ``[name]: ``."""
+        assert _looks_like_interactive_prompt("[deploy_env]: ") is True
+        assert _looks_like_interactive_prompt("[name] (default): ") is True
+
+    def test_log_line_containing_bracketed_word_is_not_a_prompt(self) -> None:
+        """Defensive: don't false-positive on log lines mentioning [INFO]."""
+        # Bracketed word in the middle isn't a prompt.
+        assert _looks_like_interactive_prompt("[INFO] processing: 5 items") is False
+        # Bracketed word followed by colon BUT with other text after isn't a prompt.
+        assert _looks_like_interactive_prompt("[INFO]: starting up") is False
+
+
+class TestStallFlushDoesNotBlock:
+    """Stall safety net must never call handle_interactive_prompt."""
+
+    def test_below_threshold_does_nothing_to_buffer(self) -> None:
+        child = _FakeChild(buffer_value="Installing packages...")
+        renderer = MagicMock()
+        sink = _FakeSink()
+
+        new_count = _handle_timeout_branch(
+            child, renderer, sink, stall_count=_STALL_FLUSH_TIMEOUTS - 2
+        )
+
+        # One step closer to the flush, but no flush yet.
+        assert new_count == _STALL_FLUSH_TIMEOUTS - 1
+        assert child.buffer == "Installing packages..."
+        renderer.print_log.assert_not_called()
+        renderer.handle_interactive_prompt.assert_not_called()
+
+    def test_at_threshold_flushes_buffer_as_log(self) -> None:
+        held_content = "Long compile step\nstill working..."
+        child = _FakeChild(buffer_value=held_content)
+        renderer = MagicMock()
+        sink = _FakeSink()
+
+        new_count = _handle_timeout_branch(
+            child, renderer, sink, stall_count=_STALL_FLUSH_TIMEOUTS - 1
+        )
+
+        # Buffer drained, count reset, content surfaced to the renderer.
+        assert child.buffer == ""
+        assert new_count == 0
+        printed = [c.args[0] for c in renderer.print_log.call_args_list]
+        assert "Long compile step" in printed
+        assert "still working..." in printed
+        # And never blocks for input.
+        renderer.handle_interactive_prompt.assert_not_called()
+
+    def test_quiet_child_just_ticks(self) -> None:
+        """No buffered output → nothing to flush; just tick the clock."""
+        child = _FakeChild(buffer_value="")
+        renderer = MagicMock()
+        sink = _FakeSink()
+
+        new_count = _handle_timeout_branch(child, renderer, sink, stall_count=5)
+
+        # No buffer means no stall progress.
+        assert new_count == 5
+        renderer.tick.assert_called_once()
+        renderer.print_log.assert_not_called()
+        renderer.handle_interactive_prompt.assert_not_called()
+
+    def test_flush_records_to_session_sink(self) -> None:
+        child = _FakeChild(buffer_value="held line one\nheld line two")
+        renderer = MagicMock()
+        sink = _FakeSink()
+
+        _handle_timeout_branch(child, renderer, sink, stall_count=_STALL_FLUSH_TIMEOUTS - 1)
+
+        # Both held lines are mirrored to the session log so a later
+        # `aom inspect show` can replay what was stuck.
+        assert "held line one" in sink.stderr_lines
+        assert "held line two" in sink.stderr_lines
+
+
+class TestHighConfidencePromptPath:
+    """When the heuristic fires, the blocking-input path takes over."""
+
+    def test_known_prompt_drains_buffer_and_calls_handler(self) -> None:
+        child = _FakeChild(buffer_value="[pause]\nPress Enter: ")
+        renderer = MagicMock()
+        renderer.handle_interactive_prompt.return_value = "yes"
+        sink = _FakeSink()
+
+        new_count = _handle_timeout_branch(child, renderer, sink, stall_count=0)
+
+        assert new_count == 0
+        assert child.buffer == ""
+        renderer.handle_interactive_prompt.assert_called_once()
+        # Answer sent through sendline; sink records the interaction.
+        assert child.sent_lines == ["yes"]
+        assert any("[user-input] yes" in line for line in sink.stderr_lines)
+
+    def test_renderer_crash_sends_empty_line_to_avoid_hang(self) -> None:
+        """A crashing renderer must not leave the child blocked forever."""
+        child = _FakeChild(buffer_value="[pause]\nPress Enter: ")
+        renderer = MagicMock()
+        renderer.handle_interactive_prompt.side_effect = RuntimeError("boom")
+        sink = _FakeSink()
+
+        _handle_timeout_branch(child, renderer, sink, stall_count=0)
+
+        # Empty string forwarded so pause accepts "continue".
+        assert child.sent_lines == [""]

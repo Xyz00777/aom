@@ -457,6 +457,24 @@ class CompactRenderer:
         )
         self._display.update(status_bar)
 
+    def handle_interactive_prompt(self, prompt_text: str) -> str:
+        """Surface a pause / vars_prompt-style prompt and capture one line.
+
+        Mirrors ``handle_password_prompt`` but uses ``input()`` instead of
+        ``getpass.getpass`` because pause and vars_prompt are not secrets —
+        echo is expected. The Rich Live panel is stopped before the prompt
+        prints so the user can actually see the captured prompt text; the
+        panel restarts in a finally block so a crashing ``input()`` never
+        leaves the terminal headless.
+        """
+        self._display.stop()
+        try:
+            return input(prompt_text)
+        except EOFError, KeyboardInterrupt:
+            return ""
+        finally:
+            self._display.start()
+
     def handle_password_prompt(self, prompt_text: str) -> str:
         """Handle a password prompt.
 
@@ -651,6 +669,30 @@ class CompactRenderer:
         self._display.stop()
         self._state = None
 
+    def _maybe_emit_pause_seconds_hint(self, task: dict) -> None:
+        """Surface a one-line hint when a pause-with-seconds task starts.
+
+        ``ansible.builtin.pause`` with ``seconds:`` doesn't read stdin
+        and emits no further output during the wait — without this
+        hint, the task name appears and then the panel sits silent
+        until the sleep finishes. We can't know the elapsed without
+        wiring a per-task timer; just printing the requested duration
+        is enough signal.
+        """
+        action = (task.get("action") or "").lower()
+        # Accept "pause", "ansible.builtin.pause", and any FQCN variant.
+        if not action.endswith("pause"):
+            return
+        seconds = task.get("args", {}).get("seconds")
+        if seconds is None:
+            return
+        # Tolerate string serialisations — ansible sometimes wraps int args.
+        try:
+            seconds_num = int(float(str(seconds)))
+        except TypeError, ValueError:
+            return
+        self._display.print_log(f"[pause] sleeping {seconds_num}s…")
+
     def _emit_event_log(self, event: dict) -> None:
         """Print one nom-style log line for a JSONL event.
 
@@ -664,8 +706,10 @@ class CompactRenderer:
             play_name = event.get("play", {}).get("name", "") or "(unnamed)"
             self._display.print_log(f"\nPLAY [{play_name}] " + "*" * 50)
         elif name == "v2_playbook_on_task_start":
-            task_name = event.get("task", {}).get("name", "") or "(unnamed)"
+            task = event.get("task", {})
+            task_name = task.get("name", "") or "(unnamed)"
             self._display.print_log(f"\nTASK [{task_name}] " + "*" * 50)
+            self._maybe_emit_pause_seconds_hint(task)
         elif name == "v2_runner_on_ok":
             for host, result in event.get("hosts", {}).items():
                 verb = "changed" if result.get("changed") else "ok"
