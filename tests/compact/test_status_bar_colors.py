@@ -233,10 +233,14 @@ class TestPerEventLogColors:
         )
 
     def test_skipping_line_is_cyan(self):
+        """Skipped hosts are buffered (collapsed-on-flush). Force the
+        mixed-task flush path to verify the per-host line is still cyan."""
         from ansible_aom.compact.renderer import _CYAN
 
         r = self._renderer()
         r._emit_event_log({"_event": "v2_runner_on_skipped", "hosts": {"web1": {}}})
+        # Flush as individual lines (the mixed-task path).
+        r._flush_pending_skips(force_individual=True)
         logged = self._logged(r)
         assert any(_CYAN in line and "skipping: [web1]" in line for line in logged)
 

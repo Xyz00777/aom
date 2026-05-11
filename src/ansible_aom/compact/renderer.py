@@ -442,6 +442,13 @@ class CompactRenderer:
         # status bar's leftmost slot. Computed once in ``start()``
         # from the ansible_args; never changes during a run.
         self._mode_label: str = ""
+        # Skipped-task collapsing: hold ``skipping: [host]`` lines for
+        # the in-flight task and decide on flush whether to print them
+        # individually (mixed-result task) or compress into a single
+        # ``… N hosts skipped`` line (all-skipped task). Reset on each
+        # task_start; flushed by the next task_start or stats.
+        self._pending_skipped_hosts: list[str] = []
+        self._current_task_had_nonskipped_result: bool = False
 
     def start(self, playbook: str, args: list[str]) -> None:
         """Start rendering a playbook run.
@@ -923,6 +930,40 @@ class CompactRenderer:
             f"{prefix} {self._last_task_name} — {duration_str} {cum_str}"
         )
 
+    def _flush_pending_skips(self, *, force_individual: bool) -> None:
+        """Drain the per-task skipped-host buffer.
+
+        ``force_individual=True`` is the mixed-task case: a non-skipped
+        result arrived for the same task, so the user expects the
+        per-host detail. Print each skipped host as the original
+        ``skipping: [host]`` line (cyan, like ansible's default
+        callback).
+
+        ``force_individual=False`` is the all-skipped case: the task
+        finished without any other result type. Collapse into a
+        single ``… N host(s) skipped`` line. For ≤3 hosts the names
+        are inlined for context; beyond that just the count.
+        """
+        if not self._pending_skipped_hosts:
+            return
+        hosts = self._pending_skipped_hosts
+        self._pending_skipped_hosts = []
+        if force_individual:
+            for host in hosts:
+                self._display.print_log(_wrap(f"skipping: [{host}]", _CYAN, self._colorize))
+            return
+        count = len(hosts)
+        plural = "" if count == 1 else "s"
+        if count <= 3:
+            host_list = ", ".join(hosts)
+            line = f"… {count} host{plural} skipped: {host_list}"
+        else:
+            line = f"… {count} hosts skipped"
+        # Compressed line: cyan to match the per-host colour but
+        # leading with ``…`` so the user can tell at a glance it's an
+        # aggregate, not an individual host record.
+        self._display.print_log(_wrap(line, _CYAN, self._colorize))
+
     def _emit_event_log(self, event: dict) -> None:
         """Print one nom-style log line for a JSONL event.
 
@@ -955,6 +996,16 @@ class CompactRenderer:
             task = event.get("task", {})
             task_name = task.get("name", "") or "(unnamed)"
             task_uuid = task.get("id", "")
+            # First: dispose of any skipped-host buffer left over from
+            # the previous task. If that task only ever produced
+            # skipped results, collapse them; otherwise (the buffer
+            # would have been drained by an earlier non-skipped
+            # result), this is a no-op.
+            self._flush_pending_skips(
+                force_individual=self._current_task_had_nonskipped_result
+            )
+            # Reset per-task state for the task we're about to print.
+            self._current_task_had_nonskipped_result = False
             # Summary for the previous task lands BEFORE the new TASK
             # header — keeps it visually attached to its own output.
             if event_time is not None:
@@ -969,6 +1020,13 @@ class CompactRenderer:
                 self._last_task_name = task_name
                 self._last_task_start_time = event_time
         elif name == "v2_runner_on_ok":
+            # A non-skipped result arrived: any buffered skipping lines
+            # for this task should print individually (mixed-result
+            # task — user wants the detail). Mark the task as having
+            # produced a real result so the eventual flush at task
+            # transition stays in individual-line mode.
+            self._flush_pending_skips(force_individual=True)
+            self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
             for host, result in event.get("hosts", {}).items():
                 if result.get("changed"):
@@ -980,6 +1038,8 @@ class CompactRenderer:
                         _wrap(f"ok: [{host}]{suffix}", _GREEN, self._colorize)
                     )
         elif name == "v2_runner_on_failed":
+            self._flush_pending_skips(force_individual=True)
+            self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
             for host, result in event.get("hosts", {}).items():
                 msg = result.get("msg", "") or ""
@@ -991,6 +1051,8 @@ class CompactRenderer:
                     )
                 )
         elif name == "v2_runner_on_unreachable":
+            self._flush_pending_skips(force_individual=True)
+            self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
             for host, result in event.get("hosts", {}).items():
                 msg = result.get("msg", "") or ""
@@ -1002,9 +1064,18 @@ class CompactRenderer:
                     )
                 )
         elif name == "v2_runner_on_skipped":
-            for host in event.get("hosts", {}):
-                self._display.print_log(_wrap(f"skipping: [{host}]", _CYAN, self._colorize))
+            # Hold individual skipping lines until we know whether
+            # they're worth printing one-by-one (mixed-result task)
+            # or worth collapsing (all-skipped task). The flush
+            # happens at task transition or stats.
+            self._pending_skipped_hosts.extend(event.get("hosts", {}).keys())
         elif name == "v2_playbook_on_stats":
+            # Drain the final task's skipped buffer with the same
+            # mixed-vs-all-skipped rule we use at task transitions.
+            self._flush_pending_skips(
+                force_individual=self._current_task_had_nonskipped_result
+            )
+            self._current_task_had_nonskipped_result = False
             # Final task's summary line — same logic as the inter-task
             # case, just triggered by stats instead of the next task_start.
             if event_time is not None:
