@@ -133,6 +133,23 @@ def _parse_timestamp(event: dict[str, Any]) -> datetime:
         return datetime.now(timezone.utc)
 
 
+def _iter_leaf_task_defs(plays: list["PlayDefinition"]) -> "list[TaskDefinition]":
+    """Flatten preflight definitions into the leaf TaskDefinitions visible by name.
+
+    ``RoleGroupDefinition`` is unwrapped so its inner tasks are reachable; the
+    grafting logic needs to look up an event task name against every static
+    leaf, regardless of whether role grouping wrapped it for display.
+    """
+    leaves: list[TaskDefinition] = []
+    for play in plays:
+        for entry in play.tasks:
+            if isinstance(entry, RoleGroupDefinition):
+                leaves.extend(entry.tasks)
+            else:
+                leaves.append(entry)
+    return leaves
+
+
 @dataclass
 class RunState:
     """Complete execution state (State class)."""
@@ -144,6 +161,8 @@ class RunState:
     end_time: datetime | None = None
     status: Status = Status.PENDING
     _current_play_id: str | None = field(default=None, init=False, repr=False)
+    _last_matched_task_def: "TaskDefinition | None" = field(default=None, init=False, repr=False)
+    _grafted_uuids: set[str] = field(default_factory=set, init=False, repr=False)
 
     def handle_event(self, event: dict[str, Any]) -> None:
         """Process a JSONL event and update state."""
@@ -208,12 +227,55 @@ class RunState:
             return play_data.get("id", "")
         return self._current_play_id or ""
 
+    def _graft_or_match_task(self, task_id: str, task_name: str) -> None:
+        """Update the dynamic-expansion cursor for an arriving task.
+
+        Matches the task name against preflight TaskDefinitions. A hit
+        updates the parent cursor — the next unknown task gets grafted as
+        its child. A miss creates a dynamic TaskDefinition under the current
+        parent (the most recently matched preflight task) and marks the
+        UUID so re-arriving events don't duplicate the graft.
+
+        Called from both ``v2_playbook_on_task_start`` (linear strategy)
+        and ``v2_runner_on_start`` (free strategy) so dynamic include_tasks
+        children land regardless of strategy.
+        """
+        if not self.definitions or not task_name or task_id in self._grafted_uuids:
+            return
+
+        for leaf in _iter_leaf_task_defs(self.definitions):
+            if leaf.name == task_name:
+                self._last_matched_task_def = leaf
+                return
+
+        parent = self._last_matched_task_def
+        if parent is None:
+            # No preflight task has matched yet — leave the unknown task as
+            # an orphan rather than grafting it onto an arbitrary node.
+            return
+
+        parent.children.append(
+            TaskDefinition(
+                name=task_name,
+                role=parent.role,
+                tags=[],
+                play_id=parent.play_id,
+                play_order=parent.play_order,
+                task_order=-1,
+                is_dynamic=True,
+            )
+        )
+        if task_id:
+            self._grafted_uuids.add(task_id)
+
     def _handle_v2_playbook_on_task_start(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_playbook_on_task_start event."""
         task_data = event.get("task", {})
         play_id = self._resolve_play_id(event)
         task_id = task_data.get("id", "")
         task_name = task_data.get("name", "")
+
+        self._graft_or_match_task(task_id, task_name)
 
         if play_id not in self.plays:
             self.plays[play_id] = PlayRunState(
@@ -247,6 +309,8 @@ class RunState:
         task_id = task_data.get("id", "")
         task_name = task_data.get("name", "")
         play_id = self._resolve_play_id(event)
+
+        self._graft_or_match_task(task_id, task_name)
 
         if play_id not in self.plays:
             self.plays[play_id] = PlayRunState(
