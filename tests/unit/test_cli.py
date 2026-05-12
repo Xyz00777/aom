@@ -929,3 +929,74 @@ def test_aom_rerun_dispatches_to_rerun_main(monkeypatch):
     rc = cli_mod.main()
     assert rc == 42
     assert captured["argv"] == ["abc12345", "--failed", "--yes"]
+
+
+class TestFormatFlag:
+    """Tests for F6: --format {compact,json} flag."""
+
+    def test_format_flag_defaults_to_compact(self):
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["playbook.yml"])
+        assert args.format == "compact"
+
+    def test_format_flag_accepts_json(self):
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--format", "json", "playbook.yml"])
+        assert args.format == "json"
+
+    def test_format_flag_accepts_compact_explicit(self):
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--format", "compact", "playbook.yml"])
+        assert args.format == "compact"
+
+    def test_format_flag_rejects_unknown_value(self, capsys):
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--format", "yaml", "playbook.yml"])
+
+    def test_format_flag_does_not_appear_in_ansible_args(self):
+        """--format is consumed by argparse, not forwarded to ansible-playbook."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--format", "json", "playbook.yml", "-i", "inv.ini"])
+        assert args.format == "json"
+        assert args.ansible_args == ["-i", "inv.ini"]
+
+    def test_main_rejects_tui_plus_json_format(self, capsys):
+        """`aom --tui --format json playbook.yml` exits 2 with a usage error."""
+        from ansible_aom.cli import main
+
+        with patch("sys.argv", ["aom", "--tui", "--format", "json", "playbook.yml"]):
+            result = main()
+        assert result == 2
+        captured = capsys.readouterr()
+        assert "--tui" in captured.err and "--format json" in captured.err
+
+    def test_main_dispatches_json_renderer_when_format_json(self):
+        """`aom --format json playbook.yml` constructs a JsonRenderer."""
+        from ansible_aom.cli import main
+        from ansible_aom.json_renderer import JsonRenderer
+
+        captured_renderer: dict = {}
+
+        def fake_run_playbook(playbook, ansible_args, renderer, **kwargs):
+            captured_renderer["renderer"] = renderer
+            return 0
+
+        with (
+            patch("ansible_aom.runner.run_playbook", side_effect=fake_run_playbook),
+            patch("sys.argv", ["aom", "--format", "json", "playbook.yml"]),
+        ):
+            result = main()
+
+        assert result == 0
+        assert isinstance(captured_renderer["renderer"], JsonRenderer)

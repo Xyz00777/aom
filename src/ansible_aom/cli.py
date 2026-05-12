@@ -154,6 +154,18 @@ See README.md and SPECIFICATION.md in the source tree for full details.
     )
 
     parser.add_argument(
+        "--format",
+        choices=["compact", "json"],
+        default="compact",
+        help=(
+            "Output format. 'compact' (default) streams the nom-style live view. "
+            "'json' is silent during the run and emits a single JSON object on stdout "
+            "at completion — designed for CI and `jq` pipelines. "
+            "Mutually exclusive with --tui."
+        ),
+    )
+
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Print AOM pre-execution diagnostics and enable DEBUG logging",
@@ -185,17 +197,29 @@ See README.md and SPECIFICATION.md in the source tree for full details.
     return parser
 
 
-def _run_compact(playbook: str, ansible_args: list[str], record: bool = True) -> int:
-    """Spawn the legacy compact renderer via ``run_playbook``.
+def _run_compact(
+    playbook: str,
+    ansible_args: list[str],
+    record: bool = True,
+    format: str = "compact",
+) -> int:
+    """Spawn the streaming renderer (compact ANSI or end-of-run JSON) via ``run_playbook``.
 
-    The compact path stays synchronous: ``run_playbook`` owns the
-    pexpect loop, the renderer prints to stdout, no Textual involved.
+    Both compact and JSON renderers are synchronous — ``run_playbook``
+    owns the pexpect loop. The renderer chosen by the factory decides
+    whether anything streams to stdout during the run.
     """
-    from ansible_aom.renderer.factory import create_renderer
+    from typing import cast
+
+    from ansible_aom.renderer.factory import RenderFormat, create_renderer
     from ansible_aom.runner import run_playbook
 
     try:
-        renderer = create_renderer(tui_mode=False, is_tty=sys.stdout.isatty())
+        renderer = create_renderer(
+            tui_mode=False,
+            is_tty=sys.stdout.isatty(),
+            format=cast(RenderFormat, format),
+        )
         return run_playbook(playbook, ansible_args, renderer, record=record)
     except KeyboardInterrupt:
         print("Cancelled by user", file=sys.stderr)
@@ -286,6 +310,14 @@ def main() -> int:
         aom_logger.debug("--list-tasks summary: verbose mode enabled, diagnostics printed")
 
     if args.playbook:
+        if args.tui and args.format == "json":
+            print(
+                "aom: --tui and --format json are mutually exclusive. "
+                "Use --format json without --tui for end-of-run JSON output.",
+                file=sys.stderr,
+            )
+            return 2
+
         if detect_duplicate_playbook(args.playbook, args.ansible_args):
             print(
                 f"aom: '{args.playbook}' appears twice on the command line — "
@@ -299,7 +331,7 @@ def main() -> int:
         record = not args.no_record
         if args.tui:
             return _run_tui(args.playbook, ansible_args, record=record)
-        return _run_compact(args.playbook, ansible_args, record=record)
+        return _run_compact(args.playbook, ansible_args, record=record, format=args.format)
 
     parser.print_help()
     return 0
