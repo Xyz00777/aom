@@ -401,9 +401,7 @@ class TestCreateParser:
         assert ns.state_dir == tmp_path
 
     def test_combined(self):
-        ns = _create_parser().parse_args(
-            ["abc12345", "--failed", "--unreachable", "--yes"]
-        )
+        ns = _create_parser().parse_args(["abc12345", "--failed", "--unreachable", "--yes"])
         assert ns.session_id == "abc12345"
         assert ns.failed is True
         assert ns.unreachable is True
@@ -433,9 +431,7 @@ def _write_session_with_failure(state_dir: Path, session_id: str) -> None:
             "hosts": {"web2": {"failed": True, "msg": "boom"}},
         }
     ]
-    (session_path / "events.jsonl").write_text(
-        "\n".join(json.dumps(e) for e in events) + "\n"
-    )
+    (session_path / "events.jsonl").write_text("\n".join(json.dumps(e) for e in events) + "\n")
     (session_path / "stderr.log").write_text("")
 
 
@@ -548,9 +544,7 @@ class TestMain:
                 "hosts": {"web2": {"failed": True}},
             }
         ]
-        (session_path / "events.jsonl").write_text(
-            "\n".join(json.dumps(e) for e in events) + "\n"
-        )
+        (session_path / "events.jsonl").write_text("\n".join(json.dumps(e) for e in events) + "\n")
         (session_path / "stderr.log").write_text("")
 
         rc = rerun_main(

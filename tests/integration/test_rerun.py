@@ -42,9 +42,7 @@ def test_aom_rerun_failed_spawns_with_correct_limit(tmp_path: Path) -> None:
             "hosts": {"web3": {"failed": True, "msg": "boom"}},
         },
     ]
-    (session_path / "events.jsonl").write_text(
-        "\n".join(json.dumps(e) for e in events) + "\n"
-    )
+    (session_path / "events.jsonl").write_text("\n".join(json.dumps(e) for e in events) + "\n")
     (session_path / "stderr.log").write_text("")
 
     # Fake ansible-playbook: a Python one-liner that records its argv to

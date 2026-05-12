@@ -50,7 +50,7 @@ def _resolve_session_id(state_dir: Path, session_id_or_short: str | None) -> str
 
     if session_id_or_short is None:
         # list_sessions returns newest-first.
-        return sessions[0]["session_id"]
+        return str(sessions[0]["session_id"])
 
     # Exact full-id match wins.
     for s in sessions:
@@ -64,7 +64,7 @@ def _resolve_session_id(state_dir: Path, session_id_or_short: str | None) -> str
     if len(matches) > 1:
         ids = ", ".join(s["session_id"] for s in matches)
         raise LookupError(f"Prefix {session_id_or_short!r} is ambiguous: matches {ids}")
-    return matches[0]["session_id"]
+    return str(matches[0]["session_id"])
 
 
 def _compose_host_set(
@@ -267,8 +267,7 @@ def _create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="aom rerun",
         description=(
-            "Re-invoke ansible-playbook on hosts that need attention from "
-            "a recorded session."
+            "Re-invoke ansible-playbook on hosts that need attention from a recorded session."
         ),
     )
     parser.add_argument(
