@@ -102,9 +102,10 @@ wheels = [
 
 [[package]]
 name = "ansible-aom"
-version = "0.44.0"
+version = "0.45.0"
 source = { editable = "." }
 dependencies = [
+    { name = "argcomplete" },
     { name = "blessed" },
     { name = "pexpect" },
     { name = "platformdirs" },
@@ -142,6 +143,7 @@ lint = [
 requires-dist = [
     { name = "ansible-core", marker = "extra == 'integration'", specifier = ">=2.16" },
     { name = "ansible-lint", marker = "extra == 'lint'", specifier = ">=24.0" },
+    { name = "argcomplete", specifier = ">=3.5" },
     { name = "blessed", specifier = ">=1.20" },
     { name = "inline-snapshot", marker = "extra == 'dev'", specifier = ">=0.10" },
     { name = "molecule", marker = "extra == 'lint'", specifier = ">=24.0" },
@@ -232,6 +234,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b6/e2/1c866404ddbd280efedff4a9f15abfe943cb83cde6e895022370f3a61f85/ansicon-1.89.0.tar.gz", hash = "sha256:e4d039def5768a47e4afec8e89e83ec3ae5a26bf00ad851f914d1240b444d2b1", size = 67312, upload-time = "2019-04-29T20:23:57.314Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/75/f9/f1c10e223c7b56a38109a3f2eb4e7fe9a757ea3ed3a166754fb30f65e466/ansicon-1.89.0-py2.py3-none-any.whl", hash = "sha256:f1def52d17f65c2c9682cf8370c03f541f410c1752d6a14029f97318e4b9dfec", size = 63675, upload-time = "2019-04-29T20:23:53.83Z" },
+]
+
+[[package]]
+name = "argcomplete"
+version = "3.6.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/38/61/0b9ae6399dd4a58d8c1b1dc5a27d6f2808023d0b5dd3104bb99f45a33ff6/argcomplete-3.6.3.tar.gz", hash = "sha256:62e8ed4fd6a45864acc8235409461b72c9a28ee785a2011cc5eb78318786c89c", size = 73754, upload-time = "2025-10-20T03:33:34.741Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/74/f5/9373290775639cb67a2fce7f629a1c240dce9f12fe927bc32b2736e16dfc/argcomplete-3.6.3-py3-none-any.whl", hash = "sha256:f5007b3a600ccac5d25bbce33089211dfd49eab4a7718da3f10e3082525a92ce", size = 43846, upload-time = "2025-10-20T03:33:33.021Z" },
 ]
 
 [[package]]

@@ -17,6 +17,9 @@ import time
 # Terminal size constants (SPECIFICATION.md Section 4.4)
 MINIMUM_LINES = 24
 MINIMUM_COLUMNS = 80
+# (cols, rows) threshold for the live panel. Below this we degrade to
+# a plain log-only stream — see R4 in .sisyphus/notepads/plans/robustness.md.
+MINIMUM_SIZE = (MINIMUM_COLUMNS, MINIMUM_LINES)
 
 # Maximum status redraws per second. Bursts of state events get coalesced
 # into the most-recent content; the next eligible update flushes whatever
@@ -119,8 +122,15 @@ class Display:
         # without waiting for the throttle window.
         self._last_update_time = 0.0
 
-    def start(self) -> None:
-        """Begin owning the bottom of the terminal."""
+    def start(self, force_size: tuple[int, int] | None = None) -> None:
+        """Begin owning the bottom of the terminal.
+
+        Args:
+            force_size: ``(cols, rows)`` override for ``shutil.get_terminal_size``.
+                Used by tests to drive the degraded-mode logic deterministically.
+                When None, the actual terminal size is queried. Wiring-only in
+                Task 1; consumed by the size check added in Task 2.
+        """
         if not self._is_tty:
             return
         sys.stdout.write(_HIDE_CURSOR)
