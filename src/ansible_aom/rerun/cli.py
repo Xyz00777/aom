@@ -12,6 +12,7 @@ and ``core/`` keeps its no-renderer rule.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Callable
 
@@ -217,3 +218,41 @@ def _confirm(
     if answer == "":
         return True
     return answer in ("y", "yes")
+
+
+def _require_ansible_args(session: dict, session_id: str) -> list[str]:
+    """Return the recorded ``ansible_args`` or refuse with a clear error.
+
+    Sessions recorded by AOM ≥ schema 1.1 always have ``ansible_args``
+    in ``meta.json`` (an empty list when no flags were passed). Older
+    sessions don't have the field at all; rather than guess what flags
+    the user originally ran, we refuse and explain.
+
+    The schema bump is documented in the project changelog and in the
+    docstring on ``SessionManager.start_session``.
+
+    Args:
+        session: Loaded session dict.
+        session_id: Used in the error message so the user knows which
+            session triggered the refusal.
+
+    Returns:
+        The recorded ``ansible_args`` list (possibly empty).
+
+    Raises:
+        SystemExit(2): If the field is missing or null.
+    """
+    args = session.get("ansible_args")
+    if args is None:
+        print(
+            f"aom rerun: session {session_id} is missing 'ansible_args' "
+            "in meta.json. This field was added in AOM session schema "
+            "1.1 — older sessions cannot be re-run automatically because "
+            "AOM doesn't know which flags (e.g. -i, --tags, --extra-vars) "
+            "were originally passed. Re-record the session with the "
+            "current AOM, or invoke ansible-playbook manually with "
+            "--limit.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    return list(args)

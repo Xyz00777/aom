@@ -320,3 +320,41 @@ class TestConfirm:
         text = out.getvalue().lower()
         # Must mention non-idempotent risk explicitly so the user sees it.
         assert "non-idempotent" in text
+
+
+from ansible_aom.rerun.cli import _require_ansible_args  # noqa: E402
+
+
+class TestRequireAnsibleArgs:
+    def test_session_with_args_returns_them(self):
+        session = {"playbook": "site.yml", "ansible_args": ["-i", "inv.ini"]}
+        assert _require_ansible_args(session, "01971111") == ["-i", "inv.ini"]
+
+    def test_session_with_empty_args_returns_empty_list(self):
+        """An explicit [] is valid — the user originally ran `aom site.yml`."""
+        session = {"playbook": "site.yml", "ansible_args": []}
+        assert _require_ansible_args(session, "01971111") == []
+
+    def test_missing_field_raises_with_clear_error(self):
+        session = {"playbook": "site.yml"}  # no ansible_args key at all
+        with pytest.raises(SystemExit) as excinfo:
+            _require_ansible_args(session, "01971111-old-session")
+        # SystemExit with non-zero exit code.
+        assert excinfo.value.code == 2
+
+    def test_missing_field_error_message_explains_schema(self, capsys):
+        session = {"playbook": "site.yml"}
+        with pytest.raises(SystemExit):
+            _require_ansible_args(session, "01971111-old-session")
+        err = capsys.readouterr().err
+        assert "01971111-old-session" in err
+        # Mentions the schema bump so the user understands.
+        assert "schema" in err.lower() or "older" in err.lower() or "missing" in err.lower()
+        # Mentions ansible_args so the user can grep their meta.json.
+        assert "ansible_args" in err
+
+    def test_none_value_treated_as_missing(self):
+        """A null value (rare, but possible if hand-edited) is also missing."""
+        session = {"playbook": "site.yml", "ansible_args": None}
+        with pytest.raises(SystemExit):
+            _require_ansible_args(session, "01971111")
