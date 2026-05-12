@@ -74,6 +74,17 @@ class AOMApp(App[None]):
         self._warnings_count: int = 0
         self._deprecations_count: int = 0
         self._log_lines: list[str] = []
+        # F1: worker→UI signalling. _dirty is incremented by every
+        # renderer callback that mutates state; the periodic tick in
+        # on_mount() refreshes widgets only when the value advances.
+        # CPython int writes are not strictly atomic but the GIL
+        # serialises bytecode and we only ever compare current vs last
+        # seen — a lost increment defers, never corrupts.
+        self._dirty: int = 0
+        # Lines buffered by print_log() from the worker thread; the
+        # UI tick drains these into LogPanel on the main thread (Rich
+        # widgets are not thread-safe).
+        self._pending_log_lines: list[str] = []
 
     # ----- Public read-only surface for tests + widgets -----
 
@@ -127,6 +138,7 @@ class AOMApp(App[None]):
     def set_definitions(self, definitions: list) -> None:
         """Renderer Protocol: store preflight definitions on the RunState."""
         self._run_state.definitions = list(definitions)
+        self._dirty += 1
 
     def add_warning(self, message: str, is_deprecation: bool = False) -> None:
         """Renderer Protocol: bump counters; widgets can read them."""
@@ -134,10 +146,17 @@ class AOMApp(App[None]):
             self._deprecations_count += 1
         else:
             self._warnings_count += 1
+        self._dirty += 1
 
     def print_log(self, message: str) -> None:
-        """Renderer Protocol: append a line to the log buffer."""
+        """Renderer Protocol: append a line to the log buffer.
+
+        The line is also queued in ``_pending_log_lines`` so the periodic
+        UI tick can write it into ``LogPanel`` on the main thread.
+        """
         self._log_lines.append(message)
+        self._pending_log_lines.append(message)
+        self._dirty += 1
 
     def tick(self) -> None:
         """Renderer Protocol: no-op. Textual has its own clock."""
@@ -157,6 +176,7 @@ class AOMApp(App[None]):
             self._state = "RUNNING"
         elif event_type == "v2_playbook_on_stats":
             self._state = "COMPLETED"
+        self._dirty += 1
 
     def handle_password_prompt(self, prompt_text: str) -> str:
         """Renderer Protocol: pause the TUI, read a password, resume."""
