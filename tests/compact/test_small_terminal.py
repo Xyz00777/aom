@@ -239,9 +239,7 @@ class TestReEnableOnResize:
             display.update("status", force_size=(40, 8))
 
         out = buf.getvalue()
-        assert out.count("terminal too small") <= 1, (
-            f"warning re-printed on re-degrade:\n{out!r}"
-        )
+        assert out.count("terminal too small") <= 1, f"warning re-printed on re-degrade:\n{out!r}"
 
     def test_update_drops_into_degraded_mode_when_terminal_shrinks(self) -> None:
         display = Display(is_tty=True)
@@ -260,9 +258,7 @@ class TestReEnableOnResize:
         # because the terminal was big enough then).
         assert "terminal too small" in buf.getvalue()
 
-    def test_update_without_force_size_falls_back_to_real_terminal(
-        self, monkeypatch
-    ) -> None:
+    def test_update_without_force_size_falls_back_to_real_terminal(self, monkeypatch) -> None:
         """force_size is the test seam; production calls don't pass it.
         Verify the real shutil path is used when force_size is None."""
         from ansible_aom.compact import display as display_module
@@ -278,7 +274,9 @@ class TestReEnableOnResize:
         monkeypatch.setattr(
             display_module.shutil,
             "get_terminal_size",
-            lambda *a, **kw: type("S", (), {"columns": 120, "lines": 40, "__iter__": lambda self: iter((120, 40))})(),
+            lambda *a, **kw: type(
+                "S", (), {"columns": 120, "lines": 40, "__iter__": lambda self: iter((120, 40))}
+            )(),
         )
 
         buf = io.StringIO()
