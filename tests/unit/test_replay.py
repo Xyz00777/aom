@@ -193,3 +193,69 @@ class TestReplayNegativeDelta:
         # And the renderer must still see all three in file order.
         seen = [c.args[0]["_event"] for c in renderer.update_state.call_args_list]
         assert seen == ["a", "b", "c"]
+
+
+class TestReplayCompletionFromMeta:
+    """`handle_completion` is called with the meta.json status."""
+
+    def test_status_completed(self, tmp_path: Path) -> None:
+        from ansible_aom.replay import replay_session
+
+        _make_session(
+            tmp_path,
+            "ok",
+            [{"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-08T10:00:00Z"}],
+            meta={"status": "completed"},
+        )
+
+        renderer = MagicMock()
+        replay_session(tmp_path, "ok", renderer, speed=0)
+
+        renderer.handle_completion.assert_called_once_with(0, "completed")
+
+    def test_status_failed(self, tmp_path: Path) -> None:
+        from ansible_aom.replay import replay_session
+
+        _make_session(
+            tmp_path,
+            "bad",
+            [{"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-08T10:00:00Z"}],
+            meta={"status": "failed"},
+        )
+
+        renderer = MagicMock()
+        replay_session(tmp_path, "bad", renderer, speed=0)
+
+        renderer.handle_completion.assert_called_once_with(0, "failed")
+
+    def test_status_crashed(self, tmp_path: Path) -> None:
+        from ansible_aom.replay import replay_session
+
+        _make_session(
+            tmp_path,
+            "boom",
+            [{"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-08T10:00:00Z"}],
+            meta={"status": "crashed"},
+        )
+
+        renderer = MagicMock()
+        replay_session(tmp_path, "boom", renderer, speed=0)
+
+        renderer.handle_completion.assert_called_once_with(0, "crashed")
+
+    def test_missing_status_defaults_to_completed(self, tmp_path: Path) -> None:
+        from ansible_aom.replay import replay_session
+
+        # Create a session whose meta.json has no status field at all.
+        session_path = tmp_path / "noStatus"
+        session_path.mkdir()
+        (session_path / "events.jsonl").write_text(
+            '{"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-08T10:00:00Z"}\n'
+        )
+        (session_path / "meta.json").write_text('{"playbook": "x.yml"}')
+        (session_path / "stderr.log").touch()
+
+        renderer = MagicMock()
+        replay_session(tmp_path, "noStatus", renderer, speed=0)
+
+        renderer.handle_completion.assert_called_once_with(0, "completed")
