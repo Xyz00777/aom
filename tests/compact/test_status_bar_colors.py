@@ -23,12 +23,12 @@ import io
 from contextlib import redirect_stdout
 
 from ansible_aom.compact.renderer import (
-    CompactRenderer,
     _GREEN,
     _MAGENTA,
     _RED,
     _RESET,
     _YELLOW,
+    CompactRenderer,
     _color_enabled,
     format_failure_recap,
     format_host_summary,

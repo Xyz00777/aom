@@ -156,9 +156,7 @@ class TestSessionRecordingDisableOnDiskError:
     further recording without flooding logs and surfaces a one-time
     warning so the user sees what happened — without losing the run."""
 
-    def test_oserror_during_record_event_disables_sink_and_warns_once(
-        self, tmp_path: Path
-    ) -> None:
+    def test_oserror_during_record_event_disables_sink_and_warns_once(self, tmp_path: Path) -> None:
         from ansible_aom.runner import run_playbook
 
         renderer = MagicMock()
