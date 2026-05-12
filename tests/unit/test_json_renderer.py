@@ -236,9 +236,7 @@ def test_handle_completion_unreachable_lands_in_tasks_failed(capsys):
     state = RunState(playbook="site.yml")
     play = PlayRunState(play_id="1", name="p", status=Status.RUNNING)
     t1 = TaskRunState(task_id="t1", name="ping")
-    t1.hosts["db1"] = HostRunState(
-        hostname="db1", status=Status.UNREACHABLE, message="ssh timeout"
-    )
+    t1.hosts["db1"] = HostRunState(hostname="db1", status=Status.UNREACHABLE, message="ssh timeout")
     play.tasks["t1"] = t1
     state.plays["1"] = play
     state.start_time = datetime(2026, 5, 12, 10, 30, 0, tzinfo=timezone.utc)
