@@ -417,3 +417,69 @@ class TestCallFromThreadRouting:
             # without the test having touched the app from the main
             # thread.
             assert app._dirty >= 2
+
+
+class TestCompletionTitleUpdate:
+    """handle_completion does one final refresh and updates the title."""
+
+    @pytest.mark.asyncio
+    async def test_completion_zero_marks_title_with_check(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        done = Event()
+
+        def fake_run_playbook(
+            playbook: str,
+            ansible_args: list[str],
+            renderer: object,
+            timeout: float = 0.5,
+            session_dir: Path | None = None,
+        ) -> int:
+            renderer.start(playbook, ansible_args)
+            renderer.handle_completion(0, "completed")
+            done.set()
+            return 0
+
+        monkeypatch.setattr("ansible_aom.tui.app.run_playbook", fake_run_playbook)
+
+        app = AOMApp(playbook="site.yml", ansible_args=[], session_dir=tmp_path)
+
+        async with app.run_test() as pilot:
+            for _ in range(50):
+                if done.is_set():
+                    break
+                await pilot.pause(0.02)
+            await pilot.pause(0.4)
+
+            assert "✓" in app.title
+
+    @pytest.mark.asyncio
+    async def test_completion_nonzero_marks_title_with_cross(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        done = Event()
+
+        def fake_run_playbook(
+            playbook: str,
+            ansible_args: list[str],
+            renderer: object,
+            timeout: float = 0.5,
+            session_dir: Path | None = None,
+        ) -> int:
+            renderer.start(playbook, ansible_args)
+            renderer.handle_completion(2, "failed")
+            done.set()
+            return 2
+
+        monkeypatch.setattr("ansible_aom.tui.app.run_playbook", fake_run_playbook)
+
+        app = AOMApp(playbook="site.yml", ansible_args=[], session_dir=tmp_path)
+
+        async with app.run_test() as pilot:
+            for _ in range(50):
+                if done.is_set():
+                    break
+                await pilot.pause(0.02)
+            await pilot.pause(0.4)
+
+            assert "✖" in app.title

@@ -249,15 +249,38 @@ class AOMApp(App[None]):
         ``stop()`` is intentionally a no-op for the same reason — the
         runner thread completes, but Textual's loop keeps spinning
         until the user presses ``q``.
+
+        Marshals through the event loop so the title update and final
+        refresh happen on the main thread (the runner worker calls
+        this from a non-UI thread).
         """
-        self._exit_code = exit_code
-        self._final_state = state
-        if exit_code == 0:
-            self._state = "COMPLETED"
-        elif exit_code == 1:
-            self._state = "FAILED"
-        else:
-            self._state = "CRASHED"
+
+        def _finish() -> None:
+            self._exit_code = exit_code
+            self._final_state = state
+            if exit_code == 0:
+                self._state = "COMPLETED"
+                marker = "✓"
+            elif exit_code == 1:
+                self._state = "FAILED"
+                marker = "✖"
+            else:
+                self._state = "CRASHED"
+                marker = "✖"
+
+            base = self._playbook or self.title
+            # Strip a stale marker if handle_completion is called twice.
+            for sym in ("✓", "✖"):
+                if base.endswith(f" {sym}"):
+                    base = base[:-2]
+            self.title = f"{base} {marker}"
+
+            # Force one final refresh independent of the tick cadence
+            # so the user sees the terminal state immediately.
+            self._dirty += 1
+            self._refresh_widgets()
+
+        self._safe_call_from_thread(_finish)
 
     def stop(self) -> None:
         """Renderer Protocol: leave the TUI up so the user can see results.
