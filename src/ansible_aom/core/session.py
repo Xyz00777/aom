@@ -100,7 +100,7 @@ class SessionManager:
     def session_dir(self) -> Path | None:
         return self._session_dir
 
-    def start_session(self, playbook: str) -> str:
+    def start_session(self, playbook: str, ansible_args: list[str] | None = None) -> str:
         """Create a new session and return the session ID (UUIDv7).
 
         Creates the session directory structure with events.jsonl, stderr.log,
@@ -108,6 +108,11 @@ class SessionManager:
 
         Args:
             playbook: Path to the playbook being executed
+            ansible_args: The argv tail passed to ansible-playbook (e.g.
+                ``["-i", "inv.ini", "--tags", "web"]``). Persisted to
+                ``meta.json`` so ``aom rerun`` can replay the original
+                invocation. Defaults to ``[]`` for callers that don't yet
+                track the args.
 
         Returns:
             The session ID (UUIDv7 format)
@@ -116,6 +121,9 @@ class SessionManager:
         self._session_id = session_id
         self._playbook = playbook
         self._start_time = datetime.now(timezone.utc)
+
+        if ansible_args is None:
+            ansible_args = []
 
         assert self._session_dir is not None, "Session directory must be set"
         session_path = self._session_dir / session_id
@@ -134,8 +142,9 @@ class SessionManager:
 
         meta = {
             "playbook": playbook,
+            "ansible_args": list(ansible_args),
             "start_time": self._start_time.isoformat().replace("+00:00", "Z"),
-            "version": "1.0",
+            "version": "1.1",
             "session_id": session_id,
         }
         with open(self._meta_file, "w") as f:
@@ -149,6 +158,7 @@ class SessionManager:
             "meta_file": self._meta_file,
             "start_time": self._start_time,
             "playbook": playbook,
+            "ansible_args": list(ansible_args),
         }
 
         return session_id

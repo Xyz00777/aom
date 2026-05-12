@@ -145,6 +145,35 @@ class TestStartSession:
         start_time = datetime.fromisoformat(meta["start_time"].replace("Z", "+00:00"))
         assert before <= start_time <= after
 
+    def test_start_session_persists_ansible_args(self, tmp_path: Path):
+        """meta.json includes the ansible_args list so aom rerun can replay flags."""
+        session_dir = tmp_path / "sessions"
+        manager = SessionManager(session_dir=session_dir, playbook="deploy.yml")
+
+        session_id = manager.start_session(
+            "deploy.yml",
+            ansible_args=["-i", "inv.ini", "--tags", "web"],
+        )
+
+        meta_file = session_dir / session_id / "meta.json"
+        with open(meta_file) as f:
+            meta = json.load(f)
+
+        assert meta["ansible_args"] == ["-i", "inv.ini", "--tags", "web"]
+
+    def test_start_session_default_ansible_args_is_empty_list(self, tmp_path: Path):
+        """Old call sites that don't pass ansible_args get [] in meta.json."""
+        session_dir = tmp_path / "sessions"
+        manager = SessionManager(session_dir=session_dir, playbook="deploy.yml")
+
+        session_id = manager.start_session("deploy.yml")
+
+        meta_file = session_dir / session_id / "meta.json"
+        with open(meta_file) as f:
+            meta = json.load(f)
+
+        assert meta["ansible_args"] == []
+
 
 class TestRecordEvent:
     """TC-219: Session events.jsonl content."""
