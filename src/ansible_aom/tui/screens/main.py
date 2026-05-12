@@ -71,9 +71,19 @@ class MainScreen(Screen):
         yield StatusBar()
 
     def update_from_state(self, run_state: RunState) -> None:
-        """Update all widgets from RunState."""
-        summary = self.query_one(SummaryPanel)
-        status = self.query_one(StatusBar)
+        """Update all widgets from RunState.
+
+        Idempotent: safe to call on every UI tick. Tree skeleton is
+        built once (when definitions first appear); subsequent calls
+        only mutate icons/colors in place.
+        """
+        try:
+            summary = self.query_one(SummaryPanel)
+            status = self.query_one(StatusBar)
+            tree = self.query_one(TaskTree)
+        except Exception:
+            # Screen not fully mounted yet; the next tick will retry.
+            return
 
         current_play_name = ""
         hosts_total = 0
@@ -109,6 +119,19 @@ class MainScreen(Screen):
 
         if run_state.start_time:
             self._update_elapsed_from_start(run_state.start_time)
+
+        # Tree handling: build the skeleton from definitions the first
+        # time they're available, then apply state icons on every call.
+        if run_state.definitions and not list(tree.root.children):
+            tree.populate_from_definitions(run_state.definitions)
+        if run_state.plays:
+            tree.apply_state_icons(run_state)
+
+        # Force a refresh — Textual reactives only fire on assignment,
+        # but we mutated node labels imperatively above.
+        summary.refresh()
+        status.refresh()
+        tree.refresh()
 
     def _update_elapsed_from_start(self, start_time: datetime) -> None:
         """Update elapsed time on both panels from start time."""

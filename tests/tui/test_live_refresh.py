@@ -226,3 +226,45 @@ class TestApplyStateIcons:
         labels = {n.data: n.label.plain for n in host_nodes}
         assert STATUS_ICONS[Status.OK] in labels["host:web1"]
         assert STATUS_ICONS[Status.FAILED] in labels["host:web2"]
+
+
+class TestMainScreenTreeIntegration:
+    """update_from_state plumbs RunState through to TaskTree."""
+
+    @pytest.mark.asyncio
+    async def test_update_from_state_populates_tree_from_definitions(self) -> None:
+        from ansible_aom.core.models import PlayDefinition, TaskDefinition
+        from ansible_aom.tui.app import AOMApp
+        from ansible_aom.tui.screens.main import MainScreen
+        from ansible_aom.tui.widgets.task_tree import TaskTree
+
+        app = AOMApp()
+
+        async with app.run_test() as pilot:
+            await pilot.pause(0.05)
+            screen = app.screen
+            assert isinstance(screen, MainScreen)
+
+            app.run_state.definitions = [
+                PlayDefinition(
+                    id="p1",
+                    name="Setup",
+                    hosts="all",
+                    resolved_hosts=["web1"],
+                    tasks=[
+                        TaskDefinition(
+                            name="Install nginx",
+                            role=None,
+                            tags=[],
+                            play_id="p1",
+                            play_order=0,
+                            task_order=0,
+                        ),
+                    ],
+                )
+            ]
+            screen.update_from_state(app.run_state)
+            await pilot.pause(0.05)
+
+            tree = screen.query_one(TaskTree)
+            assert len(list(tree.root.children)) == 1
