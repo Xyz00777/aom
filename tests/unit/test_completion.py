@@ -169,3 +169,45 @@ class TestRerunCLICompleterWiring:
         parser = _create_parser()
         action = next(a for a in parser._actions if a.dest == "session_id")
         assert getattr(action, "completer", None) is session_id_completer
+
+
+class TestArgcompleteEnvHandoff:
+    """Smoke test: setting _ARGCOMPLETE causes the parser to short-circuit.
+
+    argcomplete signals "completion done, exit now" by raising SystemExit.
+    We don't care about the completion text — only that the hook engages
+    when the env var is present, confirming the wiring really is live.
+    """
+
+    def test_top_level_parser_short_circuits_on_argcomplete_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        import io
+
+        from ansible_aom.cli import create_parser
+
+        monkeypatch.setenv("_ARGCOMPLETE", "1")
+        # argcomplete reads _ARGCOMPLETE_IFS, COMP_LINE, COMP_POINT etc.;
+        # supply minimal values so it can produce *something* without
+        # crashing on a missing var.
+        monkeypatch.setenv("COMP_LINE", "aom ")
+        monkeypatch.setenv("COMP_POINT", "4")
+        monkeypatch.setenv("_ARGCOMPLETE_IFS", "\n")
+        import argcomplete
+
+        original = argcomplete.autocomplete
+
+        def patched(parser, **kwargs):
+            # Redirect output to an in-memory buffer to avoid argcomplete's
+            # default fd-8 write. Use sys.exit (SystemExit) instead of os._exit
+            # so the test can intercept the exit cleanly.
+            kwargs.setdefault("exit_method", sys.exit)
+            kwargs.setdefault("output_stream", io.StringIO())
+            return original(parser, **kwargs)
+
+        import sys
+
+        monkeypatch.setattr("ansible_aom.cli.argcomplete.autocomplete", patched)
+
+        with pytest.raises(SystemExit):
+            create_parser()
