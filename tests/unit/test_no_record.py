@@ -1,0 +1,57 @@
+"""Unit tests for F3 --no-record plumbing."""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+
+def _fake_ansible_command(events: list[dict], exit_code: int = 0) -> tuple[str, list[str]]:
+    payload = json.dumps(events)
+    code = (
+        "import json, sys; "
+        f"events = json.loads({payload!r}); "
+        "[sys.stdout.write(json.dumps(e) + '\\n') for e in events]; "
+        "sys.stdout.flush(); "
+        f"sys.exit({exit_code})"
+    )
+    return sys.executable, ["-c", code]
+
+
+class TestRunPlaybookRecordParameter:
+    """run_playbook accepts a record=bool kwarg; default is True."""
+
+    def test_record_false_skips_session_directory(self, tmp_path: Path) -> None:
+        from ansible_aom.runner import run_playbook
+
+        renderer = MagicMock()
+        cmd, args = _fake_ansible_command(
+            [{"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-08T10:00:01Z"}],
+            exit_code=0,
+        )
+
+        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+            exit_code = run_playbook(
+                "playbook.yml", [], renderer, session_dir=tmp_path, record=False
+            )
+
+        assert exit_code == 0
+        # No session directory should have been created.
+        assert list(tmp_path.iterdir()) == []
+
+    def test_record_true_default_still_writes(self, tmp_path: Path) -> None:
+        from ansible_aom.runner import run_playbook
+
+        renderer = MagicMock()
+        cmd, args = _fake_ansible_command(
+            [{"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-08T10:00:01Z"}],
+            exit_code=0,
+        )
+
+        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+            run_playbook("playbook.yml", [], renderer, session_dir=tmp_path)
+
+        sessions = list(tmp_path.iterdir())
+        assert len(sessions) == 1

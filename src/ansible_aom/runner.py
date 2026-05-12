@@ -44,6 +44,24 @@ def _default_session_dir() -> Path:
     return Path.home() / ".local" / "state" / "aom" / "sessions"
 
 
+class _NullSink:
+    """No-op sink used when session recording is disabled (F3 --no-record).
+
+    Has the same shape as ``_SessionSink`` so the runner's hot path is
+    branchless once the sink is wired up. Methods accept the same args
+    and silently discard them.
+    """
+
+    def record_event(self, event: dict) -> None:  # noqa: ARG002
+        return None
+
+    def record_stderr(self, line: str) -> None:  # noqa: ARG002
+        return None
+
+    def end(self, status: str) -> None:  # noqa: ARG002
+        return None
+
+
 class _SessionSink:
     """Best-effort wrapper around SessionManager for runtime recording.
 
@@ -272,6 +290,7 @@ def run_playbook(
     renderer: Renderer,
     timeout: float = _DEFAULT_TIMEOUT_S,
     session_dir: Path | None = None,
+    record: bool = True,
 ) -> int:
     """Run a playbook through the renderer; return the subprocess exit code.
 
@@ -282,7 +301,8 @@ def run_playbook(
     Session recording writes a new directory under ``session_dir`` (or
     the spec default ``~/.local/state/aom/sessions/`` when None) so
     ``aom inspect`` can replay the run. Recording is best-effort —
-    disk errors are logged but never abort the run.
+    disk errors are logged but never abort the run. Pass ``record=False``
+    to disable session recording entirely (F3 --no-record).
     """
     executable, args = _build_command(playbook, ansible_args)
     env = os.environ.copy()
@@ -291,7 +311,11 @@ def run_playbook(
     parser = PtyStreamParser()
     renderer.start(playbook, ansible_args)
 
-    sink = _SessionSink(session_dir or _default_session_dir(), playbook, renderer=renderer)
+    sink: _SessionSink | _NullSink
+    if record:
+        sink = _SessionSink(session_dir or _default_session_dir(), playbook, renderer=renderer)
+    else:
+        sink = _NullSink()
 
     # Preflight: --list-tasks + --list-hosts in parallel before spawning
     # the JSONL run so the renderer can show plays/tasks/host count from
@@ -349,7 +373,7 @@ def _drive(
     parser: PtyStreamParser,
     renderer: Renderer,
     timeout: float,
-    sink: _SessionSink,
+    sink: _SessionSink | _NullSink,
 ) -> int:
     """Read the PTY until EOF, feeding lines to the parser/renderer."""
     # We expect either a newline (terminating a complete line), EOF
@@ -454,7 +478,7 @@ def _consume_unread(child: pexpect.spawn) -> str:
 def _fire_prompt(
     child: pexpect.spawn,
     renderer: Renderer,
-    sink: _SessionSink,
+    sink: _SessionSink | _NullSink,
     prompt_text: str,
     prior_plaintext: str | None,
 ) -> None:
@@ -488,7 +512,7 @@ def _fire_prompt(
 def _handle_timeout_branch(
     child: pexpect.spawn,
     renderer: Renderer,
-    sink: _SessionSink,
+    sink: _SessionSink | _NullSink,
     stall_count: int,
     prior_plaintext: str | None = None,
 ) -> int:
@@ -573,7 +597,7 @@ def _flush_pending(
     child: pexpect.spawn,
     parser: PtyStreamParser,
     renderer: Renderer,
-    sink: _SessionSink,
+    sink: _SessionSink | _NullSink,
 ) -> None:
     """Drain any final bytes left in the buffer when the subprocess ends.
 
@@ -586,7 +610,7 @@ def _flush_pending(
         _feed(leftover, parser, renderer, sink)
 
 
-def _feed(line: str, parser: PtyStreamParser, renderer: Renderer, sink: _SessionSink) -> None:
+def _feed(line: str, parser: PtyStreamParser, renderer: Renderer, sink: _SessionSink | _NullSink) -> None:
     """Feed one line to the parser and forward emitted events + warnings.
 
     Warnings (`[WARNING]:` / `[DEPRECATION WARNING]:` lines from ansible)
