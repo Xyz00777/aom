@@ -138,3 +138,55 @@ class TestCollectUnreachableHosts:
 
     def test_session_without_events_key(self):
         assert collect_unreachable_hosts({"playbook": "site.yml"}) == set()
+
+
+from ansible_aom.core.session import collect_changed_hosts  # noqa: E402
+
+
+class TestCollectChangedHosts:
+    def test_empty_session_returns_empty_set(self):
+        assert collect_changed_hosts(_session([])) == set()
+
+    def test_changed_host_collected(self):
+        events = [
+            {
+                "_event": "v2_runner_on_ok",
+                "task": {"name": "Configure"},
+                "hosts": {"web1": {"ok": True, "changed": True}},
+            }
+        ]
+        assert collect_changed_hosts(_session(events)) == {"web1"}
+
+    def test_unchanged_ok_host_ignored(self):
+        events = [
+            {
+                "_event": "v2_runner_on_ok",
+                "task": {"name": "Check"},
+                "hosts": {"web1": {"ok": True, "changed": False}},
+            }
+        ]
+        assert collect_changed_hosts(_session(events)) == set()
+
+    def test_failed_events_ignored(self):
+        events = [
+            {
+                "_event": "v2_runner_on_failed",
+                "task": {"name": "T1"},
+                "hosts": {"web2": {"failed": True, "changed": True}},
+            }
+        ]
+        assert collect_changed_hosts(_session(events)) == set()
+
+    def test_multi_host_event_picks_only_changed(self):
+        events = [
+            {
+                "_event": "v2_runner_on_ok",
+                "task": {"name": "Config"},
+                "hosts": {
+                    "web1": {"ok": True, "changed": True},
+                    "web2": {"ok": True, "changed": False},
+                    "web3": {"ok": True, "changed": True},
+                },
+            }
+        ]
+        assert collect_changed_hosts(_session(events)) == {"web1", "web3"}

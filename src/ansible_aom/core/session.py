@@ -553,3 +553,28 @@ def collect_unreachable_hosts(session: dict[str, Any]) -> set[str]:
         for hostname in hosts.keys():
             unreachable.add(hostname)
     return unreachable
+
+
+def collect_changed_hosts(session: dict[str, Any]) -> set[str]:
+    """Return the set of hostnames that had at least one changed task.
+
+    Pure: scans ``v2_runner_on_ok`` events and selects host entries
+    whose per-host result dict has ``changed`` truthy. Powers
+    ``aom rerun --changes-only`` for idempotency verification.
+
+    Args:
+        session: Session dict from ``load_session``. Sessions without an
+            ``events`` key return an empty set.
+
+    Returns:
+        Set of hostname strings.
+    """
+    changed: set[str] = set()
+    for event in session.get("events", []):
+        if event.get("_event") != "v2_runner_on_ok":
+            continue
+        hosts = event.get("hosts") or {}
+        for hostname, result in hosts.items():
+            if isinstance(result, dict) and result.get("changed"):
+                changed.add(hostname)
+    return changed
