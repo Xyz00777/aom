@@ -149,3 +149,68 @@ class TestComposeHostSet:
             changes_only=True,
         )
         assert result == set()
+
+
+from ansible_aom.rerun.cli import _build_rerun_command  # noqa: E402
+
+
+class TestBuildRerunCommand:
+    def test_appends_limit_to_original_args(self):
+        playbook, args = _build_rerun_command(
+            session={
+                "playbook": "site.yml",
+                "ansible_args": ["-i", "inv.ini", "--tags", "web"],
+            },
+            hosts={"web2", "web3"},
+        )
+        assert playbook == "site.yml"
+        # Limit value is sorted for determinism.
+        assert args == ["-i", "inv.ini", "--tags", "web", "--limit", "web2,web3"]
+
+    def test_overrides_existing_limit_flag(self):
+        """A pre-existing --limit in the original args is dropped in favour of ours."""
+        playbook, args = _build_rerun_command(
+            session={
+                "playbook": "site.yml",
+                "ansible_args": ["-i", "inv.ini", "--limit", "web1", "--tags", "web"],
+            },
+            hosts={"web2"},
+        )
+        assert args == ["-i", "inv.ini", "--tags", "web", "--limit", "web2"]
+
+    def test_overrides_short_l_flag(self):
+        """``-l`` is the short form of ``--limit``; treat it the same."""
+        playbook, args = _build_rerun_command(
+            session={
+                "playbook": "site.yml",
+                "ansible_args": ["-l", "web1", "-v"],
+            },
+            hosts={"web2"},
+        )
+        assert args == ["-v", "--limit", "web2"]
+
+    def test_overrides_limit_equals_form(self):
+        """``--limit=hosts`` (single arg) is also dropped."""
+        playbook, args = _build_rerun_command(
+            session={
+                "playbook": "site.yml",
+                "ansible_args": ["--limit=web1", "-v"],
+            },
+            hosts={"web2"},
+        )
+        assert args == ["-v", "--limit", "web2"]
+
+    def test_single_host_limit(self):
+        playbook, args = _build_rerun_command(
+            session={"playbook": "site.yml", "ansible_args": []},
+            hosts={"web2"},
+        )
+        assert args == ["--limit", "web2"]
+
+    def test_empty_host_set_raises(self):
+        """No hosts → no rerun. Caller is expected to surface this earlier."""
+        with pytest.raises(ValueError, match="empty host set"):
+            _build_rerun_command(
+                session={"playbook": "site.yml", "ansible_args": []},
+                hosts=set(),
+            )

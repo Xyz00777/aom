@@ -107,3 +107,65 @@ def _compose_host_set(
     if changes_only:
         hosts |= collect_changed_hosts(session)
     return hosts
+
+
+def _strip_limit_args(args: list[str]) -> list[str]:
+    """Drop any pre-existing ``--limit`` / ``-l`` from the args list.
+
+    Handles three forms:
+    - ``--limit foo``      (two tokens)
+    - ``--limit=foo``      (one token)
+    - ``-l foo``           (two tokens, short form)
+
+    A pre-existing limit is replaced — not unioned — because the user
+    explicitly chose a subset by running ``aom rerun --failed``.
+    Silently honouring an old ``--limit web1`` would intersect that
+    with the failed set and could empty it, surprising the user.
+    """
+    out: list[str] = []
+    skip_next = False
+    for tok in args:
+        if skip_next:
+            skip_next = False
+            continue
+        if tok in ("--limit", "-l"):
+            skip_next = True
+            continue
+        if tok.startswith("--limit="):
+            continue
+        out.append(tok)
+    return out
+
+
+def _build_rerun_command(
+    session: dict,
+    hosts: set[str],
+) -> tuple[str, list[str]]:
+    """Construct the (playbook, ansible_args) pair to spawn for the rerun.
+
+    The session's recorded ``ansible_args`` are forwarded verbatim
+    except for any pre-existing ``--limit`` / ``-l`` flags, which are
+    dropped in favour of one built from ``hosts``. The new ``--limit``
+    value is the sorted, comma-joined host list (sorted for
+    determinism — the underlying set has no order).
+
+    Args:
+        session: Loaded session dict (must contain ``playbook`` and
+            ``ansible_args``).
+        hosts: Non-empty set of hostnames to limit the rerun to.
+
+    Returns:
+        ``(playbook_path, ansible_args)`` tuple ready for
+        ``run_playbook``.
+
+    Raises:
+        ValueError: If ``hosts`` is empty (caller is expected to handle
+            "nothing to rerun" before reaching this function).
+    """
+    if not hosts:
+        raise ValueError("Cannot build rerun command for empty host set")
+    playbook = session["playbook"]
+    original_args = list(session.get("ansible_args") or [])
+    cleaned = _strip_limit_args(original_args)
+    limit_value = ",".join(sorted(hosts))
+    return playbook, [*cleaned, "--limit", limit_value]
