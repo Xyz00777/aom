@@ -408,3 +408,176 @@ class TestCreateParser:
         assert ns.failed is True
         assert ns.unreachable is True
         assert ns.yes is True
+
+
+from ansible_aom.rerun.cli import main as rerun_main  # noqa: E402
+
+
+def _write_session_with_failure(state_dir: Path, session_id: str) -> None:
+    """Helper: write a session with one failed host (web2)."""
+    session_path = state_dir / session_id
+    session_path.mkdir(parents=True)
+    meta = {
+        "playbook": "site.yml",
+        "ansible_args": ["-i", "inv.ini"],
+        "start_time": "2026-05-12T10:00:00Z",
+        "session_id": session_id,
+        "status": "failed",
+        "version": "1.1",
+    }
+    (session_path / "meta.json").write_text(json.dumps(meta))
+    events = [
+        {
+            "_event": "v2_runner_on_failed",
+            "task": {"name": "Install"},
+            "hosts": {"web2": {"failed": True, "msg": "boom"}},
+        }
+    ]
+    (session_path / "events.jsonl").write_text(
+        "\n".join(json.dumps(e) for e in events) + "\n"
+    )
+    (session_path / "stderr.log").write_text("")
+
+
+class TestMain:
+    def test_runs_with_correct_command(self, tmp_path: Path):
+        """Happy path: --yes --failed → run_playbook called with --limit web2."""
+        state_dir = tmp_path / "sessions"
+        sid = "01971111-1111-7000-8000-000000000001"
+        _write_session_with_failure(state_dir, sid)
+
+        captured: dict = {}
+
+        def fake_runner(playbook, ansible_args):
+            captured["playbook"] = playbook
+            captured["args"] = ansible_args
+            return 0
+
+        rc = rerun_main(
+            argv=["--state-dir", str(state_dir), sid, "--failed", "--yes"],
+            runner=fake_runner,
+        )
+        assert rc == 0
+        assert captured["playbook"] == "site.yml"
+        assert "--limit" in captured["args"]
+        idx = captured["args"].index("--limit")
+        assert captured["args"][idx + 1] == "web2"
+
+    def test_no_session_id_uses_latest(self, tmp_path: Path):
+        state_dir = tmp_path / "sessions"
+        sid = "01971111-1111-7000-8000-000000000001"
+        _write_session_with_failure(state_dir, sid)
+
+        captured: dict = {}
+
+        def fake_runner(playbook, ansible_args):
+            captured["args"] = ansible_args
+            return 0
+
+        rc = rerun_main(
+            argv=["--state-dir", str(state_dir), "--yes"],
+            runner=fake_runner,
+        )
+        assert rc == 0
+        assert "--limit" in captured["args"]
+
+    def test_no_hosts_to_rerun_returns_nonzero(self, tmp_path: Path, capsys):
+        """A session with no failures and --failed → nothing to do, exit 1."""
+        state_dir = tmp_path / "sessions"
+        sid = "01971111-1111-7000-8000-000000000001"
+        session_path = state_dir / sid
+        session_path.mkdir(parents=True)
+        meta = {
+            "playbook": "site.yml",
+            "ansible_args": [],
+            "start_time": "2026-05-12T10:00:00Z",
+            "session_id": sid,
+            "status": "completed",
+            "version": "1.1",
+        }
+        (session_path / "meta.json").write_text(json.dumps(meta))
+        (session_path / "events.jsonl").write_text("")
+        (session_path / "stderr.log").write_text("")
+
+        runner_called = False
+
+        def fake_runner(playbook, ansible_args):
+            nonlocal runner_called
+            runner_called = True
+            return 0
+
+        rc = rerun_main(
+            argv=["--state-dir", str(state_dir), sid, "--failed", "--yes"],
+            runner=fake_runner,
+        )
+        assert rc == 1
+        assert runner_called is False
+        err = capsys.readouterr().err
+        assert "no hosts" in err.lower() or "nothing to rerun" in err.lower()
+
+    def test_unknown_session_returns_nonzero(self, tmp_path: Path, capsys):
+        state_dir = tmp_path / "sessions"
+        state_dir.mkdir()
+        rc = rerun_main(
+            argv=["--state-dir", str(state_dir), "deadbeef", "--yes"],
+            runner=lambda p, a: 0,
+        )
+        assert rc == 1
+        err = capsys.readouterr().err
+        assert "no sessions" in err.lower() or "no session" in err.lower()
+
+    def test_missing_ansible_args_returns_2(self, tmp_path: Path, capsys):
+        """Old session without ansible_args field → exit 2."""
+        state_dir = tmp_path / "sessions"
+        sid = "01971111-1111-7000-8000-000000000001"
+        session_path = state_dir / sid
+        session_path.mkdir(parents=True)
+        # Note: NO ansible_args field — pre-schema-1.1.
+        meta = {
+            "playbook": "site.yml",
+            "start_time": "2026-05-12T10:00:00Z",
+            "session_id": sid,
+            "status": "failed",
+            "version": "1.0",
+        }
+        (session_path / "meta.json").write_text(json.dumps(meta))
+        events = [
+            {
+                "_event": "v2_runner_on_failed",
+                "task": {"name": "Install"},
+                "hosts": {"web2": {"failed": True}},
+            }
+        ]
+        (session_path / "events.jsonl").write_text(
+            "\n".join(json.dumps(e) for e in events) + "\n"
+        )
+        (session_path / "stderr.log").write_text("")
+
+        rc = rerun_main(
+            argv=["--state-dir", str(state_dir), sid, "--failed", "--yes"],
+            runner=lambda p, a: 0,
+        )
+        assert rc == 2
+        err = capsys.readouterr().err
+        assert "ansible_args" in err
+
+    def test_user_declines_returns_zero_without_running(self, tmp_path: Path):
+        state_dir = tmp_path / "sessions"
+        sid = "01971111-1111-7000-8000-000000000001"
+        _write_session_with_failure(state_dir, sid)
+
+        runner_called = False
+
+        def fake_runner(playbook, ansible_args):
+            nonlocal runner_called
+            runner_called = True
+            return 0
+
+        # No --yes, simulate "n" via input_fn.
+        rc = rerun_main(
+            argv=["--state-dir", str(state_dir), sid, "--failed"],
+            runner=fake_runner,
+            input_fn=lambda _prompt: "n",
+        )
+        assert rc == 0
+        assert runner_called is False

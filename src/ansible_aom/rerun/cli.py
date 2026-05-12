@@ -307,3 +307,100 @@ def _create_parser() -> argparse.ArgumentParser:
         help="Directory containing session data (default: ~/.local/state/aom/sessions).",
     )
     return parser
+
+
+def _default_runner(playbook: str, ansible_args: list[str]) -> int:
+    """Real-world runner: spawn the renderer + run_playbook.
+
+    Lazy-imported so unit tests can stub ``runner`` without paying the
+    cost of importing pexpect / Textual.
+    """
+    from ansible_aom.renderer.factory import create_renderer
+    from ansible_aom.runner import run_playbook
+
+    renderer = create_renderer(tui_mode=False, is_tty=sys.stdout.isatty())
+    return run_playbook(playbook, ansible_args, renderer)
+
+
+def main(
+    argv: list[str] | None = None,
+    *,
+    runner: Callable[[str, list[str]], int] | None = None,
+    input_fn: Callable[[str], str] | None = None,
+) -> int:
+    """CLI entry point for ``aom rerun``.
+
+    Args:
+        argv: Argument list. If None, parses from ``sys.argv``. The
+            top-level dispatcher in ``ansible_aom.cli`` passes
+            ``sys.argv[2:]`` so the ``rerun`` token is consumed first.
+        runner: Injectable rerun executor. Defaults to
+            ``_default_runner`` (which spawns a real ansible-playbook
+            via ``run_playbook``). Tests pass a fake to avoid
+            subprocesses.
+        input_fn: Injectable input function for the confirmation
+            prompt. Defaults to ``builtins.input``. Tests pass a
+            lambda.
+
+    Returns:
+        Exit code:
+            0 — rerun completed (or was declined cleanly by the user)
+            1 — no sessions / no hosts to rerun / unknown session
+            2 — old session missing ``ansible_args`` (schema mismatch)
+            other — propagated from ``runner``
+    """
+    from ansible_aom.core.session import load_session
+
+    args = _create_parser().parse_args(argv)
+
+    try:
+        session_id = _resolve_session_id(args.state_dir, args.session_id)
+    except LookupError as exc:
+        print(f"aom rerun: {exc}", file=sys.stderr)
+        return 1
+
+    session = load_session(session_id, args.state_dir)
+    if session is None:
+        print(f"aom rerun: failed to load session {session_id}", file=sys.stderr)
+        return 1
+
+    # _require_ansible_args raises SystemExit(2) on missing field; we
+    # catch it here so callers (and tests) see a clean integer return
+    # rather than a propagated exception.
+    try:
+        ansible_args_recorded = _require_ansible_args(session, session_id)
+    except SystemExit as exc:
+        code = exc.code if isinstance(exc.code, int) else 2
+        return code
+    # Replace whatever was on the loaded dict (defensive: ensures the
+    # downstream builder sees the validated list).
+    session["ansible_args"] = ansible_args_recorded
+
+    hosts = _compose_host_set(
+        session,
+        failed=args.failed,
+        unreachable=args.unreachable,
+        changes_only=args.changes_only,
+    )
+
+    if not hosts:
+        print(
+            f"aom rerun: no hosts to rerun in session {session_id} "
+            f"(nothing matched the requested filter).",
+            file=sys.stderr,
+        )
+        return 1
+
+    playbook, rerun_args = _build_rerun_command(session, hosts)
+
+    if not _confirm(
+        playbook=playbook,
+        args=rerun_args,
+        host_count=len(hosts),
+        assume_yes=args.yes,
+        input_fn=input_fn,
+    ):
+        return 0
+
+    runner_fn = runner if runner is not None else _default_runner
+    return runner_fn(playbook, rerun_args)
