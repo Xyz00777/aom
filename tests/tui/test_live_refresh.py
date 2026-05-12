@@ -375,3 +375,45 @@ class TestPeriodicRefresh:
             await pilot.pause(0.4)
             # The pending buffer must be drained after the tick fires.
             assert app._pending_log_lines == []
+
+
+class TestCallFromThreadRouting:
+    """Worker-thread renderer callbacks marshal through the event loop."""
+
+    @pytest.mark.asyncio
+    async def test_add_warning_from_worker_lands_on_status_bar(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        warned = Event()
+
+        def fake_run_playbook(
+            playbook: str,
+            ansible_args: list[str],
+            renderer: object,
+            timeout: float = 0.5,
+            session_dir: Path | None = None,
+        ) -> int:
+            renderer.start(playbook, ansible_args)
+            renderer.add_warning("[WARNING]: missing role")
+            renderer.add_warning("[DEPRECATION WARNING]: foo", is_deprecation=True)
+            warned.set()
+            renderer.handle_completion(0, "completed")
+            return 0
+
+        monkeypatch.setattr("ansible_aom.tui.app.run_playbook", fake_run_playbook)
+
+        app = AOMApp(playbook="site.yml", ansible_args=[], session_dir=tmp_path)
+
+        async with app.run_test() as pilot:
+            for _ in range(50):
+                if warned.is_set():
+                    break
+                await pilot.pause(0.02)
+            await pilot.pause(0.4)
+
+            assert app.warnings_count == 1
+            assert app.deprecations_count == 1
+            # The dirty counter must have advanced from the worker side
+            # without the test having touched the app from the main
+            # thread.
+            assert app._dirty >= 2

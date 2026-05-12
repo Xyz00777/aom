@@ -144,22 +144,49 @@ class AOMApp(App[None]):
         self._dirty += 1
 
     def add_warning(self, message: str, is_deprecation: bool = False) -> None:
-        """Renderer Protocol: bump counters; widgets can read them."""
-        if is_deprecation:
-            self._deprecations_count += 1
-        else:
-            self._warnings_count += 1
-        self._dirty += 1
+        """Renderer Protocol: bump counters; widgets can read them.
+
+        Counter mutation itself is GIL-safe, but we marshal through
+        ``call_from_thread`` so future side effects (toast notifications,
+        StatusBar reactives, etc.) added to the dirty bump run on the
+        UI thread by construction.
+        """
+
+        def _bump() -> None:
+            if is_deprecation:
+                self._deprecations_count += 1
+            else:
+                self._warnings_count += 1
+            self._dirty += 1
+
+        self._safe_call_from_thread(_bump)
 
     def print_log(self, message: str) -> None:
         """Renderer Protocol: append a line to the log buffer.
 
-        The line is also queued in ``_pending_log_lines`` so the periodic
-        UI tick can write it into ``LogPanel`` on the main thread.
+        Appends to ``_pending_log_lines`` which the periodic UI tick
+        drains into ``LogPanel`` on the main thread.
         """
-        self._log_lines.append(message)
-        self._pending_log_lines.append(message)
-        self._dirty += 1
+
+        def _enqueue() -> None:
+            self._log_lines.append(message)
+            self._pending_log_lines.append(message)
+            self._dirty += 1
+
+        self._safe_call_from_thread(_enqueue)
+
+    def _safe_call_from_thread(self, fn) -> None:
+        """Invoke ``fn`` on the Textual main thread when possible.
+
+        During unit tests (no event loop) and direct synchronous calls
+        from the runner-protocol smoke tests, ``call_from_thread``
+        raises ``RuntimeError``; fall back to a direct call so those
+        tests keep working.
+        """
+        try:
+            self.call_from_thread(fn)
+        except RuntimeError:
+            fn()
 
     def tick(self) -> None:
         """Renderer Protocol: no-op. Textual has its own clock."""
