@@ -118,3 +118,76 @@ class TestDegradedModeEntry:
         assert display._degraded is False
         # No warning text was printed.
         assert buf.getvalue() == ""
+
+
+class TestDegradedModeFallthrough:
+    """In degraded mode update() drops the status content (we don't
+    flood stdout with 4Hz status snapshots) and print_log() prints
+    plain text. No DEC frames, no cursor sequences."""
+
+    BSU = "\x1b[?2026h"
+    ESU = "\x1b[?2026l"
+
+    def test_update_in_degraded_mode_emits_no_dec_frame(self) -> None:
+        display = Display(is_tty=True)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            display.start(force_size=(40, 8))
+            # Reset the buffer to isolate the update() output from the
+            # startup warning line.
+        # Print the warning above, then capture only update() output.
+        buf2 = io.StringIO()
+        with redirect_stdout(buf2):
+            display.update("status: 1/3 hosts")
+
+        out = buf2.getvalue()
+        assert self.BSU not in out
+        assert self.ESU not in out
+        # Status snapshots are discarded in degraded mode: the live
+        # panel doesn't exist and printing every 250ms would spam
+        # stdout. The most recent content is still stored on the
+        # instance so a re-enable can resume drawing it.
+        assert out == ""
+        assert display._content == "status: 1/3 hosts"
+
+    def test_print_log_in_degraded_mode_emits_plain_text(self) -> None:
+        display = Display(is_tty=True)
+        with redirect_stdout(io.StringIO()):
+            display.start(force_size=(40, 8))
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            display.print_log("PLAY [Setup] (localhost, 1 host, 3 tasks)")
+
+        out = buf.getvalue()
+        assert "PLAY [Setup] (localhost, 1 host, 3 tasks)" in out
+        assert self.BSU not in out
+        assert self.ESU not in out
+        # Trailing newline so consecutive print_log lines don't merge.
+        assert out.endswith("\n")
+
+    def test_stop_in_degraded_mode_is_a_noop(self) -> None:
+        """No panel was ever shown, so stop() must not emit clear/show
+        sequences that would corrupt the user's shell."""
+        display = Display(is_tty=True)
+        with redirect_stdout(io.StringIO()):
+            display.start(force_size=(40, 8))
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            display.stop()
+
+        assert buf.getvalue() == ""
+
+    def test_clear_in_degraded_mode_is_a_noop(self) -> None:
+        display = Display(is_tty=True)
+        with redirect_stdout(io.StringIO()):
+            display.start(force_size=(40, 8))
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            display.clear()
+
+        assert buf.getvalue() == ""
+        # The stored content was wiped though, so a re-enable starts blank.
+        assert display._content == ""

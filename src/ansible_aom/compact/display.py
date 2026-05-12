@@ -165,6 +165,10 @@ class Display:
         """Erase the status block and release the terminal."""
         if not self._is_tty:
             return
+        if self._degraded:
+            # No panel, no cursor anchoring — nothing to undo.
+            self._is_running = False
+            return
         # Wipe whatever status block is currently visible so the user's
         # shell prompt doesn't appear on top of leftover content.
         frame = _BSU + self._rewind_status() + _CLEAR_TO_EOS + _SHOW_CURSOR + _ESU
@@ -180,11 +184,19 @@ class Display:
         the new content is stored but no frame is emitted. The next eligible
         call will render whatever the latest content is. If content is None,
         the current content is re-rendered.
+
+        In degraded mode (R4 — terminal smaller than MINIMUM_SIZE) the
+        status content is stored on the instance but no frame is emitted;
+        flooding stdout with 4Hz status snapshots would be unreadable.
+        Log lines still print via print_log() — that's the user's window
+        into what's happening.
         """
         if not self._is_tty:
             return
         if content is not None:
             self._content = content
+        if self._degraded:
+            return
         if not self._is_running:
             return
 
@@ -206,8 +218,11 @@ class Display:
         Wipes the status, writes the log line, then re-renders the
         status. The whole operation is a single synchronized frame so
         the user never sees an intermediate state.
+
+        In degraded mode (R4) and non-TTY mode, falls through to a
+        plain ``print()`` — there's no panel to wipe-and-restore.
         """
-        if not self._is_tty:
+        if not self._is_tty or self._degraded:
             print(message)
             return
 
@@ -227,7 +242,7 @@ class Display:
     def clear(self) -> None:
         """Erase the status content (but leave the display running)."""
         self._content = ""
-        if not self._is_tty or not self._is_running:
+        if not self._is_tty or not self._is_running or self._degraded:
             return
         frame = _BSU + self._rewind_status() + _CLEAR_TO_EOS + _ESU
         sys.stdout.write(frame)
