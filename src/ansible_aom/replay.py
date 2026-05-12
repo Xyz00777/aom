@@ -24,11 +24,14 @@ Document this in ``aom replay --help`` (see ``cli._run_replay``).
 
 from __future__ import annotations
 
+import argparse
 import sys
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
+
+import argcomplete
 
 from ansible_aom.core.session import load_session
 from ansible_aom.renderer.factory import create_renderer
@@ -135,18 +138,13 @@ Anything else that appeared in events.jsonl is replayed verbatim.
 """
 
 
-def cli_main(argv: list[str]) -> int:
-    """Entry point for ``aom replay <session-id> [...]``.
+def _build_parser() -> argparse.ArgumentParser:
+    """Build the ``aom replay`` argument parser.
 
-    Argparse the supplied tail (``sys.argv[2:]`` from the top-level
-    dispatcher), build a renderer via the shared factory, and call
-    ``replay_session``. The exit code mirrors ``replay_session``'s:
-
-    * ``0`` — replay finished
-    * ``1`` — session not found
-    * ``130`` — Ctrl+C mid-replay
+    Factored out of ``cli_main`` so shell-completion glue can introspect
+    the parser shape without invoking dispatch.
     """
-    import argparse
+    from ansible_aom.completion import session_id_completer
 
     parser = argparse.ArgumentParser(
         prog="aom replay",
@@ -154,7 +152,10 @@ def cli_main(argv: list[str]) -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=_REPLAY_HELP_EPILOG,
     )
-    parser.add_argument("session_id", help="Session ID (UUIDv7 directory name) to replay")
+    session_action = parser.add_argument(
+        "session_id", help="Session ID (UUIDv7 directory name) to replay"
+    )
+    session_action.completer = session_id_completer
     parser.add_argument(
         "--state-dir",
         type=Path,
@@ -187,6 +188,22 @@ def cli_main(argv: list[str]) -> int:
     )
     parser.set_defaults(mode="compact")
 
+    argcomplete.autocomplete(parser)
+    return parser
+
+
+def cli_main(argv: list[str]) -> int:
+    """Entry point for ``aom replay <session-id> [...]``.
+
+    Argparse the supplied tail (``sys.argv[2:]`` from the top-level
+    dispatcher), build a renderer via the shared factory, and call
+    ``replay_session``. The exit code mirrors ``replay_session``'s:
+
+    * ``0`` — replay finished
+    * ``1`` — session not found
+    * ``130`` — Ctrl+C mid-replay
+    """
+    parser = _build_parser()
     args = parser.parse_args(argv)
 
     tui_mode = args.mode == "tui"

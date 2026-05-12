@@ -17,6 +17,8 @@ import sys
 from pathlib import Path
 from typing import Callable
 
+import argcomplete
+
 from ansible_aom.core.session import (
     collect_changed_hosts,
     collect_failed_hosts,
@@ -264,18 +266,21 @@ def _create_parser() -> argparse.ArgumentParser:
 
     Split out from ``main`` so tests can drive parsing in isolation.
     """
+    from ansible_aom.completion import session_id_completer
+
     parser = argparse.ArgumentParser(
         prog="aom rerun",
         description=(
             "Re-invoke ansible-playbook on hosts that need attention from a recorded session."
         ),
     )
-    parser.add_argument(
+    session_action = parser.add_argument(
         "session_id",
         nargs="?",
         default=None,
         help="Session ID (full UUID or 8-char prefix). Defaults to the latest session.",
     )
+    session_action.completer = session_id_completer
     parser.add_argument(
         "--failed",
         action="store_true",
@@ -305,6 +310,7 @@ def _create_parser() -> argparse.ArgumentParser:
         default=Path.home() / ".local" / "state" / "aom" / "sessions",
         help="Directory containing session data (default: ~/.local/state/aom/sessions).",
     )
+    argcomplete.autocomplete(parser)
     return parser
 
 

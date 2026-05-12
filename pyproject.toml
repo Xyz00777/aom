@@ -3,7 +3,7 @@
 
 [project]
 name = "ansible-aom"
-version = "0.51.0"
+version = "0.52.0"
 description = "Ansible Output Monitor - nom-style TUI for ansible-playbook"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
@@ -129,3 +129,25 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "ansible_module_utils.*"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "argcomplete.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "ansible_aom.inspect.cli"
+# argcomplete reads ``action.completer`` off argparse Action instances
+# at runtime; the attribute isn't in argparse's type stubs.
+disable_error_code = ["attr-defined"]
+
+[[tool.mypy.overrides]]
+module = "ansible_aom.replay"
+# argcomplete reads ``action.completer`` off argparse Action instances
+# at runtime; the attribute isn't in argparse's type stubs.
+disable_error_code = ["attr-defined"]
+
+[[tool.mypy.overrides]]
+module = "ansible_aom.rerun.cli"
+# argcomplete reads ``action.completer`` off argparse Action instances
+# at runtime; the attribute isn't in argparse's type stubs.
+disable_error_code = ["attr-defined"]

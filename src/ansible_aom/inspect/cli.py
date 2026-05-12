@@ -8,6 +8,8 @@ import json
 import sys
 from pathlib import Path
 
+import argcomplete
+
 from ansible_aom.core.session import cleanup_old_sessions, list_sessions, load_session
 from ansible_aom.inspect.diff import diff_sessions
 from ansible_aom.inspect.display import (
@@ -187,14 +189,14 @@ def _filter_by_host(session: dict, hostname: str) -> dict:
     return result
 
 
-def main(argv: list[str] | None = None) -> int:
-    """CLI entry point for inspect commands.
+def _build_parser() -> argparse.ArgumentParser:
+    """Build the ``aom inspect`` argument parser.
 
-    Args:
-        argv: Argument list. If None, parses from sys.argv. The top-level
-            ``aom inspect ...`` dispatcher passes ``sys.argv[2:]`` so the
-            ``inspect`` token is consumed before this parser runs.
+    Factored out of ``main`` so the same parser shape can be used by
+    shell-completion glue without invoking dispatch.
     """
+    from ansible_aom.completion import session_id_completer
+
     parser = argparse.ArgumentParser(description="Inspect AOM sessions")
     subparsers = parser.add_subparsers(dest="command", help="Subcommand")
 
@@ -212,7 +214,8 @@ def main(argv: list[str] | None = None) -> int:
     list_parser.add_argument("--jsonl", action="store_true", help="Output as JSONL")
 
     show_parser = subparsers.add_parser("show", help="Show session summary")
-    show_parser.add_argument("session_id", help="Session ID to show")
+    show_action = show_parser.add_argument("session_id", help="Session ID to show")
+    show_action.completer = session_id_completer
     show_parser.add_argument("--failed", action="store_true", help="Show only failed tasks")
     show_parser.add_argument("--host", type=str, help="Filter by hostname")
     show_parser.add_argument("--tree", action="store_true", help="Show ASCII tree view")
@@ -220,8 +223,10 @@ def main(argv: list[str] | None = None) -> int:
     show_parser.add_argument("--jsonl", action="store_true", help="Output as JSONL")
 
     diff_parser = subparsers.add_parser("diff", help="Compare two sessions")
-    diff_parser.add_argument("session_id_1", help="Baseline session ID")
-    diff_parser.add_argument("session_id_2", help="Current session ID")
+    diff_action_1 = diff_parser.add_argument("session_id_1", help="Baseline session ID")
+    diff_action_1.completer = session_id_completer
+    diff_action_2 = diff_parser.add_argument("session_id_2", help="Current session ID")
+    diff_action_2.completer = session_id_completer
     diff_parser.add_argument("--changes-only", action="store_true", help="Show only changed tasks")
     diff_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
@@ -229,6 +234,20 @@ def main(argv: list[str] | None = None) -> int:
     prune_parser.add_argument(
         "--days", type=int, default=30, help="Remove sessions older than N days"
     )
+
+    argcomplete.autocomplete(parser)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entry point for inspect commands.
+
+    Args:
+        argv: Argument list. If None, parses from sys.argv. The top-level
+            ``aom inspect ...`` dispatcher passes ``sys.argv[2:]`` so the
+            ``inspect`` token is consumed before this parser runs.
+    """
+    parser = _build_parser()
 
     args = parser.parse_args(argv)
 
