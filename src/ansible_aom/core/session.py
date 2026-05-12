@@ -527,3 +527,29 @@ def collect_failed_hosts(session: dict[str, Any]) -> set[str]:
         for hostname in hosts.keys():
             failed.add(hostname)
     return failed
+
+
+def collect_unreachable_hosts(session: dict[str, Any]) -> set[str]:
+    """Return the set of hostnames that hit ``v2_runner_on_unreachable``.
+
+    Pure: same shape as ``collect_failed_hosts`` but watches a different
+    event type. Used by ``aom rerun --unreachable`` to build the
+    ``--limit`` argument; the CLI composes
+    ``collect_failed_hosts() | collect_unreachable_hosts()`` because
+    "things to retry" is the union, never just unreachable.
+
+    Args:
+        session: Session dict from ``load_session``. Sessions without an
+            ``events`` key return an empty set.
+
+    Returns:
+        Set of hostname strings.
+    """
+    unreachable: set[str] = set()
+    for event in session.get("events", []):
+        if event.get("_event") != "v2_runner_on_unreachable":
+            continue
+        hosts = event.get("hosts") or {}
+        for hostname in hosts.keys():
+            unreachable.add(hostname)
+    return unreachable
