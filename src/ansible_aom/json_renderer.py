@@ -15,9 +15,12 @@ shows up at construction time.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from ansible_aom.core.models import RunState
 
 
 class HostCounts(BaseModel):
@@ -60,3 +63,82 @@ class RunSummary(BaseModel):
     duration_s: float
     hosts: dict[str, HostCounts]
     tasks_failed: list[TaskFailure]
+
+
+# =============================================================================
+# JsonRenderer
+# =============================================================================
+
+
+class JsonRenderer:
+    """End-of-run JSON renderer satisfying the Renderer Protocol.
+
+    Silent during the run; emits a single JSON object on
+    ``handle_completion``. Interactive prompts are refused to stderr —
+    JSON mode is for non-interactive consumers.
+    """
+
+    def __init__(self) -> None:
+        self._playbook: str = ""
+        self._args: list[str] = []
+        self._definitions: list = []
+        self._state: RunState | None = None
+        self._wall_start: float = 0.0
+        self._wall_end: float = 0.0
+
+    def start(self, playbook: str, args: list[str]) -> None:
+        """Capture playbook + args; initialise empty RunState. No output."""
+        import time
+
+        from ansible_aom.core.models import RunState
+
+        self._playbook = playbook
+        self._args = list(args)
+        self._state = RunState(playbook=playbook)
+        self._wall_start = time.time()
+
+    def set_definitions(self, definitions: list) -> None:
+        """Store preflight definitions. No output."""
+        self._definitions = list(definitions)
+
+    def update_state(self, event: dict) -> None:
+        """Drive RunState from a JSONL event. No output."""
+        if self._state is None:
+            return
+        self._state.handle_event(event)
+
+    def add_warning(self, message: str, is_deprecation: bool = False) -> None:
+        """No-op — warnings aren't part of the v1 schema."""
+        return
+
+    def print_log(self, message: str) -> None:
+        """No-op — JSON mode produces no streaming output."""
+        return
+
+    def tick(self) -> None:
+        """No-op — no clock to refresh."""
+        return
+
+    def handle_password_prompt(self, prompt_text: str) -> str:
+        """Refuse on stderr; return empty so ansible fails the auth attempt."""
+        import sys
+
+        sys.stderr.write("aom: --format json cannot answer interactive prompt; refusing.\n")
+        sys.stderr.flush()
+        return ""
+
+    def handle_interactive_prompt(self, prompt_text: str) -> str:
+        """Refuse on stderr; return empty so the playbook proceeds without input."""
+        import sys
+
+        sys.stderr.write("aom: --format json cannot answer interactive prompt; refusing.\n")
+        sys.stderr.flush()
+        return ""
+
+    def handle_completion(self, exit_code: int, state: str) -> None:
+        """Emit the JSON summary. Filled in by Task 3."""
+        return
+
+    def stop(self) -> None:
+        """No-op — no display to tear down."""
+        return

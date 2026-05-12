@@ -49,3 +49,50 @@ def test_run_summary_schema_version_is_literal_one():
     except ValidationError:
         return
     raise AssertionError("schema_version should be a Literal[1]")
+
+
+def test_json_renderer_satisfies_renderer_protocol():
+    """JsonRenderer is structurally a Renderer (runtime_checkable Protocol)."""
+    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.renderer.protocol import Renderer
+
+    renderer = JsonRenderer()
+    assert isinstance(renderer, Renderer)
+
+
+def test_json_renderer_start_records_playbook_and_args():
+    """start() captures the playbook path and ansible args without printing."""
+    from ansible_aom.json_renderer import JsonRenderer
+
+    renderer = JsonRenderer()
+    renderer.start("site.yml", ["-i", "inv.ini"])
+    assert renderer._playbook == "site.yml"
+    assert renderer._args == ["-i", "inv.ini"]
+
+
+def test_json_renderer_set_definitions_stores_them(capsys):
+    """set_definitions stores the list and prints nothing."""
+    from ansible_aom.json_renderer import JsonRenderer
+
+    renderer = JsonRenderer()
+    renderer.set_definitions([])
+    assert renderer._definitions == []
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
+
+
+def test_json_renderer_noop_methods_emit_nothing(capsys):
+    """add_warning, print_log, tick must not write to stdout/stderr in JSON mode."""
+    from ansible_aom.json_renderer import JsonRenderer
+
+    renderer = JsonRenderer()
+    renderer.start("site.yml", [])
+    renderer.add_warning("ignored", is_deprecation=False)
+    renderer.add_warning("also ignored", is_deprecation=True)
+    renderer.print_log("nothing to see")
+    renderer.tick()
+    renderer.stop()
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
