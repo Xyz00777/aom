@@ -10,6 +10,8 @@ import os
 import shutil
 import sys
 
+import argcomplete
+
 from ansible_aom import __version__
 
 # Files we'll auto-discover as inventory when the user doesn't pass -i.
@@ -193,6 +195,10 @@ See README.md and SPECIFICATION.md in the source tree for full details.
         nargs=argparse.REMAINDER,
         help="Additional arguments passed to ansible-playbook",
     )
+
+    # F5: arm shell completion. No-op unless the shell wrapper sets
+    # the _ARGCOMPLETE env var, so this is free on the normal CLI path.
+    argcomplete.autocomplete(parser)
 
     return parser
 

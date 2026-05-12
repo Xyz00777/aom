@@ -931,6 +931,19 @@ def test_aom_rerun_dispatches_to_rerun_main(monkeypatch):
     assert captured["argv"] == ["abc12345", "--failed", "--yes"]
 
 
+class TestArgcompleteHook:
+    """F5: argcomplete.autocomplete must be called inside create_parser."""
+
+    def test_create_parser_calls_argcomplete_autocomplete(self):
+        from unittest.mock import patch
+
+        from ansible_aom.cli import create_parser
+
+        with patch("ansible_aom.cli.argcomplete.autocomplete") as mock_ac:
+            parser = create_parser()
+            mock_ac.assert_called_once_with(parser)
+
+
 class TestFormatFlag:
     """Tests for F6: --format {compact,json} flag."""
 
