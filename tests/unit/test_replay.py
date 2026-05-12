@@ -152,3 +152,44 @@ class TestReplaySpeedControl:
         )
 
         assert sleeps == [pytest.approx(1.0, abs=1e-6)]
+
+
+class TestReplayNegativeDelta:
+    """Real ansible JSONL is not strictly monotonic across threads.
+
+    A delta of -0.5s must not sleep negative time (would crash
+    time.sleep) — instead replay treats it as zero.
+    """
+
+    def test_out_of_order_timestamps_do_not_sleep_negative(
+        self, tmp_path: Path
+    ) -> None:
+        from ansible_aom.replay import replay_session
+
+        events = [
+            {"_event": "a", "_timestamp": "2026-05-08T10:00:01Z"},
+            {"_event": "b", "_timestamp": "2026-05-08T10:00:00Z"},  # earlier!
+            {"_event": "c", "_timestamp": "2026-05-08T10:00:02Z"},
+        ]
+        _make_session(tmp_path, "s4", events)
+
+        sleeps: list[float] = []
+        renderer = MagicMock()
+        exit_code = replay_session(
+            session_dir=tmp_path,
+            session_id="s4",
+            renderer=renderer,
+            speed=1.0,
+            sleeper=sleeps.append,
+        )
+
+        assert exit_code == 0
+        # Two transitions:
+        #   a -> b: delta = -1s → clamped to 0 → no sleep recorded
+        #   b -> c: delta = +2s → 2.0
+        # We allow either "no sleep at all when wait==0" or "sleep(0.0)".
+        positive_sleeps = [s for s in sleeps if s > 0]
+        assert positive_sleeps == [pytest.approx(2.0, abs=1e-6)]
+        # And the renderer must still see all three in file order.
+        seen = [c.args[0]["_event"] for c in renderer.update_state.call_args_list]
+        assert seen == ["a", "b", "c"]
