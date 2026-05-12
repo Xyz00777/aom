@@ -610,7 +610,9 @@ def _flush_pending(
         _feed(leftover, parser, renderer, sink)
 
 
-def _feed(line: str, parser: PtyStreamParser, renderer: Renderer, sink: _SessionSink | _NullSink) -> None:
+def _feed(
+    line: str, parser: PtyStreamParser, renderer: Renderer, sink: _SessionSink | _NullSink
+) -> None:
     """Feed one line to the parser and forward emitted events + warnings.
 
     Warnings (`[WARNING]:` / `[DEPRECATION WARNING]:` lines from ansible)

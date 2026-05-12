@@ -161,9 +161,7 @@ class TestReplayNegativeDelta:
     time.sleep) — instead replay treats it as zero.
     """
 
-    def test_out_of_order_timestamps_do_not_sleep_negative(
-        self, tmp_path: Path
-    ) -> None:
+    def test_out_of_order_timestamps_do_not_sleep_negative(self, tmp_path: Path) -> None:
         from ansible_aom.replay import replay_session
 
         events = [

@@ -7,6 +7,8 @@ to ``ansible_aom.replay`` (or a thin CLI wrapper there).
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from unittest.mock import patch
 
 
@@ -50,10 +52,6 @@ class TestReplayDispatch:
             patch("sys.argv", ["aom", "replay", "missing"]),
         ):
             assert main() == 2
-
-
-import json
-from pathlib import Path
 
 
 def _make_session(base: Path, session_id: str, events: list[dict]) -> Path:
