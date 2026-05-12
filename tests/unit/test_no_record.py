@@ -55,3 +55,21 @@ class TestRunPlaybookRecordParameter:
 
         sessions = list(tmp_path.iterdir())
         assert len(sessions) == 1
+
+
+class TestNoRecordParserFlag:
+    """`--no-record` is a top-level flag that defaults to False."""
+
+    def test_no_record_flag_parses(self) -> None:
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--no-record", "playbook.yml"])
+        assert args.no_record is True
+
+    def test_no_record_default_false(self) -> None:
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["playbook.yml"])
+        assert args.no_record is False

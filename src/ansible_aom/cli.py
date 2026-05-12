@@ -144,6 +144,16 @@ See README.md and SPECIFICATION.md in the source tree for full details.
     )
 
     parser.add_argument(
+        "--no-record",
+        action="store_true",
+        dest="no_record",
+        help=(
+            "Disable session recording for this run. "
+            "No directory is written under ~/.local/state/aom/sessions/."
+        ),
+    )
+
+    parser.add_argument(
         "playbook",
         nargs="?",
         default=None,
