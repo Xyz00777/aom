@@ -88,6 +88,7 @@ Examples:
   aom inspect <session-id> --failed     Only the failed tasks
   aom inspect diff <id1> <id2>          Diff two sessions
   aom inspect prune --days 30           Delete sessions older than N days
+  aom --no-record playbook.yml          Run without writing a session directory
 
 Argument forwarding:
   Anything after the playbook path is passed verbatim to ansible-playbook.
@@ -105,6 +106,8 @@ Session recording:
   events.jsonl, stderr.log, and meta.json. Recording is best-effort —
   disk errors are logged but never abort the run. Use `aom inspect`
   to replay past runs; `aom inspect prune` to clean up.
+  Pass --no-record to disable session writing for a single invocation
+  (debug logs from --verbose are unaffected).
 
 Debugging:
   AOM_TRACE=1 aom site.yml  — dumps every pexpect loop transition to
