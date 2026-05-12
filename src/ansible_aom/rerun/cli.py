@@ -12,6 +12,7 @@ and ``core/`` keeps its no-renderer rule.
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 from typing import Callable
@@ -256,3 +257,53 @@ def _require_ansible_args(session: dict, session_id: str) -> list[str]:
         )
         raise SystemExit(2)
     return list(args)
+
+
+def _create_parser() -> argparse.ArgumentParser:
+    """Build the argparse parser for ``aom rerun``.
+
+    Split out from ``main`` so tests can drive parsing in isolation.
+    """
+    parser = argparse.ArgumentParser(
+        prog="aom rerun",
+        description=(
+            "Re-invoke ansible-playbook on hosts that need attention from "
+            "a recorded session."
+        ),
+    )
+    parser.add_argument(
+        "session_id",
+        nargs="?",
+        default=None,
+        help="Session ID (full UUID or 8-char prefix). Defaults to the latest session.",
+    )
+    parser.add_argument(
+        "--failed",
+        action="store_true",
+        help="Re-run on hosts that hit v2_runner_on_failed (default when no flag is given).",
+    )
+    parser.add_argument(
+        "--unreachable",
+        action="store_true",
+        help="Re-run on failed AND unreachable hosts.",
+    )
+    parser.add_argument(
+        "--changes-only",
+        action="store_true",
+        dest="changes_only",
+        help="Re-run on hosts that had at least one changed task.",
+    )
+    parser.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Skip the confirmation prompt.",
+    )
+    parser.add_argument(
+        "--state-dir",
+        type=Path,
+        dest="state_dir",
+        default=Path.home() / ".local" / "state" / "aom" / "sessions",
+        help="Directory containing session data (default: ~/.local/state/aom/sessions).",
+    )
+    return parser

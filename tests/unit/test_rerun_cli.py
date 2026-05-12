@@ -358,3 +358,53 @@ class TestRequireAnsibleArgs:
         session = {"playbook": "site.yml", "ansible_args": None}
         with pytest.raises(SystemExit):
             _require_ansible_args(session, "01971111")
+
+
+from ansible_aom.rerun.cli import _create_parser  # noqa: E402
+
+
+class TestCreateParser:
+    def test_no_args(self):
+        ns = _create_parser().parse_args([])
+        assert ns.session_id is None
+        assert ns.failed is False
+        assert ns.unreachable is False
+        assert ns.changes_only is False
+        assert ns.yes is False
+
+    def test_session_id_positional(self):
+        ns = _create_parser().parse_args(["abc12345"])
+        assert ns.session_id == "abc12345"
+
+    def test_failed_flag(self):
+        ns = _create_parser().parse_args(["--failed"])
+        assert ns.failed is True
+
+    def test_unreachable_flag(self):
+        ns = _create_parser().parse_args(["--unreachable"])
+        assert ns.unreachable is True
+
+    def test_changes_only_flag(self):
+        ns = _create_parser().parse_args(["--changes-only"])
+        assert ns.changes_only is True
+
+    def test_yes_short_form(self):
+        ns = _create_parser().parse_args(["-y"])
+        assert ns.yes is True
+
+    def test_yes_long_form(self):
+        ns = _create_parser().parse_args(["--yes"])
+        assert ns.yes is True
+
+    def test_state_dir_override(self, tmp_path: Path):
+        ns = _create_parser().parse_args(["--state-dir", str(tmp_path)])
+        assert ns.state_dir == tmp_path
+
+    def test_combined(self):
+        ns = _create_parser().parse_args(
+            ["abc12345", "--failed", "--unreachable", "--yes"]
+        )
+        assert ns.session_id == "abc12345"
+        assert ns.failed is True
+        assert ns.unreachable is True
+        assert ns.yes is True
