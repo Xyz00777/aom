@@ -111,3 +111,118 @@ class TestTreePopulationFromDefinitions:
 
         # Calling twice with the same defs must not duplicate nodes.
         assert len(list(tree.root.children)) == 1
+
+
+class TestApplyStateIcons:
+    """apply_state_icons updates icons/colors without rebuilding nodes."""
+
+    def test_apply_state_icons_updates_task_icon(self) -> None:
+        from ansible_aom.core.models import (
+            HostRunState,
+            PlayDefinition,
+            PlayRunState,
+            RunState,
+            Status,
+            TaskDefinition,
+            TaskRunState,
+        )
+        from ansible_aom.tui.widgets.task_tree import TaskTree
+
+        tree = TaskTree("Plays")
+        tree.populate_from_definitions(
+            [
+                PlayDefinition(
+                    id="p1",
+                    name="Setup",
+                    hosts="webservers",
+                    resolved_hosts=["web1"],
+                    tasks=[
+                        TaskDefinition(
+                            name="Install nginx",
+                            role=None,
+                            tags=[],
+                            play_id="p1",
+                            play_order=0,
+                            task_order=0,
+                        ),
+                    ],
+                )
+            ]
+        )
+
+        # Snapshot the original task node so we can prove identity is
+        # preserved (the same TreeNode instance, not a fresh one).
+        play_node = list(tree.root.children)[0]
+        task_node_before = list(play_node.children)[0]
+        original_id = id(task_node_before)
+
+        # Build a RunState with the task marked OK.
+        state = RunState(playbook="site.yml")
+        play = PlayRunState(play_id="p1", name="Setup")
+        task = TaskRunState(task_id="t1", name="Install nginx", status=Status.OK)
+        task.hosts["web1"] = HostRunState(hostname="web1", status=Status.OK)
+        play.tasks["t1"] = task
+        state.plays["p1"] = play
+
+        tree.apply_state_icons(state)
+
+        task_node_after = list(play_node.children)[0]
+        assert id(task_node_after) == original_id  # same node, mutated label
+        # The OK icon (●) must now be in the rendered label text.
+        from ansible_aom.core.icons import STATUS_ICONS
+
+        ok_icon = STATUS_ICONS[Status.OK]
+        assert ok_icon in task_node_after.label.plain
+
+    def test_apply_state_icons_updates_host_icon(self) -> None:
+        from ansible_aom.core.icons import STATUS_ICONS
+        from ansible_aom.core.models import (
+            HostRunState,
+            PlayDefinition,
+            PlayRunState,
+            RunState,
+            Status,
+            TaskDefinition,
+            TaskRunState,
+        )
+        from ansible_aom.tui.widgets.task_tree import TaskTree
+
+        tree = TaskTree("Plays")
+        tree.populate_from_definitions(
+            [
+                PlayDefinition(
+                    id="p1",
+                    name="Setup",
+                    hosts="webservers",
+                    resolved_hosts=["web1", "web2"],
+                    tasks=[
+                        TaskDefinition(
+                            name="Install nginx",
+                            role=None,
+                            tags=[],
+                            play_id="p1",
+                            play_order=0,
+                            task_order=0,
+                        ),
+                    ],
+                )
+            ]
+        )
+
+        state = RunState(playbook="site.yml")
+        play = PlayRunState(play_id="p1", name="Setup")
+        task = TaskRunState(task_id="t1", name="Install nginx", status=Status.RUNNING)
+        task.hosts["web1"] = HostRunState(hostname="web1", status=Status.OK)
+        task.hosts["web2"] = HostRunState(hostname="web2", status=Status.FAILED)
+        play.tasks["t1"] = task
+        state.plays["p1"] = play
+
+        tree.apply_state_icons(state)
+
+        play_node = list(tree.root.children)[0]
+        task_node = list(play_node.children)[0]
+        host_nodes = list(task_node.children)
+        # web1 should show OK, web2 FAILED.
+        labels = {n.data: n.label.plain for n in host_nodes}
+        assert STATUS_ICONS[Status.OK] in labels["host:web1"]
+        assert STATUS_ICONS[Status.FAILED] in labels["host:web2"]
