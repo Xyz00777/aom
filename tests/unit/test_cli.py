@@ -906,3 +906,26 @@ class TestExitCode2:
         state.plays["play-1"] = play
 
         assert determine_exit_code(state) == 2
+
+
+def test_aom_rerun_dispatches_to_rerun_main(monkeypatch):
+    """Top-level `aom rerun ...` invokes the rerun subcommand main."""
+    from ansible_aom import cli as cli_mod
+
+    captured: dict = {}
+
+    def fake_rerun_main(argv):
+        captured["argv"] = argv
+        return 42
+
+    monkeypatch.setattr(
+        "ansible_aom.rerun.cli.main",
+        fake_rerun_main,
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["aom", "rerun", "abc12345", "--failed", "--yes"],
+    )
+    rc = cli_mod.main()
+    assert rc == 42
+    assert captured["argv"] == ["abc12345", "--failed", "--yes"]

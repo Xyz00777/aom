@@ -90,6 +90,10 @@ Examples:
   aom inspect prune --days 30           Delete sessions older than N days
   aom replay <session-id>               Replay a recorded session at original pace
   aom replay <session-id> --speed 10    Replay 10x faster
+  aom rerun                             Rerun the latest session's failed hosts
+  aom rerun <session-id> --failed       Rerun failed hosts from a specific session
+  aom rerun <session-id> --unreachable  Rerun failed AND unreachable hosts
+  aom rerun --changes-only -y           Rerun changed hosts; skip the prompt
   aom --no-record playbook.yml          Run without writing a session directory
 
 Argument forwarding:
@@ -259,6 +263,11 @@ def main() -> int:
         from ansible_aom.inspect.cli import main as inspect_main
 
         return inspect_main(sys.argv[2:])
+
+    if len(sys.argv) > 1 and sys.argv[1] == "rerun":
+        from ansible_aom.rerun.cli import main as rerun_main
+
+        return rerun_main(sys.argv[2:])
 
     parser = create_parser()
     args = parser.parse_args()
