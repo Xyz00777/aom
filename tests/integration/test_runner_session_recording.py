@@ -248,3 +248,30 @@ class TestSessionRecordingDefaults:
         assert default_dir.exists()
         sessions = list(default_dir.iterdir())
         assert len(sessions) == 1
+
+
+class TestSessionRecordingPersistsArgs:
+    """The runner must forward its ansible_args into meta.json (schema 1.1)."""
+
+    def test_runner_records_ansible_args_in_meta(self, tmp_path: Path) -> None:
+        """run_playbook persists the ansible_args it was invoked with into meta.json."""
+        from ansible_aom.runner import run_playbook
+
+        renderer = MagicMock()
+        cmd, args = _fake_ansible_command(
+            [{"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-08T10:00:01Z"}],
+            exit_code=0,
+        )
+
+        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+            run_playbook(
+                "site.yml",
+                ["-i", "inv.ini", "--tags", "web"],
+                renderer,
+                session_dir=tmp_path,
+            )
+
+        sessions = [p for p in tmp_path.iterdir() if p.is_dir()]
+        assert len(sessions) == 1
+        meta = json.loads((sessions[0] / "meta.json").read_text())
+        assert meta["ansible_args"] == ["-i", "inv.ini", "--tags", "web"]

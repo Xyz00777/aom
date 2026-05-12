@@ -78,7 +78,13 @@ class _SessionSink:
     run kept going.
     """
 
-    def __init__(self, session_dir: Path, playbook: str, renderer: object | None = None) -> None:
+    def __init__(
+        self,
+        session_dir: Path,
+        playbook: str,
+        ansible_args: list[str] | None = None,
+        renderer: object | None = None,
+    ) -> None:
         self._manager: SessionManager | None = None
         self._session_id: str | None = None
         self._renderer = renderer
@@ -86,7 +92,7 @@ class _SessionSink:
         try:
             session_dir.mkdir(parents=True, exist_ok=True)
             manager = SessionManager(session_dir=session_dir, playbook=playbook)
-            self._session_id = manager.start_session(playbook)
+            self._session_id = manager.start_session(playbook, ansible_args=ansible_args or [])
             self._manager = manager
         except OSError as exc:
             logger.debug("session recording disabled (start failed): %s", exc)
@@ -313,7 +319,12 @@ def run_playbook(
 
     sink: _SessionSink | _NullSink
     if record:
-        sink = _SessionSink(session_dir or _default_session_dir(), playbook, renderer=renderer)
+        sink = _SessionSink(
+            session_dir or _default_session_dir(),
+            playbook,
+            ansible_args=ansible_args,
+            renderer=renderer,
+        )
     else:
         sink = _NullSink()
 
