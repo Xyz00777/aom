@@ -483,3 +483,84 @@ class TestCompletionTitleUpdate:
             await pilot.pause(0.4)
 
             assert "✖" in app.title
+
+
+class TestEndToEndThreeTasks:
+    """Spec headline: three task_starts → three task nodes after one tick."""
+
+    @pytest.mark.asyncio
+    async def test_three_task_starts_appear_in_tree(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from ansible_aom.core.models import PlayDefinition, TaskDefinition
+        from ansible_aom.tui.screens.main import MainScreen
+        from ansible_aom.tui.widgets.task_tree import TaskTree
+
+        events_done = Event()
+
+        def fake_run_playbook(
+            playbook: str,
+            ansible_args: list[str],
+            renderer: object,
+            timeout: float = 0.5,
+            session_dir: Path | None = None,
+        ) -> int:
+            renderer.start(playbook, ansible_args)
+            renderer.set_definitions(
+                [
+                    PlayDefinition(
+                        id="p1",
+                        name="Setup",
+                        hosts="all",
+                        resolved_hosts=["web1"],
+                        tasks=[
+                            TaskDefinition(
+                                name=f"Task {i}",
+                                role=None,
+                                tags=[],
+                                play_id="p1",
+                                play_order=0,
+                                task_order=i,
+                            )
+                            for i in range(3)
+                        ],
+                    )
+                ]
+            )
+            renderer.update_state(
+                {
+                    "_event": "v2_playbook_on_play_start",
+                    "_timestamp": "2026-05-12T10:00:00Z",
+                    "play": {"id": "p1", "name": "Setup"},
+                }
+            )
+            for i in range(3):
+                renderer.update_state(
+                    {
+                        "_event": "v2_playbook_on_task_start",
+                        "_timestamp": f"2026-05-12T10:00:0{i + 1}Z",
+                        "task": {"id": f"t{i}", "name": f"Task {i}"},
+                    }
+                )
+            events_done.set()
+            renderer.handle_completion(0, "completed")
+            return 0
+
+        monkeypatch.setattr("ansible_aom.tui.app.run_playbook", fake_run_playbook)
+
+        app = AOMApp(playbook="site.yml", ansible_args=[], session_dir=tmp_path)
+
+        async with app.run_test() as pilot:
+            for _ in range(50):
+                if events_done.is_set():
+                    break
+                await pilot.pause(0.02)
+            await pilot.pause(0.4)
+
+            screen = app.screen
+            assert isinstance(screen, MainScreen)
+            tree = screen.query_one(TaskTree)
+            play_nodes = list(tree.root.children)
+            assert len(play_nodes) == 1, "expected one play node"
+            task_nodes = list(play_nodes[0].children)
+            assert len(task_nodes) == 3, f"expected 3 task nodes, got {len(task_nodes)}"
