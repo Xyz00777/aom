@@ -96,3 +96,212 @@ def test_json_renderer_noop_methods_emit_nothing(capsys):
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == ""
+
+
+# =============================================================================
+# Task 3 tests: handle_completion JSON shape
+# =============================================================================
+
+import json  # noqa: E402
+from datetime import datetime, timezone  # noqa: E402
+
+
+def _state_two_hosts_one_failure():
+    """web1: 2 ok + 1 changed; web2: 1 ok + 1 failed (msg='boom')."""
+    from ansible_aom.core.models import (
+        HostRunState,
+        PlayRunState,
+        RunState,
+        Status,
+        TaskRunState,
+    )
+
+    state = RunState(playbook="site.yml")
+    play = PlayRunState(play_id="1", name="web", status=Status.RUNNING)
+
+    t1 = TaskRunState(task_id="t1", name="gather facts")
+    t1.hosts["web1"] = HostRunState(hostname="web1", status=Status.OK)
+    t1.hosts["web2"] = HostRunState(hostname="web2", status=Status.OK)
+    play.tasks["t1"] = t1
+
+    t2 = TaskRunState(task_id="t2", name="install nginx")
+    t2.hosts["web1"] = HostRunState(hostname="web1", status=Status.CHANGED, changed=True)
+    t2.hosts["web2"] = HostRunState(hostname="web2", status=Status.FAILED, message="boom")
+    play.tasks["t2"] = t2
+
+    t3 = TaskRunState(task_id="t3", name="restart")
+    t3.hosts["web1"] = HostRunState(hostname="web1", status=Status.OK)
+    play.tasks["t3"] = t3
+
+    state.plays["1"] = play
+    state.start_time = datetime(2026, 5, 12, 10, 30, 0, tzinfo=timezone.utc)
+    state.end_time = datetime(2026, 5, 12, 10, 30, 42, 300000, tzinfo=timezone.utc)
+    return state
+
+
+def test_handle_completion_emits_one_json_object(capsys):
+    """The renderer prints exactly one JSON object on stdout."""
+    from ansible_aom.json_renderer import JsonRenderer
+
+    renderer = JsonRenderer()
+    renderer.start("site.yml", [])
+    renderer._state = _state_two_hosts_one_failure()
+    renderer.handle_completion(1, "failed")
+
+    captured = capsys.readouterr()
+    parsed = json.loads(captured.out)
+    assert isinstance(parsed, dict)
+
+
+def test_handle_completion_schema_version_is_one(capsys):
+    from ansible_aom.json_renderer import JsonRenderer
+
+    renderer = JsonRenderer()
+    renderer.start("site.yml", [])
+    renderer._state = _state_two_hosts_one_failure()
+    renderer.handle_completion(1, "failed")
+
+    parsed = json.loads(capsys.readouterr().out)
+    assert parsed["schema_version"] == 1
+
+
+def test_handle_completion_records_playbook_and_exit_code(capsys):
+    from ansible_aom.json_renderer import JsonRenderer
+
+    renderer = JsonRenderer()
+    renderer.start("site.yml", [])
+    renderer._state = _state_two_hosts_one_failure()
+    renderer.handle_completion(1, "failed")
+
+    parsed = json.loads(capsys.readouterr().out)
+    assert parsed["playbook"] == "site.yml"
+    assert parsed["exit_code"] == 1
+
+
+def test_handle_completion_uses_state_timestamps(capsys):
+    """started_at / ended_at come from RunState when present."""
+    from ansible_aom.json_renderer import JsonRenderer
+
+    renderer = JsonRenderer()
+    renderer.start("site.yml", [])
+    renderer._state = _state_two_hosts_one_failure()
+    renderer.handle_completion(1, "failed")
+
+    parsed = json.loads(capsys.readouterr().out)
+    assert parsed["started_at"] == "2026-05-12T10:30:00+00:00"
+    assert parsed["ended_at"] == "2026-05-12T10:30:42.300000+00:00"
+    assert parsed["duration_s"] == 42.3
+
+
+def test_handle_completion_aggregates_per_host_counts(capsys):
+    """Hosts dict has one entry per host with summed counts across tasks."""
+    from ansible_aom.json_renderer import JsonRenderer
+
+    renderer = JsonRenderer()
+    renderer.start("site.yml", [])
+    renderer._state = _state_two_hosts_one_failure()
+    renderer.handle_completion(1, "failed")
+
+    parsed = json.loads(capsys.readouterr().out)
+    assert parsed["hosts"] == {
+        "web1": {"ok": 2, "changed": 1, "failed": 0, "unreachable": 0},
+        "web2": {"ok": 1, "changed": 0, "failed": 1, "unreachable": 0},
+    }
+
+
+def test_handle_completion_lists_failed_tasks(capsys):
+    """tasks_failed names host, task, and the failure message."""
+    from ansible_aom.json_renderer import JsonRenderer
+
+    renderer = JsonRenderer()
+    renderer.start("site.yml", [])
+    renderer._state = _state_two_hosts_one_failure()
+    renderer.handle_completion(1, "failed")
+
+    parsed = json.loads(capsys.readouterr().out)
+    assert parsed["tasks_failed"] == [{"host": "web2", "task": "install nginx", "msg": "boom"}]
+
+
+def test_handle_completion_unreachable_lands_in_tasks_failed(capsys):
+    """UNREACHABLE hosts also appear in tasks_failed."""
+    from ansible_aom.core.models import (
+        HostRunState,
+        PlayRunState,
+        RunState,
+        Status,
+        TaskRunState,
+    )
+    from ansible_aom.json_renderer import JsonRenderer
+
+    state = RunState(playbook="site.yml")
+    play = PlayRunState(play_id="1", name="p", status=Status.RUNNING)
+    t1 = TaskRunState(task_id="t1", name="ping")
+    t1.hosts["db1"] = HostRunState(
+        hostname="db1", status=Status.UNREACHABLE, message="ssh timeout"
+    )
+    play.tasks["t1"] = t1
+    state.plays["1"] = play
+    state.start_time = datetime(2026, 5, 12, 10, 30, 0, tzinfo=timezone.utc)
+    state.end_time = datetime(2026, 5, 12, 10, 30, 1, tzinfo=timezone.utc)
+
+    renderer = JsonRenderer()
+    renderer.start("site.yml", [])
+    renderer._state = state
+    renderer.handle_completion(2, "failed")
+
+    parsed = json.loads(capsys.readouterr().out)
+    assert parsed["exit_code"] == 2
+    assert parsed["tasks_failed"] == [{"host": "db1", "task": "ping", "msg": "ssh timeout"}]
+    assert parsed["hosts"] == {
+        "db1": {"ok": 0, "changed": 0, "failed": 0, "unreachable": 1},
+    }
+
+
+def test_handle_completion_empty_state_emits_zero_exit(capsys):
+    """An empty RunState produces a valid JSON with exit_code=0 and empty hosts."""
+    from ansible_aom.json_renderer import JsonRenderer
+
+    renderer = JsonRenderer()
+    renderer.start("empty.yml", [])
+    renderer.handle_completion(0, "completed")
+
+    parsed = json.loads(capsys.readouterr().out)
+    assert parsed["schema_version"] == 1
+    assert parsed["playbook"] == "empty.yml"
+    assert parsed["exit_code"] == 0
+    assert parsed["hosts"] == {}
+    assert parsed["tasks_failed"] == []
+    datetime.fromisoformat(parsed["started_at"])
+    datetime.fromisoformat(parsed["ended_at"])
+
+
+def test_handle_completion_falls_back_to_wall_clock_when_state_lacks_timestamps(capsys):
+    """When state.start_time / end_time are None we use wall clock."""
+    from ansible_aom.core.models import (
+        HostRunState,
+        PlayRunState,
+        RunState,
+        Status,
+        TaskRunState,
+    )
+    from ansible_aom.json_renderer import JsonRenderer
+
+    state = RunState(playbook="site.yml")
+    play = PlayRunState(play_id="1", name="p", status=Status.RUNNING)
+    t1 = TaskRunState(task_id="t1", name="t")
+    t1.hosts["h"] = HostRunState(hostname="h", status=Status.OK)
+    play.tasks["t1"] = t1
+    state.plays["1"] = play
+    # Deliberately leave state.start_time / end_time as None.
+
+    renderer = JsonRenderer()
+    renderer.start("site.yml", [])
+    renderer._state = state
+    renderer.handle_completion(0, "completed")
+
+    parsed = json.loads(capsys.readouterr().out)
+    started = datetime.fromisoformat(parsed["started_at"])
+    ended = datetime.fromisoformat(parsed["ended_at"])
+    assert started.tzinfo is not None
+    assert ended.tzinfo is not None
+    assert parsed["duration_s"] >= 0.0
