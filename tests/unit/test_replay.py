@@ -259,3 +259,64 @@ class TestReplayCompletionFromMeta:
         replay_session(tmp_path, "noStatus", renderer, speed=0)
 
         renderer.handle_completion.assert_called_once_with(0, "completed")
+
+
+class TestReplayKeyboardInterrupt:
+    """User hits Ctrl+C mid-replay → renderer sees handle_completion(130, 'crashed')."""
+
+    def test_keyboard_interrupt_during_sleep(self, tmp_path: Path) -> None:
+        from ansible_aom.replay import replay_session
+
+        events = [
+            {"_event": "a", "_timestamp": "2026-05-08T10:00:00Z"},
+            {"_event": "b", "_timestamp": "2026-05-08T10:00:01Z"},
+            {"_event": "c", "_timestamp": "2026-05-08T10:00:02Z"},
+        ]
+        _make_session(tmp_path, "kc", events)
+
+        renderer = MagicMock()
+
+        # Sleep raises KeyboardInterrupt the second time it's called
+        # (i.e. between events b and c).
+        call_count = {"n": 0}
+
+        def fake_sleep(seconds: float) -> None:
+            call_count["n"] += 1
+            if call_count["n"] >= 2:
+                raise KeyboardInterrupt
+
+        exit_code = replay_session(
+            session_dir=tmp_path,
+            session_id="kc",
+            renderer=renderer,
+            speed=1.0,
+            sleeper=fake_sleep,
+        )
+
+        assert exit_code == 130
+        renderer.handle_completion.assert_called_once_with(130, "crashed")
+        # Renderer should have seen events a and b, not c.
+        seen = [c.args[0]["_event"] for c in renderer.update_state.call_args_list]
+        assert seen == ["a", "b"]
+
+    def test_keyboard_interrupt_during_update_state(self, tmp_path: Path) -> None:
+        from ansible_aom.replay import replay_session
+
+        events = [
+            {"_event": "a", "_timestamp": "2026-05-08T10:00:00Z"},
+            {"_event": "b", "_timestamp": "2026-05-08T10:00:01Z"},
+        ]
+        _make_session(tmp_path, "kc2", events)
+
+        renderer = MagicMock()
+        renderer.update_state.side_effect = KeyboardInterrupt
+
+        exit_code = replay_session(
+            session_dir=tmp_path,
+            session_id="kc2",
+            renderer=renderer,
+            speed=0,
+        )
+
+        assert exit_code == 130
+        renderer.handle_completion.assert_called_once_with(130, "crashed")

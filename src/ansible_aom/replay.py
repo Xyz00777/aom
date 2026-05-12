@@ -67,8 +67,9 @@ def replay_session(
             ``time.sleep``.
 
     Returns:
-        ``0`` on a successful replay, ``1`` when the session can't be
-        loaded.
+        ``0`` on a successful replay, ``130`` if the user pressed
+        Ctrl+C mid-replay (mirrors ``runner.run_playbook``), ``1`` when
+        the session can't be loaded.
     """
     session = load_session(session_id, session_dir)
     if session is None:
@@ -78,15 +79,15 @@ def replay_session(
     events = list(session.get("events", []))
 
     renderer.start(playbook, [])
+    interrupted = False
     try:
         previous_ts: datetime | None = None
         for event in events:
             current_ts = _parse_timestamp(event.get("_timestamp"))
             if previous_ts is not None and current_ts is not None and speed:
-                # Negative deltas can occur in real ansible JSONL when
-                # callbacks fire from different threads (R-risk: real
-                # streams are not strictly monotonic). Clamp to zero so
-                # we never call sleep(-x).
+                # Negative deltas can occur when ansible callbacks fire
+                # from different threads. Clamp to zero so we never call
+                # sleep with a negative argument.
                 delta = (current_ts - previous_ts).total_seconds()
                 if delta < 0:
                     delta = 0.0
@@ -96,10 +97,13 @@ def replay_session(
             renderer.update_state(event)
             if current_ts is not None:
                 previous_ts = current_ts
+    except KeyboardInterrupt:
+        interrupted = True
     finally:
-        # Final completion derived from meta.json status; default to
-        # "completed" when missing. Tasks 9 + 10 will widen this.
-        status = str(session.get("status") or "completed")
-        renderer.handle_completion(0, status)
+        if interrupted:
+            renderer.handle_completion(130, "crashed")
+        else:
+            status = str(session.get("status") or "completed")
+            renderer.handle_completion(0, status)
         renderer.stop()
-    return 0
+    return 130 if interrupted else 0
