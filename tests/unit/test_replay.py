@@ -81,3 +81,74 @@ class TestReplaySessionBasic:
         assert exit_code != 0
         renderer.start.assert_not_called()
         renderer.update_state.assert_not_called()
+
+
+class TestReplaySpeedControl:
+    """speed=0 means no sleeps; speed=2 halves them; default 1× honors deltas."""
+
+    def test_speed_zero_makes_no_sleep_calls(self, tmp_path: Path) -> None:
+        from ansible_aom.replay import replay_session
+
+        events = [
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-08T10:00:00Z"},
+            {"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-08T10:00:30Z"},
+        ]
+        _make_session(tmp_path, "s1", events)
+
+        sleeps: list[float] = []
+        renderer = MagicMock()
+        replay_session(
+            session_dir=tmp_path,
+            session_id="s1",
+            renderer=renderer,
+            speed=0,
+            sleeper=sleeps.append,
+        )
+
+        assert sleeps == []
+
+    def test_speed_one_sleeps_real_delta_seconds(self, tmp_path: Path) -> None:
+        from ansible_aom.replay import replay_session
+
+        events = [
+            {"_event": "a", "_timestamp": "2026-05-08T10:00:00Z"},
+            {"_event": "b", "_timestamp": "2026-05-08T10:00:01Z"},
+            {"_event": "c", "_timestamp": "2026-05-08T10:00:03Z"},
+        ]
+        _make_session(tmp_path, "s2", events)
+
+        sleeps: list[float] = []
+        renderer = MagicMock()
+        replay_session(
+            session_dir=tmp_path,
+            session_id="s2",
+            renderer=renderer,
+            speed=1.0,
+            sleeper=sleeps.append,
+        )
+
+        # Two gaps (1s, 2s) → two sleeps of ~1.0 and ~2.0.
+        assert len(sleeps) == 2
+        assert sleeps[0] == pytest.approx(1.0, abs=1e-6)
+        assert sleeps[1] == pytest.approx(2.0, abs=1e-6)
+
+    def test_speed_two_halves_sleeps(self, tmp_path: Path) -> None:
+        from ansible_aom.replay import replay_session
+
+        events = [
+            {"_event": "a", "_timestamp": "2026-05-08T10:00:00Z"},
+            {"_event": "b", "_timestamp": "2026-05-08T10:00:02Z"},
+        ]
+        _make_session(tmp_path, "s3", events)
+
+        sleeps: list[float] = []
+        renderer = MagicMock()
+        replay_session(
+            session_dir=tmp_path,
+            session_id="s3",
+            renderer=renderer,
+            speed=2.0,
+            sleeper=sleeps.append,
+        )
+
+        assert sleeps == [pytest.approx(1.0, abs=1e-6)]

@@ -79,8 +79,23 @@ def replay_session(
 
     renderer.start(playbook, [])
     try:
+        previous_ts: datetime | None = None
         for event in events:
+            current_ts = _parse_timestamp(event.get("_timestamp"))
+            if previous_ts is not None and current_ts is not None and speed:
+                # Negative deltas can occur in real ansible JSONL when
+                # callbacks fire from different threads (R-risk: real
+                # streams are not strictly monotonic). Clamp to zero so
+                # we never call sleep(-x).
+                delta = (current_ts - previous_ts).total_seconds()
+                if delta < 0:
+                    delta = 0.0
+                wait = delta / float(speed)
+                if wait > 0:
+                    sleeper(wait)
             renderer.update_state(event)
+            if current_ts is not None:
+                previous_ts = current_ts
     finally:
         # Final completion derived from meta.json status; default to
         # "completed" when missing. Tasks 9 + 10 will widen this.
