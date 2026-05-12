@@ -169,7 +169,7 @@ See README.md and SPECIFICATION.md in the source tree for full details.
     return parser
 
 
-def _run_compact(playbook: str, ansible_args: list[str]) -> int:
+def _run_compact(playbook: str, ansible_args: list[str], record: bool = True) -> int:
     """Spawn the legacy compact renderer via ``run_playbook``.
 
     The compact path stays synchronous: ``run_playbook`` owns the
@@ -180,7 +180,7 @@ def _run_compact(playbook: str, ansible_args: list[str]) -> int:
 
     try:
         renderer = create_renderer(tui_mode=False, is_tty=sys.stdout.isatty())
-        return run_playbook(playbook, ansible_args, renderer)
+        return run_playbook(playbook, ansible_args, renderer, record=record)
     except KeyboardInterrupt:
         print("Cancelled by user", file=sys.stderr)
         return 130
@@ -270,9 +270,10 @@ def main() -> int:
 
         ansible_args = ensure_inventory_arg(args.ansible_args)
 
+        record = not args.no_record
         if args.tui:
-            return _run_tui(args.playbook, ansible_args)
-        return _run_compact(args.playbook, ansible_args)
+            return _run_tui(args.playbook, ansible_args, record=record)
+        return _run_compact(args.playbook, ansible_args, record=record)
 
     parser.print_help()
     return 0

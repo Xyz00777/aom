@@ -73,3 +73,36 @@ class TestNoRecordParserFlag:
         parser = create_parser()
         args = parser.parse_args(["playbook.yml"])
         assert args.no_record is False
+
+
+class TestNoRecordCompactPlumbing:
+    """`aom --no-record playbook.yml` calls run_playbook(..., record=False)."""
+
+    def test_no_record_propagates_to_runner(self) -> None:
+        from ansible_aom.cli import main
+
+        with (
+            patch("ansible_aom.runner.run_playbook", return_value=0) as mock_run,
+            patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("sys.argv", ["aom", "--no-record", "playbook.yml"]),
+        ):
+            assert main() == 0
+
+        # record=False must be in the kwargs.
+        _args, kwargs = mock_run.call_args
+        assert kwargs.get("record") is False
+
+    def test_default_propagates_record_true(self) -> None:
+        from ansible_aom.cli import main
+
+        with (
+            patch("ansible_aom.runner.run_playbook", return_value=0) as mock_run,
+            patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("sys.argv", ["aom", "playbook.yml"]),
+        ):
+            main()
+
+        _args, kwargs = mock_run.call_args
+        # Either explicit True, or absent (default True). Accept both
+        # so the source can choose either style.
+        assert kwargs.get("record", True) is True
