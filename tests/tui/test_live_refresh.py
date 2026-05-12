@@ -60,3 +60,54 @@ class TestDirtyCounter:
         before = app._dirty
         app.set_definitions([PlayDefinition(id="1", name="P", hosts="all")])
         assert app._dirty == before + 1
+
+
+class TestTreePopulationFromDefinitions:
+    """First-time tree population uses preflight definitions."""
+
+    def test_populate_from_definitions_adds_play_nodes(self) -> None:
+        from ansible_aom.core.models import PlayDefinition, TaskDefinition
+        from ansible_aom.tui.widgets.task_tree import TaskTree
+
+        tree = TaskTree("Plays")
+        defs = [
+            PlayDefinition(
+                id="p1",
+                name="Setup",
+                hosts="webservers",
+                resolved_hosts=["web1", "web2"],
+                tasks=[
+                    TaskDefinition(
+                        name="Install nginx",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                ],
+            )
+        ]
+
+        tree.populate_from_definitions(defs)
+
+        # One play node, with one task child, with two host grandchildren.
+        play_nodes = list(tree.root.children)
+        assert len(play_nodes) == 1
+        task_nodes = list(play_nodes[0].children)
+        assert len(task_nodes) == 1
+        host_nodes = list(task_nodes[0].children)
+        assert len(host_nodes) == 2
+
+    def test_populate_from_definitions_is_idempotent(self) -> None:
+        from ansible_aom.core.models import PlayDefinition
+        from ansible_aom.tui.widgets.task_tree import TaskTree
+
+        tree = TaskTree("Plays")
+        defs = [PlayDefinition(id="p1", name="Setup", hosts="all", resolved_hosts=[])]
+
+        tree.populate_from_definitions(defs)
+        tree.populate_from_definitions(defs)
+
+        # Calling twice with the same defs must not duplicate nodes.
+        assert len(list(tree.root.children)) == 1
