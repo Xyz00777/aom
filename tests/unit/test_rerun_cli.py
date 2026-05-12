@@ -66,3 +66,86 @@ class TestResolveSessionId:
         _make_session(state_dir, sid_b, "2026-05-12T10:00:00Z")
         with pytest.raises(LookupError, match="ambiguous"):
             _resolve_session_id(state_dir, "01971111")
+
+
+from ansible_aom.rerun.cli import _compose_host_set  # noqa: E402
+
+
+def _session_dict(events: list[dict]) -> dict:
+    return {"events": events, "playbook": "site.yml", "ansible_args": []}
+
+
+class TestComposeHostSet:
+    def _events(self) -> list[dict]:
+        return [
+            {
+                "_event": "v2_runner_on_failed",
+                "task": {"name": "T1"},
+                "hosts": {"web2": {"failed": True}},
+            },
+            {
+                "_event": "v2_runner_on_unreachable",
+                "task": {"name": "T2"},
+                "hosts": {"web1": {"unreachable": True}},
+            },
+            {
+                "_event": "v2_runner_on_ok",
+                "task": {"name": "T3"},
+                "hosts": {"web3": {"ok": True, "changed": True}},
+            },
+        ]
+
+    def test_default_no_flag_returns_failed_only(self):
+        result = _compose_host_set(
+            _session_dict(self._events()),
+            failed=False,
+            unreachable=False,
+            changes_only=False,
+        )
+        assert result == {"web2"}
+
+    def test_failed_flag_returns_failed_hosts(self):
+        result = _compose_host_set(
+            _session_dict(self._events()),
+            failed=True,
+            unreachable=False,
+            changes_only=False,
+        )
+        assert result == {"web2"}
+
+    def test_unreachable_flag_includes_failed_and_unreachable(self):
+        """--unreachable is a strict superset of --failed (per spec)."""
+        result = _compose_host_set(
+            _session_dict(self._events()),
+            failed=False,
+            unreachable=True,
+            changes_only=False,
+        )
+        assert result == {"web1", "web2"}
+
+    def test_changes_only_returns_changed_hosts(self):
+        result = _compose_host_set(
+            _session_dict(self._events()),
+            failed=False,
+            unreachable=False,
+            changes_only=True,
+        )
+        assert result == {"web3"}
+
+    def test_combined_flags_union(self):
+        result = _compose_host_set(
+            _session_dict(self._events()),
+            failed=True,
+            unreachable=True,
+            changes_only=True,
+        )
+        assert result == {"web1", "web2", "web3"}
+
+    def test_no_matching_hosts_returns_empty(self):
+        result = _compose_host_set(
+            _session_dict([]),
+            failed=True,
+            unreachable=True,
+            changes_only=True,
+        )
+        assert result == set()
