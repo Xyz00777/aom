@@ -931,6 +931,54 @@ def test_aom_rerun_dispatches_to_rerun_main(monkeypatch):
     assert captured["argv"] == ["abc12345", "--failed", "--yes"]
 
 
+class TestInstallCompletionFlag:
+    """F5: ``aom --install-completion <shell>`` prints the rc snippet."""
+
+    def test_bash_prints_snippet_to_stdout(self, capsys):
+        from ansible_aom.cli import main
+
+        with patch("sys.argv", ["aom", "--install-completion", "bash"]):
+            rc = main()
+
+        captured = capsys.readouterr()
+        assert rc == 0
+        assert "register-python-argcomplete" in captured.out
+        assert "aom" in captured.out
+
+    def test_zsh_prints_snippet_to_stdout(self, capsys):
+        from ansible_aom.cli import main
+
+        with patch("sys.argv", ["aom", "--install-completion", "zsh"]):
+            rc = main()
+
+        captured = capsys.readouterr()
+        assert rc == 0
+        assert "register-python-argcomplete" in captured.out
+        assert "bashcompinit" in captured.out  # zsh-specific glue
+
+    def test_fish_prints_snippet_to_stdout(self, capsys):
+        from ansible_aom.cli import main
+
+        with patch("sys.argv", ["aom", "--install-completion", "fish"]):
+            rc = main()
+
+        captured = capsys.readouterr()
+        assert rc == 0
+        assert "register-python-argcomplete" in captured.out
+        assert "fish" in captured.out
+
+    def test_unknown_shell_returns_exit_2_and_prints_to_stderr(self, capsys):
+        from ansible_aom.cli import main
+
+        with patch("sys.argv", ["aom", "--install-completion", "powershell"]):
+            rc = main()
+
+        captured = capsys.readouterr()
+        assert rc == 2
+        assert "powershell" in captured.err
+        assert "bash" in captured.err and "zsh" in captured.err and "fish" in captured.err
+
+
 class TestArgcompleteHook:
     """F5: argcomplete.autocomplete must be called inside create_parser."""
 

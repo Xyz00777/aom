@@ -184,6 +184,18 @@ See README.md and SPECIFICATION.md in the source tree for full details.
     )
 
     parser.add_argument(
+        "--install-completion",
+        choices=("bash", "zsh", "fish"),
+        metavar="SHELL",
+        default=None,
+        help=(
+            "Print the rc-file snippet for the given shell to stdout, "
+            "then exit. Pipe to your rc file (e.g. "
+            "`aom --install-completion bash >> ~/.bashrc`)."
+        ),
+    )
+
+    parser.add_argument(
         "playbook",
         nargs="?",
         default=None,
@@ -282,6 +294,25 @@ def main() -> int:
 
     if "--help" in sys.argv or "-h" in sys.argv:
         create_parser().print_help()
+        return 0
+
+    if "--install-completion" in sys.argv:
+        from ansible_aom.completion import SUPPORTED_SHELLS, completion_snippet
+
+        # Read the value ourselves; we cannot call create_parser().parse_args()
+        # here because argcomplete may have side-effects we want to avoid on
+        # this fast path, and because parse_args would also require a playbook
+        # later in main(). Pulling the value with a tiny lookup keeps the path
+        # explicit and side-effect-free.
+        idx = sys.argv.index("--install-completion")
+        shell = sys.argv[idx + 1] if idx + 1 < len(sys.argv) else ""
+        if shell not in SUPPORTED_SHELLS:
+            print(
+                f"aom: unsupported shell {shell!r}; expected one of {', '.join(SUPPORTED_SHELLS)}",
+                file=sys.stderr,
+            )
+            return 2
+        sys.stdout.write(completion_snippet(shell))
         return 0
 
     if len(sys.argv) > 1 and sys.argv[1] == "replay":
