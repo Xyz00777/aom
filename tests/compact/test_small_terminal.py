@@ -138,7 +138,10 @@ class TestDegradedModeFallthrough:
         # Print the warning above, then capture only update() output.
         buf2 = io.StringIO()
         with redirect_stdout(buf2):
-            display.update("status: 1/3 hosts")
+            # Keep force_size small so the R4 size re-check (added in
+            # Task 4) still observes a degraded terminal; without it the
+            # live shell's real size would re-enable the panel.
+            display.update("status: 1/3 hosts", force_size=(40, 8))
 
         out = buf2.getvalue()
         assert self.BSU not in out
@@ -191,3 +194,94 @@ class TestDegradedModeFallthrough:
         assert buf.getvalue() == ""
         # The stored content was wiped though, so a re-enable starts blank.
         assert display._content == ""
+
+
+class TestReEnableOnResize:
+    """The 'SIGWINCH' equivalent: a previously-degraded display
+    re-enables its live panel when the next update() observes a
+    terminal at or above MINIMUM_SIZE. And vice versa: a running
+    display drops into degraded mode when the terminal shrinks."""
+
+    BSU = "\x1b[?2026h"
+    ESU = "\x1b[?2026l"
+    HIDE_CURSOR = "\x1b[?25l"
+
+    def test_update_re_enables_panel_when_terminal_grows(self) -> None:
+        display = Display(is_tty=True)
+        # Start small — degraded.
+        with redirect_stdout(io.StringIO()):
+            display.start(force_size=(40, 8))
+        assert display._degraded is True
+
+        # Pretend the user resized to 120×40.
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            display.update("status: 1/3 hosts", force_size=(120, 40))
+
+        assert display._degraded is False
+        assert display._is_running is True
+        out = buf.getvalue()
+        # Re-enable emits the hide-cursor sequence and at least one DEC frame.
+        assert self.HIDE_CURSOR in out, f"hide-cursor not emitted on re-enable:\n{out!r}"
+        assert self.BSU in out and self.ESU in out
+
+    def test_re_enable_does_not_reprint_warning(self) -> None:
+        display = Display(is_tty=True)
+        with redirect_stdout(io.StringIO()):
+            display.start(force_size=(40, 8))
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            # Grow back.
+            display.update("status", force_size=(120, 40))
+            # Then shrink AGAIN — we should not see a second copy of the warning.
+            display.update("status", force_size=(40, 8))
+            display.update("status", force_size=(40, 8))
+
+        out = buf.getvalue()
+        assert out.count("terminal too small") <= 1, (
+            f"warning re-printed on re-degrade:\n{out!r}"
+        )
+
+    def test_update_drops_into_degraded_mode_when_terminal_shrinks(self) -> None:
+        display = Display(is_tty=True)
+        with redirect_stdout(io.StringIO()):
+            display.start(force_size=(120, 40))
+        assert display._degraded is False
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            display.update("status", force_size=(40, 8))
+
+        assert display._degraded is True
+        assert display._is_running is False
+        # The freshly-degraded display should also have its first
+        # warning emitted right then (it wasn't printed at start()
+        # because the terminal was big enough then).
+        assert "terminal too small" in buf.getvalue()
+
+    def test_update_without_force_size_falls_back_to_real_terminal(
+        self, monkeypatch
+    ) -> None:
+        """force_size is the test seam; production calls don't pass it.
+        Verify the real shutil path is used when force_size is None."""
+        from ansible_aom.compact import display as display_module
+
+        display = Display(is_tty=True)
+        with redirect_stdout(io.StringIO()):
+            display.start(force_size=(40, 8))
+        assert display._degraded is True
+
+        # Simulate the real terminal coming back to 120×40 by patching
+        # shutil.get_terminal_size at module scope (the import inside
+        # display.py uses ``shutil.get_terminal_size`` directly).
+        monkeypatch.setattr(
+            display_module.shutil,
+            "get_terminal_size",
+            lambda *a, **kw: type("S", (), {"columns": 120, "lines": 40, "__iter__": lambda self: iter((120, 40))})(),
+        )
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            display.update("status")
+        assert display._degraded is False

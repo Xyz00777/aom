@@ -177,7 +177,12 @@ class Display:
         self._is_running = False
         self._status_rows = 0
 
-    def update(self, content: str | None = None) -> None:
+    def update(
+        self,
+        content: str | None = None,
+        *,
+        force_size: tuple[int, int] | None = None,
+    ) -> None:
         """Redraw the status block with new content.
 
         Updates within _THROTTLE_INTERVAL_S of the last write are coalesced:
@@ -185,16 +190,61 @@ class Display:
         call will render whatever the latest content is. If content is None,
         the current content is re-rendered.
 
-        In degraded mode (R4 — terminal smaller than MINIMUM_SIZE) the
-        status content is stored on the instance but no frame is emitted;
-        flooding stdout with 4Hz status snapshots would be unreadable.
-        Log lines still print via print_log() — that's the user's window
-        into what's happening.
+        Re-checks the terminal size on every call (R4): if the terminal
+        has grown past MINIMUM_SIZE since we last looked, exit degraded
+        mode and re-enable the panel; if it has shrunk below, enter
+        degraded mode and wipe any visible panel.
+
+        In degraded mode the status content is stored on the instance
+        but no frame is emitted — flooding stdout with 4Hz status
+        snapshots would be unreadable. Log lines still print via
+        print_log() — that's the user's window into what's happening.
+
+        Args:
+            content: New status content, or None to re-render the
+                previously-stored content.
+            force_size: Test seam — overrides the kernel-reported size.
+                Production callers leave this None.
         """
         if not self._is_tty:
             return
         if content is not None:
             self._content = content
+
+        # R4: re-check size on every update so resize is reflected within
+        # one render. shutil.get_terminal_size reads TIOCGWINSZ which the
+        # kernel keeps current — no signal handler required.
+        cols, rows = self._current_size(force_size)
+        too_small = (cols, rows) < MINIMUM_SIZE
+
+        if too_small and not self._degraded:
+            # Terminal shrank mid-run: wipe the live panel before going dark.
+            if self._is_running:
+                frame = _BSU + self._rewind_status() + _CLEAR_TO_EOS + _SHOW_CURSOR + _ESU
+                sys.stdout.write(frame)
+                sys.stdout.flush()
+                self._status_rows = 0
+                self._is_running = False
+            self._degraded = True
+            if not self._degraded_warning_printed:
+                print(
+                    f"[aom] terminal too small ({cols}×{rows}); "
+                    f"minimum is {MINIMUM_SIZE[0]}×{MINIMUM_SIZE[1]}. "
+                    f"Falling back to plain log output until you resize.",
+                )
+                self._degraded_warning_printed = True
+            return
+
+        if not too_small and self._degraded:
+            # Terminal grew back: re-enable the live panel.
+            self._degraded = False
+            sys.stdout.write(_HIDE_CURSOR)
+            sys.stdout.flush()
+            self._is_running = True
+            # Reset throttle so the very first re-enabled frame goes
+            # through immediately rather than waiting on a stale clock.
+            self._last_update_time = 0.0
+
         if self._degraded:
             return
         if not self._is_running:
@@ -256,6 +306,19 @@ class Display:
     @property
     def is_tty(self) -> bool:
         return self._is_tty
+
+    def _current_size(self, force_size: tuple[int, int] | None) -> tuple[int, int]:
+        """Resolve (cols, rows) — the test override or the live kernel value.
+
+        ``shutil.get_terminal_size`` reads TIOCGWINSZ which the kernel
+        keeps current via SIGWINCH, so calling it on every render is the
+        cheapest "did the user resize?" check. No real signal handler
+        needed — see R4 in .sisyphus/notepads/plans/robustness.md.
+        """
+        if force_size is not None:
+            return force_size
+        size = shutil.get_terminal_size((MINIMUM_COLUMNS, MINIMUM_LINES))
+        return (size.columns, size.lines)
 
     def _rewind_status(self) -> str:
         """Cursor sequence to move back to the start of the status block.
