@@ -412,3 +412,50 @@ def test_json_renderer_through_full_lifecycle(capsys):
     assert parsed["started_at"].startswith("2026-05-12T10:30:00")
     assert parsed["ended_at"].startswith("2026-05-12T10:30:03")
     assert parsed["duration_s"] == 3.0
+
+
+# =============================================================================
+# Task 7 tests: interactive-prompt refusal behaviour
+# =============================================================================
+
+
+def test_password_prompt_refuses_to_stderr(capsys):
+    """Password prompts under --format json are refused with empty string + stderr message."""
+    from ansible_aom.json_renderer import JsonRenderer
+
+    renderer = JsonRenderer()
+    result = renderer.handle_password_prompt("BECOME password: ")
+
+    assert result == ""
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "refusing" in captured.err.lower()
+    assert "interactive prompt" in captured.err.lower()
+
+
+def test_interactive_prompt_refuses_to_stderr(capsys):
+    """Pause/vars_prompt prompts under --format json are also refused."""
+    from ansible_aom.json_renderer import JsonRenderer
+
+    renderer = JsonRenderer()
+    result = renderer.handle_interactive_prompt("Press Enter to continue: ")
+
+    assert result == ""
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "refusing" in captured.err.lower()
+
+
+def test_prompt_refusal_does_not_corrupt_completion_json(capsys):
+    """Even after a prompt refusal, handle_completion still emits valid JSON on stdout."""
+    from ansible_aom.json_renderer import JsonRenderer
+
+    renderer = JsonRenderer()
+    renderer.start("site.yml", [])
+    renderer.handle_password_prompt("BECOME password: ")
+    renderer.handle_completion(2, "failed")
+
+    captured = capsys.readouterr()
+    parsed = json.loads(captured.out)
+    assert parsed["schema_version"] == 1
+    assert "refusing" in captured.err.lower()
