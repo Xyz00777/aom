@@ -496,3 +496,34 @@ def create_session_summary(session: dict[str, Any]) -> dict[str, Any]:
         summary["summary_note"] = f"{summary['malformed_lines']} malformed lines"
 
     return summary
+
+
+def collect_failed_hosts(session: dict[str, Any]) -> set[str]:
+    """Return the set of hostnames that hit ``v2_runner_on_failed`` in this session.
+
+    Pure: takes a session dict (as returned by ``load_session``) and
+    returns the deduplicated set of failed hostnames. No I/O. Used by
+    ``aom rerun --failed`` to build the ``--limit`` argument for the
+    re-invoked ansible-playbook.
+
+    Multi-host failure events are flattened: a single
+    ``v2_runner_on_failed`` carrying ``{"web2": ..., "web3": ...}`` adds
+    both names. A host that fails in multiple tasks contributes one
+    entry only.
+
+    Args:
+        session: Session dict from ``load_session`` (or any dict with an
+            ``events`` list of JSONL event dicts). Sessions without an
+            ``events`` key return an empty set.
+
+    Returns:
+        Set of hostname strings.
+    """
+    failed: set[str] = set()
+    for event in session.get("events", []):
+        if event.get("_event") != "v2_runner_on_failed":
+            continue
+        hosts = event.get("hosts") or {}
+        for hostname in hosts.keys():
+            failed.add(hostname)
+    return failed
