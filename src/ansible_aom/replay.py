@@ -24,12 +24,14 @@ Document this in ``aom replay --help`` (see ``cli._run_replay``).
 
 from __future__ import annotations
 
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
 from ansible_aom.core.session import load_session
+from ansible_aom.renderer.factory import create_renderer
 from ansible_aom.renderer.protocol import Renderer
 
 
@@ -109,11 +111,90 @@ def replay_session(
     return 130 if interrupted else 0
 
 
-def cli_main(argv: list[str]) -> int:
-    """Entry point for the ``aom replay`` subcommand.
+_REPLAY_HELP_EPILOG = """\
+Replay reads <session-id>/events.jsonl and <session-id>/meta.json from
+the AOM state directory (default ~/.local/state/aom/sessions) and
+feeds the recorded events through the renderer of your choice.
 
-    Wired in Task 13 to argparse + factory + ``replay_session``. This
-    stub exists so the dispatcher in ``cli.main`` (Task 12) has a
-    concrete target.
+Speed control:
+  --speed 1    real time (default)
+  --speed 10   ten times faster
+  --speed 0    as fast as possible (no sleeps)
+
+  Note: a real 8-hour run replayed at 1x sleeps for 8 hours.
+  Use --speed 10 (or higher) — or --speed 0 — for long sessions.
+
+What replay does NOT reproduce:
+  * AOM-emitted warnings (preflight, deprecations, R3 disk-disabled).
+  * The preflight summary — definitions are rebuilt from
+    v2_playbook_on_play_start / v2_playbook_on_task_start events.
+  * Password-prompt log lines.
+  * stderr lines from stderr.log.
+
+Anything else that appeared in events.jsonl is replayed verbatim.
+"""
+
+
+def cli_main(argv: list[str]) -> int:
+    """Entry point for ``aom replay <session-id> [...]``.
+
+    Argparse the supplied tail (``sys.argv[2:]`` from the top-level
+    dispatcher), build a renderer via the shared factory, and call
+    ``replay_session``. The exit code mirrors ``replay_session``'s:
+
+    * ``0`` — replay finished
+    * ``1`` — session not found
+    * ``130`` — Ctrl+C mid-replay
     """
-    raise NotImplementedError("aom replay not yet wired (see plan Task 13)")
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="aom replay",
+        description="Replay a recorded AOM session through the renderer.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=_REPLAY_HELP_EPILOG,
+    )
+    parser.add_argument("session_id", help="Session ID (UUIDv7 directory name) to replay")
+    parser.add_argument(
+        "--state-dir",
+        type=Path,
+        default=Path.home() / ".local" / "state" / "aom" / "sessions",
+        help="Directory containing session subdirectories (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--speed",
+        type=float,
+        default=1.0,
+        help=(
+            "Playback rate. 1.0 = real time, 10 = 10x faster, 0 = no sleeps. "
+            "Use a high speed for long sessions."
+        ),
+    )
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--compact",
+        dest="mode",
+        action="store_const",
+        const="compact",
+        help="Use the compact renderer (default)",
+    )
+    mode.add_argument(
+        "--tui",
+        dest="mode",
+        action="store_const",
+        const="tui",
+        help="Use the full multi-panel Textual TUI",
+    )
+    parser.set_defaults(mode="compact")
+
+    args = parser.parse_args(argv)
+
+    tui_mode = args.mode == "tui"
+    renderer = create_renderer(tui_mode=tui_mode, is_tty=sys.stdout.isatty())
+
+    return replay_session(
+        session_dir=args.state_dir,
+        session_id=args.session_id,
+        renderer=renderer,
+        speed=float(args.speed),
+    )
