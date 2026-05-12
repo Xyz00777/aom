@@ -343,3 +343,72 @@ def test_factory_tui_mode_still_wins_over_format():
 
     renderer = create_renderer(tui_mode=True, format="json")
     assert isinstance(renderer, AOMApp)
+
+
+# =============================================================================
+# Task 6 tests: end-to-end smoke through Renderer lifecycle
+# =============================================================================
+
+
+def test_json_renderer_through_full_lifecycle(capsys):
+    """Drive JsonRenderer through the same call sequence run_playbook uses."""
+    from ansible_aom.json_renderer import JsonRenderer
+
+    renderer = JsonRenderer()
+    renderer.start("site.yml", ["-i", "inv.ini"])
+    renderer.set_definitions([])
+
+    # A minimal play_start → task_start → ok → stats sequence.
+    renderer.update_state(
+        {
+            "_event": "v2_playbook_on_start",
+            "_timestamp": "2026-05-12T10:30:00Z",
+        }
+    )
+    renderer.update_state(
+        {
+            "_event": "v2_playbook_on_play_start",
+            "_timestamp": "2026-05-12T10:30:00Z",
+            "play": {"id": "p1", "name": "web"},
+        }
+    )
+    renderer.update_state(
+        {
+            "_event": "v2_playbook_on_task_start",
+            "_timestamp": "2026-05-12T10:30:01Z",
+            "play": {"id": "p1", "name": "web"},
+            "task": {"id": "t1", "name": "ping"},
+        }
+    )
+    renderer.update_state(
+        {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "2026-05-12T10:30:02Z",
+            "play": {"id": "p1", "name": "web"},
+            "task": {"id": "t1", "name": "ping"},
+            "hosts": {"web1": {"changed": False}},
+        }
+    )
+    renderer.update_state(
+        {
+            "_event": "v2_playbook_on_stats",
+            "_timestamp": "2026-05-12T10:30:03Z",
+            "stats": {"web1": {"ok": 1, "failures": 0, "unreachable": 0, "changed": 0}},
+        }
+    )
+
+    renderer.handle_completion(0, "completed")
+    renderer.stop()
+
+    out = capsys.readouterr().out
+    parsed = json.loads(out)
+    assert parsed["schema_version"] == 1
+    assert parsed["playbook"] == "site.yml"
+    assert parsed["exit_code"] == 0
+    assert parsed["hosts"] == {
+        "web1": {"ok": 1, "changed": 0, "failed": 0, "unreachable": 0},
+    }
+    assert parsed["tasks_failed"] == []
+    assert parsed["started_at"].startswith("2026-05-12T10:30:00")
+    assert parsed["ended_at"].startswith("2026-05-12T10:30:03")
+    assert parsed["duration_s"] == 3.0
