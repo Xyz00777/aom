@@ -241,6 +241,11 @@ def main() -> int:
         create_parser().print_help()
         return 0
 
+    if len(sys.argv) > 1 and sys.argv[1] == "replay":
+        from ansible_aom.replay import cli_main as replay_main
+
+        return replay_main(sys.argv[2:])
+
     if len(sys.argv) > 1 and sys.argv[1] == "inspect":
         from ansible_aom.inspect.cli import main as inspect_main
 

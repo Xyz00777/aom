@@ -107,3 +107,13 @@ def replay_session(
             renderer.handle_completion(0, status)
         renderer.stop()
     return 130 if interrupted else 0
+
+
+def cli_main(argv: list[str]) -> int:
+    """Entry point for the ``aom replay`` subcommand.
+
+    Wired in Task 13 to argparse + factory + ``replay_session``. This
+    stub exists so the dispatcher in ``cli.main`` (Task 12) has a
+    concrete target.
+    """
+    raise NotImplementedError("aom replay not yet wired (see plan Task 13)")
