@@ -13,8 +13,14 @@ and ``core/`` keeps its no-renderer rule.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Callable
 
-from ansible_aom.core.session import list_sessions
+from ansible_aom.core.session import (
+    collect_changed_hosts,
+    collect_failed_hosts,
+    collect_unreachable_hosts,
+    list_sessions,
+)
 
 
 def _resolve_session_id(state_dir: Path, session_id_or_short: str | None) -> str:
@@ -57,13 +63,6 @@ def _resolve_session_id(state_dir: Path, session_id_or_short: str | None) -> str
         ids = ", ".join(s["session_id"] for s in matches)
         raise LookupError(f"Prefix {session_id_or_short!r} is ambiguous: matches {ids}")
     return matches[0]["session_id"]
-
-
-from ansible_aom.core.session import (  # noqa: E402
-    collect_changed_hosts,
-    collect_failed_hosts,
-    collect_unreachable_hosts,
-)
 
 
 def _compose_host_set(
@@ -169,3 +168,52 @@ def _build_rerun_command(
     cleaned = _strip_limit_args(original_args)
     limit_value = ",".join(sorted(hosts))
     return playbook, [*cleaned, "--limit", limit_value]
+
+
+def _confirm(
+    *,
+    playbook: str,
+    args: list[str],
+    host_count: int,
+    assume_yes: bool,
+    input_fn: Callable[[str], str] | None,
+) -> bool:
+    """Print the rerun plan + warning, then ask for Y/n confirmation.
+
+    Always prints the planned command line, host count, and a
+    one-line warning that re-running may execute non-idempotent tasks
+    (notifications, side-effecting modules, etc.) — this happens even
+    when ``assume_yes`` is set so the user sees what's about to fire.
+
+    Args:
+        playbook: Resolved playbook path.
+        args: Final ansible-playbook arg list (already includes
+            ``--limit``).
+        host_count: Length of the resolved host set, used for the
+            "running on N host(s)" line.
+        assume_yes: When True, skip the prompt and return True
+            unconditionally (still prints the plan).
+        input_fn: Injectable for tests. Defaults to ``builtins.input``
+            when None and ``assume_yes`` is False; ignored when
+            ``assume_yes`` is True.
+
+    Returns:
+        True if the user confirmed (or ``--yes`` was passed), False
+        otherwise.
+    """
+    plural = "host" if host_count == 1 else "hosts"
+    cmd_str = "ansible-playbook " + playbook + (" " + " ".join(args) if args else "")
+    print(f"Planned: {cmd_str}")
+    print(f"Targeting {host_count} {plural}.")
+    print(
+        "WARNING: re-running may execute non-idempotent tasks again "
+        "(notifications, restarts, side-effecting modules)."
+    )
+    if assume_yes:
+        return True
+
+    fn = input_fn if input_fn is not None else input
+    answer = fn("Proceed? [Y/n] ").strip().lower()
+    if answer == "":
+        return True
+    return answer in ("y", "yes")

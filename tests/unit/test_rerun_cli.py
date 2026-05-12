@@ -214,3 +214,109 @@ class TestBuildRerunCommand:
                 session={"playbook": "site.yml", "ansible_args": []},
                 hosts=set(),
             )
+
+
+import io  # noqa: E402
+from contextlib import redirect_stdout  # noqa: E402
+
+from ansible_aom.rerun.cli import _confirm  # noqa: E402
+
+
+class TestConfirm:
+    def test_yes_flag_skips_prompt_and_returns_true(self):
+        # No input function provided — would raise EOFError if called.
+        out = io.StringIO()
+        with redirect_stdout(out):
+            assert (
+                _confirm(
+                    playbook="site.yml",
+                    args=["-i", "inv.ini", "--limit", "web2,web3"],
+                    host_count=2,
+                    assume_yes=True,
+                    input_fn=None,
+                )
+                is True
+            )
+        text = out.getvalue()
+        assert "ansible-playbook site.yml -i inv.ini --limit web2,web3" in text
+        assert "2 host" in text
+        # Warning still printed even with --yes — the user should see what's
+        # about to happen.
+        assert "non-idempotent" in text.lower()
+
+    def test_default_yes_on_empty_input(self):
+        """Bare Enter (empty string) accepts the default Y."""
+        out = io.StringIO()
+        with redirect_stdout(out):
+            result = _confirm(
+                playbook="site.yml",
+                args=["--limit", "web2"],
+                host_count=1,
+                assume_yes=False,
+                input_fn=lambda _prompt: "",
+            )
+        assert result is True
+
+    def test_y_accepted(self):
+        result = _confirm(
+            playbook="site.yml",
+            args=["--limit", "web2"],
+            host_count=1,
+            assume_yes=False,
+            input_fn=lambda _prompt: "y",
+        )
+        assert result is True
+
+    def test_yes_accepted(self):
+        result = _confirm(
+            playbook="site.yml",
+            args=["--limit", "web2"],
+            host_count=1,
+            assume_yes=False,
+            input_fn=lambda _prompt: "yes",
+        )
+        assert result is True
+
+    def test_n_rejected(self):
+        result = _confirm(
+            playbook="site.yml",
+            args=["--limit", "web2"],
+            host_count=1,
+            assume_yes=False,
+            input_fn=lambda _prompt: "n",
+        )
+        assert result is False
+
+    def test_no_rejected(self):
+        result = _confirm(
+            playbook="site.yml",
+            args=["--limit", "web2"],
+            host_count=1,
+            assume_yes=False,
+            input_fn=lambda _prompt: "no",
+        )
+        assert result is False
+
+    def test_anything_else_rejected(self):
+        result = _confirm(
+            playbook="site.yml",
+            args=["--limit", "web2"],
+            host_count=1,
+            assume_yes=False,
+            input_fn=lambda _prompt: "maybe",
+        )
+        assert result is False
+
+    def test_warning_includes_idempotency_language(self):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            _confirm(
+                playbook="site.yml",
+                args=["--limit", "web2"],
+                host_count=1,
+                assume_yes=True,
+                input_fn=None,
+            )
+        text = out.getvalue().lower()
+        # Must mention non-idempotent risk explicitly so the user sees it.
+        assert "non-idempotent" in text
