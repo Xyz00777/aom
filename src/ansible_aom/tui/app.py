@@ -85,6 +85,9 @@ class AOMApp(App[None]):
         # UI tick drains these into LogPanel on the main thread (Rich
         # widgets are not thread-safe).
         self._pending_log_lines: list[str] = []
+        # Last _dirty value the periodic tick observed; used so the
+        # tick can short-circuit when nothing has changed.
+        self._last_seen_dirty: int = 0
 
     # ----- Public read-only surface for tests + widgets -----
 
@@ -266,11 +269,65 @@ class AOMApp(App[None]):
             self._final_state = "crashed"
             self._log_lines.append(f"[ERROR] runner crashed: {exc}")
 
+    def _refresh_widgets(self) -> None:
+        """Periodic tick: drain pending updates onto widgets.
+
+        Runs on the Textual event loop (main thread). Reads the
+        worker-set _dirty counter and only refreshes when it has
+        advanced — avoids per-tick churn in idle phases.
+
+        Guards against firing before the current screen has its
+        widgets composed (screen swaps during quit confirmation, for
+        instance). Any unexpected widget-state failure is logged and
+        swallowed so the timer keeps running.
+        """
+        try:
+            screen = self.screen
+        except Exception:
+            return
+        if not screen.is_mounted:
+            return
+
+        current = self._dirty
+        if current == self._last_seen_dirty and not self._pending_log_lines:
+            return
+        self._last_seen_dirty = current
+
+        try:
+            from ansible_aom.tui.screens.main import MainScreen
+
+            if isinstance(screen, MainScreen):
+                screen.update_from_state(self._run_state)
+
+                # Drain any log lines queued by the worker thread.
+                if self._pending_log_lines:
+                    from ansible_aom.tui.widgets import LogPanel
+
+                    try:
+                        log = screen.query_one(LogPanel)
+                    except Exception:
+                        log = None
+                    if log is not None:
+                        # Snapshot-and-clear so a concurrent print_log
+                        # call appending mid-iteration is picked up on
+                        # the next tick rather than duplicated.
+                        pending = self._pending_log_lines[:]
+                        del self._pending_log_lines[: len(pending)]
+                        for line in pending:
+                            log.write_line(line)
+        except Exception as exc:
+            self.log.error(f"refresh tick error: {exc}")
+
     def on_mount(self) -> None:
         """Mount the main screen and (if configured) start the playbook."""
         from ansible_aom.tui.screens.main import MainScreen
 
         self.push_screen(MainScreen())
+
+        # F1: 0.2s refresh tick. nom uses ~200ms; battery-friendly,
+        # imperceptible latency. The tick reads the worker-set _dirty
+        # counter and only refreshes widgets when it has advanced.
+        self.set_interval(0.2, self._refresh_widgets)
 
         # Auto-start only when constructed with a playbook target. The
         # protocol smoke tests still build a bare AOMApp() and never

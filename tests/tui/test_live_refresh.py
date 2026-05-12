@@ -268,3 +268,110 @@ class TestMainScreenTreeIntegration:
 
             tree = screen.query_one(TaskTree)
             assert len(list(tree.root.children)) == 1
+
+
+class TestPeriodicRefresh:
+    """A 0.2s tick refreshes widgets when _dirty has advanced."""
+
+    @pytest.mark.asyncio
+    async def test_tick_refreshes_widgets_after_event(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from ansible_aom.tui.screens.main import MainScreen
+        from ansible_aom.tui.widgets.task_tree import TaskTree
+
+        # Stub the runner so we can drive events directly.
+        events_done = Event()
+
+        def fake_run_playbook(
+            playbook: str,
+            ansible_args: list[str],
+            renderer: object,
+            timeout: float = 0.5,
+            session_dir: Path | None = None,
+        ) -> int:
+            renderer.start(playbook, ansible_args)
+            from ansible_aom.core.models import PlayDefinition, TaskDefinition
+
+            renderer.set_definitions(
+                [
+                    PlayDefinition(
+                        id="p1",
+                        name="Setup",
+                        hosts="all",
+                        resolved_hosts=["web1"],
+                        tasks=[
+                            TaskDefinition(
+                                name="Install nginx",
+                                role=None,
+                                tags=[],
+                                play_id="p1",
+                                play_order=0,
+                                task_order=0,
+                            ),
+                        ],
+                    )
+                ]
+            )
+            renderer.update_state(
+                {
+                    "_event": "v2_playbook_on_play_start",
+                    "_timestamp": "2026-05-12T10:00:00Z",
+                    "play": {"id": "p1", "name": "Setup"},
+                }
+            )
+            events_done.set()
+            renderer.handle_completion(0, "completed")
+            return 0
+
+        monkeypatch.setattr("ansible_aom.tui.app.run_playbook", fake_run_playbook)
+
+        app = AOMApp(playbook="site.yml", ansible_args=[], session_dir=tmp_path)
+
+        async with app.run_test() as pilot:
+            for _ in range(50):
+                if events_done.is_set():
+                    break
+                await pilot.pause(0.02)
+            # Wait for at least one refresh tick (>0.2s).
+            await pilot.pause(0.4)
+
+            screen = app.screen
+            assert isinstance(screen, MainScreen)
+            tree = screen.query_one(TaskTree)
+            assert len(list(tree.root.children)) == 1, (
+                "tree should have one play node after a refresh tick"
+            )
+
+    @pytest.mark.asyncio
+    async def test_tick_drains_pending_log_lines(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        printed = Event()
+
+        def fake_run_playbook(
+            playbook: str,
+            ansible_args: list[str],
+            renderer: object,
+            timeout: float = 0.5,
+            session_dir: Path | None = None,
+        ) -> int:
+            renderer.start(playbook, ansible_args)
+            renderer.print_log("TASK [Install nginx] ***")
+            renderer.print_log("ok: [web1]")
+            printed.set()
+            renderer.handle_completion(0, "completed")
+            return 0
+
+        monkeypatch.setattr("ansible_aom.tui.app.run_playbook", fake_run_playbook)
+
+        app = AOMApp(playbook="site.yml", ansible_args=[], session_dir=tmp_path)
+
+        async with app.run_test() as pilot:
+            for _ in range(50):
+                if printed.is_set():
+                    break
+                await pilot.pause(0.02)
+            await pilot.pause(0.4)
+            # The pending buffer must be drained after the tick fires.
+            assert app._pending_log_lines == []

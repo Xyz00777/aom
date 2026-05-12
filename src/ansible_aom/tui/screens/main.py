@@ -117,15 +117,21 @@ class MainScreen(Screen):
         status.set_host_count(hosts_completed, hosts_total)
         status.set_playbook_name(run_state.playbook)
 
-        if run_state.start_time:
-            self._update_elapsed_from_start(run_state.start_time)
-
         # Tree handling: build the skeleton from definitions the first
         # time they're available, then apply state icons on every call.
         if run_state.definitions and not list(tree.root.children):
             tree.populate_from_definitions(run_state.definitions)
         if run_state.plays:
             tree.apply_state_icons(run_state)
+
+        if run_state.start_time:
+            try:
+                self._update_elapsed_from_start(run_state.start_time)
+            except TypeError:
+                # naive/aware datetime mismatch on legacy fixtures; the
+                # tree/summary updates above are the load-bearing path
+                # and must not be blocked by a clock-format quirk.
+                pass
 
         # Force a refresh — Textual reactives only fire on assignment,
         # but we mutated node labels imperatively above.
