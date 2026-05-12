@@ -126,6 +126,7 @@ class TestAOMAppInteractivePromptDuringRun:
             renderer: object,
             timeout: float = 0.5,
             session_dir: Path | None = None,
+            record: bool = True,
         ) -> int:
             renderer.start(playbook, ansible_args)  # type: ignore[attr-defined]
             answer = renderer.handle_interactive_prompt("Deploy? Press Enter: ")  # type: ignore[attr-defined]
@@ -186,6 +187,7 @@ class TestWorkerKickoff:
             renderer: object,
             timeout: float = 0.5,
             session_dir: Path | None = None,
+            record: bool = True,
         ) -> int:
             captured["playbook"] = playbook
             captured["ansible_args"] = list(ansible_args)

@@ -189,7 +189,7 @@ def _run_compact(playbook: str, ansible_args: list[str], record: bool = True) ->
         return 1
 
 
-def _run_tui(playbook: str, ansible_args: list[str]) -> int:
+def _run_tui(playbook: str, ansible_args: list[str], record: bool = True) -> int:
     """Launch the Textual TUI and let it drive the runner.
 
     AOMApp owns its own event loop (``app.run()``) and pumps the
@@ -202,7 +202,7 @@ def _run_tui(playbook: str, ansible_args: list[str]) -> int:
     from ansible_aom.tui.app import AOMApp
 
     try:
-        app = AOMApp(playbook=playbook, ansible_args=ansible_args)
+        app = AOMApp(playbook=playbook, ansible_args=ansible_args, record=record)
         app.run()
     except KeyboardInterrupt:
         print("Cancelled by user", file=sys.stderr)

@@ -50,6 +50,7 @@ class AOMApp(App[None]):
         playbook: str | None = None,
         ansible_args: list[str] | None = None,
         session_dir: Path | None = None,
+        record: bool = True,
         **kwargs: Any,
     ) -> None:
         """Initialize the AOMApp with optional playbook context.
@@ -62,11 +63,15 @@ class AOMApp(App[None]):
             session_dir: Override for the session recording location.
                 ``None`` lets the runner pick the spec default
                 ``~/.local/state/aom/sessions/``.
+            record: When False, the worker calls ``run_playbook`` with
+                ``record=False`` so no session directory is written
+                (F3 --no-record).
         """
         super().__init__(**kwargs)
         self._playbook: str | None = playbook
         self._args: list[str] = list(ansible_args) if ansible_args is not None else []
         self._session_dir: Path | None = session_dir
+        self._record: bool = record
         self._state: str = "IDLE"
         self._exit_code: int | None = None
         self._final_state: str | None = None
@@ -98,6 +103,10 @@ class AOMApp(App[None]):
     @property
     def ansible_args(self) -> list[str]:
         return self._args
+
+    @property
+    def record(self) -> bool:
+        return self._record
 
     @property
     def run_state(self) -> RunState:
@@ -311,6 +320,7 @@ class AOMApp(App[None]):
                 self._args,
                 self,
                 session_dir=self._session_dir,
+                record=self._record,
             )
         except Exception as exc:
             # Surface unexpected failures into final_state instead of

@@ -289,6 +289,7 @@ class TestPeriodicRefresh:
             renderer: object,
             timeout: float = 0.5,
             session_dir: Path | None = None,
+            record: bool = True,
         ) -> int:
             renderer.start(playbook, ansible_args)
             from ansible_aom.core.models import PlayDefinition, TaskDefinition
@@ -355,6 +356,7 @@ class TestPeriodicRefresh:
             renderer: object,
             timeout: float = 0.5,
             session_dir: Path | None = None,
+            record: bool = True,
         ) -> int:
             renderer.start(playbook, ansible_args)
             renderer.print_log("TASK [Install nginx] ***")
@@ -392,6 +394,7 @@ class TestCallFromThreadRouting:
             renderer: object,
             timeout: float = 0.5,
             session_dir: Path | None = None,
+            record: bool = True,
         ) -> int:
             renderer.start(playbook, ansible_args)
             renderer.add_warning("[WARNING]: missing role")
@@ -434,6 +437,7 @@ class TestCompletionTitleUpdate:
             renderer: object,
             timeout: float = 0.5,
             session_dir: Path | None = None,
+            record: bool = True,
         ) -> int:
             renderer.start(playbook, ansible_args)
             renderer.handle_completion(0, "completed")
@@ -465,6 +469,7 @@ class TestCompletionTitleUpdate:
             renderer: object,
             timeout: float = 0.5,
             session_dir: Path | None = None,
+            record: bool = True,
         ) -> int:
             renderer.start(playbook, ansible_args)
             renderer.handle_completion(2, "failed")
@@ -504,6 +509,7 @@ class TestEndToEndThreeTasks:
             renderer: object,
             timeout: float = 0.5,
             session_dir: Path | None = None,
+            record: bool = True,
         ) -> int:
             renderer.start(playbook, ansible_args)
             renderer.set_definitions(

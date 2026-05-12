@@ -106,3 +106,40 @@ class TestNoRecordCompactPlumbing:
         # Either explicit True, or absent (default True). Accept both
         # so the source can choose either style.
         assert kwargs.get("record", True) is True
+
+
+class TestNoRecordTUIPlumbing:
+    """--no-record reaches the TUI worker as record=False."""
+
+    def test_aomapp_accepts_record_kwarg(self) -> None:
+        from ansible_aom.tui.app import AOMApp
+
+        app = AOMApp(playbook="x.yml", ansible_args=[], record=False)
+        assert app.record is False
+
+    def test_aomapp_default_record_true(self) -> None:
+        from ansible_aom.tui.app import AOMApp
+
+        app = AOMApp(playbook="x.yml", ansible_args=[])
+        assert app.record is True
+
+    def test_tui_main_propagates_no_record_to_app(self) -> None:
+        from ansible_aom.cli import main
+
+        captured: dict[str, object] = {}
+
+        class FakeApp:
+            def __init__(self, **kwargs: object) -> None:
+                captured.update(kwargs)
+                self.exit_code = 0
+
+            def run(self) -> None:
+                return None
+
+        with (
+            patch("ansible_aom.tui.app.AOMApp", FakeApp),
+            patch("sys.argv", ["aom", "--tui", "--no-record", "playbook.yml"]),
+        ):
+            assert main() == 0
+
+        assert captured.get("record") is False
