@@ -88,6 +88,8 @@ Examples:
   aom inspect <session-id> --failed     Only the failed tasks
   aom inspect diff <id1> <id2>          Diff two sessions
   aom inspect prune --days 30           Delete sessions older than N days
+  aom replay <session-id>               Replay a recorded session at original pace
+  aom replay <session-id> --speed 10    Replay 10x faster
   aom --no-record playbook.yml          Run without writing a session directory
 
 Argument forwarding:
@@ -108,6 +110,13 @@ Session recording:
   to replay past runs; `aom inspect prune` to clean up.
   Pass --no-record to disable session writing for a single invocation
   (debug logs from --verbose are unaffected).
+
+Replay:
+  `aom replay <session-id>` re-streams a recorded run's events.jsonl
+  through the renderer at the original cadence (or scaled with
+  --speed N — use --speed 0 for as-fast-as-possible). Replay does
+  not reproduce AOM-emitted warnings, the preflight summary, or
+  password-prompt log lines — only what's in the JSONL stream.
 
 Debugging:
   AOM_TRACE=1 aom site.yml  — dumps every pexpect loop transition to
