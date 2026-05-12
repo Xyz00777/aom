@@ -305,3 +305,41 @@ def test_handle_completion_falls_back_to_wall_clock_when_state_lacks_timestamps(
     assert started.tzinfo is not None
     assert ended.tzinfo is not None
     assert parsed["duration_s"] >= 0.0
+
+
+# =============================================================================
+# Task 4 tests: factory dispatch
+# =============================================================================
+
+
+def test_factory_returns_json_renderer_for_json_format():
+    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.renderer.factory import create_renderer
+
+    renderer = create_renderer(tui_mode=False, format="json")
+    assert isinstance(renderer, JsonRenderer)
+
+
+def test_factory_default_format_is_compact():
+    from ansible_aom.compact.renderer import CompactRenderer
+    from ansible_aom.renderer.factory import create_renderer
+
+    renderer = create_renderer(tui_mode=False)
+    assert isinstance(renderer, CompactRenderer)
+
+
+def test_factory_compact_format_explicit_returns_compact_renderer():
+    from ansible_aom.compact.renderer import CompactRenderer
+    from ansible_aom.renderer.factory import create_renderer
+
+    renderer = create_renderer(tui_mode=False, format="compact")
+    assert isinstance(renderer, CompactRenderer)
+
+
+def test_factory_tui_mode_still_wins_over_format():
+    """tui_mode=True returns AOMApp regardless of format (CLI prevents this combo)."""
+    from ansible_aom.renderer.factory import create_renderer
+    from ansible_aom.tui.app import AOMApp
+
+    renderer = create_renderer(tui_mode=True, format="json")
+    assert isinstance(renderer, AOMApp)
