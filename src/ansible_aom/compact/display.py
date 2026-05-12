@@ -121,6 +121,14 @@ class Display:
         # 0.0 means we've never written, so the first update goes through
         # without waiting for the throttle window.
         self._last_update_time = 0.0
+        # R4: True when the terminal is below MINIMUM_SIZE. Degraded
+        # mode disables the live panel entirely and falls back to a
+        # plain log-only stream. Re-checked on every update() so the
+        # panel re-enables transparently when the terminal grows.
+        self._degraded = False
+        # Tracks whether we've already printed the "terminal too small"
+        # warning so we don't spam it on every update() while degraded.
+        self._degraded_warning_printed = False
 
     def start(self, force_size: tuple[int, int] | None = None) -> None:
         """Begin owning the bottom of the terminal.
@@ -128,11 +136,27 @@ class Display:
         Args:
             force_size: ``(cols, rows)`` override for ``shutil.get_terminal_size``.
                 Used by tests to drive the degraded-mode logic deterministically.
-                When None, the actual terminal size is queried. Wiring-only in
-                Task 1; consumed by the size check added in Task 2.
+                When None, the actual terminal size is queried.
         """
         if not self._is_tty:
             return
+
+        cols, rows = force_size if force_size is not None else shutil.get_terminal_size()
+        if (cols, rows) < MINIMUM_SIZE:
+            # Degraded mode: no panel, no cursor anchoring, no DEC frames.
+            # Print the warning OUTSIDE any synchronization sequence so it
+            # survives on terminals that don't implement DEC 2026.
+            self._degraded = True
+            if not self._degraded_warning_printed:
+                print(
+                    f"[aom] terminal too small ({cols}×{rows}); "
+                    f"minimum is {MINIMUM_SIZE[0]}×{MINIMUM_SIZE[1]}. "
+                    f"Falling back to plain log output until you resize.",
+                )
+                self._degraded_warning_printed = True
+            return
+
+        self._degraded = False
         sys.stdout.write(_HIDE_CURSOR)
         sys.stdout.flush()
         self._is_running = True
