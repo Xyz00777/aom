@@ -931,6 +931,23 @@ def test_aom_rerun_dispatches_to_rerun_main(monkeypatch):
     assert captured["argv"] == ["abc12345", "--failed", "--yes"]
 
 
+class TestHelpMentionsInstallCompletion:
+    """F5: --help output references the new --install-completion flag."""
+
+    def test_help_text_documents_install_completion(self):
+        import io
+
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        buf = io.StringIO()
+        parser.print_help(buf)
+        out = buf.getvalue()
+        assert "--install-completion" in out
+        # The flag has its own Examples line so users see the typical usage.
+        assert "bash" in out
+
+
 class TestInstallCompletionFlag:
     """F5: ``aom --install-completion <shell>`` prints the rc snippet."""
 

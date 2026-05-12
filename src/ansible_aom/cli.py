@@ -97,6 +97,7 @@ Examples:
   aom rerun <session-id> --unreachable  Rerun failed AND unreachable hosts
   aom rerun --changes-only -y           Rerun changed hosts; skip the prompt
   aom --no-record playbook.yml          Run without writing a session directory
+  aom --install-completion bash >> ~/.bashrc   Enable tab-completion for bash
 
 Argument forwarding:
   Anything after the playbook path is passed verbatim to ansible-playbook.
@@ -123,6 +124,12 @@ Replay:
   --speed N — use --speed 0 for as-fast-as-possible). Replay does
   not reproduce AOM-emitted warnings, the preflight summary, or
   password-prompt log lines — only what's in the JSONL stream.
+
+Shell completion:
+  aom --install-completion <bash|zsh|fish>
+  Prints the rc-file snippet to stdout. Pipe to your rc file or eval
+  it directly. Powered by argcomplete; tab-completes subcommands,
+  flags, and recorded session IDs.
 
 Debugging:
   AOM_TRACE=1 aom site.yml  — dumps every pexpect loop transition to
