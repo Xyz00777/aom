@@ -66,6 +66,9 @@ packages = ["src/ansible_aom"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+markers = [
+    "needs_ansible: requires real ansible-playbook + ansible.posix collection (auto-skipped otherwise)",
+]
 
 [tool.ruff]
 line-length = 100
