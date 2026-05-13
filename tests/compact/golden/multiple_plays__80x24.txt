@@ -1,0 +1,15 @@
+
+PLAY [Configure web tier] **************************************************
+
+TASK [Install nginx] **************************************************
+changed: [web1] (3.0s)
+
+PLAY [Configure db tier] **************************************************
+[10:00:07] Install nginx — 5.0s (cum 7.0s)
+
+TASK [Install postgres] **************************************************
+ok: [db1] (5.0s)
+[10:00:15] Install postgres — 8.0s (cum 15.0s)
+site.yml | 2/2 hosts | 0:00:00 *
+  web1: + 1 changed
+  db1: * 1 ok
