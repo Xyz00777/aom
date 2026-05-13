@@ -140,9 +140,7 @@ def test_pty_stream_parser_never_crashes_on_arbitrary_bytes(blob: bytes) -> None
     events=st.lists(valid_event_dicts(), min_size=1, max_size=12),
     garbage=st.lists(_garbage_text, max_size=12),
 )
-def test_valid_events_survive_garbage_interleaving(
-    events: list[dict], garbage: list[str]
-) -> None:
+def test_valid_events_survive_garbage_interleaving(events: list[dict], garbage: list[str]) -> None:
     """Well-formed events interleaved with arbitrary noise still drain in order.
 
     The parser may emit garbage lines via the non-JSON handler or drop them;

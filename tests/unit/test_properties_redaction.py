@@ -55,8 +55,10 @@ def _password_shaped_key() -> st.SearchStrategy[str]:
         ]
     )
     return base.filter(
-        lambda k: PASSWORD_MATCH.match(k.lower()) is not None
-        and k.lower() not in {w.lower() for w in PASSWORD_WHITELIST}
+        lambda k: (
+            PASSWORD_MATCH.match(k.lower()) is not None
+            and k.lower() not in {w.lower() for w in PASSWORD_WHITELIST}
+        )
     )
 
 
@@ -117,9 +119,7 @@ def test_password_shaped_keys_are_redacted(
     secret=_distinctive_secret(),
     depth=st.integers(min_value=1, max_value=5),
 )
-def test_password_redaction_works_through_nested_dicts(
-    key: str, secret: str, depth: int
-) -> None:
+def test_password_redaction_works_through_nested_dicts(key: str, secret: str, depth: int) -> None:
     """Nested dicts under MAX_DEPTH still redact password-shaped keys."""
     inner: dict = {key: secret}
     for _ in range(depth):
@@ -156,9 +156,7 @@ def test_whitelisted_keys_pass_through(key: str, value: str) -> None:
 @settings(max_examples=80, deadline=2000, suppress_health_check=[HealthCheck.too_slow])
 @given(
     scheme=st.sampled_from(["http", "https", "postgres", "redis", "mongodb"]),
-    user=st.text(
-        alphabet=string.ascii_lowercase + string.digits, min_size=1, max_size=12
-    ),
+    user=st.text(alphabet=string.ascii_lowercase + string.digits, min_size=1, max_size=12),
     secret=_distinctive_secret(),
     host=st.text(
         alphabet=string.ascii_lowercase + string.digits + ".",
@@ -166,9 +164,7 @@ def test_whitelisted_keys_pass_through(key: str, value: str) -> None:
         max_size=20,
     ).filter(lambda s: "." in s and not s.startswith(".") and not s.endswith(".")),
 )
-def test_url_credentials_are_stripped(
-    scheme: str, user: str, secret: str, host: str
-) -> None:
+def test_url_credentials_are_stripped(scheme: str, user: str, secret: str, host: str) -> None:
     """URL of form scheme://user:SECRET@host/ has SECRET removed by sanitize_string."""
     url = f"{scheme}://{user}:{secret}@{host}/path"
     sanitised = sanitize_string(url, _DEFAULT_CONFIG)
@@ -178,9 +174,7 @@ def test_url_credentials_are_stripped(
 
 @settings(max_examples=80, deadline=2000, suppress_health_check=[HealthCheck.too_slow])
 @given(
-    flag=st.sampled_from(
-        ["--password", "--pass", "--pwd", "--token", "--secret", "--api-key"]
-    ),
+    flag=st.sampled_from(["--password", "--pass", "--pwd", "--token", "--secret", "--api-key"]),
     sep=st.sampled_from([" ", "=", ": "]),
     secret=_distinctive_secret(),
 )
@@ -202,9 +196,7 @@ def test_cli_credentials_are_stripped(flag: str, sep: str, secret: str) -> None:
     secret=_distinctive_secret(),
     extra_text=st.text(min_size=0, max_size=40),
 )
-def test_no_log_at_top_level_censors_everything(
-    key: str, secret: str, extra_text: str
-) -> None:
+def test_no_log_at_top_level_censors_everything(key: str, secret: str, extra_text: str) -> None:
     """_ansible_no_log=True at result top-level: entire res becomes censored marker."""
     assume(secret not in extra_text)
     event = {
