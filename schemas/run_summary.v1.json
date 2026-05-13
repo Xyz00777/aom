@@ -1,0 +1,109 @@
+{
+  "$defs": {
+    "HostCounts": {
+      "description": "Per-host status counts aggregated across every task in every play.",
+      "properties": {
+        "changed": {
+          "default": 0,
+          "title": "Changed",
+          "type": "integer"
+        },
+        "failed": {
+          "default": 0,
+          "title": "Failed",
+          "type": "integer"
+        },
+        "ok": {
+          "default": 0,
+          "title": "Ok",
+          "type": "integer"
+        },
+        "unreachable": {
+          "default": 0,
+          "title": "Unreachable",
+          "type": "integer"
+        }
+      },
+      "title": "HostCounts",
+      "type": "object"
+    },
+    "TaskFailure": {
+      "description": "One (host, task) pair that ended in FAILED or UNREACHABLE.",
+      "properties": {
+        "host": {
+          "title": "Host",
+          "type": "string"
+        },
+        "msg": {
+          "title": "Msg",
+          "type": "string"
+        },
+        "task": {
+          "title": "Task",
+          "type": "string"
+        }
+      },
+      "required": [
+        "host",
+        "task",
+        "msg"
+      ],
+      "title": "TaskFailure",
+      "type": "object"
+    }
+  },
+  "description": "End-of-run summary emitted by ``JsonRenderer.handle_completion``.\n\nField rules:\n\n- ``schema_version``: literal ``1``. Bump only on breaking change.\n- ``playbook``: the path passed to ``start()``.\n- ``exit_code``: ``determine_exit_code(state)``.\n- ``started_at`` / ``ended_at``: ISO 8601 with UTC offset.\n- ``duration_s``: float seconds, rounded to 1 dp.\n- ``hosts``: every host that ever produced a result, exactly once.\n- ``tasks_failed``: one entry per (host, task) pair that failed\n  or went unreachable. ``msg`` may be the empty string.",
+  "properties": {
+    "duration_s": {
+      "title": "Duration S",
+      "type": "number"
+    },
+    "ended_at": {
+      "title": "Ended At",
+      "type": "string"
+    },
+    "exit_code": {
+      "title": "Exit Code",
+      "type": "integer"
+    },
+    "hosts": {
+      "additionalProperties": {
+        "$ref": "#/$defs/HostCounts"
+      },
+      "title": "Hosts",
+      "type": "object"
+    },
+    "playbook": {
+      "title": "Playbook",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "started_at": {
+      "title": "Started At",
+      "type": "string"
+    },
+    "tasks_failed": {
+      "items": {
+        "$ref": "#/$defs/TaskFailure"
+      },
+      "title": "Tasks Failed",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "playbook",
+    "exit_code",
+    "started_at",
+    "ended_at",
+    "duration_s",
+    "hosts",
+    "tasks_failed"
+  ],
+  "title": "RunSummary",
+  "type": "object"
+}

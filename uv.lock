@@ -120,6 +120,7 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "inline-snapshot" },
+    { name = "jsonschema" },
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -146,6 +147,7 @@ requires-dist = [
     { name = "argcomplete", specifier = ">=3.5" },
     { name = "blessed", specifier = ">=1.20" },
     { name = "inline-snapshot", marker = "extra == 'dev'", specifier = ">=0.10" },
+    { name = "jsonschema", marker = "extra == 'dev'", specifier = ">=4.20" },
     { name = "molecule", marker = "extra == 'lint'", specifier = ">=24.0" },
     { name = "molecule-plugins", marker = "extra == 'lint'", specifier = ">=23.0" },
     { name = "mypy", marker = "extra == 'dev'" },
