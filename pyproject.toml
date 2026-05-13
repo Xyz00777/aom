@@ -44,6 +44,7 @@ dev = [
     "inline-snapshot>=0.10",   # Compact mode snapshot testing
     "pre-commit>=3.0",
     "jsonschema>=4.20",        # schemas/run_summary.v1.json contract test
+    "hypothesis>=6",           # property-based tests (Batch C)
 ]
 
 integration = [
