@@ -628,6 +628,7 @@ class TestVerboseDiagnostics:
         with (
             patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("ansible_aom.runner.run_playbook", return_value=0),
             patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
             patch("builtins.print") as mock_print,
         ):
@@ -644,6 +645,7 @@ class TestVerboseDiagnostics:
         with (
             patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("ansible_aom.runner.run_playbook", return_value=0),
             patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
             patch("builtins.print") as mock_print,
         ):
@@ -658,6 +660,7 @@ class TestVerboseDiagnostics:
         with (
             patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("ansible_aom.runner.run_playbook", return_value=0),
             patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
             patch("builtins.print") as mock_print,
         ):
@@ -683,6 +686,7 @@ class TestVerboseDiagnostics:
         with (
             patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("ansible_aom.runner.run_playbook", return_value=0),
             patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
             patch("builtins.print") as mock_print,
         ):
@@ -705,6 +709,7 @@ class TestVerboseDebugLogging:
         with (
             patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("ansible_aom.runner.run_playbook", return_value=0),
             patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
         ):
             main()
@@ -735,6 +740,7 @@ class TestVerboseDebugLogging:
             with (
                 patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
                 patch("ansible_aom.renderer.factory.create_renderer"),
+                patch("ansible_aom.runner.run_playbook", return_value=0),
                 patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
             ):
                 main()
@@ -755,6 +761,7 @@ class TestVerboseDebugLogging:
         with (
             patch("sys.argv", ["aom", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("ansible_aom.runner.run_playbook", return_value=0),
         ):
             main()
 
