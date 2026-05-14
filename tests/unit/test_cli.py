@@ -28,7 +28,6 @@ CORE_MODULE_PATHS = [
     "src/ansible_aom/renderer/factory.py",
     "src/ansible_aom/compact/renderer.py",
     "src/ansible_aom/compact/display.py",
-    "src/ansible_aom/compact/logs.py",
     "src/ansible_aom/compact/password.py",
     "src/ansible_aom/tui/app.py",
     "src/ansible_aom/inspect/cli.py",
