@@ -103,11 +103,7 @@ class TestBasicDurations:
         events = []
         for i, dur in enumerate([1, 2, 3, 4, 5], start=1):
             events.append(_task_start(f"2026-04-20T10:00:{i:02d}Z", task_id=f"t{i}"))
-            events.append(
-                _runner_ok(
-                    f"2026-04-20T10:00:{i + dur:02d}Z", "h1", task_id=f"t{i}"
-                )
-            )
+            events.append(_runner_ok(f"2026-04-20T10:00:{i + dur:02d}Z", "h1", task_id=f"t{i}"))
         result = analyze_overhead(events)
         assert result.samples == 5
         assert result.overhead_floor_s == pytest.approx(2.0, abs=0.001)
@@ -136,9 +132,7 @@ class TestMultiHostMultiTask:
             tid = f"t{task_idx}"
             events.append(_task_start(f"2026-04-20T10:{task_idx:02d}:00Z", task_id=tid))
             for h in ("h1", "h2", "h3"):
-                events.append(
-                    _runner_ok(f"2026-04-20T10:{task_idx:02d}:01Z", h, task_id=tid)
-                )
+                events.append(_runner_ok(f"2026-04-20T10:{task_idx:02d}:01Z", h, task_id=tid))
         result = analyze_overhead(events)
         assert result.samples == 12
         assert result.distinct_tasks == 4
@@ -167,9 +161,7 @@ class TestWallClockAndShare:
             tid = f"t{task_idx}"
             events.append(_task_start(f"2026-04-20T10:{task_idx:02d}:00Z", task_id=tid))
             for h in ("h1", "h2", "h3"):
-                events.append(
-                    _runner_ok(f"2026-04-20T10:{task_idx:02d}:01Z", h, task_id=tid)
-                )
+                events.append(_runner_ok(f"2026-04-20T10:{task_idx:02d}:01Z", h, task_id=tid))
         result = analyze_overhead(events)
         assert result.overhead_floor_s == pytest.approx(1.0, abs=0.001)
         assert result.distinct_tasks == 4
@@ -181,9 +173,7 @@ class TestWallClockAndShare:
             tid = f"t{task_idx}"
             events.append(_task_start(f"2026-04-20T10:{task_idx:02d}:00Z", task_id=tid))
             for h in ("h1", "h2", "h3"):
-                events.append(
-                    _runner_ok(f"2026-04-20T10:{task_idx:02d}:01Z", h, task_id=tid)
-                )
+                events.append(_runner_ok(f"2026-04-20T10:{task_idx:02d}:01Z", h, task_id=tid))
         events.append(_stats("2026-04-20T10:10:00Z"))
         result = analyze_overhead(events)
         assert result.wall_clock_s == pytest.approx(600.0, abs=0.001)
@@ -199,9 +189,7 @@ class TestWallClockAndShare:
             tid = f"t{task_idx}"
             events.append(_task_start(f"2026-04-20T10:00:{task_idx:02d}Z", task_id=tid))
             for h in ("h1", "h2", "h3"):
-                events.append(
-                    _runner_ok(f"2026-04-20T10:00:{task_idx + 10:02d}Z", h, task_id=tid)
-                )
+                events.append(_runner_ok(f"2026-04-20T10:00:{task_idx + 10:02d}Z", h, task_id=tid))
         events.append(_stats("2026-04-20T10:00:05Z"))
         result = analyze_overhead(events)
         assert result.overhead_share == 1.0

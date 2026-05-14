@@ -156,7 +156,7 @@ def _parse_iso8601(ts: str) -> datetime | None:
     try:
         # Python's fromisoformat accepts "Z" suffix since 3.11.
         return datetime.fromisoformat(ts)
-    except (ValueError, TypeError):
+    except ValueError:
         return None
 
 
