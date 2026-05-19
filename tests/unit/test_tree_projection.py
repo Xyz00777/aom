@@ -104,36 +104,63 @@ class TestHostRows:
     def _multi_host_state(self) -> RunState:
         """web1 done-ok, web2 running, web3 done-changed, db1 unreachable."""
         state = RunState(playbook="site.yml")
-        state.handle_event({"_event": "v2_playbook_on_start",
-                            "_timestamp": "2026-04-20T10:00:00Z"})
-        state.handle_event({"_event": "v2_playbook_on_play_start",
-                            "_timestamp": "2026-04-20T10:00:01Z",
-                            "play": {"id": "p1", "name": "Deploy"}})
-        state.handle_event({"_event": "v2_playbook_on_task_start",
-                            "_timestamp": "2026-04-20T10:00:02Z",
-                            "task": {"id": "t1", "name": "Install nginx"},
-                            "play": {"id": "p1"}})
-        state.handle_event({"_event": "v2_runner_on_ok",
-                            "_timestamp": "2026-04-20T10:00:05Z",
-                            "task": {"id": "t1", "name": "Install nginx"},
-                            "hosts": {"web1": {"ok": True, "changed": False}}})
-        state.handle_event({"_event": "v2_runner_on_ok",
-                            "_timestamp": "2026-04-20T10:00:05Z",
-                            "task": {"id": "t1", "name": "Install nginx"},
-                            "hosts": {"web3": {"ok": True, "changed": True}}})
-        state.handle_event({"_event": "v2_runner_on_unreachable",
-                            "_timestamp": "2026-04-20T10:00:05Z",
-                            "task": {"id": "t1", "name": "Install nginx"},
-                            "hosts": {"db1": {"unreachable": True}}})
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "hosts": {"web1": {"ok": True, "changed": False}},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "hosts": {"web3": {"ok": True, "changed": True}},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_unreachable",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "hosts": {"db1": {"unreachable": True}},
+            }
+        )
         # web2 is mid-task
-        state.handle_event({"_event": "v2_playbook_on_task_start",
-                            "_timestamp": "2026-04-20T10:00:06Z",
-                            "task": {"id": "t2", "name": "Configure firewall"},
-                            "play": {"id": "p1"}})
-        state.handle_event({"_event": "v2_runner_on_start",
-                            "_timestamp": "2026-04-20T10:00:07Z",
-                            "task": {"id": "t2", "name": "Configure firewall"},
-                            "host": "web2"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:06Z",
+                "task": {"id": "t2", "name": "Configure firewall"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:07Z",
+                "task": {"id": "t2", "name": "Configure firewall"},
+                "host": "web2",
+            }
+        )
         return state
 
     def test_counts_aggregate_per_host(self):
@@ -177,3 +204,144 @@ class TestHostRows:
         # that into the "unreachable" suffix. The projection does NOT
         # synthesise a fake current_task.
         assert rows["db1"].current_task is None
+
+    def test_failed_outranks_changed_in_worst_status(self):
+        """FAILED has highest precedence — a single failure dominates worst_status."""
+        state = RunState(playbook="site.yml")
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "p1"},
+            }
+        )
+        # web1: one CHANGED task, then one FAILED task
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "hosts": {"web1": {"ok": True, "changed": True}},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:06Z",
+                "task": {"id": "t2", "name": "Start service"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_failed",
+                "_timestamp": "2026-04-20T10:00:07Z",
+                "task": {"id": "t2", "name": "Start service"},
+                "hosts": {"web1": {"failed": True, "msg": "boom"}},
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        rows = {r.hostname: r for r in p.host_rows()}
+        assert rows["web1"].worst_status == Status.FAILED
+        assert rows["web1"].counts == {Status.CHANGED: 1, Status.FAILED: 1}
+
+
+class TestTreeLinesBasic:
+    def _running_task_state(self) -> RunState:
+        state = RunState(playbook="site.yml")
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "deploy webservers"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "p1"},
+            }
+        )
+        for host in ("web1", "web2"):
+            state.handle_event(
+                {
+                    "_event": "v2_runner_on_start",
+                    "_timestamp": "2026-04-20T10:00:03Z",
+                    "task": {"id": "t1", "name": "Install nginx"},
+                    "host": host,
+                }
+            )
+        return state
+
+    def test_emits_playbook_play_task_hosts(self):
+        state = self._running_task_state()
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=20)
+
+        # Expect: playbook, play, task, host x2 — in that source order.
+        kinds = [ln.kind for ln in lines]
+        assert kinds == ["playbook", "play", "task", "host", "host"]
+
+        assert lines[0].label == "site.yml"
+        assert lines[1].label.startswith("play: ")
+        assert "deploy webservers" in lines[1].label
+        assert lines[2].kind == "task"
+        assert lines[2].status == Status.RUNNING
+
+        host_lines = [ln for ln in lines if ln.kind == "host"]
+        assert [ln.label for ln in host_lines] == ["web1", "web2"]
+        for hl in host_lines:
+            assert hl.status == Status.RUNNING
+            assert hl.elapsed_s is not None
+
+    def test_task_label_carries_count_summary(self):
+        state = self._running_task_state()
+        # Finish web1; web2 still running.
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "hosts": {"web1": {"ok": True, "changed": False}},
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=20)
+        task_line = next(ln for ln in lines if ln.kind == "task")
+        # Label format: "Install nginx  (1 ok, 1 running)"
+        assert "Install nginx" in task_line.label
+        assert "1 ok" in task_line.label
+        assert "1 running" in task_line.label
+
+    def test_only_currently_running_hosts_appear_as_leaves(self):
+        state = self._running_task_state()
+        # Finish web1 — it should drop out of the host leaves.
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "hosts": {"web1": {"ok": True, "changed": False}},
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        host_lines = [ln for ln in p.tree_lines(budget=20) if ln.kind == "host"]
+        assert [ln.label for ln in host_lines] == ["web2"]
+
+    def test_no_lines_when_no_task_running(self):
+        state = RunState(playbook="site.yml")
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        p = TreeProjection.from_run_state(state)
+        assert p.tree_lines(budget=20) == []

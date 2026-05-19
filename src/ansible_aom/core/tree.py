@@ -10,10 +10,12 @@ import from here; never the reverse.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Literal
+from datetime import datetime, timezone
+from typing import Literal
 
-from ansible_aom.core.models import RunState, Status
+from ansible_aom.core.models import RunState, Status, TaskRunState
 
 TreeKind = Literal["playbook", "play", "role", "task", "host"]
 
@@ -105,8 +107,9 @@ class TreeProjection:
         Status.PENDING,
     )
 
-    def host_rows(self) -> list[HostRow]:
-        from datetime import datetime, timezone
+    def host_rows(self, now: datetime | None = None) -> list[HostRow]:
+        if now is None:
+            now = datetime.now(timezone.utc)
 
         # Per-host accumulators.
         counts: dict[str, dict[Status, int]] = {}
@@ -116,8 +119,6 @@ class TreeProjection:
         # ansible's host order under linear and roughly the start order
         # under free.
         order: list[str] = []
-
-        now = datetime.now(timezone.utc)
 
         for play in self._state.plays.values():
             for task in play.tasks.values():
@@ -130,9 +131,7 @@ class TreeProjection:
                     # changed=True takes precedence over status=OK for
                     # count classification — spec section "host row".
                     effective = (
-                        Status.CHANGED
-                        if hs.status == Status.OK and hs.changed
-                        else hs.status
+                        Status.CHANGED if hs.status == Status.OK and hs.changed else hs.status
                     )
 
                     if hs.status == Status.RUNNING:
@@ -143,25 +142,28 @@ class TreeProjection:
                         )
                         current[hostname] = (task.name, elapsed)
                     elif effective in (
-                        Status.OK, Status.CHANGED, Status.FAILED,
-                        Status.UNREACHABLE, Status.SKIPPED,
+                        Status.OK,
+                        Status.CHANGED,
+                        Status.FAILED,
+                        Status.UNREACHABLE,
+                        Status.SKIPPED,
                     ):
-                        counts[hostname][effective] = (
-                            counts[hostname].get(effective, 0) + 1
-                        )
+                        counts[hostname][effective] = counts[hostname].get(effective, 0) + 1
 
         rows: list[HostRow] = []
         for hostname in order:
             host_counts = counts[hostname]
             worst = self._worst_status_of(host_counts.keys())
             cur = current[hostname]
-            rows.append(HostRow(
-                hostname=hostname,
-                counts=dict(host_counts),
-                worst_status=worst,
-                current_task=cur[0] if cur else None,
-                current_elapsed_s=cur[1] if cur else None,
-            ))
+            rows.append(
+                HostRow(
+                    hostname=hostname,
+                    counts=dict(host_counts),
+                    worst_status=worst,
+                    current_task=cur[0] if cur else None,
+                    current_elapsed_s=cur[1] if cur else None,
+                )
+            )
         return rows
 
     @classmethod
@@ -172,5 +174,98 @@ class TreeProjection:
                 return s
         return None
 
-    def tree_lines(self, budget: int) -> list[TreeLine]:
-        raise NotImplementedError  # Tasks 3–5
+    def tree_lines(self, budget: int, now: datetime | None = None) -> list[TreeLine]:
+        if now is None:
+            now = datetime.now(timezone.utc)
+
+        if not self.is_tree_visible():
+            return []
+
+        lines: list[TreeLine] = [
+            TreeLine(
+                depth=0,
+                kind="playbook",
+                label=self._state.playbook,
+                glyph=None,
+                status=None,
+                elapsed_s=None,
+            )
+        ]
+
+        for play in self._state.plays.values():
+            running_tasks = [t for t in play.tasks.values() if t.status == Status.RUNNING]
+            if not running_tasks:
+                continue
+            lines.append(
+                TreeLine(
+                    depth=1,
+                    kind="play",
+                    label=f"play: {play.name}",
+                    glyph=None,
+                    status=play.status,
+                    elapsed_s=None,
+                )
+            )
+            for task in running_tasks:
+                lines.append(self._task_line(task, depth=2))
+                for hostname, hs in task.hosts.items():
+                    if hs.status != Status.RUNNING:
+                        continue
+                    elapsed = (
+                        (now - hs.start_time).total_seconds() if hs.start_time is not None else 0.0
+                    )
+                    lines.append(
+                        TreeLine(
+                            depth=3,
+                            kind="host",
+                            label=hostname,
+                            glyph=None,
+                            status=Status.RUNNING,
+                            elapsed_s=elapsed,
+                        )
+                    )
+
+        return lines
+
+    @staticmethod
+    def _task_line(task: TaskRunState, depth: int) -> TreeLine:
+        # Count tally for the parenthesised summary on the task line.
+        # Order matters for the label: ok, changed, running, failed,
+        # unreachable, skipped — same order as the spec example.
+        ok = changed = running = failed = unreachable = skipped = 0
+        for hs in task.hosts.values():
+            if hs.status == Status.RUNNING:
+                running += 1
+            elif hs.status == Status.OK:
+                if hs.changed:
+                    changed += 1
+                else:
+                    ok += 1
+            elif hs.status == Status.CHANGED:
+                changed += 1
+            elif hs.status == Status.FAILED:
+                failed += 1
+            elif hs.status == Status.UNREACHABLE:
+                unreachable += 1
+            elif hs.status == Status.SKIPPED:
+                skipped += 1
+        parts: list[str] = []
+        for label, n in (
+            ("ok", ok),
+            ("changed", changed),
+            ("running", running),
+            ("failed", failed),
+            ("unreachable", unreachable),
+            ("skipped", skipped),
+        ):
+            if n > 0:
+                parts.append(f"{n} {label}")
+        suffix = f"  ({', '.join(parts)})" if parts else ""
+        return TreeLine(
+            depth=depth,
+            kind="task",
+            label=f"{task.name}{suffix}",
+            glyph=None,
+            status=Status.RUNNING,
+            elapsed_s=None,
+        )
