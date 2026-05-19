@@ -17,6 +17,7 @@ from ansible_aom.core.icons import (
     STATUS_ICONS,
     STATUS_ICONS_ASCII,
     get_running_frame,
+    get_status_color,
     is_unicode_terminal,
 )
 from ansible_aom.core.models import (
@@ -425,8 +426,6 @@ def format_tree_block(
     Returns an empty list when the projection says the tree should be
     hidden. The renderer caller stitches this list into the bottom panel.
     """
-    from ansible_aom.core.icons import get_running_frame, get_status_color
-
     if not projection.is_tree_visible():
         return []
 
@@ -455,7 +454,13 @@ def format_tree_block(
     out: list[str] = []
     for ln, last in zip(lines, is_last):
         indent = "   " * max(ln.depth - 1, 0)
+        # Branch glyph: depth 0 has none; depth>0 normally has ├─ / └─ EXCEPT
+        # host leaves under a task, which render as plain-indented children
+        # (spec section "Tree leaf shape" — the user-approved preview shows
+        # `   web1 ◐ 12s`, not `├─ web1 ◐ 12s`).
         if ln.depth == 0:
+            branch = ""
+        elif ln.kind == "host":
             branch = ""
         else:
             branch = last_glyph if last else mid_glyph
