@@ -405,6 +405,13 @@ def _drive(
     # safety-net (flush-only, never blocks).
     stall_count = 0
 
+    # CPU sampler cadence: every Nth consecutive TIMEOUT we poll psutil
+    # and feed the renderer's heartbeat so it can distinguish "quiet
+    # but the brew install is still working" from "actually stuck".
+    # Cadence chosen so a 0.5s expect-timeout polls roughly every 2s.
+    cpu_sample_every = max(1, int(2.0 / max(timeout, 0.05)))
+    timeout_count = 0
+
     while True:
         try:
             idx = child.expect(patterns, timeout=timeout)
@@ -441,6 +448,10 @@ def _drive(
                 prior=(prior or "")[:120],
             )
             stall_count = _handle_timeout_branch(child, renderer, sink, stall_count, prior)
+            timeout_count += 1
+            if timeout_count >= cpu_sample_every:
+                renderer.note_subprocess_active(_sample_subprocess_active(child.pid))
+                timeout_count = 0
             continue
         else:
             # Password prompt fired. Build the prompt text from the
@@ -448,6 +459,7 @@ def _drive(
             # haven't routed yet) and the matched prompt itself.
             prompt = (child.before or "") + (child.after or "")
             _trace("password-pattern", prompt=prompt[:200])
+            renderer.note_pty_bytes()
             password = renderer.handle_password_prompt(prompt)
             child.sendline(password)
             stall_count = 0
@@ -634,11 +646,67 @@ def _feed(
 
     Each parsed event is mirrored to the session sink so a later
     ``aom inspect show`` can replay the exact JSONL the run saw.
+
+    The line itself counts as a liveness signal (bytes arrived); a
+    task-start event additionally resets the heartbeat so the new task
+    gets a clean slate.
     """
+    renderer.note_pty_bytes()
+
     for event in parser.feed_line(line):
+        if event.get("_event") == "v2_playbook_on_task_start":
+            renderer.reset_heartbeat()
         sink.record_event(event)
         renderer.update_state(event)
 
     for warning in parser.drain_warnings():
         sink.record_stderr(warning.message)
         renderer.add_warning(warning.message, warning.type == WarningType.DEPRECATION)
+
+
+def _sample_subprocess_active(pid: int) -> bool:
+    """Return True if pid or any descendant used CPU since the last call.
+
+    Uses psutil.cpu_percent with ``interval=None`` — non-blocking, returns
+    the delta since the previous call on the same Process. The runner
+    is expected to cache a single Process object across calls so the
+    delta is meaningful; here we keep it self-contained by caching by
+    pid at module scope.
+
+    Any psutil error (process exited, permission denied, missing
+    descendant) degrades to False rather than propagating — the
+    heartbeat still works on byte signal alone.
+    """
+    try:
+        import psutil
+    except ImportError:
+        return False
+
+    cache = _PSUTIL_CACHE
+    try:
+        proc = cache.get(pid)
+        if proc is None or not proc.is_running():
+            proc = psutil.Process(pid)
+            cache[pid] = proc
+            # Seed cpu_percent so the next call has a delta baseline.
+            proc.cpu_percent(interval=None)
+            return False
+
+        any_active = bool(proc.cpu_percent(interval=None) > 0.0)
+        if not any_active:
+            for child in proc.children(recursive=True):
+                try:
+                    if child.cpu_percent(interval=None) > 0.0:
+                        any_active = True
+                        break
+                except psutil.Error:
+                    continue
+        return any_active
+    except psutil.Error:
+        cache.pop(pid, None)
+        return False
+    except Exception:
+        return False
+
+
+_PSUTIL_CACHE: dict[int, Any] = {}

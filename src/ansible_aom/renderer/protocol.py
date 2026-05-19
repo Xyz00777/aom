@@ -85,3 +85,29 @@ class Renderer(Protocol):
         keep the clock moving; renderers with their own loop may no-op.
         """
         ...
+
+    def note_pty_bytes(self) -> None:
+        """Signal that PTY bytes were just received from the subprocess.
+
+        Drives the per-task liveness indicator. Renderers that don't
+        surface a heartbeat may implement this as a no-op.
+        """
+        ...
+
+    def note_subprocess_active(self, active: bool) -> None:
+        """Report a periodic CPU-activity sample for the subprocess tree.
+
+        ``active`` is True when the ansible subprocess or any of its
+        descendants used CPU since the previous sample. Used by the
+        liveness indicator to distinguish "quiet but working" from
+        "no output AND no CPU".
+        """
+        ...
+
+    def reset_heartbeat(self) -> None:
+        """Drop any previous liveness state — called on each task boundary.
+
+        Prevents a STUCK indicator from a previous slow task from
+        bleeding into the first second of the next task.
+        """
+        ...

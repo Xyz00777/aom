@@ -201,6 +201,18 @@ class AOMApp(App[None]):
         """Renderer Protocol: no-op. Textual has its own clock."""
         return None
 
+    def note_pty_bytes(self) -> None:
+        """Renderer Protocol: no-op. TUI does not surface a heartbeat yet."""
+        return None
+
+    def note_subprocess_active(self, active: bool) -> None:  # noqa: ARG002
+        """Renderer Protocol: no-op. TUI does not surface a heartbeat yet."""
+        return None
+
+    def reset_heartbeat(self) -> None:
+        """Renderer Protocol: no-op. TUI does not surface a heartbeat yet."""
+        return None
+
     def update_state(self, event: dict) -> None:
         """Renderer Protocol: route the JSONL event through RunState.
 

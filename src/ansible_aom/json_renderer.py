@@ -119,6 +119,18 @@ class JsonRenderer:
         """No-op — no clock to refresh."""
         return
 
+    def note_pty_bytes(self) -> None:
+        """No-op — JSON mode has no liveness indicator."""
+        return
+
+    def note_subprocess_active(self, active: bool) -> None:  # noqa: ARG002
+        """No-op — JSON mode has no liveness indicator."""
+        return
+
+    def reset_heartbeat(self) -> None:
+        """No-op — JSON mode has no liveness indicator."""
+        return
+
     def handle_password_prompt(self, prompt_text: str) -> str:
         """Refuse on stderr; return empty so ansible fails the auth attempt."""
         import sys

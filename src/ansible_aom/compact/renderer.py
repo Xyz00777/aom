@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from ansible_aom.compact.display import Display
 from ansible_aom.compact.password import handle_password_prompt as do_handle_password_prompt
+from ansible_aom.core.heartbeat import HeartbeatTracker, LivenessState
 from ansible_aom.core.icons import STATUS_ICONS, STATUS_ICONS_ASCII, is_unicode_terminal
 from ansible_aom.core.models import (
     PlayDefinition,
@@ -119,6 +120,7 @@ def format_status_bar(
     ascii_mode: bool = False,
     colorize: bool = False,
     mode_label: str = "",
+    liveness: LivenessState | None = None,
 ) -> str:
     """Format the status bar for compact mode display.
 
@@ -186,6 +188,17 @@ def format_status_bar(
         parts.append(_wrap(f"{warn_glyph} {warnings}", _YELLOW, colorize))
     if deprecations > 0:
         parts.append(_wrap(f"{deprec_glyph} {deprecations}", _MAGENTA, colorize))
+
+    if liveness is not None:
+        # Hug the preceding segment (no separator pipe) so it reads as
+        # an annotation on it rather than a peer counter. ``parts`` is
+        # never empty here — at minimum the hosts segment is present.
+        live_glyph_unicode = {"live": "●", "working": "○", "stuck": "!"}
+        live_glyph_ascii = {"live": "*", "working": "o", "stuck": "!"}
+        live_color = {"live": _GREEN, "working": _DIM, "stuck": _RED}
+        glyph = (live_glyph_ascii if ascii_mode else live_glyph_unicode)[liveness.level]
+        live_seg = _wrap(f"{glyph} {liveness.age_s}s", live_color[liveness.level], colorize)
+        parts[-1] = f"{parts[-1]} {live_seg}"
 
     parts.append(_wrap(elapsed_str, _DIM, colorize))
 
@@ -448,6 +461,7 @@ class CompactRenderer:
         self._seen_warning_messages: set[str] = set()
         self._ascii_mode: bool = not is_unicode_terminal()
         self._colorize: bool = _color_enabled(is_tty)
+        self._heartbeat = HeartbeatTracker()
         # Per-task timing: start timestamp (seconds since epoch) keyed by
         # task UUID, plus a tiny single-entry cache of "the task we just
         # printed a TASK header for" so the inline result lines and the
@@ -558,6 +572,15 @@ class CompactRenderer:
             return
         self._render_status_bar()
 
+    def note_pty_bytes(self) -> None:
+        self._heartbeat.note_bytes(time.monotonic())
+
+    def note_subprocess_active(self, active: bool) -> None:
+        self._heartbeat.note_cpu_sample(time.monotonic(), active)
+
+    def reset_heartbeat(self) -> None:
+        self._heartbeat.reset()
+
     def _render_status_bar(self) -> None:
         """Compute and push the current status bar to the display."""
         if self._state is None:
@@ -596,6 +619,7 @@ class CompactRenderer:
             ascii_mode=self._ascii_mode,
             colorize=self._colorize,
             mode_label=self._mode_label,
+            liveness=self._heartbeat.state(time.monotonic()),
         )
         self._display.update(status_bar)
 
