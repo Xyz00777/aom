@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import time
 
 from ansible_aom.compact.display import Display
@@ -289,6 +290,15 @@ def _format_count_cells(
             )
         )
     return cells
+
+
+def _compute_tree_budget(rows: int, active_hosts: int) -> int:
+    """Tree height budget in lines.
+
+    Baseline ⅓ of terminal rows; +1 line per 3 active hosts; clamped to
+    [5, 25]. See spec §"Height budget & pruning".
+    """
+    return max(5, min(25, rows // 3 + active_hosts // 3))
 
 
 def format_host_summary(
@@ -773,7 +783,7 @@ class CompactRenderer:
 
         if self._state is None:
             return
-        self._render_status_bar()
+        self._render_status_panel()
 
     def update_state(self, event: dict) -> None:
         """Handle a new JSONL event.
@@ -796,7 +806,7 @@ class CompactRenderer:
         self._state.handle_event(event)
 
         # Refresh the status panel with current state + elapsed time.
-        self._render_status_bar()
+        self._render_status_panel()
 
     def tick(self) -> None:
         """Refresh the status panel without processing an event.
@@ -808,7 +818,7 @@ class CompactRenderer:
         """
         if self._state is None:
             return
-        self._render_status_bar()
+        self._render_status_panel()
 
     def note_pty_bytes(self) -> None:
         self._heartbeat.note_bytes(time.monotonic())
@@ -816,11 +826,22 @@ class CompactRenderer:
     def note_subprocess_active(self, active: bool) -> None:
         self._heartbeat.note_cpu_sample(time.monotonic(), active)
 
-    def _render_status_bar(self) -> None:
-        """Compute and push the current status bar to the display."""
+    def _render_status_panel(self) -> None:
+        """Compute and push the current panel (status bar + tree + hosts).
+
+        Composes three regions into a single Display update:
+        1. Status bar (existing — counts, elapsed, warnings, liveness).
+        2. Tree block (Task 7) — visible only while a task is RUNNING.
+        3. Per-host summary table (Task 6) — visible whenever the run
+           targets more than one host.
+
+        All three pieces are joined with newlines; Display tracks the
+        resulting row count for cursor management.
+        """
         if self._state is None:
             return
 
+        # --- Region 1: status bar (existing logic) -------------------------
         host_statuses: dict[str, Status] = {}
         for play in self._state.plays.values():
             for task in play.tasks.values():
@@ -856,7 +877,39 @@ class CompactRenderer:
             mode_label=self._mode_label,
             liveness=self._heartbeat.state(time.monotonic()),
         )
-        self._display.update(status_bar)
+
+        # --- Regions 2 & 3: tree + host rows -------------------------------
+        projection = TreeProjection.from_run_state(self._state)
+        cols, rows = shutil.get_terminal_size((80, 24))
+        active_hosts = sum(1 for s in host_statuses.values() if s == Status.RUNNING)
+        budget = _compute_tree_budget(rows, active_hosts)
+        tree_lines = format_tree_block(
+            projection,
+            budget=budget,
+            width=cols,
+            ascii_mode=self._ascii_mode,
+            colorize=self._colorize,
+        )
+        host_lines: list[str] = []
+        if projection.is_host_summary_visible():
+            host_lines = format_host_rows(
+                projection,
+                width=cols,
+                ascii_mode=self._ascii_mode,
+                colorize=self._colorize,
+            )
+
+        parts = [status_bar]
+        if tree_lines:
+            parts.append("\n".join(tree_lines))
+        if host_lines:
+            parts.append("\n".join(host_lines))
+        self._display.update("\n".join(parts))
+
+    def _render_status_bar(self) -> None:
+        """Deprecated alias — kept for any test references that still call
+        the old name. New code calls ``_render_status_panel``."""
+        self._render_status_panel()
 
     def handle_interactive_prompt(self, prompt_text: str) -> str:
         """Surface a pause / vars_prompt-style prompt and capture one line.

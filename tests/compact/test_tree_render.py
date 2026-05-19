@@ -270,3 +270,61 @@ def test_format_tree_block_host_leaves_are_plain_indented():
         assert "├─" not in hl and "└─" not in hl, (
             f"host line should have no branch glyph, got {hl!r}"
         )
+
+
+# =============================================================================
+# Task 8: CompactRenderer integration — _render_status_panel composes
+# status bar + tree + host rows into one Display update.
+# =============================================================================
+
+
+import shutil  # noqa: E402
+from unittest.mock import patch  # noqa: E402
+
+from ansible_aom.compact.renderer import CompactRenderer  # noqa: E402
+
+
+def test_render_status_panel_is_status_bar_only_before_any_task():
+    """When no task is RUNNING, the panel shows only the status bar —
+    no tree, no host rows. We capture the assembled panel via the
+    Display.update call rather than parsing stdout directly."""
+    r = CompactRenderer(is_tty=False)
+    r.start("site.yml", [])
+    with patch.object(r._display, "update") as m:
+        r._render_status_panel()
+    assert m.called
+    args, kwargs = m.call_args
+    content = args[0] if args else kwargs.get("content")
+    assert content is not None
+    assert "└─" not in content and "├─" not in content
+    assert "on: " not in content
+
+
+def test_render_status_panel_includes_tree_when_task_running(
+    event_playbook_start, event_play_start, event_task_start, event_runner_start
+):
+    r = CompactRenderer(is_tty=False)
+    r.start("site.yml", [])
+    r.update_state(event_playbook_start)
+    r.update_state(event_play_start)
+    r.update_state(event_task_start)
+    r.update_state(event_runner_start)
+    with patch.object(r._display, "update") as m:
+        r._render_status_panel()
+    args, kwargs = m.call_args
+    content = args[0] if args else kwargs.get("content")
+    assert content is not None
+    assert "Install nginx" in content
+    assert "site.yml" in content
+
+
+def test_compute_tree_budget_math():
+    from ansible_aom.compact.renderer import _compute_tree_budget
+    # Baseline: 24 rows, 0 active hosts → 24//3 = 8
+    assert _compute_tree_budget(rows=24, active_hosts=0) == 8
+    # Host scaling: 24 rows, 12 active hosts → 8 + 4 = 12
+    assert _compute_tree_budget(rows=24, active_hosts=12) == 12
+    # Lower clamp: tiny terminal, 0 hosts → 5
+    assert _compute_tree_budget(rows=10, active_hosts=0) == 5
+    # Upper clamp: huge values → 25
+    assert _compute_tree_budget(rows=200, active_hosts=200) == 25
