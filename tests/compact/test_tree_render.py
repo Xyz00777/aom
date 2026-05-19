@@ -392,7 +392,7 @@ def test_linear_strategy_panel_shape():
     # Task line appears once; each host appears at least twice (tree leaf + host row).
     assert "Install nginx" in panel
     for h in ("web1", "web2", "web3"):
-        assert panel.count(h) >= 2, (
+        assert panel.count(h) == 2, (
             f"expected {h!r} in both tree leaf and host row, got panel:\n{panel}"
         )
 
@@ -485,3 +485,6 @@ def test_post_recap_panel_drops_tree_and_suffix():
     assert "web1" in panel and "web2" in panel
     # No `on: <task>` suffix — both hosts are idle.
     assert "on: " not in panel
+    # Pin the observed shape: two host rows with "(idle)" suffix.
+    assert panel.count("(idle)") == 2
+    assert len(panel.splitlines()) == 2
