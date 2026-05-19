@@ -647,15 +647,15 @@ def _feed(
     Each parsed event is mirrored to the session sink so a later
     ``aom inspect show`` can replay the exact JSONL the run saw.
 
-    The line itself counts as a liveness signal (bytes arrived); a
-    task-start event additionally resets the heartbeat so the new task
-    gets a clean slate.
+    The line itself counts as a liveness signal — ``note_pty_bytes``
+    runs unconditionally so any task (including a silent long-running
+    one like ``community.general.homebrew`` looping over many
+    formulae) keeps the heartbeat tracker in a defined state from
+    its very first ``task_start`` event onwards.
     """
     renderer.note_pty_bytes()
 
     for event in parser.feed_line(line):
-        if event.get("_event") == "v2_playbook_on_task_start":
-            renderer.reset_heartbeat()
         sink.record_event(event)
         renderer.update_state(event)
 

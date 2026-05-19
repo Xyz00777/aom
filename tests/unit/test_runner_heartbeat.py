@@ -78,10 +78,17 @@ class TestFeedNotesBytes:
         assert renderer.update_state.called
 
 
-class TestTaskStartResetsHeartbeat:
-    """A task-start event drops any prior stuck signal for the new task."""
+class TestTaskStartCountsAsHeartbeat:
+    """The task_start line is itself bytes from the subprocess; it must
+    leave the tracker in a LIVE state, NOT clear it. Otherwise a long
+    silent task (e.g. ``community.general.homebrew`` looping over many
+    formulae) shows no liveness indicator for its entire duration.
+    """
 
-    def test_task_start_event_calls_reset_heartbeat(self) -> None:
+    def test_task_start_does_not_clear_heartbeat(self) -> None:
+        """``reset_heartbeat`` is no longer called on task_start — the
+        line's own ``note_pty_bytes`` is what establishes the new task's
+        observation window."""
         renderer = MagicMock()
         parser = _parser_in_execution_phase()
         sink = _FakeSink()
@@ -93,20 +100,10 @@ class TestTaskStartResetsHeartbeat:
 
         _feed(event_line, parser, renderer, sink)
 
-        assert renderer.reset_heartbeat.called
-
-    def test_non_task_start_event_does_not_reset(self) -> None:
-        renderer = MagicMock()
-        parser = _parser_in_execution_phase()
-        sink = _FakeSink()
-        event_line = (
-            '{"_event": "v2_runner_on_ok", "_timestamp": "2026-01-01T00:00:00Z",'
-            ' "task": {"id": "t1"}, "hosts": {"web1": {"ok": true}}}\n'
-        )
-
-        _feed(event_line, parser, renderer, sink)
-
         assert not renderer.reset_heartbeat.called
+        # ``note_pty_bytes`` must still fire — it is what gives the new
+        # task its initial LIVE state in the renderer's tracker.
+        assert renderer.note_pty_bytes.called
 
 
 class TestSampleSubprocessActive:

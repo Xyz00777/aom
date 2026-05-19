@@ -102,31 +102,32 @@ def test_new_bytes_return_tracker_to_live_after_stuck():
     assert tracker.state(now=142.0).level == "live"
 
 
-def test_reset_clears_observed_state():
-    tracker = HeartbeatTracker()
-    tracker.note_bytes(now=100.0)
-    tracker.note_cpu_sample(now=101.0, active=True)
-
-    tracker.reset()
-
-    assert tracker.state(now=200.0) is None
-
-
-def test_reset_then_new_task_starts_fresh():
-    tracker = HeartbeatTracker()
-    tracker.note_bytes(now=100.0)
-    tracker.reset()
-    tracker.note_bytes(now=200.0)
-
-    assert tracker.state(now=201.0) == LivenessState(level="live", age_s=1)
-
-
 def test_age_seconds_truncates_toward_zero():
     tracker = HeartbeatTracker()
     tracker.note_bytes(now=100.0)
 
     # 1.9s elapsed should report age_s=1, not rounded to 2.
     assert tracker.state(now=101.9).age_s == 1
+
+
+def test_silent_task_after_initial_byte_progresses_through_levels():
+    """The real-world brew-install case: one byte at task start, then
+    silence. The tracker must keep returning a state (LIVE → WORKING →
+    STUCK), not None — otherwise the user sees no liveness indicator
+    for the entire duration of the slow task."""
+    tracker = HeartbeatTracker(live_threshold_s=5.0, stuck_threshold_s=30.0)
+    tracker.note_bytes(now=100.0)
+
+    # Just after the task_start byte — LIVE.
+    assert tracker.state(now=101.0) is not None
+    assert tracker.state(now=101.0).level == "live"
+
+    # 10s later, no further bytes — WORKING (because byte age 10 > live
+    # threshold 5 but < stuck threshold 30).
+    assert tracker.state(now=110.0).level == "working"
+
+    # 35s later, no further bytes and no CPU samples — STUCK.
+    assert tracker.state(now=135.0).level == "stuck"
 
 
 def test_liveness_state_is_frozen_dataclass():

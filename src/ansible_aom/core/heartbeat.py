@@ -19,9 +19,9 @@ State derivation (see ``state``)::
     cpu active within stuck win.  → WORKING
     otherwise                     → STUCK
 
-The runner is expected to call ``reset()`` on each new task so a
-stuck-from-previous-task glyph does not bleed into the next task's
-first second.
+No explicit task-boundary reset is needed: the ``v2_playbook_on_task_start``
+line is itself a PTY byte that the runner notes, so the new task's
+observation window opens naturally.
 """
 
 from __future__ import annotations
@@ -68,10 +68,6 @@ class HeartbeatTracker:
     def note_cpu_sample(self, now: float, active: bool) -> None:
         if active:
             self._cpu_active_at = now
-
-    def reset(self) -> None:
-        self._last_byte_at = None
-        self._cpu_active_at = None
 
     def state(self, now: float) -> LivenessState | None:
         if self._last_byte_at is None:

@@ -209,10 +209,6 @@ class AOMApp(App[None]):
         """Renderer Protocol: no-op. TUI does not surface a heartbeat yet."""
         return None
 
-    def reset_heartbeat(self) -> None:
-        """Renderer Protocol: no-op. TUI does not surface a heartbeat yet."""
-        return None
-
     def update_state(self, event: dict) -> None:
         """Renderer Protocol: route the JSONL event through RunState.
 

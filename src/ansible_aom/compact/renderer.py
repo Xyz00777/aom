@@ -578,9 +578,6 @@ class CompactRenderer:
     def note_subprocess_active(self, active: bool) -> None:
         self._heartbeat.note_cpu_sample(time.monotonic(), active)
 
-    def reset_heartbeat(self) -> None:
-        self._heartbeat.reset()
-
     def _render_status_bar(self) -> None:
         """Compute and push the current status bar to the display."""
         if self._state is None:

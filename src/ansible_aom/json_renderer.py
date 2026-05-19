@@ -127,10 +127,6 @@ class JsonRenderer:
         """No-op — JSON mode has no liveness indicator."""
         return
 
-    def reset_heartbeat(self) -> None:
-        """No-op — JSON mode has no liveness indicator."""
-        return
-
     def handle_password_prompt(self, prompt_text: str) -> str:
         """Refuse on stderr; return empty so ansible fails the auth attempt."""
         import sys

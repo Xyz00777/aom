@@ -103,11 +103,3 @@ class Renderer(Protocol):
         "no output AND no CPU".
         """
         ...
-
-    def reset_heartbeat(self) -> None:
-        """Drop any previous liveness state — called on each task boundary.
-
-        Prevents a STUCK indicator from a previous slow task from
-        bleeding into the first second of the next task.
-        """
-        ...
