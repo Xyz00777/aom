@@ -392,6 +392,102 @@ def format_host_rows(
     return out
 
 
+# Tree drawing glyphs. ASCII variants chosen to be unambiguous in plain
+# terminals: "\-" is the last-child marker, "+-" is intermediate.
+_TREE_LAST_UNICODE = "└─ "
+_TREE_MID_UNICODE = "├─ "
+_TREE_LAST_ASCII = "\\- "
+_TREE_MID_ASCII = "+- "
+
+# Map status-colour names (from core.icons.get_status_color) to SGR codes
+# defined in this module. Keys must match the strings returned by
+# get_status_color() exactly.
+_COLOR_NAME_TO_SGR: dict[str, str] = {
+    "green": _GREEN,
+    "yellow": _YELLOW,
+    "red": _RED,
+    "magenta": _MAGENTA,
+    "cyan": _CYAN,
+    "dim": _DIM,
+}
+
+
+def format_tree_block(
+    projection: TreeProjection,
+    budget: int,
+    *,
+    width: int,
+    ascii_mode: bool = False,
+    colorize: bool = False,
+) -> list[str]:
+    """Render the tree block as a list of lines.
+
+    Returns an empty list when the projection says the tree should be
+    hidden. The renderer caller stitches this list into the bottom panel.
+    """
+    from ansible_aom.core.icons import get_running_frame, get_status_color
+
+    if not projection.is_tree_visible():
+        return []
+
+    lines = projection.tree_lines(budget=budget)
+    if not lines:
+        return []
+
+    # Determine "last child at depth D" by looking ahead: a line is the
+    # last child of its parent if no following line at depth ≥ D-1 has
+    # depth == D. We compute a parallel `is_last` list.
+    is_last: list[bool] = []
+    for i, ln in enumerate(lines):
+        last = True
+        for j in range(i + 1, len(lines)):
+            if lines[j].depth < ln.depth:
+                break
+            if lines[j].depth == ln.depth:
+                last = False
+                break
+        is_last.append(last)
+
+    last_glyph = _TREE_LAST_ASCII if ascii_mode else _TREE_LAST_UNICODE
+    mid_glyph = _TREE_MID_ASCII if ascii_mode else _TREE_MID_UNICODE
+    icons = STATUS_ICONS_ASCII if ascii_mode else STATUS_ICONS
+
+    out: list[str] = []
+    for ln, last in zip(lines, is_last):
+        indent = "   " * max(ln.depth - 1, 0)
+        if ln.depth == 0:
+            branch = ""
+        else:
+            branch = last_glyph if last else mid_glyph
+
+        # Per-line glyph (status icon for task/host; none for play/role).
+        glyph_seg = ""
+        if ln.kind in ("task", "host") and ln.status is not None:
+            if ln.status == Status.RUNNING and not ascii_mode:
+                # get_running_frame returns a Unicode quadrant glyph; only
+                # safe outside ASCII mode. ASCII mode falls through to the
+                # plain icon map (which uses "@" for RUNNING).
+                g = get_running_frame(0)
+            else:
+                g = icons.get(ln.status, "?")
+            color_name = get_status_color(ln.status)
+            color_code = _COLOR_NAME_TO_SGR.get(color_name, "")
+            glyph_seg = (_wrap(g, color_code, colorize) + " ") if color_code else (g + " ")
+
+        # Host leaves render as "<hostname> <glyph> <elapsed>s".
+        if ln.kind == "host":
+            elapsed = int(ln.elapsed_s or 0)
+            label_seg = f"{ln.label} {glyph_seg}{_wrap(f'{elapsed}s', _DIM, colorize)}"
+            text = f"{indent}{branch}{label_seg}"
+        else:
+            text = f"{indent}{branch}{glyph_seg}{ln.label}"
+
+        if len(_strip_sgr(text)) > width:
+            text = _truncate_visible(text, width, colorize=colorize)
+        out.append(text)
+    return out
+
+
 def _count_tasks(play: PlayDefinition) -> int:
     """Count leaf TaskDefinitions in a play, expanding any RoleGroupDefinition."""
     total = 0

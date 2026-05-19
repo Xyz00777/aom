@@ -6,7 +6,7 @@ formatting, not when you accidentally do.
 """
 from __future__ import annotations
 
-from ansible_aom.compact.renderer import format_host_rows
+from ansible_aom.compact.renderer import format_host_rows, format_tree_block
 from ansible_aom.core.models import RunState, Status
 from ansible_aom.core.tree import TreeProjection
 
@@ -120,3 +120,70 @@ def test_truncate_visible_plain_mode_emits_no_sgr():
     # Colorize=True keeps the RESET suffix to close any open SGR state.
     truncated_color = _truncate_visible("\x1b[31mhello world\x1b[0m", 5, colorize=True)
     assert truncated_color.endswith("\x1b[0m")
+
+
+def test_format_tree_block_emits_tree_shape():
+    state = _state(
+        {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"},
+        {"_event": "v2_playbook_on_play_start",
+         "_timestamp": "2026-04-20T10:00:01Z",
+         "play": {"id": "p1", "name": "deploy webservers"}},
+        {"_event": "v2_playbook_on_task_start",
+         "_timestamp": "2026-04-20T10:00:02Z",
+         "task": {"id": "t1", "name": "Install nginx"},
+         "play": {"id": "p1"}},
+        {"_event": "v2_runner_on_start",
+         "_timestamp": "2026-04-20T10:00:03Z",
+         "task": {"id": "t1", "name": "Install nginx"},
+         "host": "web1"},
+        {"_event": "v2_runner_on_start",
+         "_timestamp": "2026-04-20T10:00:03Z",
+         "task": {"id": "t1", "name": "Install nginx"},
+         "host": "web2"},
+    )
+    p = TreeProjection.from_run_state(state)
+    block = format_tree_block(p, budget=20, width=80,
+                              ascii_mode=False, colorize=False)
+    # block is list[str], one per line
+    joined = "\n".join(block)
+    assert "site.yml" in joined
+    assert "play: deploy webservers" in joined
+    assert "Install nginx" in joined
+    assert "web1" in joined and "web2" in joined
+    # Branch glyphs present
+    assert "└─" in joined or "├─" in joined
+
+
+def test_format_tree_block_ascii_fallback():
+    state = _state(
+        {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"},
+        {"_event": "v2_playbook_on_play_start",
+         "_timestamp": "2026-04-20T10:00:01Z",
+         "play": {"id": "p1", "name": "deploy"}},
+        {"_event": "v2_playbook_on_task_start",
+         "_timestamp": "2026-04-20T10:00:02Z",
+         "task": {"id": "t1", "name": "Install nginx"},
+         "play": {"id": "p1"}},
+        {"_event": "v2_runner_on_start",
+         "_timestamp": "2026-04-20T10:00:03Z",
+         "task": {"id": "t1", "name": "Install nginx"},
+         "host": "web1"},
+    )
+    p = TreeProjection.from_run_state(state)
+    block = format_tree_block(p, budget=20, width=80,
+                              ascii_mode=True, colorize=False)
+    joined = "\n".join(block)
+    # No Unicode glyphs in ascii mode
+    for ch in ("└", "├", "─", "◐", "●", "◆"):
+        assert ch not in joined, f"ascii mode contained {ch!r}"
+    # ASCII branch markers used instead
+    assert "+-" in joined or "\\-" in joined
+
+
+def test_format_tree_block_invisible_returns_empty():
+    state = _state(
+        {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"},
+    )
+    p = TreeProjection.from_run_state(state)
+    assert format_tree_block(p, budget=20, width=80,
+                             ascii_mode=False, colorize=False) == []
