@@ -68,9 +68,14 @@ def _strip_sgr(text: str) -> str:
     return _SGR_RE.sub("", text)
 
 
-def _truncate_visible(text: str, width: int) -> str:
+def _truncate_visible(text: str, width: int, *, colorize: bool = False) -> str:
     """Truncate to `width` visible chars while preserving any open SGR
-    state by appending RESET. SGR escapes are zero-width."""
+    state by appending RESET. SGR escapes are zero-width.
+
+    `colorize=False` (the default) means the input string is plain ASCII
+    with no SGR codes — in that mode the RESET is suppressed so the
+    output stays pure ASCII (`NO_COLOR` / non-TTY contract).
+    """
     if width <= 1:
         return text[:width]
     visible = 0
@@ -87,7 +92,9 @@ def _truncate_visible(text: str, width: int) -> str:
             out.append(text[i])
             visible += 1
             i += 1
-    out.append("…" + _RESET)
+    out.append("…")
+    if colorize:
+        out.append(_RESET)
     return "".join(out)
 
 
@@ -374,9 +381,13 @@ def format_host_rows(
                 f"{_wrap(f'{glyph} {elapsed}s', _CYAN, colorize)}"
             )
 
-        line = " ".join([hostname_seg, *cells, " ", suffix])
+        # Two spaces between count cells and the current-task suffix for visual
+        # separation; `" ".join` over [hostname_seg, *cells] gives the single
+        # spaces inside that group.
+        left = " ".join([hostname_seg, *cells])
+        line = f"{left}  {suffix}"
         if len(_strip_sgr(line)) > width:
-            line = _truncate_visible(line, width)
+            line = _truncate_visible(line, width, colorize=colorize)
         out.append(line)
     return out
 
