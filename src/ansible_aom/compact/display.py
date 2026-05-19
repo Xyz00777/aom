@@ -10,9 +10,17 @@ View Research".
 
 from __future__ import annotations
 
+import re
 import shutil
 import sys
 import time
+
+# ANSI escape sequences (SGR, cursor moves, mode-set, etc.) take zero
+# visible columns. ``_row_count`` must strip them before measuring or
+# a colourised status bar reports as wider than it actually renders —
+# the over-counted row total then makes the rewind step land on a log
+# line above and the clear-to-EOS eats it.
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]")
 
 # Terminal size constants (SPECIFICATION.md Section 4.4)
 MINIMUM_LINES = 24
@@ -366,11 +374,17 @@ def _row_count(text: str, width: int) -> int:
     that wrapped from 1 logical line into 2 rendered rows would only
     rewind by 1, leaving stale half-bar visible on the next redraw.
 
-    Note: ``len()`` undercounts East Asian wide chars (emoji, CJK) —
-    those occupy two columns each but Python counts them as one. Status
-    bar content is BMP punctuation and ASCII, so this approximation is
-    safe for the AOM call sites; revisit if we ever push wide content
-    through ``Display.update()``.
+    ANSI escape sequences (SGR colour codes, cursor moves) are
+    stripped before measuring — they take zero visible columns but
+    `len()` would count their bytes, over-reporting the row total and
+    corrupting later rewinds (the cursor would land on a log line
+    above the visible status, then clear-to-EOS would eat it).
+
+    Note: even after stripping, ``len()`` undercounts East Asian wide
+    chars (emoji, CJK) — those occupy two columns each but Python
+    counts them as one. Status bar content is BMP punctuation and
+    ASCII, so this approximation is safe for the AOM call sites;
+    revisit if we ever push wide content through ``Display.update()``.
     """
     if not text:
         return 0
@@ -381,9 +395,10 @@ def _row_count(text: str, width: int) -> int:
         lines = lines[:-1]
     rows = 0
     for line in lines:
-        if not line:
+        visible = _ANSI_ESCAPE_RE.sub("", line)
+        if not visible:
             rows += 1
         else:
             # ceil(len / width); the -1/+1 dance avoids importing math.
-            rows += (len(line) - 1) // width + 1
+            rows += (len(visible) - 1) // width + 1
     return rows

@@ -67,6 +67,44 @@ def test_row_count_blank_lines_count_as_one_row_each():
     assert _row_count("a\n\nb", width=80) == 3
 
 
+def test_row_count_ignores_ansi_escape_sequences():
+    """ANSI escape bytes are zero-width on screen — they must not push
+    a status line over the wrap threshold.
+
+    Before this guard, a colorised status bar (many SGR escapes around
+    every segment) wrapped to a phantom second row in ``_row_count``.
+    The rewind step then sent the cursor one row higher than the visible
+    status, and the subsequent clear-to-EOS wiped a log line above.
+    """
+    # The exact status bar the user's compact renderer emits for a
+    # mid-run colourised view. Visible width is ~64 chars (fits in 120
+    # easily); total byte length is 156 because of the SGR overhead.
+    from ansible_aom.compact.renderer import format_status_bar
+    from ansible_aom.core.heartbeat import LivenessState
+
+    bar = format_status_bar(
+        "general.yml",
+        1,
+        1,
+        3,
+        1,
+        14,
+        tasks_completed=21,
+        tasks_total=89,
+        colorize=True,
+        liveness=LivenessState(level="live", age_s=3),
+    )
+    assert _row_count(bar, width=120) == 1
+
+
+def test_row_count_ansi_long_line_still_wraps_correctly():
+    """ANSI codes are excluded from the wrap calculation; visible chars
+    are what counts. 90 visible chars at width=80 wraps to 2 rows even
+    with ANSI overhead pushing the byte length past 160."""
+    text = "\x1b[32m" + ("x" * 90) + "\x1b[0m"
+    assert _row_count(text, width=80) == 2
+
+
 def test_display_update_records_wrapped_row_count(monkeypatch):
     """After update() in a narrow terminal, _status_rows reflects wrapped rows.
 
