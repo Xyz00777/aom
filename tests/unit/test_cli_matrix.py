@@ -88,6 +88,5 @@ def test_mutex_rejected(label: str, argv: list[str], fragment: str) -> None:
     )
     combined = result.stderr + result.stdout
     assert fragment in combined, (
-        f"{label}: expected stderr fragment {fragment!r}, got "
-        f"stderr={result.stderr[:300]!r}"
+        f"{label}: expected stderr fragment {fragment!r}, got stderr={result.stderr[:300]!r}"
     )

@@ -34,7 +34,6 @@ from textual.widgets import Static
 
 from ansible_aom.tui.app import AOMApp
 
-
 # ---------------------------------------------------------------------------
 # HelpOverlay
 # ---------------------------------------------------------------------------
@@ -242,9 +241,7 @@ class TestInspectScreenSmoke:
     """
 
     @pytest.mark.asyncio
-    async def test_inspect_with_session_mounts_and_dismisses(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_inspect_with_session_mounts_and_dismisses(self, tmp_path: Path) -> None:
         import json
 
         from ansible_aom.tui.screens.inspect import InspectScreen
@@ -280,16 +277,12 @@ class TestInspectScreenSmoke:
                 "stats": {"web1": {"ok": 1, "failures": 0}},
             },
         ]
-        (session_path / "events.jsonl").write_text(
-            "\n".join(json.dumps(e) for e in events) + "\n"
-        )
+        (session_path / "events.jsonl").write_text("\n".join(json.dumps(e) for e in events) + "\n")
         (session_path / "stderr.log").write_text("")
 
         app = AOMApp()
         async with app.run_test() as pilot:
-            await pilot.app.push_screen(
-                InspectScreen(session_id=sid, state_dir=tmp_path)
-            )
+            await pilot.app.push_screen(InspectScreen(session_id=sid, state_dir=tmp_path))
             await pilot.pause()
             assert isinstance(pilot.app.screen, InspectScreen)
 

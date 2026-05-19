@@ -358,9 +358,7 @@ class TestRerunRoundtripChangesOnly:
 class TestRerunRoundtripRefusal:
     """Old-format session (no ansible_args) → exit 2, no spawn."""
 
-    def test_missing_ansible_args_refuses_without_spawning(
-        self, tmp_path: Path, capsys
-    ) -> None:
+    def test_missing_ansible_args_refuses_without_spawning(self, tmp_path: Path, capsys) -> None:
         sessions_dir = tmp_path / "sessions"
         sid = "01971111-1111-7000-8000-000000000099"
         session_path = sessions_dir / sid
@@ -381,9 +379,7 @@ class TestRerunRoundtripRefusal:
                 "hosts": {"web2": {"failed": True, "msg": "boom"}},
             }
         ]
-        (session_path / "events.jsonl").write_text(
-            "\n".join(json.dumps(e) for e in events) + "\n"
-        )
+        (session_path / "events.jsonl").write_text("\n".join(json.dumps(e) for e in events) + "\n")
         (session_path / "stderr.log").write_text("")
 
         argv_log = tmp_path / "argv.txt"

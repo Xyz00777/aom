@@ -79,9 +79,7 @@ def test_runner_returns_within_bounded_time_when_child_hangs_after_stats() -> No
         with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
             # Short per-read timeout so the worker thread can react,
             # but the run as a whole should still complete bounded.
-            result["exit_code"] = run_playbook(
-                "playbook.yml", [], renderer, timeout=0.5
-            )
+            result["exit_code"] = run_playbook("playbook.yml", [], renderer, timeout=0.5)
 
     worker = threading.Thread(target=_drive_runner, daemon=True)
     worker.start()
@@ -116,9 +114,7 @@ def test_runner_finishes_promptly_on_clean_eof() -> None:
     )
 
     start = time.monotonic()
-    with patch(
-        "ansible_aom.runner._build_command", return_value=(sys.executable, ["-c", code])
-    ):
+    with patch("ansible_aom.runner._build_command", return_value=(sys.executable, ["-c", code])):
         exit_code = run_playbook("playbook.yml", [], renderer, timeout=0.5)
     elapsed = time.monotonic() - start
 

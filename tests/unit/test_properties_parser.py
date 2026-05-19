@@ -157,7 +157,7 @@ def test_valid_events_survive_garbage_interleaving(events: list[dict], garbage: 
             continue
         try:
             obj = json.loads(g_stripped)
-        except (json.JSONDecodeError, ValueError):
+        except json.JSONDecodeError, ValueError:
             safe_garbage.append(g)
             continue
         if isinstance(obj, dict) and "_event" in obj:

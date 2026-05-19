@@ -55,7 +55,7 @@ class TestJsonLineStreamSurvivesMojibake:
         (it no longer starts with ``{``); the next line must parse cleanly.
         """
         stream = JsonLineStream()
-        bom_line = _decode_pexpect_style(b"\xef\xbb\xbf{\"_event\": \"v2_playbook_on_start\"}")
+        bom_line = _decode_pexpect_style(b'\xef\xbb\xbf{"_event": "v2_playbook_on_start"}')
         # bom_line now starts with ﻿ — JsonLineStream's `startswith("{")`
         # check will treat it as non-JSON. That's acceptable; the contract
         # is "doesn't crash and doesn't poison subsequent reads".

@@ -196,9 +196,7 @@ _GOLDEN_LOCALHOST_ONLY = {
         ("localhost-only", _GOLDEN_LOCALHOST_ONLY),
     ],
 )
-def test_golden_payload_validates_against_committed_schema(
-    name: str, payload: dict
-) -> None:
+def test_golden_payload_validates_against_committed_schema(name: str, payload: dict) -> None:
     """Each canonical shape must validate. Catches accidental tightening."""
     schema = _load_committed_schema()
     # ``validate`` raises ``ValidationError`` on failure — let it bubble.
