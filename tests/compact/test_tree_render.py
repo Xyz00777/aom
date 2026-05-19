@@ -328,3 +328,160 @@ def test_compute_tree_budget_math():
     assert _compute_tree_budget(rows=10, active_hosts=0) == 5
     # Upper clamp: huge values → 25
     assert _compute_tree_budget(rows=200, active_hosts=200) == 25
+
+
+def _full_panel(state: RunState) -> str:
+    """Helper: render the assembled panel against a fixed 80-col terminal,
+    24-row baseline. Returns the joined panel string (tree + host rows
+    only; status bar is not part of these snapshots since it's a separate
+    concern with its own dedicated tests)."""
+    from ansible_aom.compact.renderer import (
+        _compute_tree_budget,
+        format_host_rows,
+        format_tree_block,
+    )
+
+    p = TreeProjection.from_run_state(state)
+    active = sum(
+        1
+        for play in state.plays.values()
+        for task in play.tasks.values()
+        for hs in task.hosts.values()
+        if hs.status == Status.RUNNING
+    )
+    budget = _compute_tree_budget(24, active)
+    tree = format_tree_block(
+        p, budget=budget, width=80, ascii_mode=False, colorize=False
+    )
+    rows = (
+        format_host_rows(p, width=80, ascii_mode=False, colorize=False)
+        if p.is_host_summary_visible()
+        else []
+    )
+    return "\n".join(tree + rows)
+
+
+def test_linear_strategy_panel_shape():
+    """One task running on three hosts — classic linear-strategy shape.
+    Expect: one task line in the tree + three host children + three
+    host rows below (one per host, each with `on: Install nginx`)."""
+    state = _state(
+        {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"},
+        {
+            "_event": "v2_playbook_on_play_start",
+            "_timestamp": "2026-04-20T10:00:01Z",
+            "play": {"id": "p1", "name": "deploy"},
+        },
+        {
+            "_event": "v2_playbook_on_task_start",
+            "_timestamp": "2026-04-20T10:00:02Z",
+            "task": {"id": "t1", "name": "Install nginx"},
+            "play": {"id": "p1"},
+        },
+        *[
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:03Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "host": h,
+            }
+            for h in ("web1", "web2", "web3")
+        ],
+    )
+    panel = _full_panel(state)
+    # Task line appears once; each host appears at least twice (tree leaf + host row).
+    assert "Install nginx" in panel
+    for h in ("web1", "web2", "web3"):
+        assert panel.count(h) >= 2, (
+            f"expected {h!r} in both tree leaf and host row, got panel:\n{panel}"
+        )
+
+
+def test_free_strategy_panel_shows_two_tasks():
+    """Free strategy: web1 on task A, web2 on task B simultaneously.
+    Expect: two task lines in the tree with their respective host
+    children, plus host rows showing divergent `on:` suffixes."""
+    state = _state(
+        {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"},
+        {
+            "_event": "v2_playbook_on_play_start",
+            "_timestamp": "2026-04-20T10:00:01Z",
+            "play": {"id": "p1", "name": "deploy"},
+        },
+        {
+            "_event": "v2_playbook_on_task_start",
+            "_timestamp": "2026-04-20T10:00:02Z",
+            "task": {"id": "t1", "name": "Install nginx"},
+            "play": {"id": "p1"},
+        },
+        {
+            "_event": "v2_runner_on_start",
+            "_timestamp": "2026-04-20T10:00:03Z",
+            "task": {"id": "t1", "name": "Install nginx"},
+            "host": "web1",
+        },
+        {
+            "_event": "v2_playbook_on_task_start",
+            "_timestamp": "2026-04-20T10:00:04Z",
+            "task": {"id": "t2", "name": "Configure firewall"},
+            "play": {"id": "p1"},
+        },
+        {
+            "_event": "v2_runner_on_start",
+            "_timestamp": "2026-04-20T10:00:05Z",
+            "task": {"id": "t2", "name": "Configure firewall"},
+            "host": "web2",
+        },
+    )
+    panel = _full_panel(state)
+    assert "Install nginx" in panel
+    assert "Configure firewall" in panel
+    # Per-host row suffixes show divergent current tasks.
+    assert "web1" in panel and "on: Install nginx" in panel
+    assert "web2" in panel and "on: Configure firewall" in panel
+
+
+def test_post_recap_panel_drops_tree_and_suffix():
+    """After PLAY RECAP (`v2_playbook_on_stats`) no task is RUNNING, so
+    the tree disappears entirely. Host rows remain but their suffix
+    becomes `(idle)` (or is suppressed once the renderer detects the
+    finished state)."""
+    state = _state(
+        {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"},
+        {
+            "_event": "v2_playbook_on_play_start",
+            "_timestamp": "2026-04-20T10:00:01Z",
+            "play": {"id": "p1", "name": "deploy"},
+        },
+        {
+            "_event": "v2_playbook_on_task_start",
+            "_timestamp": "2026-04-20T10:00:02Z",
+            "task": {"id": "t1", "name": "Install nginx"},
+            "play": {"id": "p1"},
+        },
+        {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "2026-04-20T10:00:05Z",
+            "task": {"id": "t1", "name": "Install nginx"},
+            "hosts": {"web1": {"ok": True, "changed": False}},
+        },
+        {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "2026-04-20T10:00:05Z",
+            "task": {"id": "t1", "name": "Install nginx"},
+            "hosts": {"web2": {"ok": True, "changed": False}},
+        },
+        {
+            "_event": "v2_playbook_on_stats",
+            "_timestamp": "2026-04-20T10:00:10Z",
+            "stats": {},
+        },
+    )
+    panel = _full_panel(state)
+    # Tree is gone (no branch glyphs at all).
+    assert "└─" not in panel
+    assert "├─" not in panel
+    # Host rows still present.
+    assert "web1" in panel and "web2" in panel
+    # No `on: <task>` suffix — both hosts are idle.
+    assert "on: " not in panel
