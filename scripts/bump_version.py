@@ -114,12 +114,29 @@ def _read_head_message(repo_root: Path) -> str:
     return result.stdout
 
 
+_HELP = """\
+Usage: bump_version.py
+
+Post-commit hook. Reads HEAD's commit message, detects the conventional-
+commit type, and (if feat/fix/refactor/perf or ! / BREAKING) bumps the
+version in pyproject.toml + uv.lock and `git commit --amend`s the bump
+into HEAD.
+
+Takes no arguments. Running this manually will mutate HEAD (amend the
+current tip) — only do that if you actually want a bump folded in.
+"""
+
+
 def main(argv: list[str]) -> int:
     """Hook entry point.
 
     Called as a post-commit hook (no useful argv). Reads the message
     from ``HEAD``, bumps if appropriate, amends.
     """
+    if any(a in {"-h", "--help"} for a in argv[1:]):
+        sys.stdout.write(_HELP)
+        return 0
+
     # Recursion guard: the `git commit --amend` below re-fires the
     # post-commit hook. Without this, we'd infinitely re-bump.
     if os.environ.get("AOM_BUMP_HOOK_RUNNING"):
