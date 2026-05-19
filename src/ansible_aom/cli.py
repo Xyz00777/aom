@@ -54,6 +54,61 @@ def detect_duplicate_playbook(playbook: str, ansible_args: list[str]) -> bool:
     return any(os.path.normpath(arg) == target for arg in ansible_args)
 
 
+def merge_limit_args(ansible_args: list[str]) -> list[str]:
+    """Collapse repeated ``-l`` / ``--limit`` flags into a single comma-joined one.
+
+    ansible-playbook stores ``--limit`` as a plain string (not append),
+    so ``-l a -l b`` silently keeps only ``b``. Users reach for the
+    repeat-the-flag idiom because most CLIs accept it; we merge into
+    the comma syntax ansible actually honours as a union.
+
+    The merged flag is placed at the position of the FIRST limit
+    occurrence; trailing limit tokens are removed. The flag form
+    (``-l`` vs ``--limit``) follows the first occurrence. A trailing
+    bare ``-l`` with no value is left alone — ansible will surface
+    that as a usage error and inventing a value would mask it.
+    """
+    # Find every (start_index, flag_form, value) triple. Three forms:
+    #   "-l X" / "--limit X" (two tokens) and "--limit=X" (one token).
+    found: list[tuple[int, str, str]] = []
+    i = 0
+    while i < len(ansible_args):
+        tok = ansible_args[i]
+        if tok in ("-l", "--limit"):
+            if i + 1 >= len(ansible_args):
+                break  # dangling flag — leave for ansible to reject
+            found.append((i, tok, ansible_args[i + 1]))
+            i += 2
+            continue
+        if tok.startswith("--limit="):
+            found.append((i, "--limit", tok[len("--limit=") :]))
+            i += 1
+            continue
+        i += 1
+    if len(found) < 2:
+        return list(ansible_args)
+
+    drop_indices: set[int] = set()
+    for start, flag, _ in found:
+        drop_indices.add(start)
+        # Two-token forms also consume the value slot.
+        if not ansible_args[start].startswith("--limit="):
+            drop_indices.add(start + 1)
+
+    first_pos, first_flag, _ = found[0]
+    merged_value = ",".join(value for _, _, value in found)
+
+    out: list[str] = []
+    for idx, tok in enumerate(ansible_args):
+        if idx == first_pos:
+            out.extend([first_flag, merged_value])
+            continue
+        if idx in drop_indices:
+            continue
+        out.append(tok)
+    return out
+
+
 def ensure_inventory_arg(ansible_args: list[str]) -> list[str]:
     """If no -i/--inventory flag is set, prepend one pointing at the default file.
 
@@ -100,10 +155,15 @@ Examples:
   aom --install-completion bash >> ~/.bashrc   Enable tab-completion for bash
 
 Argument forwarding:
-  Anything after the playbook path is passed verbatim to ansible-playbook.
-  AOM never silently rewrites flags. If you pass -i / --inventory, AOM
-  leaves your inventory alone; otherwise AOM auto-detects ./inventory.ini
-  (then .yml, .yaml, hosts) and prepends -i for convenience.
+  Anything after the playbook path is passed verbatim to ansible-playbook,
+  with two ergonomic exceptions:
+  - If you pass -i / --inventory, AOM leaves your inventory alone; otherwise
+    AOM auto-detects ./inventory.ini (then .yml, .yaml, hosts) and prepends
+    -i for convenience.
+  - Repeated -l / --limit flags are merged into a single comma-joined value
+    (e.g. `-l web1 -l web2` → `-l web1,web2`). ansible-playbook itself stores
+    --limit as a single string and silently keeps only the LAST occurrence,
+    which is rarely what users mean. AOM merges them so the union runs.
 
 Verbosity:
   AOM's own debug flag is --verbose (long form only). The short -v
@@ -370,7 +430,7 @@ def main() -> int:
             )
             return 2
 
-        ansible_args = ensure_inventory_arg(args.ansible_args)
+        ansible_args = ensure_inventory_arg(merge_limit_args(args.ansible_args))
 
         record = not args.no_record
         if args.tui:
