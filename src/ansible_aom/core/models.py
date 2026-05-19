@@ -311,7 +311,7 @@ class RunState:
     def _handle_v2_runner_on_start(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_start event."""
         task_data = event.get("task", {})
-        _hostname = event.get("host", "")
+        hostname = event.get("host", "")
         task_id = task_data.get("id", "")
         task_name = task_data.get("name", "")
         play_id = self._resolve_play_id(event)
@@ -340,6 +340,18 @@ class RunState:
         else:
             play.tasks[task_id].status = Status.RUNNING
             play.tasks[task_id].start_time = ts
+
+        # Record the host as RUNNING so the renderer can show which hosts
+        # are currently executing a task (especially under strategy: free,
+        # where the only signal that host X has started task Y is this
+        # event). A subsequent v2_runner_on_ok/failed/skipped/unreachable
+        # event will overwrite this entry with the terminal status.
+        if hostname and hostname not in play.tasks[task_id].hosts:
+            play.tasks[task_id].hosts[hostname] = HostRunState(
+                hostname=hostname,
+                status=Status.RUNNING,
+                start_time=ts,
+            )
 
     def _handle_v2_runner_on_ok(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_ok event."""
