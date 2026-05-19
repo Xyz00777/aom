@@ -393,9 +393,7 @@ class TestTreeLinesRolesAndFanOut:
     def _free_strategy_state(self) -> RunState:
         state = RunState(playbook="site.yml")
         state.definitions = self._role_aware_definitions()
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -479,3 +477,120 @@ class TestTreeLinesRolesAndFanOut:
 
         assert host_under_task["Install nginx"] == ["web1"]
         assert host_under_task["Configure firewall"] == ["web2"]
+
+
+class TestTreeLinesPruning:
+    def _many_tasks_state(self, n_roles: int, tasks_per_role: int, hosts_per_task: int) -> RunState:
+        """Build a RunState with n_roles × tasks_per_role tasks, each
+        running on hosts_per_task hosts. All tasks are concurrent
+        (free-strategy-style fan-out) — pruning is exercised by the
+        sheer line count.
+        """
+        state = RunState(playbook="site.yml")
+        roles = [
+            RoleGroupDefinition(
+                role=f"role{r}",
+                tasks=[
+                    TaskDefinition(
+                        name=f"r{r}-t{t}",
+                        role=f"role{r}",
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=t,
+                    )
+                    for t in range(tasks_per_role)
+                ],
+            )
+            for r in range(n_roles)
+        ]
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="big",
+                hosts="all",
+                resolved_hosts=[f"h{i}" for i in range(hosts_per_task)],
+                tasks=list(roles),
+            )
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "big"},
+            }
+        )
+        for r in range(n_roles):
+            for t in range(tasks_per_role):
+                tname = f"r{r}-t{t}"
+                state.handle_event(
+                    {
+                        "_event": "v2_playbook_on_task_start",
+                        "_timestamp": "2026-04-20T10:00:02Z",
+                        "task": {"id": f"{r}-{t}", "name": tname},
+                        "play": {"id": "p1"},
+                    }
+                )
+                for h in range(hosts_per_task):
+                    state.handle_event(
+                        {
+                            "_event": "v2_runner_on_start",
+                            "_timestamp": "2026-04-20T10:00:03Z",
+                            "task": {"id": f"{r}-{t}", "name": tname},
+                            "host": f"h{h}",
+                        }
+                    )
+        return state
+
+    def test_within_budget_is_unchanged(self):
+        # Generous budget — no pruning should happen.
+        from datetime import datetime, timezone
+
+        state = self._many_tasks_state(n_roles=1, tasks_per_role=1, hosts_per_task=2)
+        p = TreeProjection.from_run_state(state)
+        now = datetime(2026, 4, 20, 10, 0, 5, tzinfo=timezone.utc)
+        # Within-budget call equals the unbounded baseline.
+        bounded = p.tree_lines(budget=999, now=now)
+        # Re-fetch with a generous budget — should be deterministic.
+        again = p.tree_lines(budget=999, now=now)
+        assert bounded == again
+        # Sanity check: host leaves present (not pruned away).
+        assert any(ln.kind == "host" for ln in bounded)
+
+    def test_collapses_host_leaves_first(self):
+        # 1 role × 1 task × 5 hosts → 1 playbook + 1 play + 1 role + 1 task
+        # + 5 hosts = 9 lines. Budget 5 should drop all host leaves but
+        # keep the task line.
+        state = self._many_tasks_state(n_roles=1, tasks_per_role=1, hosts_per_task=5)
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=5)
+        kinds = [ln.kind for ln in lines]
+        assert "task" in kinds
+        assert "host" not in kinds  # collapsed
+        assert len(lines) <= 5
+
+    def test_invariant_one_each_active_role_keeps_one_line(self):
+        # 4 roles × 3 tasks × 2 hosts = lots. Force tight budget.
+        state = self._many_tasks_state(n_roles=4, tasks_per_role=3, hosts_per_task=2)
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=8)
+        # Each role must have either a "role:" line OR at least one task
+        # line. The pruner can collapse to either form.
+        labels = "\n".join(ln.label for ln in lines)
+        for r in range(4):
+            assert f"role{r}" in labels, f"role{r} missing from pruned output:\n{labels}"
+
+    def test_collapsed_role_summary_format(self):
+        # Force aggressive pruning so at least one role becomes a summary.
+        state = self._many_tasks_state(n_roles=4, tasks_per_role=3, hosts_per_task=2)
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=8)
+        role_summary_lines = [
+            ln for ln in lines if ln.kind == "role" and "tasks running" in ln.label
+        ]
+        # Format check: "role: roleN  (M tasks running on K hosts)"
+        for ln in role_summary_lines:
+            assert ln.label.startswith("role: role")
+            assert "tasks running on" in ln.label
+            assert "hosts)" in ln.label

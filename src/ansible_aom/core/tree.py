@@ -10,8 +10,9 @@ import from here; never the reverse.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Literal
 
@@ -58,6 +59,7 @@ class TreeProjection:
     """Pure projection of RunState. Build via `from_run_state`."""
 
     _state: RunState
+    _role_index: dict[str, str] | None = field(default=None, init=False, repr=False)
 
     @classmethod
     def from_run_state(cls, state: RunState) -> "TreeProjection":
@@ -175,9 +177,97 @@ class TreeProjection:
         return None
 
     def tree_lines(self, budget: int, now: datetime | None = None) -> list[TreeLine]:
+        """Project + prune to fit `budget` lines.
+
+        Pruning order:
+          (a) drop host leaves under tasks
+          (b) drop excess task lines within a role, keep first one
+          (c) collapse a role to "role: X  (N tasks running on K hosts)"
+
+        Invariant: every active role retains at least one visible line.
+        """
         if now is None:
             now = datetime.now(timezone.utc)
 
+        lines = self._tree_lines_unbounded(now)
+        if len(lines) <= budget:
+            return lines
+
+        # --- Stage (a): drop host leaves -----------------------------------
+        lines = [ln for ln in lines if ln.kind != "host"]
+        if len(lines) <= budget:
+            return lines
+
+        # --- Stage (b): keep <=1 task per role bucket ----------------------
+        # Iterate forward, suppress subsequent tasks within the same role
+        # block. A "role block" starts at a role line and ends at the next
+        # role/play/playbook line. Tasks in the None-role bucket (depth=2,
+        # no preceding role line in the current play) are also capped at one.
+        kept: list[TreeLine] = []
+        tasks_in_current_bucket = 0
+        for ln in lines:
+            if ln.kind in ("playbook", "play", "role"):
+                kept.append(ln)
+                tasks_in_current_bucket = 0
+            elif ln.kind == "task":
+                if tasks_in_current_bucket == 0:
+                    kept.append(ln)
+                tasks_in_current_bucket += 1
+            else:
+                kept.append(ln)
+        lines = kept
+        if len(lines) <= budget:
+            return lines
+
+        # --- Stage (c): collapse roles to summary lines --------------------
+        # Aggregate per-role running task count and unique running-host count
+        # from current RunState. Tasks with role=None aggregate under the
+        # None bucket but won't render as "role: ..." — they survive stage
+        # (b) already; if the suite is still over-budget here, the layout is
+        # too constrained to satisfy and the result will simply be shorter
+        # than the strict bound (acceptable degradation, never worse than
+        # playbook + play + 1 line per active role).
+        tasks_per_role: dict[str | None, int] = defaultdict(int)
+        hosts_per_role: dict[str | None, set[str]] = defaultdict(set)
+        for play in self._state.plays.values():
+            for task in play.tasks.values():
+                if task.status != Status.RUNNING:
+                    continue
+                role = self._task_role(task.name)
+                tasks_per_role[role] += 1
+                for hostname, hs in task.hosts.items():
+                    if hs.status == Status.RUNNING:
+                        hosts_per_role[role].add(hostname)
+
+        collapsed: list[TreeLine] = []
+        i = 0
+        while i < len(lines):
+            ln = lines[i]
+            if ln.kind == "role":
+                role_name = ln.label.removeprefix("role: ")
+                n_tasks = tasks_per_role.get(role_name, 0)
+                n_hosts = len(hosts_per_role.get(role_name, set()))
+                collapsed.append(
+                    TreeLine(
+                        depth=ln.depth,
+                        kind="role",
+                        label=(f"role: {role_name}  ({n_tasks} tasks running on {n_hosts} hosts)"),
+                        glyph=None,
+                        status=None,
+                        elapsed_s=None,
+                    )
+                )
+                # Skip any immediately following task lines under this role.
+                i += 1
+                while i < len(lines) and lines[i].kind == "task":
+                    i += 1
+            else:
+                collapsed.append(ln)
+                i += 1
+        return collapsed
+
+    def _tree_lines_unbounded(self, now: datetime) -> list[TreeLine]:
+        """Project full tree (no pruning). See `tree_lines` for entry point."""
         if not self.is_tree_visible():
             return []
 
@@ -259,17 +349,19 @@ class TreeProjection:
         """Return the role name a task belongs to, or None.
 
         Preflight `--list-tasks` records role membership via
-        RoleGroupDefinition; we look up by task name. The first match
-        wins — duplicate task names across roles is a user-side
-        ambiguity we don't try to resolve here.
+        RoleGroupDefinition; first match wins. Memoised on first call.
         """
-        for play_def in self._state.definitions:
-            for entry in play_def.tasks:
-                if isinstance(entry, RoleGroupDefinition):
-                    for task_def in entry.tasks:
-                        if task_def.name == task_name:
-                            return entry.role
-        return None
+        if self._role_index is None:
+            idx: dict[str, str] = {}
+            for play_def in self._state.definitions:
+                for entry in play_def.tasks:
+                    if isinstance(entry, RoleGroupDefinition):
+                        for task_def in entry.tasks:
+                            idx.setdefault(task_def.name, entry.role)
+            # Direct assignment is fine because TreeProjection is a regular
+            # @dataclass (not frozen).
+            self._role_index = idx
+        return self._role_index.get(task_name)
 
     @staticmethod
     def _task_line(task: TaskRunState, depth: int) -> TreeLine:
