@@ -16,7 +16,13 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Literal
 
-from ansible_aom.core.models import RoleGroupDefinition, RunState, Status, TaskRunState
+from ansible_aom.core.models import (
+    HostRunState,
+    RoleGroupDefinition,
+    RunState,
+    Status,
+    TaskRunState,
+)
 
 TreeKind = Literal["playbook", "play", "role", "task", "host"]
 
@@ -58,6 +64,17 @@ class HostRow:
     worst_status: Status | None
     current_task: str | None
     current_elapsed_s: float | None
+
+
+def _effective_status(hs: HostRunState) -> Status:
+    """Promote OK+changed → CHANGED for count-classification purposes.
+
+    `HostRunState.status == OK` combined with `changed == True` is
+    counted as CHANGED everywhere the projection tallies host outcomes
+    (see `host_rows` and `_task_line`). Centralising the rule keeps the
+    two call sites from drifting apart.
+    """
+    return Status.CHANGED if hs.status == Status.OK and hs.changed else hs.status
 
 
 @dataclass
@@ -138,9 +155,7 @@ class TreeProjection:
 
                     # changed=True takes precedence over status=OK for
                     # count classification — spec section "host row".
-                    effective = (
-                        Status.CHANGED if hs.status == Status.OK and hs.changed else hs.status
-                    )
+                    effective = _effective_status(hs)
 
                     if hs.status == Status.RUNNING:
                         elapsed = (
@@ -388,18 +403,17 @@ class TreeProjection:
         for hs in task.hosts.values():
             if hs.status == Status.RUNNING:
                 running += 1
-            elif hs.status == Status.OK:
-                if hs.changed:
-                    changed += 1
-                else:
-                    ok += 1
-            elif hs.status == Status.CHANGED:
+                continue
+            effective = _effective_status(hs)
+            if effective == Status.OK:
+                ok += 1
+            elif effective == Status.CHANGED:
                 changed += 1
-            elif hs.status == Status.FAILED:
+            elif effective == Status.FAILED:
                 failed += 1
-            elif hs.status == Status.UNREACHABLE:
+            elif effective == Status.UNREACHABLE:
                 unreachable += 1
-            elif hs.status == Status.SKIPPED:
+            elif effective == Status.SKIPPED:
                 skipped += 1
         parts: list[str] = []
         for label, n in (

@@ -7,22 +7,25 @@ See SPECIFICATION.md Section 4.1 for compact view details.
 from __future__ import annotations
 
 import os
+import re
 import time
-from typing import TYPE_CHECKING
 
 from ansible_aom.compact.display import Display
 from ansible_aom.compact.password import handle_password_prompt as do_handle_password_prompt
 from ansible_aom.core.heartbeat import HeartbeatTracker, LivenessState
-from ansible_aom.core.icons import STATUS_ICONS, STATUS_ICONS_ASCII, is_unicode_terminal
+from ansible_aom.core.icons import (
+    STATUS_ICONS,
+    STATUS_ICONS_ASCII,
+    get_running_frame,
+    is_unicode_terminal,
+)
 from ansible_aom.core.models import (
     PlayDefinition,
     RoleGroupDefinition,
     RunState,
     Status,
 )
-
-if TYPE_CHECKING:
-    pass
+from ansible_aom.core.tree import TreeProjection
 
 
 # =============================================================================
@@ -55,6 +58,37 @@ def _wrap(text: str, code: str, colorize: bool) -> str:
     if not colorize or not text:
         return text
     return f"{code}{text}{_RESET}"
+
+
+_SGR_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _strip_sgr(text: str) -> str:
+    """Strip SGR escapes so visible-length comparisons are accurate."""
+    return _SGR_RE.sub("", text)
+
+
+def _truncate_visible(text: str, width: int) -> str:
+    """Truncate to `width` visible chars while preserving any open SGR
+    state by appending RESET. SGR escapes are zero-width."""
+    if width <= 1:
+        return text[:width]
+    visible = 0
+    out: list[str] = []
+    i = 0
+    while i < len(text) and visible < width - 1:
+        if text[i] == "\x1b":
+            j = text.find("m", i)
+            if j == -1:
+                break
+            out.append(text[i:j + 1])
+            i = j + 1
+        else:
+            out.append(text[i])
+            visible += 1
+            i += 1
+    out.append("…" + _RESET)
+    return "".join(out)
 
 
 # R2: per-event ``msg`` cap for live-display lines. A task that does
@@ -215,6 +249,40 @@ def format_status_bar(
     return f" {sep} ".join(parts)
 
 
+def _format_count_cells(
+    ok: int,
+    changed: int,
+    failed: int,
+    unreachable: int,
+    *,
+    ascii_mode: bool,
+    colorize: bool,
+) -> list[str]:
+    """Render non-zero status count cells. Order: ok, changed, failed, unreachable.
+
+    Returned as a list of styled segments so callers can space-join or
+    place them inside other layouts. Existing `format_host_summary`
+    behaviour is preserved by joining with a single space.
+    """
+    icons = STATUS_ICONS_ASCII if ascii_mode else STATUS_ICONS
+    cells: list[str] = []
+    if ok > 0:
+        cells.append(_wrap(f"{icons[Status.OK]} {ok} ok", _GREEN, colorize))
+    if changed > 0:
+        cells.append(_wrap(f"{icons[Status.CHANGED]} {changed} changed", _YELLOW, colorize))
+    if failed > 0:
+        cells.append(_wrap(f"{icons[Status.FAILED]} {failed} failed", _RED, colorize))
+    if unreachable > 0:
+        cells.append(
+            _wrap(
+                f"{icons[Status.UNREACHABLE]} {unreachable} unreachable",
+                _MAGENTA,
+                colorize,
+            )
+        )
+    return cells
+
+
 def format_host_summary(
     hostname: str,
     ok: int,
@@ -247,21 +315,70 @@ def format_host_summary(
         >>> format_host_summary("web1", 12, 3, 0, 0)
         'web1: ● 12 ok ◆ 3 changed'
     """
-    icons = STATUS_ICONS_ASCII if ascii_mode else STATUS_ICONS
-    parts = [_wrap(f"{hostname}:", _DIM, colorize)]
+    cells = _format_count_cells(
+        ok, changed, failed, unreachable,
+        ascii_mode=ascii_mode, colorize=colorize,
+    )
+    return " ".join([_wrap(f"{hostname}:", _DIM, colorize), *cells])
 
-    if ok > 0:
-        parts.append(_wrap(f"{icons[Status.OK]} {ok} ok", _GREEN, colorize))
-    if changed > 0:
-        parts.append(_wrap(f"{icons[Status.CHANGED]} {changed} changed", _YELLOW, colorize))
-    if failed > 0:
-        parts.append(_wrap(f"{icons[Status.FAILED]} {failed} failed", _RED, colorize))
-    if unreachable > 0:
-        parts.append(
-            _wrap(f"{icons[Status.UNREACHABLE]} {unreachable} unreachable", _MAGENTA, colorize)
+
+# --- Worst-status → SGR colour mapping for the hostname cell ---------------
+# Failed hosts go red; unreachable magenta; changed yellow. OK/SKIPPED/PENDING
+# stay default-foreground (the count cells already carry their own colour).
+_HOSTNAME_COLOR_BY_WORST: dict[Status, str] = {
+    Status.FAILED: _RED,
+    Status.UNREACHABLE: _MAGENTA,
+    Status.CHANGED: _YELLOW,
+}
+
+
+def format_host_rows(
+    projection: TreeProjection,
+    *,
+    width: int,
+    ascii_mode: bool = False,
+    colorize: bool = False,
+) -> list[str]:
+    """Render the per-host summary table.
+
+    One line per host: hostname (worst-status coloured) + count cells +
+    current-task suffix. Idle / unreachable / finished hosts get the
+    appropriate suffix; the projection has already classified them.
+    """
+    out: list[str] = []
+    for row in projection.host_rows():
+        hostname_color = _HOSTNAME_COLOR_BY_WORST.get(row.worst_status or Status.OK)
+        hostname_seg = (
+            _wrap(row.hostname, hostname_color, colorize)
+            if hostname_color else row.hostname
         )
 
-    return " ".join(parts)
+        cells = _format_count_cells(
+            ok=row.counts.get(Status.OK, 0),
+            changed=row.counts.get(Status.CHANGED, 0),
+            failed=row.counts.get(Status.FAILED, 0),
+            unreachable=row.counts.get(Status.UNREACHABLE, 0),
+            ascii_mode=ascii_mode, colorize=colorize,
+        )
+
+        # Current-task suffix.
+        if row.worst_status == Status.UNREACHABLE and row.current_task is None:
+            suffix = _wrap("unreachable", _MAGENTA, colorize)
+        elif row.current_task is None:
+            suffix = _wrap("(idle)", _DIM, colorize)
+        else:
+            elapsed = int(row.current_elapsed_s or 0)
+            glyph = get_running_frame(0)  # static frame in the per-host row
+            suffix = (
+                f"on: {row.current_task}  "
+                f"{_wrap(f'{glyph} {elapsed}s', _CYAN, colorize)}"
+            )
+
+        line = " ".join([hostname_seg, *cells, " ", suffix])
+        if len(_strip_sgr(line)) > width:
+            line = _truncate_visible(line, width)
+        out.append(line)
+    return out
 
 
 def _count_tasks(play: PlayDefinition) -> int:
