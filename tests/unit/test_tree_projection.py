@@ -7,7 +7,13 @@ then assert on the projection.
 
 from __future__ import annotations
 
-from ansible_aom.core.models import RunState, Status
+from ansible_aom.core.models import (
+    PlayDefinition,
+    RoleGroupDefinition,
+    RunState,
+    Status,
+    TaskDefinition,
+)
 from ansible_aom.core.tree import HostRow, TreeLine, TreeProjection
 
 
@@ -345,3 +351,131 @@ class TestTreeLinesBasic:
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
         p = TreeProjection.from_run_state(state)
         assert p.tree_lines(budget=20) == []
+
+
+class TestTreeLinesRolesAndFanOut:
+    def _role_aware_definitions(self) -> list[PlayDefinition]:
+        # Mirrors preflight output: one play with one role containing two tasks.
+        return [
+            PlayDefinition(
+                id="p1",
+                name="deploy",
+                hosts="webservers",
+                resolved_hosts=["web1", "web2"],
+                tasks=[
+                    RoleGroupDefinition(
+                        role="webserver",
+                        tasks=[
+                            TaskDefinition(
+                                name="Install nginx",
+                                role="webserver",
+                                tags=[],
+                                play_id="p1",
+                                play_order=0,
+                                task_order=0,
+                                path="nginx.yml:1",
+                            ),
+                            TaskDefinition(
+                                name="Configure firewall",
+                                role="webserver",
+                                tags=[],
+                                play_id="p1",
+                                play_order=0,
+                                task_order=1,
+                                path="nginx.yml:5",
+                            ),
+                        ],
+                    ),
+                ],
+            )
+        ]
+
+    def _free_strategy_state(self) -> RunState:
+        state = RunState(playbook="site.yml")
+        state.definitions = self._role_aware_definitions()
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "deploy"},
+            }
+        )
+        # web1 is on "Install nginx"; web2 has raced ahead to "Configure firewall"
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:03Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:04Z",
+                "task": {"id": "t2", "name": "Configure firewall"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "t2", "name": "Configure firewall"},
+                "host": "web2",
+            }
+        )
+        return state
+
+    def test_role_branch_appears_above_role_tasks(self):
+        state = self._free_strategy_state()
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+
+        # Expected ordering: playbook, play, role, task, host, task, host
+        kinds_labels = [(ln.kind, ln.label) for ln in lines]
+        assert ("role", "role: webserver") in kinds_labels
+        role_idx = kinds_labels.index(("role", "role: webserver"))
+        # Tasks under the role have depth > role's depth
+        role_depth = lines[role_idx].depth
+        # Both task lines should follow the role line with depth > role_depth
+        for ln in lines[role_idx + 1 :]:
+            if ln.kind == "task":
+                assert ln.depth > role_depth
+
+    def test_two_running_tasks_appear_as_siblings(self):
+        state = self._free_strategy_state()
+        p = TreeProjection.from_run_state(state)
+        task_lines = [ln for ln in p.tree_lines(budget=25) if ln.kind == "task"]
+        names = [ln.label.split("  ")[0] for ln in task_lines]
+        assert "Install nginx" in names
+        assert "Configure firewall" in names
+
+    def test_each_task_only_lists_its_own_running_hosts(self):
+        state = self._free_strategy_state()
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+
+        # Find each task and its host children (depth+1 immediately after).
+        host_under_task: dict[str, list[str]] = {}
+        current_task: str | None = None
+        for ln in lines:
+            if ln.kind == "task":
+                current_task = ln.label.split("  ")[0]
+                host_under_task[current_task] = []
+            elif ln.kind == "host" and current_task is not None:
+                host_under_task[current_task].append(ln.label)
+
+        assert host_under_task["Install nginx"] == ["web1"]
+        assert host_under_task["Configure firewall"] == ["web2"]

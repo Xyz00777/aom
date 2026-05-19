@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Literal
 
-from ansible_aom.core.models import RunState, Status, TaskRunState
+from ansible_aom.core.models import RoleGroupDefinition, RunState, Status, TaskRunState
 
 TreeKind = Literal["playbook", "play", "role", "task", "host"]
 
@@ -206,26 +206,70 @@ class TreeProjection:
                     elapsed_s=None,
                 )
             )
+            # Group running tasks by their role (or None for play-level tasks).
+            # Ordering preserves first-encounter order — under linear that's
+            # ansible source order; under free that's per-task start order.
+            tasks_by_role: dict[str | None, list[TaskRunState]] = {}
+            order: list[str | None] = []
             for task in running_tasks:
-                lines.append(self._task_line(task, depth=2))
-                for hostname, hs in task.hosts.items():
-                    if hs.status != Status.RUNNING:
-                        continue
-                    elapsed = (
-                        (now - hs.start_time).total_seconds() if hs.start_time is not None else 0.0
-                    )
+                role = self._task_role(task.name)
+                if role not in tasks_by_role:
+                    tasks_by_role[role] = []
+                    order.append(role)
+                tasks_by_role[role].append(task)
+
+            for role in order:
+                task_depth = 2
+                if role is not None:
                     lines.append(
                         TreeLine(
-                            depth=3,
-                            kind="host",
-                            label=hostname,
+                            depth=2,
+                            kind="role",
+                            label=f"role: {role}",
                             glyph=None,
-                            status=Status.RUNNING,
-                            elapsed_s=elapsed,
+                            status=None,
+                            elapsed_s=None,
                         )
                     )
+                    task_depth = 3
+                for task in tasks_by_role[role]:
+                    lines.append(self._task_line(task, depth=task_depth))
+                    for hostname, hs in task.hosts.items():
+                        if hs.status != Status.RUNNING:
+                            continue
+                        elapsed = (
+                            (now - hs.start_time).total_seconds()
+                            if hs.start_time is not None
+                            else 0.0
+                        )
+                        lines.append(
+                            TreeLine(
+                                depth=task_depth + 1,
+                                kind="host",
+                                label=hostname,
+                                glyph=None,
+                                status=Status.RUNNING,
+                                elapsed_s=elapsed,
+                            )
+                        )
 
         return lines
+
+    def _task_role(self, task_name: str) -> str | None:
+        """Return the role name a task belongs to, or None.
+
+        Preflight `--list-tasks` records role membership via
+        RoleGroupDefinition; we look up by task name. The first match
+        wins — duplicate task names across roles is a user-side
+        ambiguity we don't try to resolve here.
+        """
+        for play_def in self._state.definitions:
+            for entry in play_def.tasks:
+                if isinstance(entry, RoleGroupDefinition):
+                    for task_def in entry.tasks:
+                        if task_def.name == task_name:
+                            return entry.role
+        return None
 
     @staticmethod
     def _task_line(task: TaskRunState, depth: int) -> TreeLine:
