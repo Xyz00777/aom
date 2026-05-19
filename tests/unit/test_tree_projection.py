@@ -594,3 +594,70 @@ class TestTreeLinesPruning:
             assert ln.label.startswith("role: role")
             assert "tasks running on" in ln.label
             assert "hosts)" in ln.label
+
+
+class TestTreeLineIdentity:
+    """Regression guard: role TreeLines carry a structured identity field
+    so the pruner / renderer don't have to parse `label`."""
+
+    def test_role_line_has_identity_matching_role_name(self):
+        from ansible_aom.core.models import (
+            PlayDefinition, RoleGroupDefinition, TaskDefinition,
+        )
+        state = RunState(playbook="site.yml")
+        state.definitions = [PlayDefinition(
+            id="p1", name="deploy", hosts="all",
+            resolved_hosts=["web1"],
+            tasks=[RoleGroupDefinition(
+                role="webserver",
+                tasks=[TaskDefinition(
+                    name="Install nginx", role="webserver", tags=[],
+                    play_id="p1", play_order=0, task_order=0,
+                )],
+            )],
+        )]
+        state.handle_event({"_event": "v2_playbook_on_start",
+                            "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event({"_event": "v2_playbook_on_play_start",
+                            "_timestamp": "2026-04-20T10:00:01Z",
+                            "play": {"id": "p1", "name": "deploy"}})
+        state.handle_event({"_event": "v2_playbook_on_task_start",
+                            "_timestamp": "2026-04-20T10:00:02Z",
+                            "task": {"id": "t1", "name": "Install nginx"},
+                            "play": {"id": "p1"}})
+        state.handle_event({"_event": "v2_runner_on_start",
+                            "_timestamp": "2026-04-20T10:00:03Z",
+                            "task": {"id": "t1", "name": "Install nginx"},
+                            "host": "web1"})
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+        role_line = next(ln for ln in lines if ln.kind == "role")
+        assert role_line.identity == "webserver"
+        # Label is unchanged (still "role: webserver")
+        assert role_line.label == "role: webserver"
+
+    def test_non_role_lines_have_none_identity(self):
+        from ansible_aom.core.models import (
+            PlayDefinition, RoleGroupDefinition, TaskDefinition,
+        )
+        state = RunState(playbook="site.yml")
+        state.handle_event({"_event": "v2_playbook_on_start",
+                            "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event({"_event": "v2_playbook_on_play_start",
+                            "_timestamp": "2026-04-20T10:00:01Z",
+                            "play": {"id": "p1", "name": "deploy"}})
+        state.handle_event({"_event": "v2_playbook_on_task_start",
+                            "_timestamp": "2026-04-20T10:00:02Z",
+                            "task": {"id": "t1", "name": "Install nginx"},
+                            "play": {"id": "p1"}})
+        state.handle_event({"_event": "v2_runner_on_start",
+                            "_timestamp": "2026-04-20T10:00:03Z",
+                            "task": {"id": "t1", "name": "Install nginx"},
+                            "host": "web1"})
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+        for ln in lines:
+            if ln.kind != "role":
+                assert ln.identity is None, (
+                    f"non-role line {ln.kind!r}/{ln.label!r} has non-None identity"
+                )

@@ -28,6 +28,11 @@ class TreeLine:
     The renderer turns this into "{indent}{branch_glyph}{label}" with
     status-coloured glyph; this class itself carries no rendering
     concerns.
+
+    `identity` carries a non-presentation handle for the line — currently
+    used only for `kind="role"` lines, so the pruner and the renderer
+    don't have to parse the role name back out of `label`. None for all
+    other line kinds.
     """
 
     depth: int
@@ -36,6 +41,7 @@ class TreeLine:
     glyph: str | None
     status: Status | None
     elapsed_s: float | None
+    identity: str | None = None
 
 
 @dataclass(frozen=True)
@@ -199,10 +205,14 @@ class TreeProjection:
             return lines
 
         # --- Stage (b): keep <=1 task per role bucket ----------------------
-        # Iterate forward, suppress subsequent tasks within the same role
-        # block. A "role block" starts at a role line and ends at the next
-        # role/play/playbook line. Tasks in the None-role bucket (depth=2,
-        # no preceding role line in the current play) are also capped at one.
+        # Stage (b): keep ≤1 task line per role bucket. A role bucket starts
+        # at a role/play/playbook line.
+        #
+        # Tasks in the implicit "no role" bucket (depth=2, directly under
+        # `play` with no preceding `role` line) are also capped at one. The
+        # spec invariants only protect *active roles* — play-level tasks have
+        # no invariant — so capping them when over budget is allowed and gives
+        # the pruner more room. Plan-spec deviation accepted by review.
         kept: list[TreeLine] = []
         tasks_in_current_bucket = 0
         for ln in lines:
@@ -244,7 +254,9 @@ class TreeProjection:
         while i < len(lines):
             ln = lines[i]
             if ln.kind == "role":
-                role_name = ln.label.removeprefix("role: ")
+                # Use the structured role identity, not the rendered label —
+                # avoids coupling pruning to label format.
+                role_name = ln.identity or ln.label.removeprefix("role: ")
                 n_tasks = tasks_per_role.get(role_name, 0)
                 n_hosts = len(hosts_per_role.get(role_name, set()))
                 collapsed.append(
@@ -255,11 +267,14 @@ class TreeProjection:
                         glyph=None,
                         status=None,
                         elapsed_s=None,
+                        identity=role_name,
                     )
                 )
                 # Skip any immediately following task lines under this role.
                 i += 1
-                while i < len(lines) and lines[i].kind == "task":
+                # Also consume any orphaned host lines so this code is correct
+                # regardless of whether stage (a) already pruned them.
+                while i < len(lines) and lines[i].kind in ("task", "host"):
                     i += 1
             else:
                 collapsed.append(ln)
@@ -319,6 +334,7 @@ class TreeProjection:
                             glyph=None,
                             status=None,
                             elapsed_s=None,
+                            identity=role,
                         )
                     )
                     task_depth = 3
