@@ -11,7 +11,12 @@ import re
 import sys
 from typing import Any
 
-# From SPECIFICATION.md Section 5.10
+# Ansible-native prompts (SPECIFICATION.md Section 5.10) plus a small
+# set of sudo pass-through prompts. The sudo prompts matter when a
+# module shells out (``community.general.homebrew`` running a formula
+# whose post-install hooks invoke ``sudo``, or a ``shell``/``command``
+# task that calls ``sudo`` directly): ansible itself doesn't wrap those
+# in its own prompt format, so the raw sudo banner lands on the PTY.
 PASSWORD_PATTERNS: list[str] = [
     r"Vault password: ",
     r"Vault password \([^)]+\): ",  # vault_id variant
@@ -20,6 +25,9 @@ PASSWORD_PATTERNS: list[str] = [
     r"BECOME password\[defaults to SSH password\]: ",
     r"New Vault password: ",
     r"Confirm New Vault password: ",
+    r"\[sudo\] password for [^:\n]+: ",  # Linux sudo default; more specific, list first
+    r"Password for [^:\n]+: ",  # sudo -p "Password for %u: " and similar
+    r"Password: ",  # macOS sudo bare prompt — keep last as the broadest match
 ]
 
 DEFAULT_PASSWORD_TIMEOUT = 60

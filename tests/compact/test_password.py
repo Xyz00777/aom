@@ -73,6 +73,25 @@ class TestPasswordPromptPTYIntegration:
         """TC-143: Confirm New Vault password pattern detected."""
         assert is_password_prompt("Confirm New Vault password: ") is True
 
+    def test_is_password_prompt_sudo_password(self):
+        """TC-143: macOS / Linux sudo prompt 'Password: ' is recognised.
+
+        This matters when a task shells out (e.g. ``community.general.homebrew``
+        installing a formula whose post-install hooks invoke ``sudo``).
+        Ansible's own prompts use the ``BECOME password:`` / ``Vault
+        password:`` prefixes, but anything sudo emits directly from
+        inside a module lands on the PTY as plain ``Password: ``.
+        """
+        assert is_password_prompt("Password: ") is True
+
+    def test_is_password_prompt_sudo_password_for_user(self):
+        """TC-143: sudo's ``Password for <user>: `` variant is recognised."""
+        assert is_password_prompt("Password for felix: ") is True
+
+    def test_is_password_prompt_sudo_bracketed_password(self):
+        """TC-143: sudo's ``[sudo] password for <user>: `` variant is recognised."""
+        assert is_password_prompt("[sudo] password for felix: ") is True
+
     def test_is_password_prompt_rejects_non_password(self):
         """TC-143: Non-password text rejected — not a password prompt."""
         assert is_password_prompt("Some random text") is False
@@ -95,10 +114,14 @@ class TestPasswordPromptPTYIntegration:
             assert compiled is not None
 
     def test_password_patterns_count(self):
-        """TC-143: All 7 documented password patterns present."""
-        # Vault password, Vault password (id), SSH password,
-        # BECOME password, BECOME password[defaults], New Vault, Confirm New Vault
-        assert len(PASSWORD_PATTERNS) == 7
+        """TC-143: All 10 documented password patterns present.
+
+        Ansible-native (7): Vault password, Vault password (id), SSH
+        password, BECOME password, BECOME password[defaults], New Vault,
+        Confirm New Vault. Sudo pass-through (3): bare ``Password: ``,
+        ``Password for <user>: ``, ``[sudo] password for <user>: ``.
+        """
+        assert len(PASSWORD_PATTERNS) == 10
 
     def test_handle_password_prompt_delegates_to_getpass(self):
         """TC-143: handle_password_prompt uses getpass.getpass for PTY integration.

@@ -198,6 +198,15 @@ def format_status_bar(
         live_color = {"live": _GREEN, "working": _DIM, "stuck": _RED}
         glyph = (live_glyph_ascii if ascii_mode else live_glyph_unicode)[liveness.level]
         live_seg = _wrap(f"{glyph} {liveness.age_s}s", live_color[liveness.level], colorize)
+        # Annotate non-default reasons so the user can tell *why* the
+        # dot is the colour it is. ``pty`` on LIVE and ``stuck`` on
+        # STUCK are the expected default cases and stay un-annotated to
+        # keep the bar terse; the interesting cases (CPU-promoted LIVE,
+        # silent WORKING, CPU-rescued WORKING past stuck) are tagged.
+        annotated_reasons = {("live", "cpu"), ("working", "silent"), ("working", "cpu")}
+        if (liveness.level, liveness.reason) in annotated_reasons:
+            reason_seg = _wrap(f"({liveness.reason})", _DIM, colorize)
+            live_seg = f"{live_seg} {reason_seg}"
         parts[-1] = f"{parts[-1]} {live_seg}"
 
     parts.append(_wrap(elapsed_str, _DIM, colorize))

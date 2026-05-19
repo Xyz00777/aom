@@ -151,6 +151,13 @@ _PASSWORD_PATTERNS: list[str] = [
     r"BECOME password: ",
     r"New Vault password: ",
     r"Confirm New Vault password: ",
+    # sudo pass-through: fires when a module shells out to ``sudo``
+    # (e.g. a formula's post-install hooks). Order from most-specific
+    # to least so pexpect's first-match-wins semantics give bracketed
+    # and user-qualified forms priority over bare ``Password: ``.
+    r"\[sudo\] password for [^:\n]+: ",
+    r"Password for [^:\n]+: ",
+    r"Password: ",
 ]
 
 # High-confidence prompt markers. When any of these substrings appears in

@@ -13,11 +13,18 @@ floats — see ``tests/unit/test_heartbeat.py``.
 
 State derivation (see ``state``)::
 
-    no bytes ever                 → None
-    age < live_threshold_s        → LIVE
-    age < stuck_threshold_s       → WORKING
-    cpu active within stuck win.  → WORKING
-    otherwise                     → STUCK
+    no bytes ever                     → None
+    byte age < live_threshold_s       → LIVE (reason=pty)
+    cpu age < live_threshold_s        → LIVE (reason=cpu)  # silent but busy
+    byte age < stuck_threshold_s      → WORKING (reason=silent)
+    cpu age < stuck_threshold_s       → WORKING (reason=cpu)  # rescued from stuck
+    otherwise                         → STUCK (reason=stuck)
+
+The CPU-promotion path matters for tasks that emit no PTY bytes for
+long stretches but are clearly doing work — e.g. ``community.general.homebrew``
+in a loop, where ansible itself spins up Python module subprocesses
+before any ``brew`` output reaches the JSONL channel. Without it the
+user sees ○ at 5s and assumes AOM is stuck.
 
 No explicit task-boundary reset is needed: the ``v2_playbook_on_task_start``
 line is itself a PTY byte that the runner notes, so the new task's
@@ -30,6 +37,11 @@ from dataclasses import dataclass
 from typing import Literal
 
 LivenessLevel = Literal["live", "working", "stuck"]
+
+# ``reason`` annotates the level so the UI can show *why* the dot is the
+# colour it is. ``pty`` and ``cpu`` are positive signals; ``silent`` and
+# ``stuck`` are absences (no PTY, no recent CPU).
+LivenessReason = Literal["pty", "cpu", "silent", "stuck"]
 
 # Defaults chosen so that a brief stutter (network blip, slow brew
 # formula) reads as WORKING rather than alarming the user, while a
@@ -44,10 +56,17 @@ class LivenessState:
 
     ``age_s`` is whole seconds since the last observed byte, truncated
     toward zero so a partial second never reads as "1s" on the bar.
+
+    ``reason`` is the signal that decided the level: ``pty`` (recent
+    bytes), ``cpu`` (recent CPU sample), ``silent`` (no PTY, no recent
+    CPU but still within the working window), or ``stuck`` (both
+    silent past their thresholds). Defaults to ``pty`` for backwards
+    compatibility with callers that only care about ``level``.
     """
 
     level: LivenessLevel
     age_s: int
+    reason: LivenessReason = "pty"
 
 
 class HeartbeatTracker:
@@ -73,21 +92,24 @@ class HeartbeatTracker:
         if self._last_byte_at is None:
             return None
 
-        age = now - self._last_byte_at
-        age_s = int(age)
+        byte_age = now - self._last_byte_at
+        cpu_age = (now - self._cpu_active_at) if self._cpu_active_at is not None else None
+        age_s = int(byte_age)
 
-        if age < self._live_threshold_s:
-            return LivenessState(level="live", age_s=age_s)
+        if byte_age < self._live_threshold_s:
+            return LivenessState(level="live", age_s=age_s, reason="pty")
 
-        if age < self._stuck_threshold_s:
-            return LivenessState(level="working", age_s=age_s)
+        # No recent bytes — but a fresh CPU sample means the subprocess
+        # tree is doing real work right now. Keep the dot green.
+        if cpu_age is not None and cpu_age < self._live_threshold_s:
+            return LivenessState(level="live", age_s=age_s, reason="cpu")
+
+        if byte_age < self._stuck_threshold_s:
+            return LivenessState(level="working", age_s=age_s, reason="silent")
 
         # Past the stuck threshold on bytes alone — last hope is a
         # recent CPU sample within the same window.
-        if (
-            self._cpu_active_at is not None
-            and (now - self._cpu_active_at) < self._stuck_threshold_s
-        ):
-            return LivenessState(level="working", age_s=age_s)
+        if cpu_age is not None and cpu_age < self._stuck_threshold_s:
+            return LivenessState(level="working", age_s=age_s, reason="cpu")
 
-        return LivenessState(level="stuck", age_s=age_s)
+        return LivenessState(level="stuck", age_s=age_s, reason="stuck")

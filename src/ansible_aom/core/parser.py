@@ -126,6 +126,9 @@ class PtyStreamParser:
         r"BECOME password\[defaults to SSH password\]: ",
         r"New Vault password: ",
         r"Confirm New Vault password: ",
+        r"\[sudo\] password for [^:\n]+: ",
+        r"Password for [^:\n]+: ",
+        r"Password: ",
     ]
 
     RECAP_PATTERN: re.Pattern[str] = re.compile(r"^PLAY RECAP \*{5,}")

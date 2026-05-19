@@ -164,6 +164,99 @@ def test_stuck_segment_is_red_when_colorized():
     assert f"{_RED}! 90s{_RESET}" in line
 
 
+def test_live_pty_has_no_reason_annotation():
+    """The common case (●, recent PTY bytes) carries no annotation —
+    the dot alone is the signal."""
+    line = format_status_bar(
+        "site.yml",
+        1,
+        1,
+        0,
+        0,
+        30.0,
+        liveness=LivenessState(level="live", age_s=3, reason="pty"),
+    )
+    assert "● 3s" in line
+    assert "(cpu)" not in line
+    assert "(silent)" not in line
+
+
+def test_live_cpu_annotated_with_cpu_marker():
+    """LIVE rescued by CPU activity (no recent PTY but subprocess tree is
+    busy) — make the source visible so the user knows AOM is reading
+    CPU, not output."""
+    line = format_status_bar(
+        "site.yml",
+        1,
+        1,
+        0,
+        0,
+        30.0,
+        liveness=LivenessState(level="live", age_s=8, reason="cpu"),
+    )
+    assert "● 8s (cpu)" in line
+
+
+def test_working_silent_annotated_with_silent_marker():
+    """WORKING via byte-age alone: nothing positive to report. The
+    annotation tells the user we're seeing neither output nor CPU."""
+    line = format_status_bar(
+        "site.yml",
+        1,
+        1,
+        0,
+        0,
+        30.0,
+        liveness=LivenessState(level="working", age_s=12, reason="silent"),
+    )
+    assert "○ 12s (silent)" in line
+
+
+def test_working_cpu_annotated_with_cpu_marker():
+    """WORKING rescued from STUCK by an old-ish CPU sample (5–30s)."""
+    line = format_status_bar(
+        "site.yml",
+        1,
+        1,
+        0,
+        0,
+        30.0,
+        liveness=LivenessState(level="working", age_s=40, reason="cpu"),
+    )
+    assert "○ 40s (cpu)" in line
+
+
+def test_stuck_carries_no_reason_annotation():
+    """STUCK is unambiguous on its own — the red ! already says it all."""
+    line = format_status_bar(
+        "site.yml",
+        1,
+        1,
+        0,
+        0,
+        30.0,
+        liveness=LivenessState(level="stuck", age_s=90, reason="stuck"),
+    )
+    assert "! 90s" in line
+    assert "(stuck)" not in line
+
+
+def test_reason_annotation_is_dim_when_colorized():
+    """The (cpu)/(silent) suffix is metadata — render it dim so it
+    sits visually behind the glyph+age, not competing with it."""
+    line = format_status_bar(
+        "site.yml",
+        1,
+        1,
+        0,
+        0,
+        30.0,
+        colorize=True,
+        liveness=LivenessState(level="working", age_s=12, reason="silent"),
+    )
+    assert f"{_DIM}(silent){_RESET}" in line
+
+
 def test_no_color_in_segment_when_colorize_off():
     line = format_status_bar(
         "site.yml",

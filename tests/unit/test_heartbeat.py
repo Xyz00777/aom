@@ -44,7 +44,7 @@ def test_working_state_via_byte_age_alone():
 
     state = tracker.state(now=110.0)
 
-    assert state == LivenessState(level="working", age_s=10)
+    assert state == LivenessState(level="working", age_s=10, reason="silent")
 
 
 def test_cpu_activity_keeps_state_working_past_stuck_threshold():
@@ -67,7 +67,7 @@ def test_stuck_when_bytes_old_and_no_cpu_activity():
 
     state = tracker.state(now=135.0)
 
-    assert state == LivenessState(level="stuck", age_s=35)
+    assert state == LivenessState(level="stuck", age_s=35, reason="stuck")
 
 
 def test_stuck_when_only_inactive_cpu_samples_received():
@@ -128,6 +128,111 @@ def test_silent_task_after_initial_byte_progresses_through_levels():
 
     # 35s later, no further bytes and no CPU samples — STUCK.
     assert tracker.state(now=135.0).level == "stuck"
+
+
+def test_cpu_activity_promotes_state_to_live_during_silent_window():
+    """User-facing case: ansible-playbook is silent for >5s but its CPU
+    sampler shows the process tree is busy (e.g. spawning module
+    subprocesses, compiling modules, running ``brew``). The grey ○ should
+    flip back to a green ● so the user knows AOM is observing genuine
+    activity. This is the inverse of the existing stuck-rescue path:
+    same CPU signal, applied earlier in the timeline."""
+    tracker = HeartbeatTracker(live_threshold_s=5.0, stuck_threshold_s=30.0)
+    tracker.note_bytes(now=100.0)
+    # 6s past last byte (out of LIVE window), but CPU was active 1s ago.
+    tracker.note_cpu_sample(now=105.0, active=True)
+
+    state = tracker.state(now=106.0)
+
+    assert state.level == "live"
+    assert state.age_s == 6  # age tracks last byte, not last CPU sample
+
+
+def test_inactive_cpu_sample_does_not_promote_to_live():
+    """An ``active=False`` sample is informational ('CPU was idle') and
+    must not satisfy the CPU-promotion path."""
+    tracker = HeartbeatTracker(live_threshold_s=5.0, stuck_threshold_s=30.0)
+    tracker.note_bytes(now=100.0)
+    tracker.note_cpu_sample(now=105.0, active=False)
+
+    state = tracker.state(now=106.0)
+
+    assert state.level == "working"
+
+
+def test_cpu_active_too_long_ago_does_not_promote_to_live():
+    """CPU samples older than the live window stop counting as 'recent'.
+    They can still rescue from STUCK (existing behaviour) but cannot
+    keep the dot green."""
+    tracker = HeartbeatTracker(live_threshold_s=5.0, stuck_threshold_s=30.0)
+    tracker.note_bytes(now=100.0)
+    # Active 10s ago — past the 5s live window but inside the 30s stuck window.
+    tracker.note_cpu_sample(now=110.0, active=True)
+
+    state = tracker.state(now=120.0)
+
+    assert state.level == "working"
+
+
+def test_liveness_state_reason_field_defaults():
+    """``reason`` annotates why the level is what it is. Backwards-compat:
+    existing call sites that pass only level + age_s must still work."""
+    state = LivenessState(level="live", age_s=3)
+    assert state.reason == "pty"
+
+
+def test_reason_pty_for_recent_bytes():
+    tracker = HeartbeatTracker(live_threshold_s=5.0, stuck_threshold_s=30.0)
+    tracker.note_bytes(now=100.0)
+
+    assert tracker.state(now=102.0).reason == "pty"
+
+
+def test_reason_cpu_when_promoted_from_working_to_live():
+    tracker = HeartbeatTracker(live_threshold_s=5.0, stuck_threshold_s=30.0)
+    tracker.note_bytes(now=100.0)
+    tracker.note_cpu_sample(now=107.0, active=True)
+
+    state = tracker.state(now=108.0)
+
+    assert state.level == "live"
+    assert state.reason == "cpu"
+
+
+def test_reason_silent_when_working_via_byte_age_only():
+    """No CPU info available (sampler hasn't reported yet, or always
+    inactive) — the WORKING dot means 'silent, but not yet stuck'."""
+    tracker = HeartbeatTracker(live_threshold_s=5.0, stuck_threshold_s=30.0)
+    tracker.note_bytes(now=100.0)
+
+    state = tracker.state(now=110.0)
+
+    assert state.level == "working"
+    assert state.reason == "silent"
+
+
+def test_reason_cpu_for_stuck_window_rescue():
+    """Bytes long-stale, but CPU active recently → WORKING (not STUCK).
+    The reason field should make this distinction visible to the UI."""
+    tracker = HeartbeatTracker(live_threshold_s=5.0, stuck_threshold_s=30.0)
+    tracker.note_bytes(now=100.0)
+    # CPU was active 15s ago — past the live window but inside stuck.
+    tracker.note_cpu_sample(now=135.0, active=True)
+
+    state = tracker.state(now=150.0)
+
+    assert state.level == "working"
+    assert state.reason == "cpu"
+
+
+def test_reason_stuck_when_no_signals_at_all():
+    tracker = HeartbeatTracker(live_threshold_s=5.0, stuck_threshold_s=30.0)
+    tracker.note_bytes(now=100.0)
+
+    state = tracker.state(now=135.0)
+
+    assert state.level == "stuck"
+    assert state.reason == "stuck"
 
 
 def test_liveness_state_is_frozen_dataclass():
