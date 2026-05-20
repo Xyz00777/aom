@@ -179,7 +179,9 @@ class InspectApp(App):
         Binding("tab", "focus_next_pane", "Next pane", show=True),
         Binding("shift+tab", "focus_prev_pane", "Prev pane", show=False),
         Binding("f", "toggle_failed", "Failed-only"),
-        Binding("g", "show_first_failure", "Goto failure"),
+        Binding("g", "show_first_failure", "First failure"),
+        Binding("n", "next_failure", "Next failure"),
+        Binding("N", "prev_failure", "Prev failure"),
         Binding("R", "copy_rerun", "Copy rerun"),
         Binding("y", "yank_detail", "Yank"),
     ]
@@ -392,16 +394,54 @@ class InspectApp(App):
         self._detail_text = self._render_detail_block(block)
         detail.update(self._detail_text)
 
-    def action_show_first_failure(self) -> None:
+    def _failure_pairs(self) -> list[tuple[TaskTreeNode, TaskTreeNode]]:
         if self._current_tree is None:
-            return
-        pairs = list(self._iter_failures(self._current_tree))
+            return []
+        return list(self._iter_failures(self._current_tree))
+
+    def _current_failure_index(self) -> int:
+        """Return the index of the focused (task, host) pair in the failure list, or -1."""
+        pairs = self._failure_pairs()
+        if not pairs or self._focused_task is None or self._focused_host is None:
+            return -1
+        for idx, (task, host) in enumerate(pairs):
+            if task.task_id == self._focused_task.task_id and host.label == self._focused_host.label:
+                return idx
+        return -1
+
+    def _focus_failure_at(self, index: int) -> None:
+        """Move the Detail pane focus to the failure at ``index`` (wrapping)."""
+        pairs = self._failure_pairs()
         if not pairs:
             self._focused_task = None
             self._focused_host = None
-        else:
-            self._focused_task, self._focused_host = pairs[0]
+            self._update_detail()
+            return
+        idx = index % len(pairs)
+        self._focused_task, self._focused_host = pairs[idx]
         self._update_detail()
+        # Surface a toast so the user knows where they are when many failures exist.
+        if len(pairs) > 1:
+            self.notify(f"Failure {idx + 1} of {len(pairs)}")
+
+    def action_show_first_failure(self) -> None:
+        self._focus_failure_at(0)
+
+    def action_next_failure(self) -> None:
+        pairs = self._failure_pairs()
+        if not pairs:
+            self.notify("No failures in this run")
+            return
+        current = self._current_failure_index()
+        self._focus_failure_at(current + 1 if current >= 0 else 0)
+
+    def action_prev_failure(self) -> None:
+        pairs = self._failure_pairs()
+        if not pairs:
+            self.notify("No failures in this run")
+            return
+        current = self._current_failure_index()
+        self._focus_failure_at(current - 1 if current >= 0 else len(pairs) - 1)
 
     def on_tree_node_highlighted(self, event) -> None:
         data = getattr(event.node, "data", None)

@@ -136,6 +136,75 @@ async def test_r_copies_rerun_command(state_dir: Path, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_n_and_shift_n_cycle_through_failures(state_dir: Path):
+    """`n` and `N` walk forward / backward through the run's failure list.
+
+    The failed_loop fixture has exactly 1 failure; we add multi_host
+    (1 failure on web2) and unreachable (1 unreachable on web2) into the
+    state dir already, but the tree is per-session — so we exercise the
+    wrap-around: `n` from the only failure should land on the same one
+    again (after a wrap), with a toast.
+    """
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        initial_task_id = app._focused_task.task_id  # type: ignore[union-attr]
+        await pilot.press("n")
+        await pilot.pause()
+        # Only one failure in this run → wraps back to itself.
+        assert app._focused_task is not None
+        assert app._focused_task.task_id == initial_task_id
+        await pilot.press("N")
+        await pilot.pause()
+        assert app._focused_task is not None
+        assert app._focused_task.task_id == initial_task_id
+
+
+@pytest.mark.asyncio
+async def test_highlighting_successful_task_updates_detail(state_dir: Path):
+    """Navigating to a non-failed task must still populate the Detail pane.
+
+    Confirms users can inspect OK / changed / skipped task logs too, not
+    just failures.
+    """
+    from ansible_aom.core.inspect_model import TaskTreeNode, build_task_tree
+    from ansible_aom.core.session import load_session
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        # Find the OK task in the tree (the "os_macos : update brew" task).
+        session = load_session(_ALIASES["failed_loop"], state_dir)
+        assert session is not None
+        model = build_task_tree(session)
+
+        def find_first_ok_task(node: TaskTreeNode) -> TaskTreeNode | None:
+            if node.kind == "task" and node.stats.ok > 0 and node.stats.failed == 0:
+                return node
+            for c in node.children:
+                hit = find_first_ok_task(c)
+                if hit is not None:
+                    return hit
+            return None
+
+        ok_task = find_first_ok_task(model)
+        assert ok_task is not None, "Fixture should contain at least one OK task"
+
+        # Simulate highlighting the OK task by setting focused_task/host
+        # directly and triggering the detail update (Pilot can't easily
+        # arrow-navigate Tree without exact node coordinates).
+        app._focused_task = ok_task
+        app._focused_host = ok_task.children[0] if ok_task.children else None
+        app._update_detail()
+        body = app._detail_text
+        assert ok_task.label in body
+        assert "STATUS ok" in body or "STATUS changed" in body
+
+
+@pytest.mark.asyncio
 async def test_y_yanks_detail(state_dir: Path, monkeypatch):
     copied: list[str] = []
     monkeypatch.setattr(
