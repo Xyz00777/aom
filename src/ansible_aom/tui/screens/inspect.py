@@ -152,16 +152,20 @@ class _RunRow(ListItem):
 class InspectApp(App):
     """Three-pane inspector app."""
 
+    # ``ansi`` is Textual's literal pass-through to the terminal default
+    # background. Combined with ``ansi_color=True`` on the App, the
+    # user's terminal background (including any transparency, image, or
+    # gradient) shows straight through.
     CSS = """
-    Screen { background: transparent; }
-    Header, Footer { background: transparent; }
+    Screen { background: ansi_default; }
+    Header, Footer { background: ansi_default; }
 
     Horizontal { height: 1fr; }
 
     /* Equal-weight panes — adapt naturally to terminal width. */
     #runs-pane, #tasks-pane, #detail-pane {
         width: 1fr;
-        background: transparent;
+        background: ansi_default;
     }
 
     /* Pane separators are subtle borders rather than solid backgrounds
@@ -170,8 +174,14 @@ class InspectApp(App):
     #tasks-pane   { border-right: tall $panel; }
     #detail-pane  { padding: 0 1; }
 
-    #runs-list { background: transparent; }
-    #tasks-tree { background: transparent; }
+    #runs-list, #tasks-tree, #detail-body {
+        background: ansi_default;
+    }
+
+    /* List items pick up the App background too, except the highlighted
+       row which keeps a subtle accent so the cursor remains visible. */
+    _RunRow { background: ansi_default; }
+    ListView > ListItem.--highlight { background: $accent 40%; }
     """
 
     BINDINGS = [
@@ -190,7 +200,11 @@ class InspectApp(App):
     _PANE_ORDER: tuple[str, ...] = ("runs-list", "tasks-tree", "detail-pane")
 
     def __init__(self, *, state_dir: Path, initial_session_id: str | None = None) -> None:
-        super().__init__()
+        # ``ansi_color=True`` keeps Textual from substituting its theme
+        # palette for ANSI default colors, so the user's terminal
+        # background shows through wherever the app uses
+        # ``background: $background`` or ``transparent``.
+        super().__init__(ansi_color=True)
         self.state_dir = state_dir
         self.initial_session_id = initial_session_id
         self.selected_session_id: str | None = None
