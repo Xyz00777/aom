@@ -23,9 +23,6 @@ import pytest
 _HELP_TARGETS: list[tuple[str, list[str]]] = [
     ("top-level", []),
     ("inspect", ["inspect"]),
-    ("inspect-list", ["inspect", "list"]),
-    ("inspect-show", ["inspect", "show"]),
-    ("inspect-diff", ["inspect", "diff"]),
     ("inspect-prune", ["inspect", "prune"]),
     ("replay", ["replay"]),
     ("rerun", ["rerun"]),

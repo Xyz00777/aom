@@ -139,11 +139,8 @@ Examples:
   aom --tui playbook.yml                Run with the full multi-panel TUI
   aom playbook.yml -i inv.ini -v        Flags after the playbook are forwarded
   aom playbook.yml -vvv --tags=deploy   …including ansible-playbook's own -v / -vv / -vvv
-  aom inspect list                      List all recorded sessions
-  aom inspect <session-id>              Show one session's summary
-  aom inspect <session-id> --tree       Tree view of plays/tasks/hosts
-  aom inspect <session-id> --failed     Only the failed tasks
-  aom inspect diff <id1> <id2>          Diff two sessions
+  aom inspect                           Launch the TUI on the most recent run
+  aom inspect --text                    Dump the most recent run as plain text
   aom inspect prune --days 30           Delete sessions older than N days
   aom replay <session-id>               Replay a recorded session at original pace
   aom replay <session-id> --speed 10    Replay 10x faster

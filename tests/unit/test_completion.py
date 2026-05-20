@@ -118,35 +118,6 @@ class TestCompletionSnippet:
         assert SUPPORTED_SHELLS == ("bash", "zsh", "fish")
 
 
-class TestInspectCLICompleterWiring:
-    """F5: session-id positionals on inspect parsers carry the completer."""
-
-    def _completer_of(self, parser, dest):
-        action = next(a for a in parser._actions if a.dest == dest)
-        return getattr(action, "completer", None)
-
-    def _subparser(self, parser, name):
-        sub = next(a for a in parser._actions if a.__class__.__name__ == "_SubParsersAction")
-        return sub.choices[name]
-
-    def test_show_session_id_has_completer(self):
-        from ansible_aom.completion import session_id_completer
-        from ansible_aom.inspect.cli import _build_parser
-
-        parser = _build_parser()
-        show_parser = self._subparser(parser, "show")
-        assert self._completer_of(show_parser, "session_id") is session_id_completer
-
-    def test_diff_session_ids_have_completer(self):
-        from ansible_aom.completion import session_id_completer
-        from ansible_aom.inspect.cli import _build_parser
-
-        parser = _build_parser()
-        diff_parser = self._subparser(parser, "diff")
-        assert self._completer_of(diff_parser, "session_id_1") is session_id_completer
-        assert self._completer_of(diff_parser, "session_id_2") is session_id_completer
-
-
 class TestReplayCLICompleterWiring:
     """F5: session-id positional on the replay parser carries the completer."""
 

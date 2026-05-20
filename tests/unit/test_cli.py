@@ -32,7 +32,7 @@ CORE_MODULE_PATHS = [
     "src/ansible_aom/tui/app.py",
     "src/ansible_aom/inspect/cli.py",
     "src/ansible_aom/inspect/display.py",
-    "src/ansible_aom/inspect/diff.py",
+    "src/ansible_aom/inspect/text.py",
 ]
 
 
@@ -528,39 +528,39 @@ class TestInspectSubcommand:
     """
 
     def test_inspect_dispatches_to_inspect_main_with_remaining_argv(self):
-        """TC-013: 'aom inspect list' forwards ['list'] to inspect.cli.main."""
+        """No-arg `aom inspect` forwards an empty argv to inspect.cli.main."""
         from ansible_aom.cli import main
 
         with patch("ansible_aom.inspect.cli.main", return_value=0) as mock_main:
-            with patch("sys.argv", ["aom", "inspect", "list"]):
+            with patch("sys.argv", ["aom", "inspect"]):
                 result = main()
                 assert result == 0
-                mock_main.assert_called_once_with(["list"])
+                mock_main.assert_called_once_with([])
 
-    def test_inspect_forwards_subcommand_flags(self):
-        """TC-015/TC-016/TC-022: flags after the subcommand reach inspect.cli.main."""
+    def test_inspect_forwards_text_flag(self):
+        """`aom inspect --text` forwards `['--text']` to inspect.cli.main."""
         from ansible_aom.cli import main
 
         with patch("ansible_aom.inspect.cli.main", return_value=0) as mock_main:
-            with patch("sys.argv", ["aom", "inspect", "show", "id1", "--failed", "--json"]):
+            with patch("sys.argv", ["aom", "inspect", "--text"]):
                 main()
-                mock_main.assert_called_once_with(["show", "id1", "--failed", "--json"])
+                mock_main.assert_called_once_with(["--text"])
 
-    def test_inspect_forwards_diff_subcommand(self):
-        """TC-019: 'aom inspect diff id1 id2' forwards args verbatim."""
+    def test_inspect_forwards_prune_subcommand(self):
+        """`aom inspect prune --days 30` forwards args verbatim."""
         from ansible_aom.cli import main
 
         with patch("ansible_aom.inspect.cli.main", return_value=0) as mock_main:
-            with patch("sys.argv", ["aom", "inspect", "diff", "id1", "id2"]):
+            with patch("sys.argv", ["aom", "inspect", "prune", "--days", "30"]):
                 main()
-                mock_main.assert_called_once_with(["diff", "id1", "id2"])
+                mock_main.assert_called_once_with(["prune", "--days", "30"])
 
     def test_inspect_propagates_exit_code(self):
         """Exit code from inspect.cli.main flows back through the dispatcher."""
         from ansible_aom.cli import main
 
         with patch("ansible_aom.inspect.cli.main", return_value=2):
-            with patch("sys.argv", ["aom", "inspect", "show", "missing"]):
+            with patch("sys.argv", ["aom", "inspect", "--text"]):
                 assert main() == 2
 
 
