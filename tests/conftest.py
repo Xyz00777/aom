@@ -6,8 +6,39 @@ mutable state from these fixtures. Never modify fixture return values.
 
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def isolated_state_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> Path:
+    """Pin AOM's state directory to a per-test tmp dir for every test.
+
+    Without this, runner integration tests write real sessions into
+    ``~/.local/state/aom/sessions/``, polluting the user's machine and
+    causing flaky test ordering.
+
+    Uses ``tmp_path_factory`` (session-scoped) rather than the per-test
+    ``tmp_path`` so the isolated state dir doesn't appear inside any
+    test's own ``tmp_path`` directory listing (which would break tests
+    that inspect ``tmp_path`` for emptiness or specific contents).
+    """
+    state_root = tmp_path_factory.mktemp("aom-state-iso", numbered=True)
+    state = state_root / "sessions"
+    state.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(
+        "ansible_aom.runner._default_session_dir",
+        lambda: state,
+    )
+    monkeypatch.setattr(
+        "ansible_aom.inspect.cli._default_state_dir",
+        lambda: state,
+    )
+    return state
+
 
 # --- Event Fixtures ---
 

@@ -16,6 +16,8 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 def _fake_ansible_command(events: list[dict], exit_code: int = 0) -> tuple[str, list[str]]:
     """(command, args) pair emitting `events` then exiting with `exit_code`."""
@@ -227,10 +229,19 @@ class TestSessionRecordingDisableOnDiskError:
 class TestSessionRecordingDefaults:
     """When no session_dir is passed, the runner picks the standard state dir."""
 
-    def test_default_state_dir_is_used_when_none_given(self, tmp_path: Path) -> None:
-        """run_playbook must produce a session under the spec-standard default
-        when no override is supplied; we patch home() to keep the test clean."""
+    def test_default_state_dir_is_used_when_none_given(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """run_playbook must produce a session under whatever the
+        ``_default_session_dir`` helper returns when no override is
+        supplied. The autouse isolation fixture monkeypatches that
+        helper to a per-test tmp dir; we override it again here to
+        point at this test's ``tmp_path`` so we can assert against it.
+        """
         from ansible_aom.runner import run_playbook
+
+        default_dir = tmp_path / ".local" / "state" / "aom" / "sessions"
+        monkeypatch.setattr("ansible_aom.runner._default_session_dir", lambda: default_dir)
 
         renderer = MagicMock()
         cmd, args = _fake_ansible_command(
@@ -238,13 +249,9 @@ class TestSessionRecordingDefaults:
             exit_code=0,
         )
 
-        with (
-            patch("ansible_aom.runner._build_command", return_value=(cmd, args)),
-            patch("ansible_aom.runner.Path.home", return_value=tmp_path),
-        ):
+        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
             run_playbook("playbook.yml", [], renderer)
 
-        default_dir = tmp_path / ".local" / "state" / "aom" / "sessions"
         assert default_dir.exists()
         sessions = list(default_dir.iterdir())
         assert len(sessions) == 1
