@@ -472,6 +472,20 @@ def load_session(session_id: str, session_dir: Path) -> dict[str, Any] | None:
     return result
 
 
+def find_latest_session(session_dir: Path) -> str | None:
+    """Return the session_id of the most-recently-started session, or None.
+
+    Reuses ``list_sessions`` (which already sorts newest-first) and returns
+    just the top entry's id. Sessions without a parseable ``start_time`` are
+    ignored. Returns ``None`` when no sessions exist or the directory is
+    missing.
+    """
+    sessions = list_sessions(session_dir)
+    if not sessions:
+        return None
+    return sessions[0].get("session_id")
+
+
 def create_session_summary(session: dict[str, Any]) -> dict[str, Any]:
     """Create a human-readable summary of a session.
 
