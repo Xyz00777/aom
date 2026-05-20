@@ -661,3 +661,65 @@ class TestTreeLineIdentity:
                 assert ln.identity is None, (
                     f"non-role line {ln.kind!r}/{ln.label!r} has non-None identity"
                 )
+
+
+class TestTaskCompletionLifecycle:
+    """Regression guards: under linear strategy the state machine sets
+    task.status = RUNNING on v2_runner_on_start and never transitions it
+    back. The projection therefore must not rely on task.status to decide
+    'is this task currently running'; it must derive that from per-host
+    HostRunState.RUNNING entries instead. See bug found post-Task 9."""
+
+    def _linear_strategy_finished_task(self) -> RunState:
+        """Simulate a complete linear-strategy task lifecycle:
+        task_start → runner_on_start per host → runner_on_ok per host.
+        After this sequence task.status is stuck at RUNNING but every
+        host has terminal status — the task is logically complete."""
+        state = RunState(playbook="site.yml")
+        state.handle_event({"_event": "v2_playbook_on_start",
+                            "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event({"_event": "v2_playbook_on_play_start",
+                            "_timestamp": "2026-04-20T10:00:01Z",
+                            "play": {"id": "p1", "name": "deploy"}})
+        state.handle_event({"_event": "v2_playbook_on_task_start",
+                            "_timestamp": "2026-04-20T10:00:02Z",
+                            "task": {"id": "t1", "name": "Install nginx"},
+                            "play": {"id": "p1"}})
+        for host in ("web1", "web2"):
+            state.handle_event({"_event": "v2_runner_on_start",
+                                "_timestamp": "2026-04-20T10:00:03Z",
+                                "task": {"id": "t1", "name": "Install nginx"},
+                                "host": host})
+            state.handle_event({"_event": "v2_runner_on_ok",
+                                "_timestamp": "2026-04-20T10:00:05Z",
+                                "task": {"id": "t1", "name": "Install nginx"},
+                                "hosts": {host: {"ok": True, "changed": False}}})
+        return state
+
+    def test_tree_hidden_after_all_hosts_finished(self):
+        """Even though task.status is RUNNING (state-machine quirk), no
+        host is currently RUNNING — the tree should be hidden."""
+        state = self._linear_strategy_finished_task()
+        p = TreeProjection.from_run_state(state)
+        assert p.is_tree_visible() is False
+
+    def test_tree_lines_skip_tasks_with_no_running_hosts(self):
+        """A new task starts while a previous task is still stuck at
+        task.status=RUNNING but has all hosts in terminal state. The
+        tree should show ONLY the new task, not the stale one."""
+        state = self._linear_strategy_finished_task()
+        state.handle_event({"_event": "v2_playbook_on_task_start",
+                            "_timestamp": "2026-04-20T10:00:06Z",
+                            "task": {"id": "t2", "name": "Configure firewall"},
+                            "play": {"id": "p1"}})
+        state.handle_event({"_event": "v2_runner_on_start",
+                            "_timestamp": "2026-04-20T10:00:07Z",
+                            "task": {"id": "t2", "name": "Configure firewall"},
+                            "host": "web1"})
+        p = TreeProjection.from_run_state(state)
+        task_lines = [ln for ln in p.tree_lines(budget=25) if ln.kind == "task"]
+        names = [ln.label.split("  ")[0] for ln in task_lines]
+        assert "Install nginx" not in names, (
+            f"completed task should not appear in tree, got {names!r}"
+        )
+        assert "Configure firewall" in names

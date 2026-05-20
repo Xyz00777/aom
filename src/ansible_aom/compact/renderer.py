@@ -526,26 +526,28 @@ def count_total_tasks(definitions: list[PlayDefinition]) -> int:
 
 
 def count_completed_tasks(state: RunState) -> int:
-    """Count tasks across all plays that have produced at least one host result.
+    """Count tasks across all plays whose hosts have all reached terminal state.
 
-    The state machine populates ``TaskRunState.hosts`` only when a
-    ``v2_runner_on_*`` event fires (ok / failed / skipped / unreachable),
-    so a task with a non-empty ``hosts`` dict has finished execution from
-    the perspective of every host that reported. Tasks that have only
-    been *announced* (``v2_playbook_on_task_start``) but produced no
-    results yet keep ``hosts`` empty and don't count — that's the
-    in-flight state we want to exclude.
+    The state machine populates ``TaskRunState.hosts`` from two events:
+    ``v2_runner_on_start`` (with ``status=RUNNING``) and the terminal
+    handlers (ok / failed / skipped / unreachable, with the appropriate
+    terminal status). A task counts as completed only when its hosts
+    dict is non-empty AND no host is still in RUNNING — i.e. every host
+    that began the task has produced a terminal result.
 
     For the status bar this is a monotonic, ansible-faithful progress
     signal: linear-strategy plays advance one task at a time, so the
     previous task's host results land before the next task starts.
-    Multi-host free-strategy plays can briefly over-count by one, which
-    is acceptable for a coarse indicator.
+    Multi-host free-strategy plays can briefly under-count while a
+    fast-finishing host has its terminal event but its slower peer is
+    still running — acceptable for a coarse indicator.
     """
     total = 0
     for play in state.plays.values():
         for task in play.tasks.values():
-            if task.hosts:
+            if task.hosts and all(
+                hs.status != Status.RUNNING for hs in task.hosts.values()
+            ):
                 total += 1
     return total
 

@@ -91,11 +91,21 @@ class TreeProjection:
     # --- Visibility predicates --------------------------------------------
 
     def is_tree_visible(self) -> bool:
-        """True iff at least one task has status=RUNNING right now."""
+        """True iff at least one host is currently RUNNING a task.
+
+        Derived from per-host state, not from `task.status`. The state
+        machine sets `task.status = RUNNING` on first `v2_runner_on_start`
+        but never transitions it back, so `task.status` is unreliable as
+        a "currently running" signal. Per-host `HostRunState.status`
+        does get overwritten to terminal values by the runner_on_ok /
+        failed / skipped / unreachable handlers, so it's the source of
+        truth.
+        """
         for play in self._state.plays.values():
             for task in play.tasks.values():
-                if task.status == Status.RUNNING:
-                    return True
+                for hs in task.hosts.values():
+                    if hs.status == Status.RUNNING:
+                        return True
         return False
 
     def is_host_summary_visible(self) -> bool:
@@ -256,13 +266,16 @@ class TreeProjection:
         hosts_per_role: dict[str | None, set[str]] = defaultdict(set)
         for play in self._state.plays.values():
             for task in play.tasks.values():
-                if task.status != Status.RUNNING:
+                # Same "running iff any host is RUNNING" rule as the walker.
+                running_hosts = {
+                    hostname for hostname, hs in task.hosts.items()
+                    if hs.status == Status.RUNNING
+                }
+                if not running_hosts:
                     continue
                 role = self._task_role(task.name)
                 tasks_per_role[role] += 1
-                for hostname, hs in task.hosts.items():
-                    if hs.status == Status.RUNNING:
-                        hosts_per_role[role].add(hostname)
+                hosts_per_role[role].update(running_hosts)
 
         collapsed: list[TreeLine] = []
         i = 0
@@ -313,7 +326,13 @@ class TreeProjection:
         ]
 
         for play in self._state.plays.values():
-            running_tasks = [t for t in play.tasks.values() if t.status == Status.RUNNING]
+            # A task is "currently running" iff at least one of its hosts
+            # is in RUNNING state. See `is_tree_visible` docstring for why
+            # we cannot trust `task.status`.
+            running_tasks = [
+                t for t in play.tasks.values()
+                if any(hs.status == Status.RUNNING for hs in t.hosts.values())
+            ]
             if not running_tasks:
                 continue
             lines.append(

@@ -151,6 +151,37 @@ def test_count_completed_tasks_empty_state():
     assert count_completed_tasks(RunState(playbook="site.yml")) == 0
 
 
+def test_count_completed_tasks_excludes_tasks_with_running_hosts():
+    """A task whose hosts dict contains a RUNNING entry is in-flight,
+    not completed. The state machine's `_handle_v2_runner_on_start`
+    populates `task.hosts` with HostRunState(RUNNING) on host start, so
+    'non-empty hosts' alone is no longer sufficient to mean 'completed'
+    — we must also require no host be in RUNNING state. Regression
+    guard for a bug where every announced task was counted as
+    completed, producing nonsense ratios like `30/4 tasks`."""
+    state = RunState(playbook="site.yml")
+    play = PlayRunState(play_id="1", name="web")
+
+    in_flight = TaskRunState(task_id="t1", name="in-flight",
+                             status=Status.RUNNING)
+    in_flight.hosts["w1"] = HostRunState(hostname="w1", status=Status.RUNNING)
+
+    done = TaskRunState(task_id="t2", name="done")
+    done.hosts["w1"] = HostRunState(hostname="w1", status=Status.OK)
+
+    partially_done = TaskRunState(task_id="t3", name="partially-done")
+    partially_done.hosts["w1"] = HostRunState(hostname="w1", status=Status.OK)
+    partially_done.hosts["w2"] = HostRunState(hostname="w2", status=Status.RUNNING)
+
+    play.tasks["t1"] = in_flight
+    play.tasks["t2"] = done
+    play.tasks["t3"] = partially_done
+    state.plays["1"] = play
+
+    # Only t2 (all hosts terminal) counts as completed.
+    assert count_completed_tasks(state) == 1
+
+
 def test_renderer_status_bar_reflects_task_progress(monkeypatch):
     """Wire-up: renderer.tick() should refresh status bar with current task progress."""
     from ansible_aom.compact.renderer import CompactRenderer
