@@ -1,21 +1,22 @@
 """Inspect TUI app — three-pane browser for past AOM sessions.
 
-Pane layout:
-- Runs (left)   : DataTable, newest-first, date + playbook + duration + status icon.
-- Tasks (mid)   : Tree, hierarchical (play → role/group → task → host); failure
-                  paths auto-expanded, all-OK groups collapsed by default.
-- Detail (right): Static, failure-first body for the focused (task, host) pair.
+Pane layout (Horizontal, each pane sized 1fr so they scale with terminal
+width):
+- Runs (left)   : ListView. Each entry spans 3 lines (date+playbook,
+                  duration+host count+status, short session_id) with a
+                  trailing blank line.
+- Tasks (mid)   : Tree, hierarchical (play → role/group → task → host);
+                  failure paths auto-expanded, all-OK groups collapsed
+                  by default.
+- Detail (right): Static, failure-first body for the focused (task, host).
 
 Keybindings:
-  q        quit
-  f        toggle failed-only filter in Runs pane
-  g        jump to first failure in current run
-  R        copy a rerun command for focused (task, host) to clipboard
-  y        yank current detail body to clipboard
-  Tab      cycle pane focus
-
-Designed so that ``app.run_test()`` (Textual's Pilot harness) can drive
-every keybinding and assert against the visible state.
+  q          quit
+  Tab / S-Tab cycle pane focus
+  f          toggle failed-only filter
+  g          jump to first failure in current run
+  R          copy rerun command for focused (task, host) to clipboard
+  y          yank current detail body to clipboard
 """
 
 from __future__ import annotations
@@ -26,11 +27,12 @@ from pathlib import Path
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
-from textual.widgets import DataTable, Footer, Header, Static, Tree
+from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.widgets import Footer, Header, Label, ListItem, ListView, Static, Tree
 
 from ansible_aom.core.inspect_model import (
     DetailBlock,
+    RunSummary,
     StatusCounts,
     TaskTreeNode,
     build_detail_block,
@@ -95,55 +97,126 @@ def _stats_label(stats: StatusCounts) -> str:
     return " ".join(parts)
 
 
+def _summarise_hosts(host_counts) -> str:
+    """One-line per-host roll-up: 'caeli 22✓ 1✖, web2 8✓'."""
+    if not host_counts:
+        return "(no hosts)"
+    pieces = [f"{h} {_stats_label(c) or '—'}" for h, c in host_counts.items()]
+    return ", ".join(pieces)
+
+
+def _render_run_lines(summary: RunSummary) -> tuple[str, str, str]:
+    """Three lines per run row.
+
+    Designed so each line stays informative even when the column is
+    narrow — date is always first, status icon hugs the right.
+    """
+    date = summary.start_time.strftime("%Y-%m-%d %H:%M") if summary.start_time else "—"
+    icon = _STATUS_ICON.get(summary.status, "?")
+    dur = _fmt_duration_short(summary.duration.total_seconds() if summary.duration else None)
+    playbook = summary.playbook or "(no playbook)"
+
+    line1 = f"{icon} {date}  {playbook}"
+    line2 = f"   {dur}  {summary.status}"
+    if summary.failed_task_count:
+        line2 += f"  {summary.failed_task_count}✖ tasks"
+    host_summary = _summarise_hosts(summary.host_counts) if summary.host_counts else ""
+    if host_summary:
+        line2 += f"  · {host_summary}"
+    line3 = f"   id {summary.short_id}"
+    return line1, line2, line3
+
+
+class _RunRow(ListItem):
+    """One ListView entry: three label lines + blank spacer for breathing room."""
+
+    DEFAULT_CSS = """
+    _RunRow { padding: 0 1; height: 4; }
+    _RunRow > .run-line1 { text-style: bold; }
+    _RunRow > .run-line2 { color: $text-muted; }
+    _RunRow > .run-line3 { color: $text-disabled; }
+    """
+
+    def __init__(self, summary: RunSummary) -> None:
+        super().__init__()
+        self.summary = summary
+        self.session_id = summary.session_id
+
+    def compose(self) -> ComposeResult:
+        line1, line2, line3 = _render_run_lines(self.summary)
+        yield Label(line1, classes="run-line1")
+        yield Label(line2, classes="run-line2")
+        yield Label(line3, classes="run-line3")
+
+
 class InspectApp(App):
     """Three-pane inspector app."""
 
     CSS = """
+    Screen { background: transparent; }
+    Header, Footer { background: transparent; }
+
     Horizontal { height: 1fr; }
-    #runs-table { width: 32%; }
-    #tasks-tree { width: 36%; }
-    #detail-pane { width: 1fr; padding: 0 1; }
+
+    /* Equal-weight panes — adapt naturally to terminal width. */
+    #runs-pane, #tasks-pane, #detail-pane {
+        width: 1fr;
+        background: transparent;
+    }
+
+    /* Pane separators are subtle borders rather than solid backgrounds
+       so the terminal's own background shows through. */
+    #runs-pane    { border-right: tall $panel; }
+    #tasks-pane   { border-right: tall $panel; }
+    #detail-pane  { padding: 0 1; }
+
+    #runs-list { background: transparent; }
+    #tasks-tree { background: transparent; }
     """
 
     BINDINGS = [
         Binding("q", "quit", "Quit"),
+        Binding("tab", "focus_next_pane", "Next pane", show=True),
+        Binding("shift+tab", "focus_prev_pane", "Prev pane", show=False),
         Binding("f", "toggle_failed", "Failed-only"),
         Binding("g", "show_first_failure", "Goto failure"),
         Binding("R", "copy_rerun", "Copy rerun"),
         Binding("y", "yank_detail", "Yank"),
     ]
 
+    # IDs in tab order. action_focus_next_pane / prev cycles through these.
+    _PANE_ORDER: tuple[str, ...] = ("runs-list", "tasks-tree", "detail-pane")
+
     def __init__(self, *, state_dir: Path, initial_session_id: str | None = None) -> None:
         super().__init__()
         self.state_dir = state_dir
         self.initial_session_id = initial_session_id
         self.selected_session_id: str | None = None
-        self._all_summaries: list = []
+        self._all_summaries: list[RunSummary] = []
         self._failed_only = False
         self._current_session: dict | None = None
         self._current_tree: TaskTreeNode | None = None
         self._focused_task: TaskTreeNode | None = None
         self._focused_host: TaskTreeNode | None = None
-        # Mirror of what the detail pane shows. Textual's Static doesn't
-        # expose a stable read-back of the content; keeping our own copy
-        # is simpler than fishing through internals.
+        # Mirror of the detail-pane content. Static doesn't expose a
+        # stable read-back; the mirror is used by yank and tests.
         self._detail_text: str = "Select a task to see details."
 
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal():
-            yield DataTable(id="runs-table", cursor_type="row")
-            yield Tree("Tasks", id="tasks-tree")
-            yield Static("Select a run to see details.", id="detail-pane", expand=True)
+            with Vertical(id="runs-pane"):
+                yield ListView(id="runs-list")
+            with Vertical(id="tasks-pane"):
+                yield Tree("Tasks", id="tasks-tree")
+            with VerticalScroll(id="detail-pane"):
+                yield Static("Select a run to see details.", id="detail-body", expand=True)
         yield Footer()
 
     def on_mount(self) -> None:
-        table = self.query_one("#runs-table", DataTable)
-        table.add_columns("Date", "Playbook", "Dur", "")
         tree = self.query_one("#tasks-tree", Tree)
         tree.show_root = False
         self._reload_runs()
-        # Pre-select initial session (default: latest).
         sid = self.initial_session_id or (
             self._all_summaries[0].session_id if self._all_summaries else None
         )
@@ -151,40 +224,63 @@ class InspectApp(App):
             self._select_session(sid)
             self._load_tasks_for(sid)
 
+    # ── Pane navigation ──────────────────────────────────────────────────
+
+    def _focus_pane(self, offset: int) -> None:
+        """Move focus N positions through ``_PANE_ORDER`` (wrapping)."""
+        current = self.focused
+        # Walk up to find which top-level pane currently holds focus.
+        current_idx = -1
+        node = current
+        while node is not None:
+            ident = getattr(node, "id", None)
+            if ident in self._PANE_ORDER:
+                current_idx = self._PANE_ORDER.index(ident)
+                break
+            node = getattr(node, "parent", None)
+        next_idx = (current_idx + offset) % len(self._PANE_ORDER)
+        target_id = self._PANE_ORDER[next_idx]
+        try:
+            widget = self.query_one(f"#{target_id}")
+        except Exception:
+            return
+        widget.focus()
+
+    def action_focus_next_pane(self) -> None:
+        self._focus_pane(+1)
+
+    def action_focus_prev_pane(self) -> None:
+        self._focus_pane(-1)
+
     # ── Runs pane ────────────────────────────────────────────────────────
 
     def _reload_runs(self) -> None:
         raws = list_sessions(self.state_dir)
-        summaries = []
+        summaries: list[RunSummary] = []
         for raw in raws:
             session = load_session(raw["session_id"], self.state_dir)
             if session is not None:
                 summaries.append(build_run_summary(session))
         self._all_summaries = summaries
-        self._refresh_table()
+        self._refresh_list()
 
-    def _visible_summaries(self):
+    def _visible_summaries(self) -> list[RunSummary]:
         if self._failed_only:
             return [s for s in self._all_summaries if s.status in ("failed", "crashed")]
         return self._all_summaries
 
-    def _refresh_table(self) -> None:
-        table = self.query_one("#runs-table", DataTable)
-        table.clear()
+    def _refresh_list(self) -> None:
+        listview = self.query_one("#runs-list", ListView)
+        listview.clear()
         for s in self._visible_summaries():
-            date = s.start_time.strftime("%Y-%m-%d %H:%M") if s.start_time else "—"
-            dur = _fmt_duration_short(s.duration.total_seconds() if s.duration else None)
-            icon = _STATUS_ICON.get(s.status, "?")
-            playbook = s.playbook if len(s.playbook) <= 24 else "…" + s.playbook[-23:]
-            table.add_row(date, playbook, dur, icon, key=s.session_id)
+            listview.append(_RunRow(s))
 
     def _select_session(self, session_id: str) -> None:
-        table = self.query_one("#runs-table", DataTable)
-        visible = self._visible_summaries()
-        for idx, s in enumerate(visible):
+        listview = self.query_one("#runs-list", ListView)
+        for idx, s in enumerate(self._visible_summaries()):
             if s.session_id == session_id:
                 try:
-                    table.move_cursor(row=idx)
+                    listview.index = idx
                 except Exception:
                     pass
                 self.selected_session_id = session_id
@@ -192,17 +288,16 @@ class InspectApp(App):
 
     def action_toggle_failed(self) -> None:
         self._failed_only = not self._failed_only
-        self._refresh_table()
-        # Re-select latest visible run.
+        self._refresh_list()
         visible = self._visible_summaries()
         if visible:
             self._select_session(visible[0].session_id)
             self._load_tasks_for(visible[0].session_id)
 
-    def on_data_table_row_highlighted(self, event) -> None:
-        sid_raw = getattr(event, "row_key", None)
-        sid = sid_raw.value if sid_raw is not None and hasattr(sid_raw, "value") else sid_raw
-        if isinstance(sid, str) and sid != self.selected_session_id:
+    def on_list_view_highlighted(self, event) -> None:
+        item = event.item
+        sid = getattr(item, "session_id", None)
+        if sid and sid != self.selected_session_id:
             self.selected_session_id = sid
             self._load_tasks_for(sid)
 
@@ -210,7 +305,7 @@ class InspectApp(App):
 
     def _should_auto_expand(self, node: TaskTreeNode, depth: int) -> bool:
         if depth == 0:
-            return True  # plays always expanded
+            return True
         return node.stats.failed > 0 or node.stats.unreachable > 0
 
     def _add_node(self, parent, node: TaskTreeNode, *, depth: int) -> None:
@@ -236,7 +331,6 @@ class InspectApp(App):
         self._current_tree = model
         for play in model.children:
             self._add_node(tree_widget.root, play, depth=0)
-        # Auto-jump to first failure for the detail pane.
         self.action_show_first_failure()
 
     def _iter_failures(self, node: TaskTreeNode):
@@ -289,7 +383,7 @@ class InspectApp(App):
         return "\n".join(lines)
 
     def _update_detail(self) -> None:
-        detail = self.query_one("#detail-pane", Static)
+        detail = self.query_one("#detail-body", Static)
         if self._current_session is None or self._focused_task is None:
             self._detail_text = "Select a task to see details."
             detail.update(self._detail_text)

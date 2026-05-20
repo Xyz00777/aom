@@ -22,6 +22,7 @@ _ALIASES = {
     "multi_host": "019e4100-0000-7000-8000-000000000003",
     "unreachable": "019e4200-0000-7000-8000-000000000004",
     "running": "019e4300-0000-7000-8000-000000000005",
+    "real_shape": "019e4600-0000-7000-8000-000000000006",
 }
 
 
@@ -180,6 +181,28 @@ def test_task_tree_failed_loop_marks_failure_path():
     assert host_node.stats == StatusCounts(failed=1)
 
 
+def test_task_tree_real_event_shape():
+    """Real ansible.posix.jsonl events DON'T carry ``play`` or ``role``.
+
+    The model must track the current play during iteration and derive
+    role from ``task.path`` (regex ``roles/<name>/``). Absolute paths
+    must be handled too.
+    """
+    session = _load_fixture("real_shape")
+    root = build_task_tree(session)
+    assert len(root.children) == 1
+    play = root.children[0]
+    assert play.label == "all"  # NOT "(orphan tasks)" or "unknown"
+    labels = {c.label for c in play.children}
+    # Gathering Facts is top-level → flat under the play (no group).
+    assert "Gathering Facts" in labels
+    # The role tasks should be nested under an "os_macos" group node.
+    role_groups = [c for c in play.children if c.kind == "group" and c.label == "os_macos"]
+    assert len(role_groups) == 1
+    role_task_labels = {c.label for c in role_groups[0].children}
+    assert role_task_labels == {"Update brew", "Install brew casks"}
+
+
 def test_task_tree_multi_host_per_host_breakdown():
     session = _load_fixture("multi_host")
     root = build_task_tree(session)
@@ -219,8 +242,8 @@ def test_detail_block_unreachable():
     session = _load_fixture("unreachable")
     root = build_task_tree(session)
     play = root.children[0]
-    group = play.children[0]
-    task = group.children[0]
+    # New _group_key: no "roles/" in path → task is flat under the play.
+    task = play.children[0]
     host_node = task.children[0]
     block = build_detail_block(session, task, host_node)
     assert block.status == "unreachable"

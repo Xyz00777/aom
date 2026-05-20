@@ -31,9 +31,9 @@ async def test_runs_pane_lists_newest_first(state_dir: Path):
     app = InspectApp(state_dir=state_dir)
     async with app.run_test() as pilot:
         await pilot.pause()
-        runs_table = app.query_one("#runs-table")
+        listview = app.query_one("#runs-list")
         # 4 fixture sessions; expect 4 rows.
-        assert runs_table.row_count == 4
+        assert len(listview.children) == 4
         # Newest first: failed_loop (2026-05-20 11:24) pre-selected.
         assert app.selected_session_id == _ALIASES["failed_loop"]
 
@@ -47,9 +47,45 @@ async def test_runs_pane_failed_filter(state_dir: Path):
         await pilot.pause()
         await pilot.press("f")
         await pilot.pause()
-        runs_table = app.query_one("#runs-table")
+        listview = app.query_one("#runs-list")
         # clean_run is the only "completed" session; the other 3 are "failed".
-        assert runs_table.row_count == 3
+        assert len(listview.children) == 3
+
+
+@pytest.mark.asyncio
+async def test_tab_cycles_focus_between_panes(state_dir: Path):
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        # Start: Tab should move focus toward the Tasks pane.
+        await pilot.press("tab")
+        await pilot.pause()
+        focused = app.focused
+        # The focused widget should be (or live inside) #tasks-tree.
+        node = focused
+        ids = []
+        while node is not None:
+            ids.append(getattr(node, "id", None))
+            node = getattr(node, "parent", None)
+        assert "tasks-tree" in ids, f"Expected focus on tasks-tree, got chain {ids!r}"
+
+
+@pytest.mark.asyncio
+async def test_run_row_renders_multi_line_content(state_dir: Path):
+    """Each Runs-pane entry should render 3 distinct lines of info."""
+    from ansible_aom.tui.screens.inspect import InspectApp, _RunRow
+
+    app = InspectApp(state_dir=state_dir)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        listview = app.query_one("#runs-list")
+        first = listview.children[0]
+        assert isinstance(first, _RunRow)
+        labels = list(first.query("Label"))
+        # 3 label widgets per row (line1, line2, line3).
+        assert len(labels) == 3
 
 
 @pytest.mark.asyncio

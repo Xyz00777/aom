@@ -13,6 +13,7 @@ render the same information for the same session.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Mapping
@@ -163,26 +164,25 @@ class TaskTreeNode:
     task_id: str | None = None  # so the detail pane can fetch the underlying event
 
 
+_ROLE_PATH_RE = re.compile(r"roles/([^/]+)/")
+
+
 def _group_key(task: dict) -> str:
     """Determine the grouping bucket for a task.
 
-    Order of preference:
-    1. ``task.role`` (most reliable, present in JSONL for role tasks).
-    2. First meaningful component of ``task.path`` (e.g.
-       ``roles/<name>/tasks/main.yml:42`` → ``<name>``;
-       ``playbooks/site.yml:8`` → ``playbooks``).
-    3. ``"_root"`` (renders flat under the play).
+    Ansible's posix.jsonl callback does NOT include ``task.role`` on
+    runner events even for tasks inside a role — the only reliable signal
+    is the path. We look for ``roles/<name>/`` anywhere in the path
+    (handles both relative and absolute paths). Top-level playbook tasks
+    fall through to ``"_root"`` and render flat under the play.
     """
     role = task.get("role")
     if role:
         return str(role)
     path = task.get("path") or ""
-    if path.startswith("roles/"):
-        parts = path.split("/", 3)
-        if len(parts) >= 2:
-            return parts[1]
-    if "/" in path:
-        return path.split("/", 1)[0]
+    m = _ROLE_PATH_RE.search(path)
+    if m:
+        return m.group(1)
     return "_root"
 
 
@@ -199,47 +199,67 @@ def _runner_event_type(event: dict) -> str | None:
 
 
 def build_task_tree(session: dict) -> TaskTreeNode:
-    """Build the hierarchical task tree for one session."""
+    """Build the hierarchical task tree for one session.
+
+    Ansible's posix.jsonl emits ``v2_playbook_on_play_start`` only when
+    the play opens; subsequent task/runner events do NOT carry the
+    ``play`` key. We track the current play as a sliding window during
+    iteration and attribute tasks/results to whatever play was last
+    active. Same for task_start timestamps used for duration.
+    """
     events = session.get("events", [])
 
-    # Collect plays in order of appearance.
+    # Single linear pass: track current play / task contexts.
     play_order: list[tuple[str, str]] = []
     play_seen: set[str] = set()
+    task_starts: dict[str, dict] = {}
+    task_records: dict[str, dict] = {}
+    task_order: list[str] = []
+
+    current_pid: str = ""
+    current_play_name: str = ""
+
     for event in events:
-        if event.get("_event") == "v2_playbook_on_play_start":
+        et = event.get("_event", "")
+
+        if et == "v2_playbook_on_play_start":
             play = event.get("play") or {}
             pid = str(play.get("id", ""))
+            pname = str(play.get("name", "unnamed play"))
             if pid and pid not in play_seen:
                 play_seen.add(pid)
-                play_order.append((pid, str(play.get("name", "unknown"))))
+                play_order.append((pid, pname))
+            current_pid = pid
+            current_play_name = pname
+            continue
 
-    # Capture task_start timestamps for duration calculation.
-    task_starts: dict[str, dict] = {}
-    for event in events:
-        if event.get("_event") == "v2_playbook_on_task_start":
+        if et == "v2_playbook_on_task_start":
             tid = str((event.get("task") or {}).get("id", ""))
             if tid:
                 task_starts[tid] = event
-
-    # Aggregate per task: collect runner events, derive label/path/group/play.
-    task_records: dict[str, dict] = {}
-    task_order: list[str] = []
-    for event in events:
-        et = _runner_event_type(event)
-        if not et:
             continue
+
+        runner_et = _runner_event_type(event)
+        if not runner_et:
+            continue
+
         task = event.get("task") or {}
         tid = str(task.get("id", ""))
         if not tid:
             continue
-        play = event.get("play") or {}
-        pid = str(play.get("id", ""))
+        # Prefer the current sliding-window play; fall back to anything
+        # the event itself carries (older fixtures + future ansible
+        # versions that might attach play to runner events).
+        pid = current_pid
+        if not pid:
+            evt_play = event.get("play") or {}
+            pid = str(evt_play.get("id", ""))
         if tid not in task_records:
             task_order.append(tid)
         rec = task_records.setdefault(
             tid,
             {
-                "label": str(task.get("name", "")),
+                "label": str(task.get("name") or "unnamed task"),
                 "path": task.get("path"),
                 "group": _group_key(task),
                 "play_id": pid,
@@ -249,7 +269,12 @@ def build_task_tree(session: dict) -> TaskTreeNode:
         hosts = event.get("hosts") or {}
         for host, result in hosts.items():
             changed = bool(result.get("changed", False)) if isinstance(result, dict) else False
-            rec["events"].append((et, str(host), changed, event))
+            rec["events"].append((runner_et, str(host), changed, event))
+
+    # If no play_start events were captured but tasks exist, synthesise a
+    # placeholder play so the tree still renders.
+    if not play_order and task_records:
+        play_order.append(("", current_play_name or "(no play header)"))
 
     task_start_ts: dict[str, datetime] = {}
     for tid, ts_event in task_starts.items():
@@ -273,10 +298,15 @@ def build_task_tree(session: dict) -> TaskTreeNode:
         rec = task_records[tid]
         pid = rec["play_id"]
         if pid not in play_groups:
-            play_order.append((pid or "_unknown", "unknown"))
-            play_groups[pid or "_unknown"] = {}
-            play_group_order[pid or "_unknown"] = []
-            pid = pid or "_unknown"
+            # Task with no matching play_start — attribute to a synthetic
+            # play so it still renders. Label intentionally indicates the
+            # missing-header condition rather than "unknown" so users can
+            # distinguish "ansible didn't emit play_start" from "we don't
+            # know which play this belongs to".
+            play_order.append((pid or "_orphans", "(orphan tasks)"))
+            play_groups[pid or "_orphans"] = {}
+            play_group_order[pid or "_orphans"] = []
+            pid = pid or "_orphans"
         grp = rec["group"]
         # Aggregate stats across hosts.
         task_counts = StatusCounts()
