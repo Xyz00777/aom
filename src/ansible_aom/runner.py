@@ -44,6 +44,20 @@ def _default_session_dir() -> Path:
     return Path.home() / ".local" / "state" / "aom" / "sessions"
 
 
+def _print_session_footer(*, session_id: str | None, stderr_isatty: bool) -> None:
+    """Print the end-of-run hint that points users at ``aom inspect``.
+
+    Suppressed in two cases:
+    - The runner had no session (recording disabled or failed to start).
+    - stderr is not a TTY (CI, pipe, redirect) — keeps script output clean.
+    """
+    if not session_id or not stderr_isatty:
+        return
+    short = session_id[:8]
+    sys.stderr.write(f"\nSession {short}   aom inspect\n")
+    sys.stderr.flush()
+
+
 class _NullSink:
     """No-op sink used when session recording is disabled (F3 --no-record).
 
@@ -51,6 +65,10 @@ class _NullSink:
     branchless once the sink is wired up. Methods accept the same args
     and silently discard them.
     """
+
+    @property
+    def session_id(self) -> str | None:
+        return None
 
     def record_event(self, event: dict) -> None:  # noqa: ARG002
         return None
@@ -138,6 +156,10 @@ class _SessionSink:
             self._manager.end_session(self._session_id, status)
         except OSError as exc:
             logger.debug("session end failed: %s", exc)
+
+    @property
+    def session_id(self) -> str | None:
+        return self._session_id
 
 
 # Same patterns the parser uses for replay-time detection. They appear
@@ -384,6 +406,14 @@ def run_playbook(
         return 130
     finally:
         renderer.stop()
+        try:
+            stderr_tty = sys.stderr.isatty()
+        except (AttributeError, ValueError):
+            stderr_tty = False
+        _print_session_footer(
+            session_id=getattr(sink, "session_id", None),
+            stderr_isatty=stderr_tty,
+        )
 
 
 def _drive(
