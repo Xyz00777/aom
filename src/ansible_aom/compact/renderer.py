@@ -29,7 +29,6 @@ from ansible_aom.core.models import (
 )
 from ansible_aom.core.tree import TreeProjection
 
-
 # =============================================================================
 # ANSI color helpers
 # =============================================================================
@@ -88,7 +87,7 @@ def _truncate_visible(text: str, width: int, *, colorize: bool = False) -> str:
             j = text.find("m", i)
             if j == -1:
                 break
-            out.append(text[i:j + 1])
+            out.append(text[i : j + 1])
             i = j + 1
         else:
             out.append(text[i])
@@ -334,8 +333,12 @@ def format_host_summary(
         'web1: ● 12 ok ◆ 3 changed'
     """
     cells = _format_count_cells(
-        ok, changed, failed, unreachable,
-        ascii_mode=ascii_mode, colorize=colorize,
+        ok,
+        changed,
+        failed,
+        unreachable,
+        ascii_mode=ascii_mode,
+        colorize=colorize,
     )
     return " ".join([_wrap(f"{hostname}:", _DIM, colorize), *cells])
 
@@ -367,8 +370,7 @@ def format_host_rows(
     for row in projection.host_rows():
         hostname_color = _HOSTNAME_COLOR_BY_WORST.get(row.worst_status or Status.OK)
         hostname_seg = (
-            _wrap(row.hostname, hostname_color, colorize)
-            if hostname_color else row.hostname
+            _wrap(row.hostname, hostname_color, colorize) if hostname_color else row.hostname
         )
 
         cells = _format_count_cells(
@@ -376,7 +378,8 @@ def format_host_rows(
             changed=row.counts.get(Status.CHANGED, 0),
             failed=row.counts.get(Status.FAILED, 0),
             unreachable=row.counts.get(Status.UNREACHABLE, 0),
-            ascii_mode=ascii_mode, colorize=colorize,
+            ascii_mode=ascii_mode,
+            colorize=colorize,
         )
 
         # Current-task suffix.
@@ -387,10 +390,7 @@ def format_host_rows(
         else:
             elapsed = int(row.current_elapsed_s or 0)
             glyph = get_running_frame(0)  # static frame in the per-host row
-            suffix = (
-                f"on: {row.current_task}  "
-                f"{_wrap(f'{glyph} {elapsed}s', _CYAN, colorize)}"
-            )
+            suffix = f"on: {row.current_task}  {_wrap(f'{glyph} {elapsed}s', _CYAN, colorize)}"
 
         # Two spaces between count cells and the current-task suffix for visual
         # separation; `" ".join` over [hostname_seg, *cells] gives the single
@@ -561,9 +561,7 @@ def count_completed_tasks(state: RunState) -> int:
     total = 0
     for play in state.plays.values():
         for task in play.tasks.values():
-            if task.hosts and all(
-                hs.status != Status.RUNNING for hs in task.hosts.values()
-            ):
+            if task.hosts and all(hs.status != Status.RUNNING for hs in task.hosts.values()):
                 total += 1
     return total
 
@@ -1091,7 +1089,8 @@ class CompactRenderer:
         # (dynamic include_tasks). User-reported `30/4 tasks` regression.
         tasks_total = (
             count_total_tasks_seen(self._definitions, self._state)
-            if self._state else count_total_tasks(self._definitions)
+            if self._state
+            else count_total_tasks(self._definitions)
         )
         tasks_completed = count_completed_tasks(self._state) if self._state else 0
 

@@ -187,7 +187,7 @@ def _group_key(task: dict) -> str:
 
 
 def _runner_event_type(event: dict) -> str | None:
-    et = event.get("_event", "")
+    et = str(event.get("_event", ""))
     if et in (
         "v2_runner_on_ok",
         "v2_runner_on_failed",

@@ -40,9 +40,7 @@ def load_session_dict(name: str) -> dict:
     src = _resolve(name)
     meta = json.loads((src / "meta.json").read_text())
     events = [
-        json.loads(line)
-        for line in (src / "events.jsonl").read_text().splitlines()
-        if line.strip()
+        json.loads(line) for line in (src / "events.jsonl").read_text().splitlines() if line.strip()
     ]
     stderr_file = src / "stderr.log"
     stderr = stderr_file.read_text().splitlines() if stderr_file.exists() else []

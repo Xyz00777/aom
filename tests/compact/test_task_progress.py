@@ -159,10 +159,14 @@ def test_count_total_tasks_grows_with_runtime_announced_tasks():
     shows `N/M` with N > M. Regression guard for: '30/4 tasks' user
     report where runtime had 30 announced tasks but preflight saw 4."""
     from ansible_aom.compact.renderer import count_total_tasks_seen
+
     # Preflight saw 4 leaf tasks.
     preflight = [
         PlayDefinition(
-            id="1", name="deploy", hosts="all", resolved_hosts=["h1"],
+            id="1",
+            name="deploy",
+            hosts="all",
+            resolved_hosts=["h1"],
             tasks=[_task(f"static-{i}", "1", i) for i in range(4)],
         ),
     ]
@@ -171,7 +175,8 @@ def test_count_total_tasks_grows_with_runtime_announced_tasks():
     play = PlayRunState(play_id="1", name="deploy")
     for i in range(30):
         play.tasks[f"runtime-{i}"] = TaskRunState(
-            task_id=f"runtime-{i}", name=f"task-{i}",
+            task_id=f"runtime-{i}",
+            name=f"task-{i}",
         )
     state.plays["1"] = play
     # Result: max(4, 30) == 30 — the running upper bound.
@@ -193,7 +198,10 @@ def test_handle_completion_keeps_runtime_grown_denominator():
     # Preflight said 4 tasks; runtime announced 30 (dynamic includes).
     r._definitions = [
         PlayDefinition(
-            id="1", name="big", hosts="all", resolved_hosts=["h1"],
+            id="1",
+            name="big",
+            hosts="all",
+            resolved_hosts=["h1"],
             tasks=[_task(f"static-{i}", "1", i) for i in range(4)],
         ),
     ]
@@ -202,10 +210,12 @@ def test_handle_completion_keeps_runtime_grown_denominator():
     play = PlayRunState(play_id="1", name="big")
     for i in range(30):
         play.tasks[f"runtime-{i}"] = TaskRunState(
-            task_id=f"runtime-{i}", name=f"t{i}",
+            task_id=f"runtime-{i}",
+            name=f"t{i}",
         )
         play.tasks[f"runtime-{i}"].hosts["h1"] = HostRunState(
-            hostname="h1", status=Status.OK,
+            hostname="h1",
+            status=Status.OK,
         )
     r._state.plays["1"] = play
 
@@ -224,9 +234,13 @@ def test_count_total_tasks_seen_falls_back_to_preflight_before_any_announce():
     """At the start of a run, before any task_start event, the runtime
     count is 0. The denominator should be the preflight count, not 0."""
     from ansible_aom.compact.renderer import count_total_tasks_seen
+
     preflight = [
         PlayDefinition(
-            id="1", name="deploy", hosts="all", resolved_hosts=["h1"],
+            id="1",
+            name="deploy",
+            hosts="all",
+            resolved_hosts=["h1"],
             tasks=[_task("a", "1", 0), _task("b", "1", 1)],
         ),
     ]
@@ -245,8 +259,7 @@ def test_count_completed_tasks_excludes_tasks_with_running_hosts():
     state = RunState(playbook="site.yml")
     play = PlayRunState(play_id="1", name="web")
 
-    in_flight = TaskRunState(task_id="t1", name="in-flight",
-                             status=Status.RUNNING)
+    in_flight = TaskRunState(task_id="t1", name="in-flight", status=Status.RUNNING)
     in_flight.hosts["w1"] = HostRunState(hostname="w1", status=Status.RUNNING)
 
     done = TaskRunState(task_id="t2", name="done")

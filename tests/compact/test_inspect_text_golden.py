@@ -5,7 +5,6 @@ from pathlib import Path
 
 from ansible_aom.inspect.text import render_session
 
-
 _ALIASES = {
     "clean_run": "019e4000-0000-7000-8000-000000000001",
     "failed_loop": "019e4520-fa64-7000-a627-000000000002",
@@ -20,9 +19,7 @@ def _load(name: str) -> dict:
     src = Path(__file__).parent.parent / "fixtures" / "sessions" / sid
     meta = json.loads((src / "meta.json").read_text())
     events = [
-        json.loads(line)
-        for line in (src / "events.jsonl").read_text().splitlines()
-        if line.strip()
+        json.loads(line) for line in (src / "events.jsonl").read_text().splitlines() if line.strip()
     ]
     stderr_file = src / "stderr.log"
     stderr = stderr_file.read_text().splitlines() if stderr_file.exists() else []

@@ -37,7 +37,7 @@ def _default_state_dir() -> Path:
 def _stdout_is_tty() -> bool:
     try:
         return sys.stdout.isatty()
-    except (AttributeError, ValueError):
+    except AttributeError, ValueError:
         return False
 
 

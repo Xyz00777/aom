@@ -16,7 +16,6 @@ from ansible_aom.core.inspect_model import (
     build_task_tree,
 )
 
-
 _ALIASES = {
     "clean_run": "019e4000-0000-7000-8000-000000000001",
     "failed_loop": "019e4520-fa64-7000-a627-000000000002",
@@ -32,9 +31,7 @@ def _load_fixture(name: str) -> dict:
     src = Path(__file__).parent.parent / "fixtures" / "sessions" / sid
     meta = json.loads((src / "meta.json").read_text())
     events = [
-        json.loads(line)
-        for line in (src / "events.jsonl").read_text().splitlines()
-        if line.strip()
+        json.loads(line) for line in (src / "events.jsonl").read_text().splitlines() if line.strip()
     ]
     stderr_file = src / "stderr.log"
     stderr = stderr_file.read_text().splitlines() if stderr_file.exists() else []
@@ -137,9 +134,9 @@ def test_run_summary_running_has_no_end():
 
 def test_run_summaries_sorted_newest_first():
     sessions = [
-        _load_fixture("clean_run"),       # 2026-05-19 18:02
-        _load_fixture("failed_loop"),     # 2026-05-20 11:24
-        _load_fixture("multi_host"),      # 2026-05-19 15:00
+        _load_fixture("clean_run"),  # 2026-05-19 18:02
+        _load_fixture("failed_loop"),  # 2026-05-20 11:24
+        _load_fixture("multi_host"),  # 2026-05-19 15:00
     ]
     summaries = build_run_summaries(sessions)
     assert [s.short_id for s in summaries] == ["019e4520", "019e4000", "019e4100"]

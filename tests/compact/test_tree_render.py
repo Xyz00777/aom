@@ -331,11 +331,14 @@ def test_hosts_completed_doesnt_oscillate_with_in_flight_task():
     assert r._state is not None
     # web1 completed task 1, then started task 2 (still running).
     play = r._state.plays.setdefault(
-        "p1", __import__("ansible_aom.core.models", fromlist=["PlayRunState"]).PlayRunState(
-            play_id="p1", name="deploy",
+        "p1",
+        __import__("ansible_aom.core.models", fromlist=["PlayRunState"]).PlayRunState(
+            play_id="p1",
+            name="deploy",
         ),
     )
     from ansible_aom.core.models import HostRunState, TaskRunState
+
     t1 = TaskRunState(task_id="t1", name="Install nginx")
     t1.hosts["web1"] = HostRunState(hostname="web1", status=Status.OK)
     t2 = TaskRunState(task_id="t2", name="Configure firewall")
@@ -379,9 +382,7 @@ def test_render_status_panel_status_bar_is_last_line(
     assert any("site.yml" in ln for ln in lines), "expected playbook name somewhere"
     # The line containing "Install nginx" (a task or host leaf) must come
     # BEFORE the status bar's elapsed-time / playbook-name line.
-    status_idx = next(
-        i for i, ln in enumerate(lines) if "│" in ln and "site.yml" in ln
-    )
+    status_idx = next(i for i, ln in enumerate(lines) if "│" in ln and "site.yml" in ln)
     tree_lines = [i for i, ln in enumerate(lines) if "Install nginx" in ln]
     assert tree_lines, "tree content missing from panel"
     for ti in tree_lines:
@@ -393,6 +394,7 @@ def test_render_status_panel_status_bar_is_last_line(
 
 def test_compute_tree_budget_math():
     from ansible_aom.compact.renderer import _compute_tree_budget
+
     # Baseline: 24 rows, 0 active hosts → 24//3 = 8
     assert _compute_tree_budget(rows=24, active_hosts=0) == 8
     # Host scaling: 24 rows, 12 active hosts → 8 + 4 = 12
@@ -423,9 +425,7 @@ def _full_panel(state: RunState) -> str:
         if hs.status == Status.RUNNING
     )
     budget = _compute_tree_budget(24, active)
-    tree = format_tree_block(
-        p, budget=budget, width=80, ascii_mode=False, colorize=False
-    )
+    tree = format_tree_block(p, budget=budget, width=80, ascii_mode=False, colorize=False)
     rows = (
         format_host_rows(p, width=80, ascii_mode=False, colorize=False)
         if p.is_host_summary_visible()

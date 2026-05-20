@@ -591,33 +591,59 @@ class TestTreeLineIdentity:
 
     def test_role_line_has_identity_matching_role_name(self):
         from ansible_aom.core.models import (
-            PlayDefinition, RoleGroupDefinition, TaskDefinition,
+            PlayDefinition,
+            RoleGroupDefinition,
+            TaskDefinition,
         )
+
         state = RunState(playbook="site.yml")
-        state.definitions = [PlayDefinition(
-            id="p1", name="deploy", hosts="all",
-            resolved_hosts=["web1"],
-            tasks=[RoleGroupDefinition(
-                role="webserver",
-                tasks=[TaskDefinition(
-                    name="Install nginx", role="webserver", tags=[],
-                    play_id="p1", play_order=0, task_order=0,
-                )],
-            )],
-        )]
-        state.handle_event({"_event": "v2_playbook_on_start",
-                            "_timestamp": "2026-04-20T10:00:00Z"})
-        state.handle_event({"_event": "v2_playbook_on_play_start",
-                            "_timestamp": "2026-04-20T10:00:01Z",
-                            "play": {"id": "p1", "name": "deploy"}})
-        state.handle_event({"_event": "v2_playbook_on_task_start",
-                            "_timestamp": "2026-04-20T10:00:02Z",
-                            "task": {"id": "t1", "name": "Install nginx"},
-                            "play": {"id": "p1"}})
-        state.handle_event({"_event": "v2_runner_on_start",
-                            "_timestamp": "2026-04-20T10:00:03Z",
-                            "task": {"id": "t1", "name": "Install nginx"},
-                            "host": "web1"})
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="deploy",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[
+                    RoleGroupDefinition(
+                        role="webserver",
+                        tasks=[
+                            TaskDefinition(
+                                name="Install nginx",
+                                role="webserver",
+                                tags=[],
+                                play_id="p1",
+                                play_order=0,
+                                task_order=0,
+                            )
+                        ],
+                    )
+                ],
+            )
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:03Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "host": "web1",
+            }
+        )
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
         role_line = next(ln for ln in lines if ln.kind == "role")
@@ -627,22 +653,36 @@ class TestTreeLineIdentity:
 
     def test_non_role_lines_have_none_identity(self):
         from ansible_aom.core.models import (
-            PlayDefinition, RoleGroupDefinition, TaskDefinition,
+            PlayDefinition,
+            RoleGroupDefinition,
+            TaskDefinition,
         )
+
         state = RunState(playbook="site.yml")
-        state.handle_event({"_event": "v2_playbook_on_start",
-                            "_timestamp": "2026-04-20T10:00:00Z"})
-        state.handle_event({"_event": "v2_playbook_on_play_start",
-                            "_timestamp": "2026-04-20T10:00:01Z",
-                            "play": {"id": "p1", "name": "deploy"}})
-        state.handle_event({"_event": "v2_playbook_on_task_start",
-                            "_timestamp": "2026-04-20T10:00:02Z",
-                            "task": {"id": "t1", "name": "Install nginx"},
-                            "play": {"id": "p1"}})
-        state.handle_event({"_event": "v2_runner_on_start",
-                            "_timestamp": "2026-04-20T10:00:03Z",
-                            "task": {"id": "t1", "name": "Install nginx"},
-                            "host": "web1"})
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:03Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "host": "web1",
+            }
+        )
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
         for ln in lines:
@@ -665,24 +705,39 @@ class TestTaskCompletionLifecycle:
         After this sequence task.status is stuck at RUNNING but every
         host has terminal status — the task is logically complete."""
         state = RunState(playbook="site.yml")
-        state.handle_event({"_event": "v2_playbook_on_start",
-                            "_timestamp": "2026-04-20T10:00:00Z"})
-        state.handle_event({"_event": "v2_playbook_on_play_start",
-                            "_timestamp": "2026-04-20T10:00:01Z",
-                            "play": {"id": "p1", "name": "deploy"}})
-        state.handle_event({"_event": "v2_playbook_on_task_start",
-                            "_timestamp": "2026-04-20T10:00:02Z",
-                            "task": {"id": "t1", "name": "Install nginx"},
-                            "play": {"id": "p1"}})
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "p1"},
+            }
+        )
         for host in ("web1", "web2"):
-            state.handle_event({"_event": "v2_runner_on_start",
-                                "_timestamp": "2026-04-20T10:00:03Z",
-                                "task": {"id": "t1", "name": "Install nginx"},
-                                "host": host})
-            state.handle_event({"_event": "v2_runner_on_ok",
-                                "_timestamp": "2026-04-20T10:00:05Z",
-                                "task": {"id": "t1", "name": "Install nginx"},
-                                "hosts": {host: {"ok": True, "changed": False}}})
+            state.handle_event(
+                {
+                    "_event": "v2_runner_on_start",
+                    "_timestamp": "2026-04-20T10:00:03Z",
+                    "task": {"id": "t1", "name": "Install nginx"},
+                    "host": host,
+                }
+            )
+            state.handle_event(
+                {
+                    "_event": "v2_runner_on_ok",
+                    "_timestamp": "2026-04-20T10:00:05Z",
+                    "task": {"id": "t1", "name": "Install nginx"},
+                    "hosts": {host: {"ok": True, "changed": False}},
+                }
+            )
         return state
 
     def test_tree_visible_after_all_hosts_finished_no_stats(self):
@@ -706,24 +761,34 @@ class TestTaskCompletionLifecycle:
         # Build a state where task t1 has fully completed (all hosts OK)
         # and no new task has started yet. Playbook hasn't ended.
         state = RunState(playbook="site.yml")
-        state.handle_event({"_event": "v2_playbook_on_start",
-                            "_timestamp": "2026-04-20T10:00:00Z"})
-        state.handle_event({"_event": "v2_playbook_on_play_start",
-                            "_timestamp": "2026-04-20T10:00:01Z",
-                            "play": {"id": "p1", "name": "deploy"}})
-        state.handle_event({"_event": "v2_playbook_on_task_start",
-                            "_timestamp": "2026-04-20T10:00:02Z",
-                            "task": {"id": "t1", "name": "Install nginx"},
-                            "play": {"id": "p1"}})
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "p1"},
+            }
+        )
         for host in ("web1", "web2"):
-            state.handle_event({"_event": "v2_runner_on_ok",
-                                "_timestamp": "2026-04-20T10:00:05Z",
-                                "task": {"id": "t1", "name": "Install nginx"},
-                                "hosts": {host: {"ok": True, "changed": False}}})
+            state.handle_event(
+                {
+                    "_event": "v2_runner_on_ok",
+                    "_timestamp": "2026-04-20T10:00:05Z",
+                    "task": {"id": "t1", "name": "Install nginx"},
+                    "hosts": {host: {"ok": True, "changed": False}},
+                }
+            )
         p = TreeProjection.from_run_state(state)
         assert p.is_tree_visible() is True, (
-            "tree should remain visible between tasks while playbook is "
-            "in flight"
+            "tree should remain visible between tasks while playbook is in flight"
         )
         lines = p.tree_lines(budget=25)
         kinds = [ln.kind for ln in lines]
@@ -743,22 +808,33 @@ class TestTaskCompletionLifecycle:
         COMPLETED/FAILED and end_time is set — the tree should hide
         regardless of any lingering task entries."""
         state = RunState(playbook="site.yml")
-        state.handle_event({"_event": "v2_playbook_on_start",
-                            "_timestamp": "2026-04-20T10:00:00Z"})
-        state.handle_event({"_event": "v2_playbook_on_play_start",
-                            "_timestamp": "2026-04-20T10:00:01Z",
-                            "play": {"id": "p1", "name": "deploy"}})
-        state.handle_event({"_event": "v2_playbook_on_task_start",
-                            "_timestamp": "2026-04-20T10:00:02Z",
-                            "task": {"id": "t1", "name": "Install nginx"},
-                            "play": {"id": "p1"}})
-        state.handle_event({"_event": "v2_runner_on_ok",
-                            "_timestamp": "2026-04-20T10:00:05Z",
-                            "task": {"id": "t1", "name": "Install nginx"},
-                            "hosts": {"web1": {"ok": True, "changed": False}}})
-        state.handle_event({"_event": "v2_playbook_on_stats",
-                            "_timestamp": "2026-04-20T10:00:10Z",
-                            "stats": {}})
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "hosts": {"web1": {"ok": True, "changed": False}},
+            }
+        )
+        state.handle_event(
+            {"_event": "v2_playbook_on_stats", "_timestamp": "2026-04-20T10:00:10Z", "stats": {}}
+        )
         p = TreeProjection.from_run_state(state)
         assert p.is_tree_visible() is False
 
@@ -768,11 +844,14 @@ class TestTaskCompletionLifecycle:
         stay hidden — sticky-mode only kicks in once a task has been
         seen."""
         state = RunState(playbook="site.yml")
-        state.handle_event({"_event": "v2_playbook_on_start",
-                            "_timestamp": "2026-04-20T10:00:00Z"})
-        state.handle_event({"_event": "v2_playbook_on_play_start",
-                            "_timestamp": "2026-04-20T10:00:01Z",
-                            "play": {"id": "p1", "name": "deploy"}})
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "deploy"},
+            }
+        )
         p = TreeProjection.from_run_state(state)
         assert p.is_tree_visible() is False
 
@@ -785,27 +864,46 @@ class TestTaskCompletionLifecycle:
         `resolved_hosts`. Regression guard for: tree never appearing
         under linear-strategy playbooks."""
         from ansible_aom.core.models import (
-            PlayDefinition, TaskDefinition,
+            PlayDefinition,
+            TaskDefinition,
         )
+
         state = RunState(playbook="site.yml")
-        state.definitions = [PlayDefinition(
-            id="1", name="deploy", hosts="webservers",
-            resolved_hosts=["web1", "web2", "web3"],
-            tasks=[TaskDefinition(
-                name="Install nginx", role=None, tags=[],
-                play_id="1", play_order=0, task_order=0,
-            )],
-        )]
+        state.definitions = [
+            PlayDefinition(
+                id="1",
+                name="deploy",
+                hosts="webservers",
+                resolved_hosts=["web1", "web2", "web3"],
+                tasks=[
+                    TaskDefinition(
+                        name="Install nginx",
+                        role=None,
+                        tags=[],
+                        play_id="1",
+                        play_order=0,
+                        task_order=0,
+                    )
+                ],
+            )
+        ]
         # No v2_runner_on_start events — pure linear-strategy flow.
-        state.handle_event({"_event": "v2_playbook_on_start",
-                            "_timestamp": "2026-04-20T10:00:00Z"})
-        state.handle_event({"_event": "v2_playbook_on_play_start",
-                            "_timestamp": "2026-04-20T10:00:01Z",
-                            "play": {"id": "play-uuid-real", "name": "deploy"}})
-        state.handle_event({"_event": "v2_playbook_on_task_start",
-                            "_timestamp": "2026-04-20T10:00:02Z",
-                            "task": {"id": "t1", "name": "Install nginx"},
-                            "play": {"id": "play-uuid-real"}})
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "play-uuid-real", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "play-uuid-real"},
+            }
+        )
         p = TreeProjection.from_run_state(state)
         # The tree must be visible — all three hosts should be reported
         # as RUNNING for this task.
@@ -819,14 +917,22 @@ class TestTaskCompletionLifecycle:
         task.status=RUNNING but has all hosts in terminal state. The
         tree should show ONLY the new task, not the stale one."""
         state = self._linear_strategy_finished_task()
-        state.handle_event({"_event": "v2_playbook_on_task_start",
-                            "_timestamp": "2026-04-20T10:00:06Z",
-                            "task": {"id": "t2", "name": "Configure firewall"},
-                            "play": {"id": "p1"}})
-        state.handle_event({"_event": "v2_runner_on_start",
-                            "_timestamp": "2026-04-20T10:00:07Z",
-                            "task": {"id": "t2", "name": "Configure firewall"},
-                            "host": "web1"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:06Z",
+                "task": {"id": "t2", "name": "Configure firewall"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:07Z",
+                "task": {"id": "t2", "name": "Configure firewall"},
+                "host": "web1",
+            }
+        )
         p = TreeProjection.from_run_state(state)
         task_lines = [ln for ln in p.tree_lines(budget=25) if ln.kind == "task"]
         names = [ln.label.split("  ")[0] for ln in task_lines]

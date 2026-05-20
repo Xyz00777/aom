@@ -110,11 +110,6 @@ disallow_untyped_defs = false
 disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
-module = "ansible_aom.inspect.diff"
-disallow_untyped_defs = false
-disallow_untyped_calls = false
-
-[[tool.mypy.overrides]]
 module = "ansible_aom.inspect.display"
 disallow_untyped_defs = false
 disallow_untyped_calls = false

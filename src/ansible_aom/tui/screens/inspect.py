@@ -69,7 +69,7 @@ def _copy_to_clipboard(text: str) -> None:
     where no local clipboard daemon exists.
     """
     try:
-        import pyperclip  # type: ignore[import-not-found]
+        import pyperclip  # type: ignore[import-untyped]
 
         pyperclip.copy(text)
         return
@@ -242,9 +242,7 @@ class InspectApp(App):
     def _iter_failures(self, node: TaskTreeNode):
         if node.kind == "task":
             for child in node.children:
-                if child.kind == "host" and (
-                    child.stats.failed or child.stats.unreachable
-                ):
+                if child.kind == "host" and (child.stats.failed or child.stats.unreachable):
                     yield node, child
         else:
             for child in node.children:
@@ -277,8 +275,7 @@ class InspectApp(App):
                     lines.append(f"      stderr: {item.stderr}")
             if block.ok_items:
                 lines.append(
-                    f"  ({len(block.ok_items)} ok item"
-                    f"{'s' if len(block.ok_items) != 1 else ''})"
+                    f"  ({len(block.ok_items)} ok item{'s' if len(block.ok_items) != 1 else ''})"
                 )
             lines.append("")
         if block.module_stderr and not block.failed_items:
@@ -297,9 +294,7 @@ class InspectApp(App):
             self._detail_text = "Select a task to see details."
             detail.update(self._detail_text)
             return
-        block = build_detail_block(
-            self._current_session, self._focused_task, self._focused_host
-        )
+        block = build_detail_block(self._current_session, self._focused_task, self._focused_host)
         self._detail_text = self._render_detail_block(block)
         detail.update(self._detail_text)
 

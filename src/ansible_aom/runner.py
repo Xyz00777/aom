@@ -408,7 +408,7 @@ def run_playbook(
         renderer.stop()
         try:
             stderr_tty = sys.stderr.isatty()
-        except (AttributeError, ValueError):
+        except AttributeError, ValueError:
             stderr_tty = False
         _print_session_footer(
             session_id=getattr(sink, "session_id", None),

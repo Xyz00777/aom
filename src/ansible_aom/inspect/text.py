@@ -9,7 +9,7 @@ two render the same information for the same session.
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, Iterator
 
 from ansible_aom.core.inspect_model import (
     DetailBlock,
@@ -70,7 +70,9 @@ def _render_header(summary: RunSummary) -> list[str]:
     return lines
 
 
-def _iter_failed_tasks(node: TaskTreeNode):
+def _iter_failed_tasks(
+    node: TaskTreeNode,
+) -> Iterator[tuple[TaskTreeNode, TaskTreeNode]]:
     """Walk the tree yielding (task_node, host_node) for every failed/unreachable host."""
     if node.kind == "task":
         for child in node.children:
@@ -104,7 +106,9 @@ def _render_detail(block: DetailBlock) -> list[str]:
             if item.stderr:
                 lines.append(f"        stderr: {item.stderr}")
         if block.ok_items:
-            lines.append(f"  ({len(block.ok_items)} ok item{'s' if len(block.ok_items) != 1 else ''})")
+            lines.append(
+                f"  ({len(block.ok_items)} ok item{'s' if len(block.ok_items) != 1 else ''})"
+            )
     if block.module_stderr and not block.failed_items:
         lines.append("  stderr:")
         for line in block.module_stderr.splitlines():

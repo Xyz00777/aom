@@ -270,8 +270,7 @@ class TreeProjection:
             for task in play.tasks.values():
                 # Same "running iff any host is RUNNING" rule as the walker.
                 running_hosts = {
-                    hostname for hostname, hs in task.hosts.items()
-                    if hs.status == Status.RUNNING
+                    hostname for hostname, hs in task.hosts.items() if hs.status == Status.RUNNING
                 }
                 if not running_hosts:
                     continue
@@ -332,7 +331,8 @@ class TreeProjection:
             # is in RUNNING state. See `is_tree_visible` docstring for why
             # we cannot trust `task.status`.
             running_tasks = [
-                t for t in play.tasks.values()
+                t
+                for t in play.tasks.values()
                 if any(hs.status == Status.RUNNING for hs in t.hosts.values())
             ]
 
