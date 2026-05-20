@@ -151,6 +151,47 @@ def test_count_completed_tasks_empty_state():
     assert count_completed_tasks(RunState(playbook="site.yml")) == 0
 
 
+def test_count_total_tasks_grows_with_runtime_announced_tasks():
+    """Preflight `--list-tasks` only sees static + import_tasks. Dynamic
+    `include_tasks` expand at runtime — runtime task count exceeds the
+    preflight count. The denominator shown in the status bar should
+    take `max(preflight_total, runtime_announced)` so the ratio never
+    shows `N/M` with N > M. Regression guard for: '30/4 tasks' user
+    report where runtime had 30 announced tasks but preflight saw 4."""
+    from ansible_aom.compact.renderer import count_total_tasks_seen
+    # Preflight saw 4 leaf tasks.
+    preflight = [
+        PlayDefinition(
+            id="1", name="deploy", hosts="all", resolved_hosts=["h1"],
+            tasks=[_task(f"static-{i}", "1", i) for i in range(4)],
+        ),
+    ]
+    # Runtime has announced 30 tasks (via dynamic include_tasks).
+    state = RunState(playbook="site.yml")
+    play = PlayRunState(play_id="1", name="deploy")
+    for i in range(30):
+        play.tasks[f"runtime-{i}"] = TaskRunState(
+            task_id=f"runtime-{i}", name=f"task-{i}",
+        )
+    state.plays["1"] = play
+    # Result: max(4, 30) == 30 — the running upper bound.
+    assert count_total_tasks_seen(preflight, state) == 30
+
+
+def test_count_total_tasks_seen_falls_back_to_preflight_before_any_announce():
+    """At the start of a run, before any task_start event, the runtime
+    count is 0. The denominator should be the preflight count, not 0."""
+    from ansible_aom.compact.renderer import count_total_tasks_seen
+    preflight = [
+        PlayDefinition(
+            id="1", name="deploy", hosts="all", resolved_hosts=["h1"],
+            tasks=[_task("a", "1", 0), _task("b", "1", 1)],
+        ),
+    ]
+    state = RunState(playbook="site.yml")
+    assert count_total_tasks_seen(preflight, state) == 2
+
+
 def test_count_completed_tasks_excludes_tasks_with_running_hosts():
     """A task whose hosts dict contains a RUNNING entry is in-flight,
     not completed. The state machine's `_handle_v2_runner_on_start`

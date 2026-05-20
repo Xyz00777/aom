@@ -525,6 +525,22 @@ def count_total_tasks(definitions: list[PlayDefinition]) -> int:
     return sum(_count_tasks(play) for play in definitions)
 
 
+def count_total_tasks_seen(definitions: list[PlayDefinition], state: RunState) -> int:
+    """Running upper bound on task count for the status-bar denominator.
+
+    Preflight `--list-tasks` only sees static + `import_tasks`. Dynamic
+    `include_tasks` expand at runtime, so a playbook with 4 visible tasks
+    may actually announce 30 once `include_tasks` resolve. We take the
+    max of the preflight total and the runtime announced count so the
+    ratio `completed / total` never displays N > total.
+
+    Before any runtime event arrives, falls back to the preflight count
+    (avoids showing `0/0` during preflight).
+    """
+    runtime = sum(len(play.tasks) for play in state.plays.values())
+    return max(count_total_tasks(definitions), runtime)
+
+
 def count_completed_tasks(state: RunState) -> int:
     """Count tasks across all plays whose hosts have all reached terminal state.
 
@@ -785,6 +801,11 @@ class CompactRenderer:
 
         if self._state is None:
             return
+        # Mirror onto state so the state machine's task_start handler
+        # can look up per-play resolved_hosts (used to synthesise the
+        # per-host RUNNING entries under linear strategy, where the
+        # JSONL callback does not emit v2_runner_on_start).
+        self._state.definitions = list(self._definitions)
         self._render_status_panel()
 
     def update_state(self, event: dict) -> None:
@@ -873,7 +894,7 @@ class CompactRenderer:
             deprecations=self._deprecations_count,
             elapsed_seconds=elapsed,
             tasks_completed=count_completed_tasks(self._state),
-            tasks_total=count_total_tasks(self._definitions),
+            tasks_total=count_total_tasks_seen(self._definitions, self._state),
             ascii_mode=self._ascii_mode,
             colorize=self._colorize,
             mode_label=self._mode_label,

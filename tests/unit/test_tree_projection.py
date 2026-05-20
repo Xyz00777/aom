@@ -391,6 +391,11 @@ class TestTreeLinesRolesAndFanOut:
         ]
 
     def _free_strategy_state(self) -> RunState:
+        # `ansible.posix.jsonl` emits v2_playbook_on_task_start ONLY under
+        # lockstep strategies (linear/host_pinned) and v2_runner_on_start
+        # ONLY under non-lockstep strategies (free). A realistic free-
+        # strategy fixture fires runner_on_start without a preceding
+        # task_start — one host per concurrent task.
         state = RunState(playbook="site.yml")
         state.definitions = self._role_aware_definitions()
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
@@ -404,26 +409,10 @@ class TestTreeLinesRolesAndFanOut:
         # web1 is on "Install nginx"; web2 has raced ahead to "Configure firewall"
         state.handle_event(
             {
-                "_event": "v2_playbook_on_task_start",
-                "_timestamp": "2026-04-20T10:00:02Z",
-                "task": {"id": "t1", "name": "Install nginx"},
-                "play": {"id": "p1"},
-            }
-        )
-        state.handle_event(
-            {
                 "_event": "v2_runner_on_start",
                 "_timestamp": "2026-04-20T10:00:03Z",
                 "task": {"id": "t1", "name": "Install nginx"},
                 "host": "web1",
-            }
-        )
-        state.handle_event(
-            {
-                "_event": "v2_playbook_on_task_start",
-                "_timestamp": "2026-04-20T10:00:04Z",
-                "task": {"id": "t2", "name": "Configure firewall"},
-                "play": {"id": "p1"},
             }
         )
         state.handle_event(
@@ -702,6 +691,44 @@ class TestTaskCompletionLifecycle:
         state = self._linear_strategy_finished_task()
         p = TreeProjection.from_run_state(state)
         assert p.is_tree_visible() is False
+
+    def test_tree_visible_under_linear_strategy_with_preflight_hosts(self):
+        """Under linear strategy, `ansible.posix.jsonl` does NOT emit
+        `v2_runner_on_start` (the callback guards it with `if
+        self._is_lockstep: return`). So per-host RUNNING entries cannot
+        come from runner_on_start. Instead they must be synthesised at
+        `v2_playbook_on_task_start` using the matching play's preflight
+        `resolved_hosts`. Regression guard for: tree never appearing
+        under linear-strategy playbooks."""
+        from ansible_aom.core.models import (
+            PlayDefinition, TaskDefinition,
+        )
+        state = RunState(playbook="site.yml")
+        state.definitions = [PlayDefinition(
+            id="1", name="deploy", hosts="webservers",
+            resolved_hosts=["web1", "web2", "web3"],
+            tasks=[TaskDefinition(
+                name="Install nginx", role=None, tags=[],
+                play_id="1", play_order=0, task_order=0,
+            )],
+        )]
+        # No v2_runner_on_start events — pure linear-strategy flow.
+        state.handle_event({"_event": "v2_playbook_on_start",
+                            "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event({"_event": "v2_playbook_on_play_start",
+                            "_timestamp": "2026-04-20T10:00:01Z",
+                            "play": {"id": "play-uuid-real", "name": "deploy"}})
+        state.handle_event({"_event": "v2_playbook_on_task_start",
+                            "_timestamp": "2026-04-20T10:00:02Z",
+                            "task": {"id": "t1", "name": "Install nginx"},
+                            "play": {"id": "play-uuid-real"}})
+        p = TreeProjection.from_run_state(state)
+        # The tree must be visible — all three hosts should be reported
+        # as RUNNING for this task.
+        assert p.is_tree_visible() is True
+        host_lines = [ln for ln in p.tree_lines(budget=25) if ln.kind == "host"]
+        host_labels = sorted(ln.label for ln in host_lines)
+        assert host_labels == ["web1", "web2", "web3"]
 
     def test_tree_lines_skip_tasks_with_no_running_hosts(self):
         """A new task starts while a previous task is still stuck at

@@ -299,8 +299,41 @@ class RunState:
             play.tasks[task_id] = TaskRunState(
                 task_id=task_id,
                 name=task_name,
-                status=Status.PENDING,
+                status=Status.RUNNING,
+                start_time=ts,
             )
+        else:
+            play.tasks[task_id].status = Status.RUNNING
+            play.tasks[task_id].start_time = ts
+
+        # Under linear strategy `ansible.posix.jsonl` does not emit
+        # v2_runner_on_start (guarded by `if self._is_lockstep: return`),
+        # so per-host RUNNING state has no other signal. Synthesise it
+        # from the matching play's preflight resolved_hosts. Terminal
+        # handlers (runner_on_ok/failed/skipped/unreachable) will
+        # overwrite each host entry as the events arrive.
+        resolved_hosts = self._resolve_play_hosts(play)
+        for hostname in resolved_hosts:
+            if hostname not in play.tasks[task_id].hosts:
+                play.tasks[task_id].hosts[hostname] = HostRunState(
+                    hostname=hostname,
+                    status=Status.RUNNING,
+                    start_time=ts,
+                )
+
+    def _resolve_play_hosts(self, play: "PlayRunState") -> list[str]:
+        """Look up preflight resolved_hosts for a runtime play.
+
+        Preflight assigns `PlayDefinition.id = str(play_number)` while
+        runtime events carry an opaque UUID, so the IDs don't match.
+        We match by name instead. Returns an empty list when no
+        definition matches (no preflight data, or play name mismatch) —
+        callers should treat that as "no per-host signal available".
+        """
+        for play_def in self.definitions:
+            if play_def.name == play.name:
+                return list(play_def.resolved_hosts)
+        return []
 
     def _handle_v2_playbook_on_handler_task_start(
         self, event: dict[str, Any], ts: datetime
