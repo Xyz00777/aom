@@ -37,16 +37,27 @@ The rich data the user needs is already on disk (`msg`, per-item `results[]`, `t
 | Command | Behavior |
 |---|---|
 | `aom inspect` | Launch TUI, most-recent run pre-selected. |
-| `aom inspect <prefix>` | TUI with the run matching `<prefix>` pre-selected. `<prefix>` is any unique UUIDv7 prefix (e.g. `019e4520`). Errors on ambiguous or no match. |
-| `aom inspect --text` | Force text-mode output (run header + failure detail). Also implied when stdout is not a TTY. |
+| `aom inspect --text` | Print most-recent run's text-mode summary (run header + failure detail). Also implied when stdout is not a TTY. |
 | `aom inspect prune [--days N] [--keep N]` | Manual cleanup of old sessions. Kept from the existing CLI. |
 
-**Removed:** `aom inspect list`, `aom inspect show`, `aom inspect diff`. Their behaviour folds into the no-arg TUI invocation (`list`+`show`) or is dropped (`diff`).
+**Removed:** `aom inspect list`, `aom inspect show`, `aom inspect diff`, and the previously-considered `aom inspect <prefix>` positional. Rationale: users navigate chronologically inside the TUI, so a CLI-level prefix selector buys nothing once the no-arg invocation lands them in a browsable list.
 
-`--state-dir` moves to a subcommand-level flag so it composes naturally:
+`--state-dir` is a subcommand-level flag:
 ```bash
-aom inspect --state-dir /tmp/aom 019e4520
+aom inspect --state-dir /tmp/aom
 ```
+
+### Surfacing the session ID at the end of a run
+
+`aom <playbook>` (the streaming runner, not `inspect`) currently records a session dir but never tells the user the ID. The inspector cannot help if the user doesn't know a session exists. Therefore:
+
+- On every normal termination (clean exit, failure exit, `Ctrl+C`), the compact renderer prints a final one-line footer:
+  ```
+  Session 019e4520-fa64-7000-…   aom inspect
+  ```
+  The 8-char short ID is rendered prominently; the hint at the right tells the user how to drill in. Suppressed when `--no-session` is passed or when output is not a TTY *and* `--quiet` is set (so JSON/CI usage stays clean).
+- On crash (uncaught exception during runner setup before a session exists), nothing extra is printed.
+- The TUI mode (`--tui`) prints the same line to stderr after exit so it's visible in the scroll-back.
 
 ## TUI layout
 
@@ -223,7 +234,8 @@ Pipe-friendly, free of ANSI control codes unless stdout is a TTY (Rich's `Consol
 | Rewritten | `inspect/cli.py` | Argparse for the new CLI surface; dispatches to TUI or text renderer; prefix resolver. |
 | Modified | `inspect/display.py` | Keep overhead-section helper; remove `format_session_table` / `format_tree_view` (replaced by core model + new renderers). |
 | Deleted | `inspect/diff.py` | Removed alongside `inspect diff` subcommand. |
-| Modified | `core/session.py` | Add `resolve_session_prefix(prefix, session_dir) -> str` (returns full session_id or raises on ambiguous/no match). Add `find_latest_session(session_dir) -> str | None`. |
+| Modified | `core/session.py` | Add `find_latest_session(session_dir) -> str \| None`. |
+| Modified | `runner.py` (or its end-of-run hook) | Print the session-ID footer on termination (see §Surfacing the session ID). |
 
 ### Data flow
 
@@ -310,10 +322,10 @@ Adheres to the project's TDD rule (write failing tests first).
   - stat roll-up across multiple hosts
   - smart-collapse rules (all-OK groups vs path-to-failure groups)
   - loop result extraction (failed items, OK items separated)
-  - prefix resolution (unique, ambiguous, no-match)
+- `test_runner_session_footer.py` — runner prints the `Session …  aom inspect` line on clean exit, failure exit, and Ctrl+C; suppressed on `--quiet` non-TTY.
 
 ### Integration tests (`tests/integration/`)
-- `test_inspect_cli.py` — `aom inspect`, `aom inspect <prefix>`, `aom inspect --text`, `aom inspect prune` invocations against a fixture state dir.
+- `test_inspect_cli.py` — `aom inspect`, `aom inspect --text`, `aom inspect prune` invocations against a fixture state dir.
 - `test_inspect_parity.py` — for a curated sample of sessions (success, single-host failure, multi-host failure, loop failure, unreachable, in-progress), assert that TUI's rendered text and text-mode output cover the same key information.
 - `test_session_leakage_guard.py` — fixture verifies no test ever writes to `~/.local/state/aom/sessions/`.
 
@@ -342,8 +354,8 @@ Suggested incremental delivery; each step ships green tests.
 
 1. **`core.inspect_model`** + unit tests. No UI, no I/O changes.
 2. **Text-mode renderer** + golden frame tests. Wires model to `aom inspect --text`. Already useful: `aom inspect --text` is a viable v1 even before the TUI lands.
-3. **Prefix resolver** + `core.session.find_latest_session` + unit tests.
-4. **New CLI dispatch** (`aom inspect [prefix] [--text]`). Drops `list` / `show` / `diff` subcommands. Updates argparse + completions.
+3. **New CLI dispatch** (`aom inspect [--text]` + `prune`). Drops `list` / `show` / `diff` subcommands. Updates argparse + completions. Adds `core.session.find_latest_session`.
+4. **Session-ID footer in the runner** + unit/integration tests. Independent of inspect work; once landed, users start discovering sessions exist.
 5. **Test-leakage fix** + autouse fixture. Independent and unblocks the user's machine.
 6. **TUI screen** — Runs pane first (port of text mode into a Textual list), then Tasks pane, then Detail pane. Each pane independently testable via `Pilot`.
 7. **Smart defaults** (auto-collapse, auto-jump-to-failure) layered on top of the working tree pane.
