@@ -141,12 +141,21 @@ fanned out.
 
 ## Tree lifecycle
 
-| Condition | Tree visible? | Host rows visible? |
-|---|---|---|
-| Preflight / before first task | no | no |
-| Any task RUNNING somewhere | **yes** | yes (if `host_count > 1`) |
-| All tasks complete, between plays | no | yes (suffix becomes `(idle)`) |
-| PLAY RECAP done | no | yes, but suffix suppressed |
+| Condition | Tree visible? | Host rows visible? | Tree content |
+|---|---|---|---|
+| Preflight / before first task | no | no | — |
+| Any task RUNNING somewhere | **yes** | yes (if `host_count > 1`) | running tasks; only RUNNING hosts shown as leaves |
+| Between fast-completing tasks (no host RUNNING, but playbook in flight) | **yes (sticky)** | yes (if `host_count > 1`) | most recently active task per play, with all its host leaves showing terminal status |
+| PLAY RECAP done (`v2_playbook_on_stats`) | no | yes, but `on:` suffix suppressed | — |
+
+**Sticky mode** (2026-05-20 amendment): under linear strategy especially,
+fast tasks may finish before a render frame can fire, leaving the tree
+to flicker on/off. To avoid this, the tree stays visible whenever the
+playbook is in flight. When no task is currently RUNNING the tree falls
+back to showing the most recently active task with all its host
+leaves rendered at their terminal status — informative content during
+the transient gap, no animation, no stale state once the next task
+starts running (which immediately switches back to the running view).
 
 Host rows display whenever the run targets more than one host (count
 comes from preflight `--list-hosts`, not from "hosts seen in events so

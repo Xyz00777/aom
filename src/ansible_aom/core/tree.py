@@ -91,21 +91,23 @@ class TreeProjection:
     # --- Visibility predicates --------------------------------------------
 
     def is_tree_visible(self) -> bool:
-        """True iff at least one host is currently RUNNING a task.
+        """True iff the playbook is currently in flight.
 
-        Derived from per-host state, not from `task.status`. The state
-        machine sets `task.status = RUNNING` on first `v2_runner_on_start`
-        but never transitions it back, so `task.status` is unreliable as
-        a "currently running" signal. Per-host `HostRunState.status`
-        does get overwritten to terminal values by the runner_on_ok /
-        failed / skipped / unreachable handlers, so it's the source of
-        truth.
+        "In flight" = at least one task has been announced AND
+        `v2_playbook_on_stats` hasn't fired yet (`state.end_time` set).
+
+        The tree is sticky between tasks: even when no host is
+        currently RUNNING (transient gap between tasks under linear
+        strategy, especially for fast tasks), the tree stays visible
+        and falls back to showing the most recently active task. This
+        avoids flicker on sub-second tasks. See `tree_lines` for the
+        fallback render.
         """
+        if self._state.end_time is not None:
+            return False
         for play in self._state.plays.values():
-            for task in play.tasks.values():
-                for hs in task.hosts.values():
-                    if hs.status == Status.RUNNING:
-                        return True
+            if play.tasks:
+                return True
         return False
 
     def is_host_summary_visible(self) -> bool:
@@ -333,8 +335,25 @@ class TreeProjection:
                 t for t in play.tasks.values()
                 if any(hs.status == Status.RUNNING for hs in t.hosts.values())
             ]
-            if not running_tasks:
-                continue
+
+            # Sticky fallback: when no task is currently RUNNING but the
+            # playbook hasn't ended (`is_tree_visible` would not have
+            # called us otherwise), keep showing the most recently active
+            # task with its terminal host states. This bridges the gap
+            # between fast-completing tasks so the tree doesn't flicker.
+            if running_tasks:
+                tasks_to_emit = running_tasks
+                running_mode = True
+            else:
+                most_recent = None
+                for t in play.tasks.values():
+                    if t.hosts:
+                        most_recent = t
+                if most_recent is None:
+                    continue
+                tasks_to_emit = [most_recent]
+                running_mode = False
+
             lines.append(
                 TreeLine(
                     depth=1,
@@ -345,12 +364,13 @@ class TreeProjection:
                     elapsed_s=None,
                 )
             )
-            # Group running tasks by their role (or None for play-level tasks).
-            # Ordering preserves first-encounter order — under linear that's
-            # ansible source order; under free that's per-task start order.
+            # Group tasks by role (or None for play-level tasks).
+            # Ordering preserves first-encounter order — under linear
+            # that's ansible source order; under free that's per-task
+            # start order.
             tasks_by_role: dict[str | None, list[TaskRunState]] = {}
             order: list[str | None] = []
-            for task in running_tasks:
+            for task in tasks_to_emit:
                 role = self._task_role(task.name)
                 if role not in tasks_by_role:
                     tasks_by_role[role] = []
@@ -375,7 +395,11 @@ class TreeProjection:
                 for task in tasks_by_role[role]:
                     lines.append(self._task_line(task, depth=task_depth))
                     for hostname, hs in task.hosts.items():
-                        if hs.status != Status.RUNNING:
+                        # In running mode, only currently-RUNNING hosts
+                        # appear as leaves (spec: "running-only pruning"
+                        # for the active state). In sticky mode all host
+                        # entries appear with their terminal status.
+                        if running_mode and hs.status != Status.RUNNING:
                             continue
                         elapsed = (
                             (now - hs.start_time).total_seconds()
@@ -388,7 +412,7 @@ class TreeProjection:
                                 kind="host",
                                 label=hostname,
                                 glyph=None,
-                                status=Status.RUNNING,
+                                status=hs.status,
                                 elapsed_s=elapsed,
                             )
                         )

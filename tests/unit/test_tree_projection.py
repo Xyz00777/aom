@@ -685,10 +685,94 @@ class TestTaskCompletionLifecycle:
                                 "hosts": {host: {"ok": True, "changed": False}}})
         return state
 
-    def test_tree_hidden_after_all_hosts_finished(self):
-        """Even though task.status is RUNNING (state-machine quirk), no
-        host is currently RUNNING — the tree should be hidden."""
+    def test_tree_visible_after_all_hosts_finished_no_stats(self):
+        """After a task's hosts all reach terminal state, the tree
+        stays visible (sticky) until either the next task starts or
+        v2_playbook_on_stats fires. See sister test
+        `test_tree_sticky_between_tasks_shows_last_task` and
+        `test_tree_hidden_after_playbook_stats` for the bracketing
+        cases."""
         state = self._linear_strategy_finished_task()
+        p = TreeProjection.from_run_state(state)
+        assert p.is_tree_visible() is True
+
+    def test_tree_sticky_between_tasks_shows_last_task(self):
+        """Spec: while the playbook is in flight, the tree should stay
+        visible — when no task is currently RUNNING (transient gap
+        between tasks), it falls back to the most recently active task
+        with its final per-host status. Avoids the brief flicker for
+        fast-executing tasks. Regression guard for: user reported
+        'tree view becomes hidden for a bit for fast tasks'."""
+        # Build a state where task t1 has fully completed (all hosts OK)
+        # and no new task has started yet. Playbook hasn't ended.
+        state = RunState(playbook="site.yml")
+        state.handle_event({"_event": "v2_playbook_on_start",
+                            "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event({"_event": "v2_playbook_on_play_start",
+                            "_timestamp": "2026-04-20T10:00:01Z",
+                            "play": {"id": "p1", "name": "deploy"}})
+        state.handle_event({"_event": "v2_playbook_on_task_start",
+                            "_timestamp": "2026-04-20T10:00:02Z",
+                            "task": {"id": "t1", "name": "Install nginx"},
+                            "play": {"id": "p1"}})
+        for host in ("web1", "web2"):
+            state.handle_event({"_event": "v2_runner_on_ok",
+                                "_timestamp": "2026-04-20T10:00:05Z",
+                                "task": {"id": "t1", "name": "Install nginx"},
+                                "hosts": {host: {"ok": True, "changed": False}}})
+        p = TreeProjection.from_run_state(state)
+        assert p.is_tree_visible() is True, (
+            "tree should remain visible between tasks while playbook is "
+            "in flight"
+        )
+        lines = p.tree_lines(budget=25)
+        kinds = [ln.kind for ln in lines]
+        assert "task" in kinds, "expected the just-completed task to remain"
+        task_line = next(ln for ln in lines if ln.kind == "task")
+        assert "Install nginx" in task_line.label
+        # Hosts under the sticky task are terminal — they show terminal
+        # status icons, not the RUNNING animation glyph.
+        host_lines = [ln for ln in lines if ln.kind == "host"]
+        assert len(host_lines) == 2
+        for hl in host_lines:
+            assert hl.status == Status.OK
+            assert hl.status != Status.RUNNING
+
+    def test_tree_hidden_after_playbook_stats(self):
+        """Once v2_playbook_on_stats fires, RunState.status becomes
+        COMPLETED/FAILED and end_time is set — the tree should hide
+        regardless of any lingering task entries."""
+        state = RunState(playbook="site.yml")
+        state.handle_event({"_event": "v2_playbook_on_start",
+                            "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event({"_event": "v2_playbook_on_play_start",
+                            "_timestamp": "2026-04-20T10:00:01Z",
+                            "play": {"id": "p1", "name": "deploy"}})
+        state.handle_event({"_event": "v2_playbook_on_task_start",
+                            "_timestamp": "2026-04-20T10:00:02Z",
+                            "task": {"id": "t1", "name": "Install nginx"},
+                            "play": {"id": "p1"}})
+        state.handle_event({"_event": "v2_runner_on_ok",
+                            "_timestamp": "2026-04-20T10:00:05Z",
+                            "task": {"id": "t1", "name": "Install nginx"},
+                            "hosts": {"web1": {"ok": True, "changed": False}}})
+        state.handle_event({"_event": "v2_playbook_on_stats",
+                            "_timestamp": "2026-04-20T10:00:10Z",
+                            "stats": {}})
+        p = TreeProjection.from_run_state(state)
+        assert p.is_tree_visible() is False
+
+    def test_tree_hidden_before_any_task_starts(self):
+        """At the very start of a run (after playbook_on_start, before
+        any task announcement), there's nothing to show. Tree must
+        stay hidden — sticky-mode only kicks in once a task has been
+        seen."""
+        state = RunState(playbook="site.yml")
+        state.handle_event({"_event": "v2_playbook_on_start",
+                            "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event({"_event": "v2_playbook_on_play_start",
+                            "_timestamp": "2026-04-20T10:00:01Z",
+                            "play": {"id": "p1", "name": "deploy"}})
         p = TreeProjection.from_run_state(state)
         assert p.is_tree_visible() is False
 
