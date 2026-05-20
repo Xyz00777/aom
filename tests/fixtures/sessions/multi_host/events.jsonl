@@ -1,0 +1,7 @@
+{"_event":"v2_playbook_on_start","_timestamp":"2026-05-19T15:00:00.000000Z","playbook":{"file":"playbooks/deploy.yml"}}
+{"_event":"v2_playbook_on_play_start","_timestamp":"2026-05-19T15:00:00.500000Z","play":{"id":"p1","name":"web"}}
+{"_event":"v2_playbook_on_task_start","_timestamp":"2026-05-19T15:00:01.000000Z","task":{"id":"t1","name":"deploy : restart service","path":"playbooks/deploy.yml:10"},"play":{"id":"p1","name":"web"}}
+{"_event":"v2_runner_on_ok","_timestamp":"2026-05-19T15:00:05.000000Z","task":{"id":"t1","name":"deploy : restart service","path":"playbooks/deploy.yml:10"},"play":{"id":"p1","name":"web"},"hosts":{"web1":{"changed":true,"failed":false}}}
+{"_event":"v2_runner_on_ok","_timestamp":"2026-05-19T15:00:06.000000Z","task":{"id":"t1","name":"deploy : restart service","path":"playbooks/deploy.yml:10"},"play":{"id":"p1","name":"web"},"hosts":{"web3":{"changed":true,"failed":false}}}
+{"_event":"v2_runner_on_failed","_timestamp":"2026-05-19T15:00:07.000000Z","task":{"id":"t1","name":"deploy : restart service","path":"playbooks/deploy.yml:10"},"play":{"id":"p1","name":"web"},"hosts":{"web2":{"changed":false,"failed":true,"msg":"systemctl: Unit not found"}}}
+{"_event":"v2_playbook_on_stats","_timestamp":"2026-05-19T15:00:30.000000Z","stats":{"web1":{"ok":1,"changed":1,"failures":0,"unreachable":0,"skipped":0},"web2":{"ok":0,"changed":0,"failures":1,"unreachable":0,"skipped":0},"web3":{"ok":1,"changed":1,"failures":0,"unreachable":0,"skipped":0}}}

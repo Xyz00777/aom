@@ -1,0 +1,10 @@
+{
+  "session_id": "019e4000-0000-7000-8000-000000000001",
+  "playbook": "ansible/site.yml",
+  "ansible_args": ["-i", "inv.ini"],
+  "start_time": "2026-05-19T18:02:00.000000Z",
+  "end_time": "2026-05-19T18:02:42.000000Z",
+  "duration_seconds": 42.0,
+  "status": "completed",
+  "version": "1.1"
+}

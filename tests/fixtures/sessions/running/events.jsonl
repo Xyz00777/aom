@@ -1,0 +1,3 @@
+{"_event":"v2_playbook_on_start","_timestamp":"2026-05-20T12:00:00.000000Z","playbook":{"file":"ansible/site.yml"}}
+{"_event":"v2_playbook_on_play_start","_timestamp":"2026-05-20T12:00:00.500000Z","play":{"id":"p1","name":"all"}}
+{"_event":"v2_playbook_on_task_start","_timestamp":"2026-05-20T12:00:01.000000Z","task":{"id":"t1","name":"common : ping","path":"roles/common/tasks/main.yml:1"},"play":{"id":"p1","name":"all"}}
