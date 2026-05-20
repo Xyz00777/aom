@@ -4,6 +4,6 @@ PLAY [Edge case probe] **************************************************
 TASK [Touch file] **************************************************
 changed: [localhost] (2.0s)
 [10:00:05] Touch file — 3.0s (cum 5.0s)
-probe.yml | 1/1 hosts | 0:00:00 *
+probe.yml | 1/1 hosts | 1/1 tasks | 0:00:00 *
   localhost: + 1 changed
   (1 unknown events: v2_runner_item_on_ok×1)

@@ -178,6 +178,48 @@ def test_count_total_tasks_grows_with_runtime_announced_tasks():
     assert count_total_tasks_seen(preflight, state) == 30
 
 
+def test_handle_completion_keeps_runtime_grown_denominator():
+    """When the run cancels mid-flight the final status bar must NOT
+    revert to the preflight-only task total — it must keep using the
+    runtime-grown denominator (max of preflight and announced).
+    Regression guard for: user reported `30/4 tasks` after Ctrl+C even
+    though during execution the count was correct."""
+    from unittest.mock import patch
+
+    from ansible_aom.compact.renderer import CompactRenderer
+
+    r = CompactRenderer(is_tty=False)
+    r.start("site.yml", [])
+    # Preflight said 4 tasks; runtime announced 30 (dynamic includes).
+    r._definitions = [
+        PlayDefinition(
+            id="1", name="big", hosts="all", resolved_hosts=["h1"],
+            tasks=[_task(f"static-{i}", "1", i) for i in range(4)],
+        ),
+    ]
+    assert r._state is not None
+    r._state.definitions = list(r._definitions)
+    play = PlayRunState(play_id="1", name="big")
+    for i in range(30):
+        play.tasks[f"runtime-{i}"] = TaskRunState(
+            task_id=f"runtime-{i}", name=f"t{i}",
+        )
+        play.tasks[f"runtime-{i}"].hosts["h1"] = HostRunState(
+            hostname="h1", status=Status.OK,
+        )
+    r._state.plays["1"] = play
+
+    with patch.object(r._display, "update") as m:
+        r.handle_completion(130, "crashed")
+    args, kwargs = m.call_args
+    content = args[0] if args else kwargs.get("content")
+    assert content is not None
+    # Denominator must be the runtime grown count (30), not preflight (4).
+    assert "30/30 tasks" in content or "30 / 30 tasks" in content, (
+        f"expected '30/30 tasks' in final status, got: {content!r}"
+    )
+
+
 def test_count_total_tasks_seen_falls_back_to_preflight_before_any_announce():
     """At the start of a run, before any task_start event, the runtime
     count is 0. The denominator should be the preflight count, not 0."""

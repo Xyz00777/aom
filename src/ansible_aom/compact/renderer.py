@@ -865,10 +865,17 @@ class CompactRenderer:
             return
 
         # --- Region 1: status bar (existing logic) -------------------------
+        # Per-host status: last terminal state wins. We skip RUNNING
+        # entries because a host's HostRunState in the *current* task
+        # is transiently RUNNING while previous tasks left it at OK —
+        # without this guard the `X/Y hosts` count would oscillate
+        # back to zero every time a new task started.
         host_statuses: dict[str, Status] = {}
         for play in self._state.plays.values():
             for task in play.tasks.values():
                 for hostname, host_state in task.hosts.items():
+                    if host_state.status == Status.RUNNING:
+                        continue
                     host_statuses[hostname] = host_state.status
 
         # Prefer the preflight-resolved host count when JSONL hasn't yet
@@ -922,11 +929,15 @@ class CompactRenderer:
                 colorize=self._colorize,
             )
 
-        parts = [status_bar]
+        # Status bar is the BOTTOM line so it stays anchored where the
+        # user's eye expects a status line. Tree + host rows render
+        # above it (and grow upward into the log area as needed).
+        parts: list[str] = []
         if tree_lines:
             parts.append("\n".join(tree_lines))
         if host_lines:
             parts.append("\n".join(host_lines))
+        parts.append(status_bar)
         self._display.update("\n".join(parts))
 
     def _render_status_bar(self) -> None:
@@ -1054,10 +1065,15 @@ class CompactRenderer:
         hosts_total = 0
 
         if self._state is not None:
+            # Skip RUNNING so a cancelled-mid-task run still counts the
+            # host as "completed earlier tasks" — see _render_status_panel
+            # for the rationale.
             host_statuses: dict[str, Status] = {}
             for play in self._state.plays.values():
                 for task in play.tasks.values():
                     for hostname, host_state in task.hosts.items():
+                        if host_state.status == Status.RUNNING:
+                            continue
                         host_statuses[hostname] = host_state.status
 
             preflight_hosts: set[str] = set()
@@ -1069,7 +1085,14 @@ class CompactRenderer:
                 if status in (Status.OK, Status.CHANGED, Status.SKIPPED, Status.COMPLETED):
                     hosts_completed += 1
 
-        tasks_total = count_total_tasks(self._definitions)
+        # Use the runtime-grown denominator here too — otherwise on
+        # cancellation the count snaps back to the preflight-only total,
+        # which can be smaller than the runtime-announced count
+        # (dynamic include_tasks). User-reported `30/4 tasks` regression.
+        tasks_total = (
+            count_total_tasks_seen(self._definitions, self._state)
+            if self._state else count_total_tasks(self._definitions)
+        )
         tasks_completed = count_completed_tasks(self._state) if self._state else 0
 
         # Format final status bar

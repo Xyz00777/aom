@@ -318,6 +318,79 @@ def test_render_status_panel_includes_tree_when_task_running(
     assert "site.yml" in content
 
 
+def test_hosts_completed_doesnt_oscillate_with_in_flight_task():
+    """A host that previously reported OK and is now in the middle of
+    the next task (status=RUNNING for that next task) should still
+    count as 'completed' for the hosts-completed segment of the status
+    bar — its OK status from the prior task is the meaningful signal,
+    not the transient RUNNING for the in-flight one. Regression guard
+    for: user reported the hosts count oscillating 0/1 during execution
+    and 1/1 between tasks."""
+    r = CompactRenderer(is_tty=False)
+    r.start("site.yml", [])
+    assert r._state is not None
+    # web1 completed task 1, then started task 2 (still running).
+    play = r._state.plays.setdefault(
+        "p1", __import__("ansible_aom.core.models", fromlist=["PlayRunState"]).PlayRunState(
+            play_id="p1", name="deploy",
+        ),
+    )
+    from ansible_aom.core.models import HostRunState, TaskRunState
+    t1 = TaskRunState(task_id="t1", name="Install nginx")
+    t1.hosts["web1"] = HostRunState(hostname="web1", status=Status.OK)
+    t2 = TaskRunState(task_id="t2", name="Configure firewall")
+    t2.hosts["web1"] = HostRunState(hostname="web1", status=Status.RUNNING)
+    play.tasks["t1"] = t1
+    play.tasks["t2"] = t2
+
+    with patch.object(r._display, "update") as m:
+        r._render_status_panel()
+    args, kwargs = m.call_args
+    content = args[0] if args else kwargs.get("content")
+    assert content is not None
+    # Status bar should show 1/1 hosts (web1 has terminal OK from t1),
+    # NOT 0/1 (which would mean we're treating the RUNNING on t2 as
+    # 'not done').
+    assert "1/1 hosts" in content, f"expected '1/1 hosts', got: {content!r}"
+
+
+def test_render_status_panel_status_bar_is_last_line(
+    event_playbook_start, event_play_start, event_task_start, event_runner_start
+):
+    """The status bar must be the BOTTOM line of the panel so it stays
+    anchored at the terminal's bottom. Tree + host rows render above it.
+    Regression guard for: user reported the tree appeared BELOW the
+    status line, which pushes the 'sticky' status bar off the natural
+    bottom position."""
+    r = CompactRenderer(is_tty=False)
+    r.start("site.yml", [])
+    r.update_state(event_playbook_start)
+    r.update_state(event_play_start)
+    r.update_state(event_task_start)
+    r.update_state(event_runner_start)
+    with patch.object(r._display, "update") as m:
+        r._render_status_panel()
+    args, kwargs = m.call_args
+    content = args[0] if args else kwargs.get("content")
+    assert content is not None
+    lines = content.splitlines()
+    # Status bar carries the playbook name and elapsed time; tree carries
+    # the play / task / host glyphs. Status bar must be the last line.
+    assert any("site.yml" in ln for ln in lines), "expected playbook name somewhere"
+    # The line containing "Install nginx" (a task or host leaf) must come
+    # BEFORE the status bar's elapsed-time / playbook-name line.
+    status_idx = next(
+        i for i, ln in enumerate(lines) if "│" in ln and "site.yml" in ln
+    )
+    tree_lines = [i for i, ln in enumerate(lines) if "Install nginx" in ln]
+    assert tree_lines, "tree content missing from panel"
+    for ti in tree_lines:
+        assert ti < status_idx, (
+            f"tree line {ti} ({lines[ti]!r}) must come before status bar "
+            f"at line {status_idx} ({lines[status_idx]!r})"
+        )
+
+
 def test_compute_tree_budget_math():
     from ansible_aom.compact.renderer import _compute_tree_budget
     # Baseline: 24 rows, 0 active hosts → 24//3 = 8
