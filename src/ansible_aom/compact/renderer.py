@@ -22,6 +22,7 @@ from ansible_aom.compact.format import (
     _DIM,
     _GREEN,
     _MAGENTA,
+    _MSG_DISPLAY_CAP,  # noqa: F401 — re-export
     _RED,
     _RESET,  # noqa: F401 — re-export
     _SGR_RE,  # noqa: F401 — re-export
