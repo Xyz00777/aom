@@ -147,7 +147,7 @@ class SessionManager:
             "playbook": playbook,
             "ansible_args": list(ansible_args),
             "start_time": self._start_time.isoformat().replace("+00:00", "Z"),
-            "version": "1.1",
+            "version": "1.2",
             "session_id": session_id,
         }
         with open(self._meta_file, "w") as f:
@@ -194,12 +194,28 @@ class SessionManager:
         with open(stderr_file, "a", encoding="utf-8") as f:
             f.write(line + "\n")
 
-    def end_session(self, session_id: str, status: str) -> None:
+    def end_session(
+        self,
+        session_id: str,
+        status: str,
+        *,
+        task_count: int | None = None,
+        resolved_host_count: int | None = None,
+    ) -> None:
         """Finalize session and update metadata.
 
         Args:
-            session_id: The session ID
-            status: Final status ("completed", "failed", "crashed")
+            session_id: The session ID.
+            status: Final status ("completed", "failed", "crashed").
+            task_count: Preflight-derived task count (sum across plays).
+                Persisted to ``meta.json`` so a future run with the same
+                run configuration can show "last run: N tasks in T".
+                ``None`` when preflight didn't yield definitions (e.g.
+                early failure).
+            resolved_host_count: Union of ``resolved_hosts`` across all
+                plays from preflight. Used as a secondary filter when
+                matching prior runs — two runs with the same config but
+                different inventory sizes bucket separately.
         """
         if session_id not in self._active_sessions:
             raise ValueError(f"Session {session_id} not found")
@@ -217,6 +233,8 @@ class SessionManager:
         meta["status"] = status
         meta["end_time"] = end_time.isoformat().replace("+00:00", "Z")
         meta["duration_seconds"] = duration
+        meta["preflight_task_count"] = task_count
+        meta["resolved_host_count"] = resolved_host_count
 
         with open(meta_file, "w") as f:
             json.dump(meta, f)
