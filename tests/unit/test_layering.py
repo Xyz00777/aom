@@ -105,7 +105,6 @@ def test_core_does_not_depend_on_infrastructure() -> None:
         "ansible_aom.formats.",
         # Top-level infra modules still living at package root pre-§7.2.
         # Removed as each module relocates into its target subpackage.
-        "ansible_aom.replay",
         "ansible_aom.cli",
     )
     violations = _violations("core", forbidden)

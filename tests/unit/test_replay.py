@@ -39,7 +39,7 @@ def _make_session(
 
 class TestReplaySessionBasic:
     def test_renderer_receives_each_event_in_order(self, tmp_path: Path) -> None:
-        from ansible_aom.replay import replay_session
+        from ansible_aom.drivers.replay import replay_session
 
         events = [
             {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-08T10:00:00Z"},
@@ -67,7 +67,7 @@ class TestReplaySessionBasic:
         ]
 
     def test_returns_minus_one_when_session_missing(self, tmp_path: Path) -> None:
-        from ansible_aom.replay import replay_session
+        from ansible_aom.drivers.replay import replay_session
 
         renderer = MagicMock()
         exit_code = replay_session(
@@ -87,7 +87,7 @@ class TestReplaySpeedControl:
     """speed=0 means no sleeps; speed=2 halves them; default 1× honors deltas."""
 
     def test_speed_zero_makes_no_sleep_calls(self, tmp_path: Path) -> None:
-        from ansible_aom.replay import replay_session
+        from ansible_aom.drivers.replay import replay_session
 
         events = [
             {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-08T10:00:00Z"},
@@ -108,7 +108,7 @@ class TestReplaySpeedControl:
         assert sleeps == []
 
     def test_speed_one_sleeps_real_delta_seconds(self, tmp_path: Path) -> None:
-        from ansible_aom.replay import replay_session
+        from ansible_aom.drivers.replay import replay_session
 
         events = [
             {"_event": "a", "_timestamp": "2026-05-08T10:00:00Z"},
@@ -133,7 +133,7 @@ class TestReplaySpeedControl:
         assert sleeps[1] == pytest.approx(2.0, abs=1e-6)
 
     def test_speed_two_halves_sleeps(self, tmp_path: Path) -> None:
-        from ansible_aom.replay import replay_session
+        from ansible_aom.drivers.replay import replay_session
 
         events = [
             {"_event": "a", "_timestamp": "2026-05-08T10:00:00Z"},
@@ -162,7 +162,7 @@ class TestReplayNegativeDelta:
     """
 
     def test_out_of_order_timestamps_do_not_sleep_negative(self, tmp_path: Path) -> None:
-        from ansible_aom.replay import replay_session
+        from ansible_aom.drivers.replay import replay_session
 
         events = [
             {"_event": "a", "_timestamp": "2026-05-08T10:00:01Z"},
@@ -197,7 +197,7 @@ class TestReplayCompletionFromMeta:
     """`handle_completion` is called with the meta.json status."""
 
     def test_status_completed(self, tmp_path: Path) -> None:
-        from ansible_aom.replay import replay_session
+        from ansible_aom.drivers.replay import replay_session
 
         _make_session(
             tmp_path,
@@ -212,7 +212,7 @@ class TestReplayCompletionFromMeta:
         renderer.handle_completion.assert_called_once_with(0, "completed")
 
     def test_status_failed(self, tmp_path: Path) -> None:
-        from ansible_aom.replay import replay_session
+        from ansible_aom.drivers.replay import replay_session
 
         _make_session(
             tmp_path,
@@ -227,7 +227,7 @@ class TestReplayCompletionFromMeta:
         renderer.handle_completion.assert_called_once_with(0, "failed")
 
     def test_status_crashed(self, tmp_path: Path) -> None:
-        from ansible_aom.replay import replay_session
+        from ansible_aom.drivers.replay import replay_session
 
         _make_session(
             tmp_path,
@@ -242,7 +242,7 @@ class TestReplayCompletionFromMeta:
         renderer.handle_completion.assert_called_once_with(0, "crashed")
 
     def test_missing_status_defaults_to_completed(self, tmp_path: Path) -> None:
-        from ansible_aom.replay import replay_session
+        from ansible_aom.drivers.replay import replay_session
 
         # Create a session whose meta.json has no status field at all.
         session_path = tmp_path / "noStatus"
@@ -263,7 +263,7 @@ class TestReplayKeyboardInterrupt:
     """User hits Ctrl+C mid-replay → renderer sees handle_completion(130, 'crashed')."""
 
     def test_keyboard_interrupt_during_sleep(self, tmp_path: Path) -> None:
-        from ansible_aom.replay import replay_session
+        from ansible_aom.drivers.replay import replay_session
 
         events = [
             {"_event": "a", "_timestamp": "2026-05-08T10:00:00Z"},
@@ -298,7 +298,7 @@ class TestReplayKeyboardInterrupt:
         assert seen == ["a", "b"]
 
     def test_keyboard_interrupt_during_update_state(self, tmp_path: Path) -> None:
-        from ansible_aom.replay import replay_session
+        from ansible_aom.drivers.replay import replay_session
 
         events = [
             {"_event": "a", "_timestamp": "2026-05-08T10:00:00Z"},

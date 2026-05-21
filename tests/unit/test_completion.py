@@ -123,7 +123,7 @@ class TestReplayCLICompleterWiring:
 
     def test_replay_session_id_has_completer(self):
         from ansible_aom.completion import session_id_completer
-        from ansible_aom.replay import _build_parser
+        from ansible_aom.drivers.replay import _build_parser
 
         parser = _build_parser()
         action = next(a for a in parser._actions if a.dest == "session_id")

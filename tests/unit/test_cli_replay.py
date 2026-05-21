@@ -2,7 +2,7 @@
 
 Mirrors the inspect-dispatcher tests in test_cli.py: top-level
 ``aom replay ...`` strips the ``replay`` token and forwards the rest
-to ``ansible_aom.replay`` (or a thin CLI wrapper there).
+to ``ansible_aom.drivers.replay`` (or a thin CLI wrapper there).
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ class TestReplayDispatch:
         from ansible_aom.cli import main
 
         with (
-            patch("ansible_aom.replay.cli_main", return_value=0) as mock_main,
+            patch("ansible_aom.drivers.replay.cli_main", return_value=0) as mock_main,
             patch("sys.argv", ["aom", "replay", "abc123"]),
         ):
             assert main() == 0
@@ -28,7 +28,7 @@ class TestReplayDispatch:
         from ansible_aom.cli import main
 
         with (
-            patch("ansible_aom.replay.cli_main", return_value=0) as mock_main,
+            patch("ansible_aom.drivers.replay.cli_main", return_value=0) as mock_main,
             patch("sys.argv", ["aom", "replay", "abc123", "--speed", "5"]),
         ):
             main()
@@ -38,7 +38,7 @@ class TestReplayDispatch:
         from ansible_aom.cli import main
 
         with (
-            patch("ansible_aom.replay.cli_main", return_value=0) as mock_main,
+            patch("ansible_aom.drivers.replay.cli_main", return_value=0) as mock_main,
             patch("sys.argv", ["aom", "replay", "abc123", "--tui"]),
         ):
             main()
@@ -48,7 +48,7 @@ class TestReplayDispatch:
         from ansible_aom.cli import main
 
         with (
-            patch("ansible_aom.replay.cli_main", return_value=2),
+            patch("ansible_aom.drivers.replay.cli_main", return_value=2),
             patch("sys.argv", ["aom", "replay", "missing"]),
         ):
             assert main() == 2
@@ -70,7 +70,7 @@ class TestReplayCLIMain:
     """`replay.cli_main` parses argv, builds a renderer, calls replay_session."""
 
     def test_cli_main_default_uses_compact_renderer(self, tmp_path: Path) -> None:
-        from ansible_aom.replay import cli_main
+        from ansible_aom.drivers.replay import cli_main
 
         _make_session(
             tmp_path,
@@ -85,8 +85,8 @@ class TestReplayCLIMain:
             return 0
 
         with (
-            patch("ansible_aom.replay.replay_session", side_effect=fake_replay),
-            patch("ansible_aom.replay.create_renderer") as mock_factory,
+            patch("ansible_aom.drivers.replay.replay_session", side_effect=fake_replay),
+            patch("ansible_aom.drivers.replay.create_renderer") as mock_factory,
         ):
             mock_factory.return_value = object()
             exit_code = cli_main(["abc", "--state-dir", str(tmp_path)])
@@ -97,7 +97,7 @@ class TestReplayCLIMain:
         assert kw.get("tui_mode") is False
 
     def test_cli_main_tui_flag_selects_tui_renderer(self, tmp_path: Path) -> None:
-        from ansible_aom.replay import cli_main
+        from ansible_aom.drivers.replay import cli_main
 
         _make_session(
             tmp_path,
@@ -106,8 +106,8 @@ class TestReplayCLIMain:
         )
 
         with (
-            patch("ansible_aom.replay.replay_session", return_value=0),
-            patch("ansible_aom.replay.create_renderer") as mock_factory,
+            patch("ansible_aom.drivers.replay.replay_session", return_value=0),
+            patch("ansible_aom.drivers.replay.create_renderer") as mock_factory,
         ):
             mock_factory.return_value = object()
             cli_main(["abc", "--state-dir", str(tmp_path), "--tui"])
@@ -115,7 +115,7 @@ class TestReplayCLIMain:
         assert mock_factory.call_args.kwargs.get("tui_mode") is True
 
     def test_cli_main_speed_forwarded(self, tmp_path: Path) -> None:
-        from ansible_aom.replay import cli_main
+        from ansible_aom.drivers.replay import cli_main
 
         _make_session(
             tmp_path,
@@ -130,8 +130,8 @@ class TestReplayCLIMain:
             return 0
 
         with (
-            patch("ansible_aom.replay.replay_session", side_effect=fake_replay),
-            patch("ansible_aom.replay.create_renderer", return_value=object()),
+            patch("ansible_aom.drivers.replay.replay_session", side_effect=fake_replay),
+            patch("ansible_aom.drivers.replay.create_renderer", return_value=object()),
         ):
             cli_main(["abc", "--state-dir", str(tmp_path), "--speed", "10"])
 
@@ -139,7 +139,7 @@ class TestReplayCLIMain:
 
     def test_cli_main_speed_zero_allowed(self, tmp_path: Path) -> None:
         """`--speed 0` is the documented "fast as possible" sentinel."""
-        from ansible_aom.replay import cli_main
+        from ansible_aom.drivers.replay import cli_main
 
         _make_session(
             tmp_path,
@@ -154,18 +154,18 @@ class TestReplayCLIMain:
             return 0
 
         with (
-            patch("ansible_aom.replay.replay_session", side_effect=fake_replay),
-            patch("ansible_aom.replay.create_renderer", return_value=object()),
+            patch("ansible_aom.drivers.replay.replay_session", side_effect=fake_replay),
+            patch("ansible_aom.drivers.replay.create_renderer", return_value=object()),
         ):
             cli_main(["abc", "--state-dir", str(tmp_path), "--speed", "0"])
 
         assert captured.get("speed") == 0.0
 
     def test_cli_main_returns_1_when_session_missing(self, tmp_path: Path) -> None:
-        from ansible_aom.replay import cli_main
+        from ansible_aom.drivers.replay import cli_main
 
         # No session created — replay_session returns 1 (real behaviour).
-        with patch("ansible_aom.replay.create_renderer", return_value=object()):
+        with patch("ansible_aom.drivers.replay.create_renderer", return_value=object()):
             exit_code = cli_main(["nope", "--state-dir", str(tmp_path)])
 
         assert exit_code == 1
@@ -174,11 +174,11 @@ class TestReplayCLIMain:
         """Passing both --compact and --tui exits with usage error (argparse SystemExit)."""
         import pytest
 
-        from ansible_aom.replay import cli_main
+        from ansible_aom.drivers.replay import cli_main
 
         with (
-            patch("ansible_aom.replay.replay_session", return_value=0),
-            patch("ansible_aom.replay.create_renderer", return_value=object()),
+            patch("ansible_aom.drivers.replay.replay_session", return_value=0),
+            patch("ansible_aom.drivers.replay.create_renderer", return_value=object()),
             pytest.raises(SystemExit),
         ):
             cli_main(["abc", "--state-dir", str(tmp_path), "--compact", "--tui"])

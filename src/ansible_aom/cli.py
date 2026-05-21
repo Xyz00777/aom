@@ -383,7 +383,7 @@ def main() -> int:
         return 0
 
     if len(sys.argv) > 1 and sys.argv[1] == "replay":
-        from ansible_aom.replay import cli_main as replay_main
+        from ansible_aom.drivers.replay import cli_main as replay_main
 
         return replay_main(sys.argv[2:])
 
