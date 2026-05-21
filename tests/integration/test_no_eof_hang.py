@@ -114,7 +114,9 @@ def test_runner_finishes_promptly_on_clean_eof() -> None:
     )
 
     start = time.monotonic()
-    with patch("ansible_aom.ansible.runner._build_command", return_value=(sys.executable, ["-c", code])):
+    with patch(
+        "ansible_aom.ansible.runner._build_command", return_value=(sys.executable, ["-c", code])
+    ):
         exit_code = run_playbook("playbook.yml", [], renderer, timeout=0.5)
     elapsed = time.monotonic() - start
 

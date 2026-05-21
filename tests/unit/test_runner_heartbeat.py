@@ -20,8 +20,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from ansible_aom.core.parser import PtyStreamParser, StreamPhase
 from ansible_aom.ansible.runner import _feed, _sample_subprocess_active
+from ansible_aom.core.parser import PtyStreamParser, StreamPhase
 
 
 def _parser_in_execution_phase() -> PtyStreamParser:

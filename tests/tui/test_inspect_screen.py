@@ -88,7 +88,7 @@ async def test_run_row_renders_local_timezone(state_dir: Path, monkeypatch):
     if hasattr(_time, "tzset"):
         _time.tzset()
 
-    from ansible_aom.tui.screens.inspect import InspectApp, _RunRow, _render_run_lines
+    from ansible_aom.tui.screens.inspect import InspectApp, _render_run_lines, _RunRow
 
     app = InspectApp(state_dir=state_dir)
     async with app.run_test() as pilot:
@@ -309,11 +309,7 @@ async def test_e_expands_all_and_c_collapses_all(state_dir: Path):
             for c in n.children:
                 yield from walk(c)
 
-        expandables = [
-            n
-            for n in walk(tree.root)
-            if n is not tree.root and n.allow_expand
-        ]
+        expandables = [n for n in walk(tree.root) if n is not tree.root and n.allow_expand]
         assert expandables, "fixture should have at least one expandable node"
         assert all(n.is_expanded for n in expandables), (
             "After `e`, every expandable node should be expanded"
@@ -375,9 +371,7 @@ async def test_left_does_not_steal_focus_to_detail_pane(state_dir: Path):
             while node is not None:
                 ids.append(getattr(node, "id", None))
                 node = getattr(node, "parent", None)
-            assert "tasks-tree" in ids, (
-                f"Left arrow stole focus out of Tasks pane; got {ids!r}"
-            )
+            assert "tasks-tree" in ids, f"Left arrow stole focus out of Tasks pane; got {ids!r}"
 
 
 @pytest.mark.asyncio

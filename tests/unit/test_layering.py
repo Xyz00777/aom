@@ -108,9 +108,8 @@ def test_core_does_not_depend_on_infrastructure() -> None:
         "ansible_aom.cli",
     )
     violations = _violations("core", forbidden)
-    assert violations == [], (
-        "core/ imported infrastructure: "
-        + ", ".join(f"{src}→{dst}" for src, dst in violations)
+    assert violations == [], "core/ imported infrastructure: " + ", ".join(
+        f"{src}→{dst}" for src, dst in violations
     )
 
 
@@ -127,7 +126,9 @@ def test_renderer_protocol_does_not_import_concrete_renderers() -> None:
         "ansible_aom.formats.",
     )
     imports = _imports_in(SRC_ROOT / "renderer" / "protocol.py")
-    bad = sorted({imp for imp in imports for p in forbidden if imp == p.rstrip(".") or imp.startswith(p)})
+    bad = sorted(
+        {imp for imp in imports for p in forbidden if imp == p.rstrip(".") or imp.startswith(p)}
+    )
     assert bad == [], f"renderer/protocol.py must not depend on a concrete renderer; got {bad}"
 
 
@@ -147,9 +148,8 @@ def test_concrete_renderers_do_not_cross_import(
     subpkg: str, forbidden_siblings: tuple[str, ...]
 ) -> None:
     violations = _violations(subpkg, forbidden_siblings)
-    assert violations == [], (
-        f"{subpkg}/ imported a sibling renderer: "
-        + ", ".join(f"{src}→{dst}" for src, dst in violations)
+    assert violations == [], f"{subpkg}/ imported a sibling renderer: " + ", ".join(
+        f"{src}→{dst}" for src, dst in violations
     )
 
 
@@ -173,7 +173,6 @@ def test_drivers_do_not_depend_on_concrete_renderers() -> None:
         "ansible_aom.formats.",
     )
     violations = _violations("drivers", forbidden)
-    assert violations == [], (
-        "drivers/ imported a concrete renderer: "
-        + ", ".join(f"{src}→{dst}" for src, dst in violations)
+    assert violations == [], "drivers/ imported a concrete renderer: " + ", ".join(
+        f"{src}→{dst}" for src, dst in violations
     )

@@ -22,12 +22,12 @@ import argparse
 import sys
 from pathlib import Path
 
+from ansible_aom.inspect.text import render_session
 from ansible_aom.session.store import (
     cleanup_old_sessions,
     find_latest_session,
     load_session,
 )
-from ansible_aom.inspect.text import render_session
 
 
 def _default_state_dir() -> Path:

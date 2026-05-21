@@ -24,11 +24,11 @@ from typing import Any
 
 import pexpect
 
+from ansible_aom.ansible.preflight import run_preflight
 from ansible_aom.core.models import WarningType
 from ansible_aom.core.parser import PtyStreamParser
-from ansible_aom.ansible.preflight import run_preflight
-from ansible_aom.session.store import SessionManager
 from ansible_aom.renderer.protocol import Renderer
+from ansible_aom.session.store import SessionManager
 
 logger = logging.getLogger(__name__)
 

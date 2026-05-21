@@ -23,8 +23,8 @@ def test_assemble_definitions_combines_tasks_and_hosts(
     list_tasks_output: str, list_hosts_output: str
 ):
     """assemble_definitions builds a PlayDefinition per play with tasks + resolved_hosts."""
-    from ansible_aom.core.parser import parse_list_hosts_output, parse_list_tasks_output
     from ansible_aom.ansible.preflight import assemble_definitions
+    from ansible_aom.core.parser import parse_list_hosts_output, parse_list_tasks_output
 
     plays = parse_list_tasks_output(list_tasks_output)
     play_hosts = parse_list_hosts_output(list_hosts_output)
@@ -131,8 +131,8 @@ def test_trim_stderr_empty_returns_empty():
 
 def test_assemble_definitions_invokes_role_grouping():
     """5+ consecutive same-role tasks collapse into a RoleGroupDefinition."""
-    from ansible_aom.core.models import RoleGroupDefinition
     from ansible_aom.ansible.preflight import assemble_definitions
+    from ansible_aom.core.models import RoleGroupDefinition
 
     plays = [
         {

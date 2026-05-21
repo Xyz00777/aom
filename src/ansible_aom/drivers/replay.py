@@ -37,9 +37,9 @@ from typing import Callable
 
 import argcomplete
 
-from ansible_aom.session.store import load_session
 from ansible_aom.renderer.factory import create_renderer
 from ansible_aom.renderer.protocol import Renderer
+from ansible_aom.session.store import load_session
 
 
 def _parse_timestamp(value: object) -> datetime | None:

@@ -262,9 +262,7 @@ def test_live_driver_drives_renderer_with_fake_subprocess(
     # in unit-test env). The driver only needs the smoke loop to fire.
     monkeypatch.setattr(
         "ansible_aom.ansible.runner.run_preflight",
-        lambda playbook, ansible_args: type(
-            "PR", (), {"definitions": [], "errors": []}
-        )(),
+        lambda playbook, ansible_args: type("PR", (), {"definitions": [], "errors": []})(),
     )
 
     renderer = FakeRenderer()

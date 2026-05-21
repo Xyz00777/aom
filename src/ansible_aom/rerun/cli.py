@@ -320,8 +320,8 @@ def _default_runner(playbook: str, ansible_args: list[str]) -> int:
     Lazy-imported so unit tests can stub ``runner`` without paying the
     cost of importing pexpect / Textual.
     """
-    from ansible_aom.renderer.factory import create_renderer
     from ansible_aom.ansible.runner import run_playbook
+    from ansible_aom.renderer.factory import create_renderer
 
     renderer = create_renderer(mode="compact", is_tty=sys.stdout.isatty())
     return run_playbook(playbook, ansible_args, renderer)

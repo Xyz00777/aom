@@ -17,7 +17,6 @@ import time
 from ansible_aom.compact.display import Display
 from ansible_aom.compact.exit_code import determine_exit_code  # noqa: F401 — re-export
 from ansible_aom.compact.format import (
-    _MSG_DISPLAY_CAP,
     _BOLD,  # noqa: F401 — re-export
     _CYAN,
     _DIM,

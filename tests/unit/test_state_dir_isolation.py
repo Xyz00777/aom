@@ -7,8 +7,8 @@ taking effect by re-reading the attribute lazily (a top-level
 original function before the fixture runs).
 """
 
-import ansible_aom.inspect.cli
 import ansible_aom.ansible.runner
+import ansible_aom.inspect.cli
 
 
 def test_runner_state_dir_is_isolated():
