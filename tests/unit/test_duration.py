@@ -47,3 +47,9 @@ def test_format_age_days() -> None:
     now = datetime.now(timezone.utc)
     assert format_age(now - timedelta(days=3)) == "3d ago"
     assert format_age(now - timedelta(days=30)) == "30d ago"
+
+
+def test_format_age_clamps_future_to_zero() -> None:
+    """Clock skew shouldn't produce '-Ns ago'."""
+    future = datetime.now(timezone.utc) + timedelta(seconds=30)
+    assert format_age(future) == "0s ago"

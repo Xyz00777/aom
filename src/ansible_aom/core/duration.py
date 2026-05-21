@@ -47,7 +47,10 @@ def format_age(end_time: datetime) -> str:
     drop the string into a sentence without further glue.
     """
     delta = datetime.now(timezone.utc) - end_time
-    secs = int(delta.total_seconds())
+    # Clamp negative deltas to 0 — clock skew (NFS sessions across
+    # machines, manual clock reset, hand-edited meta.json) shouldn't
+    # surface as ``-3s ago`` in the UI.
+    secs = max(int(delta.total_seconds()), 0)
     if secs < 60:
         return f"{secs}s ago"
     if secs < 3600:
