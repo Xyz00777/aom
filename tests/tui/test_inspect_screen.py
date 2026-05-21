@@ -201,7 +201,10 @@ async def test_highlighting_successful_task_updates_detail(state_dir: Path):
         app._update_detail()
         body = app._detail_text
         assert ok_task.label in body
-        assert "STATUS ok" in body or "STATUS changed" in body
+        # Status is rendered with Rich markup, so the literal status
+        # name still appears in the body string.
+        assert "ok" in body or "changed" in body
+        assert "STATUS" in body
 
 
 @pytest.mark.asyncio
@@ -406,6 +409,92 @@ async def test_focused_pane_gets_visual_class(state_dir: Path):
         runs_pane = app.query_one("#runs-pane")
         assert "--focused-pane" in tasks_pane.classes
         assert "--focused-pane" not in runs_pane.classes
+
+
+@pytest.mark.asyncio
+async def test_right_arrow_on_runs_drills_into_tasks(state_dir: Path):
+    """Right arrow while focused on the Runs pane moves to the Tasks pane."""
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.focus_runs()
+        await pilot.pause()
+        await pilot.press("right")
+        await pilot.pause()
+        node = app.focused
+        ids: list[str | None] = []
+        while node is not None:
+            ids.append(getattr(node, "id", None))
+            node = getattr(node, "parent", None)
+        assert "tasks-tree" in ids, f"Expected focus on tasks-tree, got {ids!r}"
+
+
+@pytest.mark.asyncio
+async def test_escape_steps_back_to_previous_pane(state_dir: Path):
+    """Escape moves focus one pane to the left (Detail → Tasks → Runs)."""
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.focus_detail()
+        await pilot.pause()
+        await pilot.press("escape")
+        await pilot.pause()
+        # From Detail, Escape lands in Tasks pane.
+        node = app.focused
+        ids: list[str | None] = []
+        while node is not None:
+            ids.append(getattr(node, "id", None))
+            node = getattr(node, "parent", None)
+        assert "tasks-tree" in ids, f"After Esc from Detail, expected Tasks pane; got {ids!r}"
+
+
+@pytest.mark.asyncio
+async def test_status_labels_carry_colour_markup(state_dir: Path):
+    """Stats labels in tree + runs use Rich markup so OK/failed are colour-coded."""
+    from ansible_aom.core.inspect_model import StatusCounts
+    from ansible_aom.tui.screens.inspect import _RunRow, _stats_label
+
+    label = _stats_label(StatusCounts(ok=3, failed=1, changed=2))
+    assert "[green]" in label
+    assert "[bold red]" in label
+    assert "[yellow]" in label
+
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        listview = app.query_one("#runs-list")
+        # The failed_loop row's status icon should be wrapped in a colour
+        # markup span, so the source line1 (before Rich consumes it)
+        # contains the icon plus the colour tag.
+        first = listview.children[0]
+        assert isinstance(first, _RunRow)
+        from ansible_aom.tui.screens.inspect import _render_run_lines
+
+        line1, _line2, _line3 = _render_run_lines(first.summary)
+        assert "✖" in line1
+        assert "bold red" in line1
+
+
+@pytest.mark.asyncio
+async def test_detail_block_includes_action_and_no_session_stderr(state_dir: Path):
+    """Per-task detail surfaces the module (``action``) and omits the
+    session-wide stderr.log that used to leak into every task."""
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        body = app._detail_text
+        assert "ACTION community.general.homebrew_cask" in body
+        # The previous version embedded "stderr.log (tail)" here; the
+        # session-wide log no longer leaks into per-task detail.
+        assert "stderr.log" not in body
 
 
 @pytest.mark.asyncio

@@ -37,6 +37,7 @@ import shutil
 import sys
 from pathlib import Path
 
+from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -74,6 +75,30 @@ _STATUS_ICON = {
     "running": "⠋",
 }
 
+# Rich-markup colour for each per-task status. Used in the Tasks tree
+# stats labels and the Runs pane status icon. Picked to match common
+# terminal-theme expectations:
+#   ok        — green (success)
+#   changed   — yellow (touched but not failure)
+#   failed    — bold red (high signal)
+#   unreachable — bold magenta (something different; not "module fail")
+#   skipped   — dim (low signal)
+_STATUS_COLOR = {
+    "ok": "green",
+    "changed": "yellow",
+    "failed": "bold red",
+    "unreachable": "bold magenta",
+    "skipped": "dim",
+}
+
+# Per-run-status colour for the icon column on Runs rows.
+_RUN_STATUS_COLOR = {
+    "completed": "green",
+    "failed": "bold red",
+    "crashed": "bold red",
+    "running": "cyan",
+}
+
 
 def _copy_to_clipboard(text: str) -> None:
     """Best-effort clipboard copy: try pyperclip, then OSC52, then no-op."""
@@ -90,6 +115,27 @@ def _copy_to_clipboard(text: str) -> None:
 
 
 def _stats_label(stats: StatusCounts) -> str:
+    """Render a colour-coded stats summary using Rich markup."""
+    parts: list[str] = []
+    if stats.ok:
+        parts.append(f"[{_STATUS_COLOR['ok']}]{stats.ok}✓[/]")
+    if stats.changed:
+        parts.append(f"[{_STATUS_COLOR['changed']}]{stats.changed}◆[/]")
+    if stats.failed:
+        parts.append(f"[{_STATUS_COLOR['failed']}]{stats.failed}✖[/]")
+    if stats.unreachable:
+        parts.append(f"[{_STATUS_COLOR['unreachable']}]{stats.unreachable}⊝[/]")
+    if stats.skipped:
+        parts.append(f"[{_STATUS_COLOR['skipped']}]{stats.skipped}○[/]")
+    return " ".join(parts)
+
+
+def _stats_label_plain(stats: StatusCounts) -> str:
+    """Same as :func:`_stats_label` but without colour markup.
+
+    Used in the Runs-row per-host roll-up where Rich markup would
+    interfere with column alignment.
+    """
     parts: list[str] = []
     if stats.ok:
         parts.append(f"{stats.ok}✓")
@@ -105,6 +151,7 @@ def _stats_label(stats: StatusCounts) -> str:
 
 
 def _summarise_hosts(host_counts) -> str:
+    """Colour-coded per-host roll-up using Rich markup."""
     if not host_counts:
         return ""
     pieces = [f"{h} {_stats_label(c) or '—'}" for h, c in host_counts.items()]
@@ -114,13 +161,16 @@ def _summarise_hosts(host_counts) -> str:
 def _render_run_lines(summary: RunSummary) -> tuple[str, str, str]:
     date = summary.start_time.strftime("%Y-%m-%d %H:%M") if summary.start_time else "—"
     icon = _STATUS_ICON.get(summary.status, "?")
+    icon_color = _RUN_STATUS_COLOR.get(summary.status, "")
+    icon_markup = f"[{icon_color}]{icon}[/]" if icon_color else icon
     dur = _fmt_duration_short(summary.duration.total_seconds() if summary.duration else None)
     playbook = summary.playbook or "(no playbook)"
 
-    line1 = f"{icon} {date}  {playbook}"
-    line2 = f"   {dur}  {summary.status}"
+    line1 = f"{icon_markup} {date}  {playbook}"
+    status_markup = f"[{icon_color}]{summary.status}[/]" if icon_color else summary.status
+    line2 = f"   {dur}  {status_markup}"
     if summary.failed_task_count:
-        line2 += f"  {summary.failed_task_count}✖ tasks"
+        line2 += f"  [{_STATUS_COLOR['failed']}]{summary.failed_task_count}✖ tasks[/]"
     host_summary = _summarise_hosts(summary.host_counts)
     if host_summary:
         line2 += f"  · {host_summary}"
@@ -143,9 +193,10 @@ class _RunRow(ListItem):
 
     def compose(self) -> ComposeResult:
         line1, line2, line3 = _render_run_lines(self.summary)
-        yield Label(line1, classes="run-line1")
-        yield Label(line2, classes="run-line2")
-        yield Label(line3, classes="run-line3")
+        # ``markup=True`` is the default for Label; spelt out for clarity.
+        yield Label(line1, classes="run-line1", markup=True)
+        yield Label(line2, classes="run-line2", markup=True)
+        yield Label(line3, classes="run-line3", markup=True)
 
 
 class _ConfirmDelete(ModalScreen[bool]):
@@ -231,6 +282,33 @@ class _HelpScreen(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         with VerticalScroll():
             yield Static(_HELP_TEXT, expand=True)
+
+
+class _RunsListView(ListView):
+    """ListView that treats Right / Enter as "drill into Tasks pane"."""
+
+    BINDINGS = ListView.BINDINGS + [
+        Binding("right", "drill_in", "Drill in", show=False),
+    ]
+
+    def action_drill_in(self) -> None:
+        app = self.app
+        if isinstance(app, InspectApp):
+            app.focus_tasks()
+
+
+class _DetailScroll(VerticalScroll):
+    """VerticalScroll that uses Left / Escape to step back to Tasks pane."""
+
+    BINDINGS = VerticalScroll.BINDINGS + [
+        Binding("left", "step_back", "Back", show=False),
+        Binding("escape", "step_back", "Back", show=False),
+    ]
+
+    def action_step_back(self) -> None:
+        app = self.app
+        if isinstance(app, InspectApp):
+            app.focus_tasks()
 
 
 class _NavTree(Tree):
@@ -349,6 +427,9 @@ class InspectApp(App):
         # Pane navigation
         Binding("tab", "focus_next_pane", "Next pane", show=False),
         Binding("shift+tab", "focus_prev_pane", "Prev pane", show=False),
+        # Escape always steps back one pane (modals consume it first
+        # via their own bindings, so this only fires at the top level).
+        Binding("escape", "focus_prev_pane", "Back", show=True),
         # Filter / failures / help
         Binding("f", "toggle_failed", "Failed-only"),
         Binding("g", "show_first_failure", "First fail"),
@@ -390,11 +471,11 @@ class InspectApp(App):
         yield Header()
         with Horizontal():
             with Vertical(id="runs-pane"):
-                yield ListView(id="runs-list")
+                yield _RunsListView(id="runs-list")
             with Vertical(id="tasks-pane"):
                 yield _NavTree("Tasks", id="tasks-tree")
-            with VerticalScroll(id="detail-pane", can_focus=True):
-                yield Static(self._detail_text, id="detail-body", expand=True)
+            with _DetailScroll(id="detail-pane", can_focus=True):
+                yield Static(self._detail_text, id="detail-body", expand=True, markup=True)
         yield Footer()
 
     def on_mount(self) -> None:
@@ -504,13 +585,13 @@ class InspectApp(App):
         return self._all_summaries
 
     def _refresh_list(self) -> None:
-        listview = self.query_one("#runs-list", ListView)
+        listview = self.query_one("#runs-list", _RunsListView)
         listview.clear()
         for s in self._visible_summaries():
             listview.append(_RunRow(s))
 
     def _select_session(self, session_id: str) -> None:
-        listview = self.query_one("#runs-list", ListView)
+        listview = self.query_one("#runs-list", _RunsListView)
         for idx, s in enumerate(self._visible_summaries()):
             if s.session_id == session_id:
                 try:
@@ -560,12 +641,15 @@ class InspectApp(App):
         return node.stats.failed > 0 or node.stats.unreachable > 0
 
     def _add_node(self, parent, node: TaskTreeNode, *, depth: int) -> None:
-        label = f"{node.label}  {_stats_label(node.stats)}".strip()
+        # ``Tree.add`` / ``add_leaf`` treat a plain string as literal text;
+        # passing a ``rich.Text`` parses the embedded markup so the stats
+        # icons show in their per-status colour.
+        label_text = Text.from_markup(f"{node.label}  {_stats_label(node.stats)}".strip())
         is_leaf = not node.children
         if is_leaf:
-            parent.add_leaf(label, data=node)
+            parent.add_leaf(label_text, data=node)
             return
-        sub = parent.add(label, data=node)
+        sub = parent.add(label_text, data=node)
         for child in node.children:
             self._add_node(sub, child, depth=depth + 1)
         # Expand after children exist — Textual's ``expand()`` is a no-op
@@ -622,24 +706,40 @@ class InspectApp(App):
     # ── Detail pane ──────────────────────────────────────────────────────
 
     def _render_detail_block(self, block: DetailBlock) -> str:
+        """Render the per-task detail body.
+
+        Everything here is specific to the focused (task, host) pair —
+        session-wide content (the session ``stderr.log``) belongs in a
+        separate view, not under each task, because re-rendering the same
+        text on every cursor move was confusing.
+        """
+        status_color = _STATUS_COLOR.get(block.status, "")
+        status_markup = f"[{status_color}]{block.status}[/]" if status_color else block.status
+
         lines: list[str] = []
-        lines.append(f"TASK   {block.task_name}")
+        lines.append(f"[bold]TASK[/]   {block.task_name}")
         if block.file_line:
             lines.append(f"FILE   {block.file_line}")
         if block.host:
             lines.append(f"HOST   {block.host}")
+        if block.action:
+            lines.append(f"ACTION {block.action}")
         if block.duration is not None:
             lines.append(f"TIME   {_fmt_duration_short(block.duration.total_seconds())}")
-        lines.append(f"STATUS {block.status}")
+        lines.append(f"STATUS {status_markup}")
         lines.append("─" * 40)
+
         if block.msg:
             lines.append(f"msg: {block.msg}")
             lines.append("")
+
         if block.failed_items:
             total = len(block.failed_items) + len(block.ok_items)
-            lines.append(f"Failed items ({len(block.failed_items)} of {total}):")
+            lines.append(
+                f"[{_STATUS_COLOR['failed']}]Failed items[/] ({len(block.failed_items)} of {total}):"
+            )
             for item in block.failed_items:
-                lines.append(f"  ✖ {item.label}")
+                lines.append(f"  [{_STATUS_COLOR['failed']}]✖[/] {item.label}")
                 if item.msg:
                     lines.append(f"      {item.msg}")
                 if item.stderr:
@@ -649,14 +749,37 @@ class InspectApp(App):
                     f"  ({len(block.ok_items)} ok item{'s' if len(block.ok_items) != 1 else ''})"
                 )
             lines.append("")
+
         if block.module_stderr and not block.failed_items:
-            lines.append("stderr:")
+            lines.append("[bold]stderr[/]")
             for line in block.module_stderr.splitlines():
                 lines.append(f"  {line}")
             lines.append("")
-        if block.session_stderr_tail:
-            lines.append("─ stderr.log (tail) ─")
-            lines.extend(block.session_stderr_tail)
+
+        if block.module_stdout:
+            lines.append("[bold]stdout[/]")
+            for line in block.module_stdout.splitlines():
+                lines.append(f"  {line}")
+            lines.append("")
+
+        if block.warnings:
+            lines.append(f"[{_STATUS_COLOR['changed']}]warnings[/]")
+            for w in block.warnings:
+                lines.append(f"  ⚠ {w}")
+            lines.append("")
+
+        # If we got here with no per-task content beyond the header, give
+        # the user a hint rather than a blank pane.
+        non_header = (
+            block.msg
+            or block.failed_items
+            or block.module_stderr
+            or block.module_stdout
+            or block.warnings
+        )
+        if not non_header:
+            lines.append("[dim](module returned no message, stdout, or stderr)[/]")
+
         return "\n".join(lines)
 
     def _update_detail(self) -> None:

@@ -85,13 +85,16 @@ def _iter_failed_tasks(
 
 def _render_detail(block: DetailBlock) -> list[str]:
     lines: list[str] = []
-    lines.append(f"Task: {block.task_name}")
+    lines.append(f"Task:   {block.task_name}")
     if block.file_line:
-        lines.append(f"File: {block.file_line}")
+        lines.append(f"File:   {block.file_line}")
     if block.host:
-        lines.append(f"Host: {block.host}")
+        lines.append(f"Host:   {block.host}")
+    if block.action:
+        lines.append(f"Action: {block.action}")
     if block.duration is not None:
-        lines.append(f"Time: {_fmt_duration(block.duration.total_seconds())}")
+        lines.append(f"Time:   {_fmt_duration(block.duration.total_seconds())}")
+    lines.append(f"Status: {block.status}")
     lines.append("")
     if block.msg:
         lines.append(f"  msg: {block.msg}")
@@ -109,10 +112,22 @@ def _render_detail(block: DetailBlock) -> list[str]:
             lines.append(
                 f"  ({len(block.ok_items)} ok item{'s' if len(block.ok_items) != 1 else ''})"
             )
+        lines.append("")
     if block.module_stderr and not block.failed_items:
         lines.append("  stderr:")
         for line in block.module_stderr.splitlines():
             lines.append(f"    {line}")
+        lines.append("")
+    if block.module_stdout:
+        lines.append("  stdout:")
+        for line in block.module_stdout.splitlines():
+            lines.append(f"    {line}")
+        lines.append("")
+    if block.warnings:
+        lines.append("  warnings:")
+        for w in block.warnings:
+            lines.append(f"    ⚠ {w}")
+        lines.append("")
     return lines
 
 

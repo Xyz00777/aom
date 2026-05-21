@@ -235,7 +235,9 @@ def test_detail_block_loop_failure():
     assert "404" in (block.failed_items[0].stderr or "")
     assert len(block.ok_items) == 1
     assert block.ok_items[0].label == "amethyst"
-    assert any("curl" in line for line in block.session_stderr_tail)
+    # Per-task detail no longer carries the session-wide stderr.log
+    # (that was misleading because it didn't change between tasks).
+    assert block.action == "community.general.homebrew_cask"
 
 
 def test_detail_block_unreachable():

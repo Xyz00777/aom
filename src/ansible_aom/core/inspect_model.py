@@ -422,19 +422,26 @@ class LoopItem:
 
 @dataclass(frozen=True)
 class DetailBlock:
-    """Right-pane data for a focused (task, host) pair."""
+    """Right-pane data for a focused (task, host) pair.
+
+    Everything here is *per task × host*. Session-wide info
+    (``stderr.log``, overall stats) belongs elsewhere — including the
+    session stderr in this block was confusing because it didn't change
+    when navigating between tasks.
+    """
 
     task_name: str
     file_line: str | None
     host: str | None
     duration: timedelta | None
     status: str  # "ok" | "changed" | "failed" | "skipped" | "unreachable"
+    action: str | None  # the ansible module that ran (e.g. "command", "homebrew_cask")
     msg: str | None
     failed_items: tuple[LoopItem, ...]
     ok_items: tuple[LoopItem, ...]
     module_stdout: str | None
     module_stderr: str | None
-    session_stderr_tail: tuple[str, ...]
+    warnings: tuple[str, ...]
     raw_event: dict | None
 
 
@@ -465,15 +472,18 @@ def build_detail_block(
     session: dict,
     task_node: TaskTreeNode,
     host_node: TaskTreeNode | None,
-    *,
-    stderr_tail_lines: int = 20,
 ) -> DetailBlock:
     """Build the right-pane DetailBlock for a focused (task, host) pair.
 
     ``host_node`` may be None to aggregate over all hosts that ran the
     task. In aggregate mode the first failed host's event is used, falling
     back to any event.
+
+    ``session`` is accepted for symmetry / future use but no longer read —
+    everything in the block is per (task, host).
     """
+    del session  # session-wide content lives elsewhere now
+
     raw_event: dict | None = None
     host_label: str | None = None
     if host_node is not None and host_node.kind == "host":
@@ -495,6 +505,7 @@ def build_detail_block(
     changed = bool(host_data.get("changed", False))
     status = _status_from_event_type(event_type, changed)
     msg = host_data.get("msg")
+    action = host_data.get("action") or host_data.get("invocation", {}).get("module_name")
 
     failed_items: list[LoopItem] = []
     ok_items: list[LoopItem] = []
@@ -504,8 +515,8 @@ def build_detail_block(
         item = _make_loop_item(raw)
         (failed_items if item.failed else ok_items).append(item)
 
-    stderr_lines = session.get("stderr") or []
-    tail = tuple(stderr_lines[-stderr_tail_lines:])
+    warnings_raw = host_data.get("warnings") or []
+    warnings = tuple(str(w) for w in warnings_raw if isinstance(w, (str, bytes)))
 
     return DetailBlock(
         task_name=task_node.label,
@@ -513,11 +524,12 @@ def build_detail_block(
         host=host_label,
         duration=task_node.duration,
         status=status,
+        action=str(action) if action else None,
         msg=msg if isinstance(msg, str) else None,
         failed_items=tuple(failed_items),
         ok_items=tuple(ok_items),
         module_stdout=host_data.get("stdout"),
         module_stderr=host_data.get("stderr") or host_data.get("module_stderr"),
-        session_stderr_tail=tail,
+        warnings=warnings,
         raw_event=raw_event,
     )
