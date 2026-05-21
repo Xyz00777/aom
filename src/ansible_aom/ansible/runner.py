@@ -25,6 +25,7 @@ from typing import Any
 import pexpect
 
 from ansible_aom.ansible.preflight import run_preflight
+from ansible_aom.core import diagnostics
 from ansible_aom.core.models import WarningType, count_leaf_tasks
 from ansible_aom.core.parser import PtyStreamParser
 from ansible_aom.core.run_config import build_run_config_key
@@ -271,6 +272,9 @@ def run_playbook(
     disk errors are logged but never abort the run. Pass ``record=False``
     to disable session recording entirely (F3 --no-record).
     """
+    diag = diagnostics.RunDiagnostics()
+    diagnostics.set_last_run_diagnostics(diag)
+
     executable, args = _build_command(playbook, ansible_args)
     env = os.environ.copy()
     env["ANSIBLE_STDOUT_CALLBACK"] = "ansible.posix.jsonl"
@@ -297,7 +301,9 @@ def run_playbook(
     # Preflight: --list-tasks + --list-hosts in parallel before spawning
     # the JSONL run so the renderer can show plays/tasks/host count from
     # the very first frame. Failures are non-fatal — surfaced as warnings.
+    diagnostics.lifecycle_mark("preflight_start")
     pre_result = run_preflight(playbook=playbook, ansible_args=ansible_args)
+    diagnostics.lifecycle_mark("preflight_end")
 
     # Union of resolved hosts across plays — preflight is best-effort,
     # so a play with no resolved_hosts simply contributes nothing.
@@ -342,8 +348,10 @@ def run_playbook(
             )
             renderer.handle_completion(127, "crashed")
             return 127
+        diagnostics.lifecycle_mark("spawn")
 
-        exit_code = _drive(child, parser, renderer, timeout, sink)
+        exit_code = _drive(child, parser, renderer, timeout, sink, diag=diag)
+        diagnostics.lifecycle_mark("last_event")
         state = "completed" if exit_code == 0 else "failed"
         sink.end(
             state,
@@ -351,6 +359,7 @@ def run_playbook(
             resolved_host_count=resolved_host_count,
         )
         renderer.handle_completion(exit_code, state)
+        diagnostics.lifecycle_mark("completion")
         return exit_code
 
     except KeyboardInterrupt:
@@ -387,8 +396,18 @@ def _drive(
     renderer: Renderer,
     timeout: float,
     sink: _SessionSink | _NullSink,
+    *,
+    diag: diagnostics.RunDiagnostics | None = None,
 ) -> int:
-    """Read the PTY until EOF, feeding lines to the parser/renderer."""
+    """Read the PTY until EOF, feeding lines to the parser/renderer.
+
+    ``diag`` is the optional run-scoped diagnostics accumulator. When
+    supplied (which ``run_playbook`` always does in production), it
+    receives per-event histogram bumps from ``_feed`` and TIMEOUT /
+    stall counters from this loop. Passing ``None`` is a no-op path
+    kept for legacy callers and unit tests that don't care about
+    instrumentation.
+    """
     # We expect either a newline (terminating a complete line), EOF
     # (subprocess exited), TIMEOUT (no output for `timeout` seconds —
     # fine, just keep going), or one of the password-prompt patterns
@@ -424,7 +443,7 @@ def _drive(
         if idx == newline_idx:
             line = (child.before or "") + (child.after or "")
             _trace("newline", line=line[:200])
-            _feed(line, parser, renderer, sink)
+            _feed(line, parser, renderer, sink, diag=diag)
             # Reset to 0 (not max(stall_count, 0)) — a newline always
             # ends a silent window, including the "already-handled"
             # window marked by negative stall_count.
@@ -450,6 +469,9 @@ def _drive(
                 prior=(prior or "")[:120],
             )
             stall_count = _handle_timeout_branch(child, renderer, sink, stall_count, prior)
+            if diag is not None:
+                diag.note_timeout()
+                diag.note_stall(stall_count if stall_count > 0 else 0)
             timeout_count += 1
             if timeout_count >= cpu_sample_every:
                 renderer.note_subprocess_active(_sample_subprocess_active(child.pid))
@@ -636,7 +658,12 @@ def _flush_pending(
 
 
 def _feed(
-    line: str, parser: PtyStreamParser, renderer: Renderer, sink: _SessionSink | _NullSink
+    line: str,
+    parser: PtyStreamParser,
+    renderer: Renderer,
+    sink: _SessionSink | _NullSink,
+    *,
+    diag: diagnostics.RunDiagnostics | None = None,
 ) -> None:
     """Feed one line to the parser and forward emitted events + warnings.
 
@@ -654,12 +681,21 @@ def _feed(
     one like ``community.general.homebrew`` looping over many
     formulae) keeps the heartbeat tracker in a defined state from
     its very first ``task_start`` event onwards.
+
+    When ``diag`` is supplied, it receives ``note_pty_bytes(len(line))``
+    plus a ``note_event`` per parsed JSONL event — that's how the
+    diagnostics histogram is built (also fires the ``first_event``
+    lifecycle mark on the first call).
     """
     renderer.note_pty_bytes()
+    if diag is not None:
+        diag.note_pty_bytes(len(line))
 
     for event in parser.feed_line(line):
         sink.record_event(event)
         renderer.update_state(event)
+        if diag is not None:
+            diag.note_event(event.get("_event", "<unknown>"))
 
     for warning in parser.drain_warnings():
         sink.record_stderr(warning.message)

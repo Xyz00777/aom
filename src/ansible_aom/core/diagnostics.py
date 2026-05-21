@@ -42,7 +42,7 @@ import logging
 import os
 import time
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 _LOGGER_NAME = "ansible_aom"
@@ -129,6 +129,7 @@ def _reset_for_testing() -> None:
     production behavior (where it stays on for the process lifetime).
     """
     global _installed, _debug, _trace_pexpect, _trace_events, _watchdog_seconds
+    global _last_run_diagnostics
     if _watchdog_seconds is not None:
         try:
             faulthandler.cancel_dump_traceback_later()
@@ -140,6 +141,7 @@ def _reset_for_testing() -> None:
     _trace_events = False
     _watchdog_seconds = None
     _lifecycle_marks.clear()
+    _last_run_diagnostics = None
 
 
 def is_debug() -> bool:
@@ -172,6 +174,65 @@ def lifecycle_mark(name: str) -> None:
 def get_lifecycle_marks() -> list[tuple[str, int]]:
     """Return a *copy* of the recorded lifecycle marks (name, monotonic_ns)."""
     return list(_lifecycle_marks)
+
+
+@dataclass
+class RunDiagnostics:
+    """Mutable per-run accumulator threaded through ``run_playbook``.
+
+    Captures the counters that ``diagnostics.json`` (phase 5) needs and
+    fires the ``first_event`` lifecycle mark the first time
+    :meth:`note_event` is called. Distinct from :class:`RendererStats`
+    (which is the renderer's view of its own activity); the two are
+    merged at completion when the JSON record is built.
+
+    Counters increment regardless of ``AOM_DEBUG`` — they're the only
+    way to answer "how many events did the run see?" in post-mortem.
+    Lifecycle marks remain debug-gated; the counter is the cheap
+    always-on signal, the marks are the richer opt-in one.
+    """
+
+    events_received: int = 0
+    pty_bytes: int = 0
+    pexpect_timeouts: int = 0
+    stall_count_max: int = 0
+    event_histogram: dict[str, int] = field(default_factory=dict)
+    _first_event_marked: bool = False
+
+    def note_event(self, event_type: str) -> None:
+        if not self._first_event_marked:
+            lifecycle_mark("first_event")
+            self._first_event_marked = True
+        self.events_received += 1
+        self.event_histogram[event_type] = self.event_histogram.get(event_type, 0) + 1
+
+    def note_timeout(self) -> None:
+        self.pexpect_timeouts += 1
+
+    def note_stall(self, stall_count: int) -> None:
+        if stall_count > self.stall_count_max:
+            self.stall_count_max = stall_count
+
+    def note_pty_bytes(self, n: int) -> None:
+        self.pty_bytes += n
+
+
+_last_run_diagnostics: RunDiagnostics | None = None
+
+
+def set_last_run_diagnostics(diag: RunDiagnostics | None) -> None:
+    """Publish the just-finished run's diagnostics for post-hoc readers.
+
+    Phase 5 uses this to plumb the accumulator into ``diagnostics.json``
+    without changing :func:`ansible_aom.ansible.runner.run_playbook`'s
+    int return signature.
+    """
+    global _last_run_diagnostics
+    _last_run_diagnostics = diag
+
+
+def get_last_run_diagnostics() -> RunDiagnostics | None:
+    return _last_run_diagnostics
 
 
 @dataclass(frozen=True)
