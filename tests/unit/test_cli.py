@@ -215,7 +215,8 @@ class TestCoreModuleStructure:
 
     def test_core_module_exists(self):
         """TC-003: core/ module exists."""
-        from ansible_aom.core import models, parser, state_machine as state
+        from ansible_aom.core import models, parser
+        from ansible_aom.core import state_machine as state
 
         assert models is not None
         assert state is not None
