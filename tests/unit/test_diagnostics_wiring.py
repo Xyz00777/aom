@@ -67,21 +67,13 @@ def test_replay_main_installs_diagnostics() -> None:
     _assert_installed()
 
 
-def test_runner_trace_pexpect_consults_diagnostics(
+def test_runner_trace_enabled_follows_aom_debug(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The runner's per-loop trace check delegates to diagnostics.
-
-    Phase 2 routes the legacy ``AOM_TRACE`` and the new ``AOM_TRACE_PEXPECT``
-    through one helper, so the alias works without runner re-reading env.
-    """
+    """The runner's per-loop pexpect trace is now folded into AOM_DEBUG."""
     from ansible_aom.ansible import runner
 
-    diagnostics.install_from_env(env={"AOM_TRACE_PEXPECT": "1"})
-    assert runner._trace_enabled() is True
-
-    diagnostics._reset_for_testing()
-    diagnostics.install_from_env(env={"AOM_TRACE": "1"})
+    diagnostics.install_from_env(env={"AOM_DEBUG": "1"})
     assert runner._trace_enabled() is True
 
     diagnostics._reset_for_testing()

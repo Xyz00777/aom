@@ -30,8 +30,6 @@ def test_install_from_env_with_empty_env_is_noop() -> None:
     diagnostics.install_from_env(env={})
 
     assert diagnostics.is_debug() is False
-    assert diagnostics.is_trace_pexpect() is False
-    assert diagnostics.is_trace_events() is False
     assert diagnostics.watchdog_seconds() is None
     assert aom_logger.level == initial_level
 
@@ -60,17 +58,12 @@ def test_debug_sets_logger_level() -> None:
         aom_logger.setLevel(original)
 
 
-# TC-D04 — lifecycle_mark without AOM_DEBUG records nothing.
-def test_lifecycle_mark_noop_without_debug() -> None:
+# TC-D04 / TC-D05 — lifecycle_mark is always-on; AOM_DEBUG only controls
+# whether the post-run summary is *printed*, not whether marks are
+# *recorded*. Marks always flow into diagnostics.json so post-mortem
+# has the timeline regardless of how the run was invoked.
+def test_lifecycle_mark_always_records() -> None:
     diagnostics.install_from_env(env={})
-    diagnostics.lifecycle_mark("preflight_start")
-    diagnostics.lifecycle_mark("spawn")
-    assert diagnostics.get_lifecycle_marks() == []
-
-
-# TC-D05 — lifecycle_mark records monotonic timestamps when debug is on.
-def test_lifecycle_mark_records_monotonic_with_debug() -> None:
-    diagnostics.install_from_env(env={"AOM_DEBUG": "1"})
     diagnostics.lifecycle_mark("first")
     diagnostics.lifecycle_mark("second")
     marks = diagnostics.get_lifecycle_marks()
@@ -105,15 +98,14 @@ def test_build_diagnostics_record_json_roundtrip() -> None:
     assert parsed["event_histogram"]["v2_runner_on_ok"] == 7
 
 
-# TC-D07 — legacy AOM_TRACE is an alias for AOM_TRACE_PEXPECT.
-def test_aom_trace_alias_enables_pexpect_trace() -> None:
-    diagnostics.install_from_env(env={"AOM_TRACE": "1"})
-    assert diagnostics.is_trace_pexpect() is True
-
-
-def test_aom_trace_pexpect_enables_pexpect_trace() -> None:
-    diagnostics.install_from_env(env={"AOM_TRACE_PEXPECT": "1"})
-    assert diagnostics.is_trace_pexpect() is True
+# TC-D07 — phase 15 collapsed AOM_TRACE_PEXPECT / AOM_TRACE / AOM_TRACE_EVENTS
+# into a single AOM_DEBUG knob. Those names are gone; AOM_DEBUG=1 enables
+# the entire verbose surface.
+def test_aom_debug_is_the_only_trace_knob() -> None:
+    diagnostics.install_from_env(env={"AOM_DEBUG": "1"})
+    assert diagnostics.is_debug() is True
+    assert not hasattr(diagnostics, "is_trace_pexpect")
+    assert not hasattr(diagnostics, "is_trace_events")
 
 
 # TC-D08 — faulthandler is enabled after install_from_env regardless of env.
@@ -127,11 +119,6 @@ def test_install_is_idempotent() -> None:
     diagnostics.install_from_env(env={"AOM_DEBUG": "1"})
     diagnostics.install_from_env(env={"AOM_DEBUG": "0"})
     assert diagnostics.is_debug() is True
-
-
-def test_trace_events_env() -> None:
-    diagnostics.install_from_env(env={"AOM_TRACE_EVENTS": "1"})
-    assert diagnostics.is_trace_events() is True
 
 
 def test_watchdog_with_invalid_value_is_none() -> None:

@@ -42,13 +42,15 @@ def test_note_event_records_first_event_lifecycle_mark_once() -> None:
     assert marks.count("first_event") == 1
 
 
-def test_note_event_first_event_silent_without_debug() -> None:
+def test_note_event_first_event_records_mark_regardless_of_debug() -> None:
+    """Lifecycle marks are now always-on (phase 15); the first event mark
+    fires without needing AOM_DEBUG. AOM_DEBUG only controls the stderr
+    summary, not the marks themselves."""
     diagnostics.install_from_env(env={})
     diag = diagnostics.RunDiagnostics()
     diag.note_event("v2_playbook_on_start")
-    assert diagnostics.get_lifecycle_marks() == []
-    # counters still increment regardless of debug flag — they always fuel
-    # the diagnostics.json histogram.
+    marks = [name for name, _ in diagnostics.get_lifecycle_marks()]
+    assert marks == ["first_event"]
     assert diag.events_received == 1
 
 

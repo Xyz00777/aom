@@ -1,8 +1,8 @@
-"""Phase 14: AOM_TRACE_EVENTS emits stderr counters during the run.
+"""Phase 14/15: every-100th event stderr counter (under AOM_DEBUG).
 
 Logs ``[aom-trace-events] count=N type=…`` every Nth event so users
-spotting an event storm don't have to wait for completion. Silent
-when the env var is off.
+spotting an event storm don't have to wait for completion. Folded
+into ``AOM_DEBUG`` in phase 15 — no separate AOM_TRACE_EVENTS flag.
 """
 
 from __future__ import annotations
@@ -59,15 +59,15 @@ def _feed_many(n: int, *, diag: diagnostics.RunDiagnostics) -> str:
     return captured.getvalue()
 
 
-def test_trace_events_silent_when_off() -> None:
+def test_trace_events_silent_when_debug_off() -> None:
     diagnostics.install_from_env(env={})
     diag = diagnostics.RunDiagnostics()
     out = _feed_many(250, diag=diag)
     assert "aom-trace-events" not in out
 
 
-def test_trace_events_emits_every_100th_event() -> None:
-    diagnostics.install_from_env(env={"AOM_TRACE_EVENTS": "1"})
+def test_trace_events_emits_every_100th_event_under_debug() -> None:
+    diagnostics.install_from_env(env={"AOM_DEBUG": "1"})
     diag = diagnostics.RunDiagnostics()
     out = _feed_many(250, diag=diag)
     lines = [ln for ln in out.splitlines() if "aom-trace-events" in ln]

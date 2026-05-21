@@ -14,15 +14,22 @@ happens in later phases.
 
 Env vars
 --------
-``AOM_DEBUG``           — enable DEBUG logging on the ``ansible_aom``
-                          logger and record lifecycle marks.
-``AOM_TRACE_PEXPECT``   — enable per-loop pexpect trace (replaces the
-                          legacy ``AOM_TRACE``).
-``AOM_TRACE``           — legacy alias for ``AOM_TRACE_PEXPECT``.
-``AOM_TRACE_EVENTS``    — log every Nth JSONL event with running counters.
-``AOM_WATCHDOG``        — integer seconds; arms
-                          ``faulthandler.dump_traceback_later`` with
-                          ``repeat=True``. Zero/invalid disables.
+``AOM_DEBUG``      — turn on every verbose diagnostic in one knob:
+                     DEBUG-level logging on ``ansible_aom``, per-loop
+                     pexpect trace, every-100th-event stderr counter,
+                     and the post-run ``[aom-debug]`` summary on
+                     stderr. Lifecycle marks are *always* recorded
+                     (one bool check + a small list); this flag
+                     decides whether the summary is *printed*.
+``AOM_PROFILE``    — wrap ``_drive`` in ``cProfile`` and dump pstats
+                     to ``~/.local/state/aom/profile/<sid>.pstats``.
+                     ~5-10% CPU cost; separate because it writes a
+                     distinct artifact.
+``AOM_TRACEMALLOC``— start ``tracemalloc``; record the peak in
+                     ``diagnostics.json``. ~10% memory cost.
+``AOM_WATCHDOG``   — integer seconds; arms
+                     ``faulthandler.dump_traceback_later`` with
+                     ``repeat=True``. Catches hangs without a fault.
 
 Falsy values
 ------------
@@ -54,8 +61,6 @@ _LOGGER_NAME = "ansible_aom"
 # Module-level state. Reset only via _reset_for_testing.
 _installed: bool = False
 _debug: bool = False
-_trace_pexpect: bool = False
-_trace_events: bool = False
 _watchdog_seconds: int | None = None
 _lifecycle_marks: list[tuple[str, int]] = []
 _profile_enabled: bool = False
@@ -96,13 +101,13 @@ def install_from_env(env: Mapping[str, str] | None = None) -> None:
 
     Side effects (per env var):
 
-    - ``AOM_DEBUG``         → sets the ``ansible_aom`` logger to DEBUG.
-    - ``AOM_WATCHDOG``      → calls ``faulthandler.dump_traceback_later``.
-    - ``AOM_TRACE_PEXPECT`` → flips :func:`is_trace_pexpect` to True.
-    - ``AOM_TRACE``         → alias for ``AOM_TRACE_PEXPECT``.
-    - ``AOM_TRACE_EVENTS``  → flips :func:`is_trace_events` to True.
+    - ``AOM_DEBUG``      → DEBUG logger + pexpect trace + events trace
+                          + post-run stderr summary (one knob).
+    - ``AOM_WATCHDOG``   → calls ``faulthandler.dump_traceback_later``.
+    - ``AOM_PROFILE``    → creates a ``cProfile.Profile``.
+    - ``AOM_TRACEMALLOC``→ ``tracemalloc.start()``.
     """
-    global _installed, _debug, _trace_pexpect, _trace_events, _watchdog_seconds
+    global _installed, _debug, _watchdog_seconds
     global _profile_enabled, _tracemalloc_enabled, _profiler
 
     if _installed:
@@ -117,10 +122,6 @@ def install_from_env(env: Mapping[str, str] | None = None) -> None:
         faulthandler.enable()
 
     _debug = _is_truthy(source.get("AOM_DEBUG"))
-    _trace_pexpect = _is_truthy(source.get("AOM_TRACE_PEXPECT")) or _is_truthy(
-        source.get("AOM_TRACE")
-    )
-    _trace_events = _is_truthy(source.get("AOM_TRACE_EVENTS"))
     _watchdog_seconds = _parse_watchdog(source.get("AOM_WATCHDOG"))
     _profile_enabled = _is_truthy(source.get("AOM_PROFILE"))
     _tracemalloc_enabled = _is_truthy(source.get("AOM_TRACEMALLOC"))
@@ -150,7 +151,7 @@ def _reset_for_testing() -> None:
     ``faulthandler`` — leaving it on between tests is safe and matches
     production behavior (where it stays on for the process lifetime).
     """
-    global _installed, _debug, _trace_pexpect, _trace_events, _watchdog_seconds
+    global _installed, _debug, _watchdog_seconds
     global _last_run_diagnostics, _last_renderer_stats
     global _profile_enabled, _tracemalloc_enabled, _profiler, _tracemalloc_peak_kb
     global _session_recording_disabled, _session_disable_reason
@@ -163,8 +164,6 @@ def _reset_for_testing() -> None:
         tracemalloc.stop()
     _installed = False
     _debug = False
-    _trace_pexpect = False
-    _trace_events = False
     _watchdog_seconds = None
     _lifecycle_marks.clear()
     _last_run_diagnostics = None
@@ -181,26 +180,19 @@ def is_debug() -> bool:
     return _debug
 
 
-def is_trace_pexpect() -> bool:
-    return _trace_pexpect
-
-
-def is_trace_events() -> bool:
-    return _trace_events
-
-
 def watchdog_seconds() -> int | None:
     return _watchdog_seconds
 
 
 def lifecycle_mark(name: str) -> None:
-    """Record a named timestamp (monotonic nanoseconds) when debug is on.
+    """Record a named timestamp (monotonic nanoseconds).
 
-    No-op when ``AOM_DEBUG`` is unset, so the call site cost in steady
-    state is one bool check.
+    Always-on: the cost is one ``time.monotonic_ns`` syscall plus a
+    list append, total ~100 ns. Lifecycle marks always flow into
+    ``diagnostics.json`` so post-mortem has the timeline regardless
+    of whether ``AOM_DEBUG`` was set at run time. ``AOM_DEBUG`` only
+    controls whether the post-run summary is *printed*.
     """
-    if not _debug:
-        return
     _lifecycle_marks.append((name, time.monotonic_ns()))
 
 

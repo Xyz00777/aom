@@ -218,17 +218,16 @@ _STALL_HINT_TIMEOUTS: int = 4  # ~2s at the default 0.5s timeout
 
 _DEFAULT_TIMEOUT_S = 0.5
 
-# Per-loop pexpect trace toggle. Reads through ``core.diagnostics`` so
-# ``AOM_TRACE_PEXPECT=1`` (new canonical) and ``AOM_TRACE=1`` (legacy
-# alias, kept for one release) flow through one decision point. Used to
-# debug "AOM didn't see the prompt" reports — every TIMEOUT branch logs
+# Per-loop pexpect trace toggle. Now folded into ``AOM_DEBUG`` — one
+# diagnostic knob instead of three. Used to debug "AOM didn't see the
+# prompt" reports — every TIMEOUT branch logs
 # ``buffer=... before=... prior=...``.
 
 
 def _trace_enabled() -> bool:
     from ansible_aom.core import diagnostics
 
-    return diagnostics.is_trace_pexpect()
+    return diagnostics.is_debug()
 
 
 def _trace(label: str, **fields: object) -> None:
@@ -703,7 +702,7 @@ def _feed(
     if diag is not None:
         diag.note_pty_bytes(len(line))
 
-    trace_events = diagnostics.is_trace_events()
+    trace_events = diagnostics.is_debug()
     for event in parser.feed_line(line):
         sink.record_event(event)
         renderer.update_state(event)

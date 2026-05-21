@@ -191,35 +191,29 @@ Shell completion:
 Debugging:
   faulthandler is enabled unconditionally so a SIGSEGV in pexpect /
   ptyprocess / any C extension dumps a Python + C stack to stderr
-  before the process dies. No flag needed; the cost is one syscall
-  at startup.
+  before the process dies. Every recorded session also writes
+  diagnostics.json next to meta.json (lifecycle timestamps, event
+  histogram, per-renderer counters). Inspect with
+  `aom inspect --debug [--session ID]` or `--json` for jq.
 
-  AOM_DEBUG=1          DEBUG-level logging on the `ansible_aom`
-                       logger plus lifecycle marks (preflight start /
-                       end, spawn, first / last event, completion).
-                       Marks are persisted into the session's
-                       diagnostics.json — read with
-                       `aom inspect --debug`.
-  AOM_TRACE_PEXPECT=1  Per-loop pexpect trace (TIMEOUT branches,
-                       newline matches, buffer contents). Useful when
-                       an interactive prompt doesn't seem to fire.
-                       Legacy name AOM_TRACE=1 still works.
-  AOM_TRACE_EVENTS=1   Log every Nth JSONL event type with running
-                       counters — for spotting event storms.
+  AOM_DEBUG=1          One knob, everything verbose: DEBUG-level
+                       logging, per-loop pexpect trace (TIMEOUT
+                       branches, buffer contents — useful when an
+                       interactive prompt doesn't fire), every-100th
+                       event stderr counter, and a one-line
+                       `[aom-debug] events=… renders=… top=…`
+                       post-run digest on stderr.
   AOM_WATCHDOG=<secs>  Periodic stack dump every N seconds via
                        faulthandler.dump_traceback_later. Catches
                        hangs without a fault.
   AOM_PROFILE=1        cProfile around the runner's _drive loop.
                        Dumps to ~/.local/state/aom/profile/<sid>.pstats
                        — open with `python -m pstats <file>` or
-                       snakeviz.
+                       snakeviz. ~5-10% CPU cost.
   AOM_TRACEMALLOC=1    tracemalloc snapshot at completion; peak KB
                        lands in diagnostics.json under
-                       `resources.tracemalloc_peak_kb`.
-
-  Every recorded session also writes diagnostics.json next to
-  meta.json (lifecycle timestamps, event histogram, per-renderer
-  counters). Inspect with `aom inspect --debug [--session ID]`.
+                       `resources.tracemalloc_peak_kb`. ~10% memory
+                       cost.
 
 File locations:
   Sessions:    ~/.local/state/aom/sessions/<uuidv7>/
