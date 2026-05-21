@@ -69,6 +69,10 @@ class JsonLineStream:
         - Invalid JSON (stored as carry if line started with ``{``)
         - JSON without _event field
         """
+        # Stash the raw incoming chunk so we can fall back to it if the
+        # carry-prepended view turns out to be garbage that would
+        # otherwise swallow this line's event.
+        raw = line
         # Prepend any pending partial from a previous call so a JSONL
         # event split across two reads is rejoined.
         if self._carry:
@@ -87,6 +91,21 @@ class JsonLineStream:
         try:
             data = json.loads(line)
         except json.JSONDecodeError:
+            # The carry-prepended view failed. If the bare new chunk
+            # parses cleanly on its own as a JSON object, the carry
+            # was garbage masquerading as a split-event head — drop
+            # the carry and process the bare chunk.
+            raw_stripped = raw.strip()
+            if raw_stripped != line and raw_stripped.startswith("{"):
+                try:
+                    data = json.loads(raw_stripped)
+                except json.JSONDecodeError:
+                    data = None
+                if isinstance(data, dict):
+                    if "_event" not in data:
+                        logger.warning("JSON missing _event field: %s", raw_stripped[:100])
+                        return []
+                    return [data]
             # Stash as carry if there's room, otherwise drop. Without
             # the cap a runaway/garbage stream would grow ``_carry``
             # without bound.

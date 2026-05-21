@@ -254,6 +254,18 @@ class TestJsonLineStreamCarryBuffer:
         result2 = parser.feed_line('{"_event":"v2_runner_on_ok","hosts":{}}')
         assert len(result2) == 1
 
+    def test_garbage_carry_does_not_swallow_next_valid_event(self):
+        """A garbage prefix that can't be the head of a real event (e.g.
+        a bare ``{``) must not corrupt the next valid line by prepending.
+        Discovered by hypothesis: ``feed_line("{")`` stashed ``{`` as carry,
+        then ``feed_line('{"_event":...}')`` produced ``{{"_event":...}`` →
+        invalid JSON → re-stashed → event permanently lost."""
+        parser = JsonLineStream()
+        assert parser.feed_line("{") == []
+        result = parser.feed_line('{"_event":"v2_playbook_on_start"}')
+        assert len(result) == 1
+        assert result[0]["_event"] == "v2_playbook_on_start"
+
 
 class TestRunStateUnknownEvent:
     """R5: unknown _event values are counted so the renderer can show a
