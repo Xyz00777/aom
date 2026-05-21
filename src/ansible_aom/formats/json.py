@@ -242,7 +242,9 @@ class JsonRenderer:
             tasks_failed=failures,
         )
 
-        sys.stdout.write(summary.model_dump_json())
+        import orjson
+
+        sys.stdout.write(orjson.dumps(summary.model_dump()).decode())
         sys.stdout.write("\n")
         sys.stdout.flush()
 

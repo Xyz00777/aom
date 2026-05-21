@@ -9,13 +9,14 @@ Phases:
 3. POST_RUN_RECAP: Final PLAY RECAP output
 """
 
-import json
 import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from typing import Callable
+
+import orjson
 
 from ansible_aom.core.models import (
     PlayDefinition,
@@ -89,8 +90,8 @@ class JsonLineStream:
             return []
 
         try:
-            data = json.loads(line)
-        except json.JSONDecodeError:
+            data = orjson.loads(line)
+        except orjson.JSONDecodeError:
             # The carry-prepended view failed. If the bare new chunk
             # parses cleanly on its own as a JSON object, the carry
             # was garbage masquerading as a split-event head — drop
@@ -98,8 +99,8 @@ class JsonLineStream:
             raw_stripped = raw.strip()
             if raw_stripped != line and raw_stripped.startswith("{"):
                 try:
-                    data = json.loads(raw_stripped)
-                except json.JSONDecodeError:
+                    data = orjson.loads(raw_stripped)
+                except orjson.JSONDecodeError:
                     data = None
                 if isinstance(data, dict):
                     if "_event" not in data:
@@ -205,10 +206,10 @@ class PtyStreamParser:
     def _parse_and_return(self, line: str) -> list[dict]:
         """Parse JSON line and return events."""
         try:
-            data = json.loads(line)
+            data = orjson.loads(line)
             if "_event" in data:
                 return [data]
-        except json.JSONDecodeError:
+        except orjson.JSONDecodeError:
             pass
         return []
 
@@ -257,7 +258,7 @@ class PtyStreamParser:
         if not line.startswith("{"):
             return False
         try:
-            data = json.loads(line)
+            data = orjson.loads(line)
             return bool(
                 data.get("_event")
                 in (
@@ -265,7 +266,7 @@ class PtyStreamParser:
                     "v2_playbook_on_play_start",
                 )
             )
-        except json.JSONDecodeError:
+        except orjson.JSONDecodeError:
             return False
 
     def _is_jsonl_stats_event(self, line: str) -> bool:
@@ -273,9 +274,9 @@ class PtyStreamParser:
         if not line.startswith("{"):
             return False
         try:
-            data = json.loads(line)
+            data = orjson.loads(line)
             return bool(data.get("_event") == "v2_playbook_on_stats")
-        except json.JSONDecodeError:
+        except orjson.JSONDecodeError:
             return False
 
     def _is_json(self, line: str) -> bool:
@@ -283,14 +284,14 @@ class PtyStreamParser:
         if not line.startswith("{"):
             return False
         try:
-            json.loads(line)
+            orjson.loads(line)
             return True
-        except json.JSONDecodeError:
+        except orjson.JSONDecodeError:
             return False
 
     def _parse_json(self, line: str) -> dict:
         """Parse a JSON line into a dict."""
-        result = json.loads(line)
+        result = orjson.loads(line)
         assert isinstance(result, dict), "Expected JSON object"
         return result
 
