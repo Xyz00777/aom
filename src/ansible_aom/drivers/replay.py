@@ -240,6 +240,10 @@ def cli_main(argv: list[str]) -> int:
     * ``1`` — session not found
     * ``130`` — Ctrl+C mid-replay
     """
+    from ansible_aom.core import diagnostics
+
+    diagnostics.install_from_env()
+
     parser = _build_parser()
     args = parser.parse_args(argv)
 

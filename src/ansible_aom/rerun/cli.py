@@ -354,7 +354,10 @@ def main(
             2 — old session missing ``ansible_args`` (schema mismatch)
             other — propagated from ``runner``
     """
+    from ansible_aom.core import diagnostics
     from ansible_aom.session.store import load_session
+
+    diagnostics.install_from_env()
 
     args = _create_parser().parse_args(argv)
 

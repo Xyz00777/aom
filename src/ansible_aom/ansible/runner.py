@@ -215,16 +215,17 @@ _STALL_HINT_TIMEOUTS: int = 4  # ~2s at the default 0.5s timeout
 
 _DEFAULT_TIMEOUT_S = 0.5
 
-# When set to a truthy value, write a per-loop trace of the runner's
-# pexpect activity to stderr. Used to debug "AOM didn't see the
-# prompt" reports — every TIMEOUT branch logs ``buffer=...
-# before=... prior=...`` so we can tell whether pexpect is buffering
-# the data, returning empty, or something else.
-_TRACE_ENV_VAR = "AOM_TRACE"
+# Per-loop pexpect trace toggle. Reads through ``core.diagnostics`` so
+# ``AOM_TRACE_PEXPECT=1`` (new canonical) and ``AOM_TRACE=1`` (legacy
+# alias, kept for one release) flow through one decision point. Used to
+# debug "AOM didn't see the prompt" reports — every TIMEOUT branch logs
+# ``buffer=... before=... prior=...``.
 
 
 def _trace_enabled() -> bool:
-    return bool(os.environ.get(_TRACE_ENV_VAR))
+    from ansible_aom.core import diagnostics
+
+    return diagnostics.is_trace_pexpect()
 
 
 def _trace(label: str, **fields: object) -> None:

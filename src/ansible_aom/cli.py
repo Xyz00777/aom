@@ -344,6 +344,10 @@ def main() -> int:
     Returns:
         Exit code (0 for success, non-zero for errors).
     """
+    from ansible_aom.core import diagnostics
+
+    diagnostics.install_from_env()
+
     if "--version" in sys.argv:
         from ansible_aom import source_hash
 

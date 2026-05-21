@@ -99,6 +99,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from ansible_aom.core import diagnostics
+
+    diagnostics.install_from_env()
+
     parser = _build_parser()
     args = parser.parse_args(argv)
 
