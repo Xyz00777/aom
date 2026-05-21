@@ -26,7 +26,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from ansible_aom.core.state import VALID_TRANSITIONS, ExecutionState, StateMachine
+from ansible_aom.core.state_machine import VALID_TRANSITIONS, ExecutionState, StateMachine
 
 # =============================================================================
 # Section 14.1: Crash Recovery (TC-441 to TC-444)

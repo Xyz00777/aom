@@ -6,7 +6,7 @@ TC-234 through TC-260.
 
 import pytest
 
-from ansible_aom.core.state import (
+from ansible_aom.core.state_machine import (
     VALID_TRANSITIONS,
     ExecutionState,
     InvalidTransitionError,
@@ -577,31 +577,31 @@ class TestMemoryBounds:
 
     def test_max_plays_value(self):
         """TC-253: Maximum 1000 plays tracked."""
-        from ansible_aom.core.state import MAX_PLAYS
+        from ansible_aom.core.state_machine import MAX_PLAYS
 
         assert MAX_PLAYS == 1000
 
     def test_max_tasks_per_play_value(self):
         """TC-254: Maximum 10000 tasks per play tracked."""
-        from ansible_aom.core.state import MAX_TASKS_PER_PLAY
+        from ansible_aom.core.state_machine import MAX_TASKS_PER_PLAY
 
         assert MAX_TASKS_PER_PLAY == 10000
 
     def test_max_hosts_per_task_value(self):
         """TC-255: Maximum 10000 hosts per task tracked."""
-        from ansible_aom.core.state import MAX_HOSTS_PER_TASK
+        from ansible_aom.core.state_machine import MAX_HOSTS_PER_TASK
 
         assert MAX_HOSTS_PER_TASK == 10000
 
     def test_max_total_host_run_states_value(self):
         """TC-256: Maximum 1,000,000 total HostRunState entries."""
-        from ansible_aom.core.state import MAX_TOTAL_HOST_RUN_STATES
+        from ansible_aom.core.state_machine import MAX_TOTAL_HOST_RUN_STATES
 
         assert MAX_TOTAL_HOST_RUN_STATES == 1000000
 
     def test_memory_bound_warning_message_constant(self):
         """TC-257: Memory bounds have associated warning constants."""
-        from ansible_aom.core.state import (
+        from ansible_aom.core.state_machine import (
             MAX_HOSTS_PER_TASK,
             MAX_PLAYS,
             MAX_TASKS_PER_PLAY,
@@ -615,13 +615,13 @@ class TestMemoryBounds:
 
     def test_max_log_lines_value(self):
         """TC-259: Log panel max_lines=50000."""
-        from ansible_aom.core.state import MAX_LOG_LINES
+        from ansible_aom.core.state_machine import MAX_LOG_LINES
 
         assert MAX_LOG_LINES == 50000
 
     def test_memory_bounds_are_reasonable(self):
         """Verify memory bounds are positive integers."""
-        from ansible_aom.core.state import (
+        from ansible_aom.core.state_machine import (
             MAX_HOSTS_PER_TASK,
             MAX_LOG_LINES,
             MAX_PLAYS,
@@ -637,7 +637,7 @@ class TestMemoryBounds:
 
     def test_memory_bounds_hierarchy(self):
         """Verify memory bounds scale appropriately."""
-        from ansible_aom.core.state import (
+        from ansible_aom.core.state_machine import (
             MAX_HOSTS_PER_TASK,
             MAX_PLAYS,
             MAX_TASKS_PER_PLAY,

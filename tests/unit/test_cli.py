@@ -18,7 +18,7 @@ CORE_MODULE_PATHS = [
     "src/ansible_aom/cli.py",
     "src/ansible_aom/__main__.py",
     "src/ansible_aom/core/models.py",
-    "src/ansible_aom/core/state.py",
+    "src/ansible_aom/core/state_machine.py",
     "src/ansible_aom/core/parser.py",
     "src/ansible_aom/session/store.py",
     "src/ansible_aom/session/summary.py",
@@ -32,7 +32,7 @@ CORE_MODULE_PATHS = [
     "src/ansible_aom/compact/password.py",
     "src/ansible_aom/tui/app.py",
     "src/ansible_aom/inspect/cli.py",
-    "src/ansible_aom/inspect/display.py",
+    "src/ansible_aom/inspect/formatters.py",
     "src/ansible_aom/inspect/text.py",
 ]
 
@@ -215,7 +215,7 @@ class TestCoreModuleStructure:
 
     def test_core_module_exists(self):
         """TC-003: core/ module exists."""
-        from ansible_aom.core import models, parser, state
+        from ansible_aom.core import models, parser, state_machine as state
 
         assert models is not None
         assert state is not None

@@ -316,7 +316,7 @@ class TestPtyStreamParserPlaintextCap:
     """
 
     def test_plaintext_lines_capped_at_max_log_lines(self):
-        from ansible_aom.core.state import MAX_LOG_LINES
+        from ansible_aom.core.state_machine import MAX_LOG_LINES
 
         parser = PtyStreamParser()
         # Push the parser past the cap. Use feed_line with non-JSON in

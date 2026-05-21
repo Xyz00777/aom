@@ -23,7 +23,7 @@ from ansible_aom.core.models import (
     WarningEntry,
     WarningType,
 )
-from ansible_aom.core.state import MAX_LOG_LINES
+from ansible_aom.core.state_machine import MAX_LOG_LINES
 
 logger = logging.getLogger(__name__)
 

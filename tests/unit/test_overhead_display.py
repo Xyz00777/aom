@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ansible_aom.core.overhead import OverheadStats
-from ansible_aom.inspect.display import format_overhead_section
+from ansible_aom.inspect.formatters import format_overhead_section
 
 
 def _stats(
