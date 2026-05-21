@@ -293,13 +293,12 @@ def _run_compact(
     from typing import cast
 
     from ansible_aom.drivers.live import LiveDriver
-    from ansible_aom.renderer.factory import RenderFormat, create_renderer
+    from ansible_aom.renderer.factory import RenderMode, create_renderer
 
     try:
         renderer = create_renderer(
-            tui_mode=False,
+            mode=cast(RenderMode, format),
             is_tty=sys.stdout.isatty(),
-            format=cast(RenderFormat, format),
         )
         driver = LiveDriver(playbook, ansible_args, record=record)
         return driver.drive(renderer)

@@ -92,9 +92,9 @@ class TestReplayCLIMain:
             exit_code = cli_main(["abc", "--state-dir", str(tmp_path)])
 
         assert exit_code == 0
-        # Default = compact renderer (tui_mode=False).
+        # Default = compact renderer (mode="compact").
         kw = mock_factory.call_args.kwargs
-        assert kw.get("tui_mode") is False
+        assert kw.get("mode") == "compact"
 
     def test_cli_main_tui_flag_selects_tui_renderer(self, tmp_path: Path) -> None:
         from ansible_aom.drivers.replay import cli_main
@@ -112,7 +112,7 @@ class TestReplayCLIMain:
             mock_factory.return_value = object()
             cli_main(["abc", "--state-dir", str(tmp_path), "--tui"])
 
-        assert mock_factory.call_args.kwargs.get("tui_mode") is True
+        assert mock_factory.call_args.kwargs.get("mode") == "tui"
 
     def test_cli_main_speed_forwarded(self, tmp_path: Path) -> None:
         from ansible_aom.drivers.replay import cli_main

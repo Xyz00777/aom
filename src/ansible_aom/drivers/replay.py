@@ -243,8 +243,7 @@ def cli_main(argv: list[str]) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    tui_mode = args.mode == "tui"
-    renderer = create_renderer(tui_mode=tui_mode, is_tty=sys.stdout.isatty())
+    renderer = create_renderer(mode=args.mode, is_tty=sys.stdout.isatty())
     driver = ReplayDriver(
         session_dir=args.state_dir,
         session_id=args.session_id,

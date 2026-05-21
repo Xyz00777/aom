@@ -323,7 +323,7 @@ def _default_runner(playbook: str, ansible_args: list[str]) -> int:
     from ansible_aom.renderer.factory import create_renderer
     from ansible_aom.ansible.runner import run_playbook
 
-    renderer = create_renderer(tui_mode=False, is_tty=sys.stdout.isatty())
+    renderer = create_renderer(mode="compact", is_tty=sys.stdout.isatty())
     return run_playbook(playbook, ansible_args, renderer)
 
 
