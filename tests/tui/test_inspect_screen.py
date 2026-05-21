@@ -306,6 +306,26 @@ async def test_d_opens_confirm_then_y_deletes(state_dir: Path):
 
 
 @pytest.mark.asyncio
+async def test_dd_double_tap_deletes(state_dir: Path):
+    """Two consecutive `d` presses (open + confirm) also delete the session."""
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    target_dir = state_dir / _ALIASES["failed_loop"]
+    assert target_dir.exists()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.focus_runs()
+        await pilot.pause()
+        await pilot.press("d")
+        await pilot.pause()
+        await pilot.press("d")  # confirm on the modal
+        await pilot.pause()
+        await pilot.pause()
+    assert not target_dir.exists(), "Session should have been deleted by `dd`"
+
+
+@pytest.mark.asyncio
 async def test_delete_auto_selects_next_session(state_dir: Path):
     """After deleting a session, the next entry in the list takes focus.
 

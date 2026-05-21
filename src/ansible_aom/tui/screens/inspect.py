@@ -213,7 +213,9 @@ class _ConfirmDelete(ModalScreen[bool]):
     """
 
     BINDINGS = [
-        Binding("y", "confirm", "Delete", show=True),
+        # ``d`` confirms too so a quick ``dd`` (vim-style double-tap)
+        # deletes the focused session without leaving the keyboard.
+        Binding("y,d", "confirm", "Delete", show=True),
         Binding("n,escape,q", "cancel", "Cancel", show=True),
     ]
 
@@ -226,7 +228,7 @@ class _ConfirmDelete(ModalScreen[bool]):
         with Vertical():
             yield Label(f"Delete session {self._short_id} ({self._playbook})?")
             yield Label("")
-            yield Label("y to delete · n / Esc to cancel", classes="hint")
+            yield Label("y / d to delete · n / Esc to cancel", classes="hint")
 
     def action_confirm(self) -> None:
         self.dismiss(True)
@@ -254,7 +256,8 @@ Failures
   n / N       next / previous failure
 
 Session management
-  d           delete focused session (with confirm)
+  d           delete focused session (opens confirm modal)
+              ↳ y / d to confirm · n / Esc to cancel  (so `dd` deletes)
   r           reload runs from disk
 
 Clipboard
