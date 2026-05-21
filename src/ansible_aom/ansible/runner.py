@@ -25,7 +25,7 @@ from typing import Any
 import pexpect
 
 from ansible_aom.ansible.preflight import run_preflight
-from ansible_aom.core.models import PlayDefinition, RoleGroupDefinition, WarningType
+from ansible_aom.core.models import WarningType, count_leaf_tasks
 from ansible_aom.core.parser import PtyStreamParser
 from ansible_aom.renderer.protocol import Renderer
 from ansible_aom.session.store import SessionManager
@@ -239,17 +239,6 @@ def _trace(label: str, **fields: object) -> None:
 from ansible_aom.core.prompts import looks_like_interactive_prompt as _looks_like_interactive_prompt
 
 
-def _count_preflight_tasks(play: PlayDefinition) -> int:
-    """Count leaf TaskDefinitions in a play, unwrapping any RoleGroupDefinition."""
-    total = 0
-    for entry in play.tasks:
-        if isinstance(entry, RoleGroupDefinition):
-            total += len(entry.tasks)
-        else:
-            total += 1
-    return total
-
-
 def _build_command(playbook: str, ansible_args: list[str]) -> tuple[str, list[str]]:
     """Return the (executable, args) pair to spawn.
 
@@ -308,7 +297,7 @@ def run_playbook(
     resolved_host_count = len(
         {host for play in pre_result.definitions for host in play.resolved_hosts}
     )
-    preflight_task_count = sum(_count_preflight_tasks(play) for play in pre_result.definitions)
+    preflight_task_count = count_leaf_tasks(pre_result.definitions)
 
     # add_warning prints the message above the panel AND bumps the counter.
     # The renderer's own dedupe handles repeats so it's safe to forward

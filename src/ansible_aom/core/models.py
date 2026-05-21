@@ -150,6 +150,18 @@ def _iter_leaf_task_defs(plays: list["PlayDefinition"]) -> "list[TaskDefinition]
     return leaves
 
 
+def count_leaf_tasks(plays: list["PlayDefinition"]) -> int:
+    """Total number of leaf TaskDefinitions across all preflight plays.
+
+    Shared by infrastructure callers that need a task count without
+    materialising the list (the runner persisting ``preflight_task_count``
+    to ``meta.json``, the compact renderer's status-bar denominator, …).
+    Lives in ``core/`` so layering rules (no infra-to-infra imports) are
+    satisfied with one definition.
+    """
+    return len(_iter_leaf_task_defs(plays))
+
+
 @dataclass
 class RunState:
     """Complete execution state (State class)."""
