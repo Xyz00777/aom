@@ -30,9 +30,7 @@ def _populate() -> None:
     diag.note_event("v2_playbook_on_stats")
     diag.note_preflight_elapsed_ms(120)
     diagnostics.set_last_run_diagnostics(diag)
-    diagnostics.set_last_renderer_stats(
-        diagnostics.RendererStats(render_calls=4, log_writes=8)
-    )
+    diagnostics.set_last_renderer_stats(diagnostics.RendererStats(render_calls=4, log_writes=8))
 
 
 def test_print_summary_if_debug_silent_without_debug() -> None:

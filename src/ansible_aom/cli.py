@@ -460,9 +460,7 @@ def main() -> int:
         try:
             if args.tui:
                 return _run_tui(args.playbook, ansible_args, record=record)
-            return _run_compact(
-                args.playbook, ansible_args, record=record, format=args.format
-            )
+            return _run_compact(args.playbook, ansible_args, record=record, format=args.format)
         finally:
             # AOM_DEBUG=1 → single-line post-run digest on stderr. Silent
             # otherwise. Lands in finally so even a non-zero exit still

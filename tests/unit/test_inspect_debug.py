@@ -74,7 +74,8 @@ def _write_session(
                 "state_size_bytes": None,
                 "tracemalloc_peak_kb": None,
             },
-            "event_histogram": histogram or {
+            "event_histogram": histogram
+            or {
                 "v2_playbook_on_task_start": 4200,
                 "v2_runner_on_ok": 400,
                 "v2_runner_on_failed": 21,

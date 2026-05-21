@@ -95,7 +95,9 @@ def test_load_session_returns_none_diagnostics_for_legacy_session(tmp_path: Path
     sdir = tmp_path / "legacy-session-id"
     sdir.mkdir()
     (sdir / "meta.json").write_text(
-        json.dumps({"session_id": "legacy-session-id", "playbook": "old.yml", "status": "completed"})
+        json.dumps(
+            {"session_id": "legacy-session-id", "playbook": "old.yml", "status": "completed"}
+        )
     )
     (sdir / "events.jsonl").write_text("")
 
