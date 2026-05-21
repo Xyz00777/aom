@@ -463,9 +463,19 @@ def main() -> int:
         ansible_args = ensure_inventory_arg(merge_limit_args(args.ansible_args))
 
         record = not args.no_record
-        if args.tui:
-            return _run_tui(args.playbook, ansible_args, record=record)
-        return _run_compact(args.playbook, ansible_args, record=record, format=args.format)
+        try:
+            if args.tui:
+                return _run_tui(args.playbook, ansible_args, record=record)
+            return _run_compact(
+                args.playbook, ansible_args, record=record, format=args.format
+            )
+        finally:
+            # AOM_DEBUG=1 → single-line post-run digest on stderr. Silent
+            # otherwise. Lands in finally so even a non-zero exit still
+            # shows the signal that's usually most actionable.
+            from ansible_aom.core import diagnostics
+
+            diagnostics.print_summary_if_debug()
 
     parser.print_help()
     return 0

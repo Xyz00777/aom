@@ -41,12 +41,13 @@ import cProfile
 import faulthandler
 import logging
 import os
+import sys
 import time
 import tracemalloc
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
 
 _LOGGER_NAME = "ansible_aom"
 
@@ -355,6 +356,62 @@ def session_recording_disabled() -> bool:
 
 def session_disable_reason() -> str | None:
     return _session_disable_reason
+
+
+def print_summary_if_debug(file: IO[str] | None = None) -> None:
+    """Emit a single-line ``[aom-debug] …`` post-run digest to ``file``.
+
+    Silent unless ``AOM_DEBUG=1``. Reads from the in-process
+    accumulators (``get_last_run_diagnostics`` / ``get_last_renderer_stats``)
+    plus the top-N event histogram entries, so the user doesn't have
+    to chase ``aom inspect --debug`` to see the post-run signal that
+    matters most.
+
+    ``file`` defaults to ``sys.stderr`` so the summary doesn't pollute
+    the renderer's stdout (json/jq pipelines, capture-on-success
+    workflows).
+    """
+    if not _debug:
+        return
+    out = file if file is not None else sys.stderr
+
+    diag = _last_run_diagnostics
+    stats = _last_renderer_stats
+    if diag is None and stats is None:
+        out.write("[aom-debug] no run data published (early exit / no playbook run)\n")
+        return
+
+    events = diag.events_received if diag is not None else 0
+    pty_bytes = diag.pty_bytes if diag is not None else 0
+    timeouts = diag.pexpect_timeouts if diag is not None else 0
+    stall_max = diag.stall_count_max if diag is not None else 0
+    preflight = diag.preflight_ms if diag is not None else 0
+
+    renders = stats.render_calls if stats is not None else 0
+    log_writes = stats.log_writes if stats is not None else 0
+
+    top: list[str] = []
+    if diag is not None and diag.event_histogram:
+        items = sorted(diag.event_histogram.items(), key=lambda kv: (-kv[1], kv[0]))[:3]
+        top = [f"{name}×{count}" for name, count in items]
+
+    parts = [
+        f"events={events}",
+        f"renders={renders}",
+        f"log_writes={log_writes}",
+        f"pty_bytes={pty_bytes}",
+        f"pexpect_timeouts={timeouts}",
+        f"stall_max={stall_max}",
+        f"preflight_ms={preflight}",
+    ]
+    if top:
+        parts.append("top=" + ",".join(top))
+    if _tracemalloc_peak_kb is not None:
+        parts.append(f"tracemalloc_peak_kb={_tracemalloc_peak_kb}")
+    if _session_recording_disabled:
+        parts.append(f"recording_disabled={_session_disable_reason!r}")
+
+    out.write("[aom-debug] " + " ".join(parts) + "\n")
 
 
 @dataclass(frozen=True)
