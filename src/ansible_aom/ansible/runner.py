@@ -720,22 +720,95 @@ def _feed(
         renderer.add_warning(warning.message, warning.type == WarningType.DEPRECATION)
 
 
+_PSUTIL_CACHE: dict[int, Any] = {}
+_PSUTIL_PROBE_SENTINEL: Any = object()
+_PSUTIL_MODULE: Any = _PSUTIL_PROBE_SENTINEL
+_PSUTIL_DISABLED_REASON: str | None = None
+
+
+def _probe_psutil() -> tuple[Any, str | None]:
+    """Subprocess-probe ``import psutil``; return ``(module, None)`` on
+    success or ``(None, reason)`` on failure.
+
+    A try/except cannot catch the SIGSEGV that ``_psutil_linux.abi3.so``
+    raises during its C-level module init when the shared object is
+    ABI-incompatible with the running interpreter (the common case:
+    uv-installed CPython loading a Nix-built ``.so``). Running the
+    import inside a subprocess turns that crash into an exit code we
+    can read — and the main process keeps running.
+    """
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", "import psutil"],
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return None, "psutil import probe timed out"
+    except OSError as e:
+        return None, f"psutil import probe OSError: {e}"
+
+    if result.returncode != 0:
+        stderr_tail = (result.stderr or b"").decode("utf-8", errors="replace").strip()
+        # Negative return code on POSIX = killed by signal (e.g. -11 = SIGSEGV).
+        return None, f"psutil import probe exit={result.returncode} stderr={stderr_tail!r}"
+
+    try:
+        import psutil  # noqa: PLC0415
+    except ImportError as e:
+        return None, f"psutil ImportError after passing probe: {e}"
+
+    return psutil, None
+
+
+def _get_psutil() -> Any:
+    """Return the cached psutil module, or None if probing failed.
+
+    Lazy: the first call probes (one subprocess spawn). All subsequent
+    calls return the cached result so the heartbeat loop pays at most
+    one probe cost per process.
+    """
+    global _PSUTIL_MODULE, _PSUTIL_DISABLED_REASON
+    if _PSUTIL_MODULE is _PSUTIL_PROBE_SENTINEL:
+        module, reason = _probe_psutil()
+        _PSUTIL_MODULE = module
+        _PSUTIL_DISABLED_REASON = reason
+        if reason is not None:
+            diagnostics.set_psutil_disabled(reason)
+    return _PSUTIL_MODULE
+
+
+def _psutil_disabled_reason() -> str | None:
+    return _PSUTIL_DISABLED_REASON
+
+
+def _reset_psutil_probe_for_testing() -> None:
+    """Test-only: undo the probe cache so each test sees a fresh state."""
+    global _PSUTIL_MODULE, _PSUTIL_DISABLED_REASON
+    _PSUTIL_MODULE = _PSUTIL_PROBE_SENTINEL
+    _PSUTIL_DISABLED_REASON = None
+    _PSUTIL_CACHE.clear()
+
+
 def _sample_subprocess_active(pid: int) -> bool:
     """Return True if pid or any descendant used CPU since the last call.
 
-    Uses psutil.cpu_percent with ``interval=None`` — non-blocking, returns
-    the delta since the previous call on the same Process. The runner
-    is expected to cache a single Process object across calls so the
-    delta is meaningful; here we keep it self-contained by caching by
-    pid at module scope.
+    Uses ``psutil.cpu_percent(interval=None)`` — non-blocking, returns
+    the delta since the previous call on the same Process. Caches by
+    pid at module scope so deltas stay meaningful.
 
-    Any psutil error (process exited, permission denied, missing
-    descendant) degrades to False rather than propagating — the
-    heartbeat still works on byte signal alone.
+    psutil is loaded behind a one-shot subprocess probe (see
+    :func:`_get_psutil`) so an ABI-broken ``_psutil_linux.abi3.so``
+    can't SIGSEGV the runner. When psutil is unavailable for any
+    reason — broken install, import error, missing module — this
+    helper returns False; the heartbeat still works on the byte
+    signal alone.
     """
-    try:
-        import psutil
-    except ImportError:
+    psutil = _get_psutil()
+    if psutil is None:
         return False
 
     cache = _PSUTIL_CACHE
@@ -763,6 +836,3 @@ def _sample_subprocess_active(pid: int) -> bool:
         return False
     except Exception:
         return False
-
-
-_PSUTIL_CACHE: dict[int, Any] = {}

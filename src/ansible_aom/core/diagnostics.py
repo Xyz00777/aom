@@ -69,6 +69,7 @@ _profiler: cProfile.Profile | None = None
 _tracemalloc_peak_kb: int | None = None
 _session_recording_disabled: bool = False
 _session_disable_reason: str | None = None
+_psutil_disabled_reason: str | None = None
 
 
 def _is_truthy(value: str | None) -> bool:
@@ -155,6 +156,7 @@ def _reset_for_testing() -> None:
     global _last_run_diagnostics, _last_renderer_stats
     global _profile_enabled, _tracemalloc_enabled, _profiler, _tracemalloc_peak_kb
     global _session_recording_disabled, _session_disable_reason
+    global _psutil_disabled_reason
     if _watchdog_seconds is not None:
         try:
             faulthandler.cancel_dump_traceback_later()
@@ -174,6 +176,7 @@ def _reset_for_testing() -> None:
     _tracemalloc_peak_kb = None
     _session_recording_disabled = False
     _session_disable_reason = None
+    _psutil_disabled_reason = None
 
 
 def is_debug() -> bool:
@@ -350,6 +353,24 @@ def session_disable_reason() -> str | None:
     return _session_disable_reason
 
 
+def set_psutil_disabled(reason: str) -> None:
+    """Flag that psutil-based CPU sampling was disabled with ``reason``.
+
+    Set by :func:`ansible_aom.ansible.runner._sample_subprocess_active`
+    when its subprocess-probe of ``import psutil`` exits non-zero (which
+    happens when the C extension's shared object is ABI-incompatible with
+    the running interpreter — e.g. uv-installed CPython trying to load a
+    Nix-built ``_psutil_linux.abi3.so``). The flag is surfaced in the
+    post-run summary so users see *why* their CPU heartbeat went silent.
+    """
+    global _psutil_disabled_reason
+    _psutil_disabled_reason = reason
+
+
+def psutil_disabled_reason() -> str | None:
+    return _psutil_disabled_reason
+
+
 def print_summary_if_debug(file: IO[str] | None = None) -> None:
     """Emit a single-line ``[aom-debug] …`` post-run digest to ``file``.
 
@@ -402,6 +423,8 @@ def print_summary_if_debug(file: IO[str] | None = None) -> None:
         parts.append(f"tracemalloc_peak_kb={_tracemalloc_peak_kb}")
     if _session_recording_disabled:
         parts.append(f"recording_disabled={_session_disable_reason!r}")
+    if _psutil_disabled_reason is not None:
+        parts.append(f"psutil_disabled={_psutil_disabled_reason!r}")
 
     out.write("[aom-debug] " + " ".join(parts) + "\n")
 
@@ -469,6 +492,7 @@ def build_diagnostics_record(
     playbook_task_count: int | None = None,
     session_recording_disabled: bool = False,
     session_disable_reason: str | None = None,
+    psutil_disabled_reason: str | None = None,
 ) -> dict[str, Any]:
     """Build the JSON-serializable ``diagnostics.json`` payload.
 
@@ -495,6 +519,7 @@ def build_diagnostics_record(
         "preflight_ms": stats.preflight_ms,
         "session_recording_disabled": session_recording_disabled,
         "session_disable_reason": session_disable_reason,
+        "psutil_disabled_reason": psutil_disabled_reason,
     }
 
     resources: dict[str, Any] = {

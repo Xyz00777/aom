@@ -319,9 +319,7 @@ class SessionManager:
         )
 
         env_snapshot = {
-            key: os.environ[key]
-            for key in _DIAGNOSTICS_ENV_SNAPSHOT_KEYS
-            if key in os.environ
+            key: os.environ[key] for key in _DIAGNOSTICS_ENV_SNAPSHOT_KEYS if key in os.environ
         }
 
         record = diagnostics.build_diagnostics_record(
@@ -335,6 +333,7 @@ class SessionManager:
             playbook_task_count=preflight_task_count,
             session_recording_disabled=diagnostics.session_recording_disabled(),
             session_disable_reason=diagnostics.session_disable_reason(),
+            psutil_disabled_reason=diagnostics.psutil_disabled_reason(),
         )
 
         diag_file = self._active_sessions[session_id]["session_path"] / "diagnostics.json"
@@ -598,7 +597,7 @@ def load_session(session_id: str, session_dir: Path) -> dict[str, Any] | None:
         try:
             with open(diag_file) as f:
                 result["diagnostics"] = json.load(f)
-        except (OSError, json.JSONDecodeError):
+        except OSError, json.JSONDecodeError:
             result["diagnostics"] = None
     else:
         result["diagnostics"] = None
