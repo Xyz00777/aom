@@ -5,7 +5,7 @@ Operates on the dict shape returned by ``core.session.load_session``:
 fixtures from disk — sessions are constructed inline.
 """
 
-from ansible_aom.core.session import collect_failed_hosts
+from ansible_aom.session.summary import collect_failed_hosts
 
 
 def _session(events: list[dict]) -> dict:
@@ -96,7 +96,7 @@ class TestCollectFailedHosts:
         assert collect_failed_hosts({"playbook": "site.yml"}) == set()
 
 
-from ansible_aom.core.session import collect_unreachable_hosts  # noqa: E402
+from ansible_aom.session.summary import collect_unreachable_hosts  # noqa: E402
 
 
 class TestCollectUnreachableHosts:
@@ -140,7 +140,7 @@ class TestCollectUnreachableHosts:
         assert collect_unreachable_hosts({"playbook": "site.yml"}) == set()
 
 
-from ansible_aom.core.session import collect_changed_hosts  # noqa: E402
+from ansible_aom.session.summary import collect_changed_hosts  # noqa: E402
 
 
 class TestCollectChangedHosts:

@@ -22,7 +22,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from ansible_aom.core.session import (
+from ansible_aom.session.store import (
     cleanup_old_sessions,
     find_latest_session,
     load_session,

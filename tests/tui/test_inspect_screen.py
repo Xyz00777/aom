@@ -200,7 +200,7 @@ async def test_highlighting_successful_task_updates_detail(state_dir: Path):
     just failures.
     """
     from ansible_aom.core.inspect_model import TaskTreeNode, build_task_tree
-    from ansible_aom.core.session import load_session
+    from ansible_aom.session.store import load_session
     from ansible_aom.tui.screens.inspect import InspectApp
 
     app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])

@@ -53,7 +53,7 @@ from ansible_aom.core.inspect_model import (
     build_run_summary,
     build_task_tree,
 )
-from ansible_aom.core.session import list_sessions, load_session
+from ansible_aom.session.store import list_sessions, load_session
 
 
 def _fmt_duration_short(seconds: float | None) -> str:

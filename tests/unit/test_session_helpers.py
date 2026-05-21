@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from ansible_aom.core.session import find_latest_session
+from ansible_aom.session.store import find_latest_session
 
 
 def _write_session(root: Path, session_id: str, start_time: str) -> None:

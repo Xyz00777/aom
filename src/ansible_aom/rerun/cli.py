@@ -19,11 +19,11 @@ from typing import Callable
 
 import argcomplete
 
-from ansible_aom.core.session import (
+from ansible_aom.session.store import list_sessions
+from ansible_aom.session.summary import (
     collect_changed_hosts,
     collect_failed_hosts,
     collect_unreachable_hosts,
-    list_sessions,
 )
 
 
@@ -354,7 +354,7 @@ def main(
             2 — old session missing ``ansible_args`` (schema mismatch)
             other — propagated from ``runner``
     """
-    from ansible_aom.core.session import load_session
+    from ansible_aom.session.store import load_session
 
     args = _create_parser().parse_args(argv)
 

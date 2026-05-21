@@ -13,14 +13,14 @@ from typing import Any
 
 import pytest
 
-from ansible_aom.core.session import (
+from ansible_aom.session.store import (
     SessionManager,
     cleanup_old_sessions,
-    create_session_summary,
     generate_uuidv7,
     list_sessions,
     load_session,
 )
+from ansible_aom.session.summary import create_session_summary
 
 
 class TestGenerateUUIDv7:

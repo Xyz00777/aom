@@ -195,7 +195,7 @@ class TestSessionRecordingDisableOnDiskError:
             assert original_record is not None
             return original_record(self, session_id, event)
 
-        from ansible_aom.core.session import SessionManager
+        from ansible_aom.session.store import SessionManager
 
         original_record = SessionManager.record_event
 
