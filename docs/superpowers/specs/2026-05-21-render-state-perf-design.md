@@ -6,6 +6,23 @@
 
 ## 1. Verified hot spots
 
+### HS-0: `json.loads` on every PTY line (parse-side)
+**Location:** `src/ansible_aom/core/parser.py` (`JsonLineStream.feed_line` line 92; `_is_jsonl_start_event` line 260; `_is_jsonl_stats_event` line 276; `_is_json` line 286; `_parse_and_return` line 208; `_parse_json` line 293) and `src/ansible_aom/formats/json.py` (`RunSummary.model_dump_json` at line 241).
+
+Every PTY line that looks like JSON goes through stdlib `json.loads`. Several paths parse the *same* line more than once: `EXECUTION`-phase lines are checked by `_is_jsonl_stats_event` (parse) and, when not a stats event, by `_is_json` (parse again) before `_parse_and_return` parses a third time. The `PRE_RUN_PROMPTS` phase parses each JSON-looking line in `_is_jsonl_start_event` before re-parsing in `_parse_and_return`. This is not quadratic, but it is a constant-factor 2–3× overhead on top of an already-significant baseline.
+
+**Measured cost** (`experiments/pyo3-prototype/bench.py`, synthetic 13 hosts × 50,000 tasks = 700k lines / 130 MiB JSONL stream, isolated parse + per-host aggregate path, no `RunState`):
+
+| Impl | Wall time | vs stdlib |
+|---|---|---|
+| Python + `json` (today) | 3,117 ms | 1.0× |
+| Python + `orjson` | 1,717 ms | **1.8×** |
+| Hand-written PyO3 extension (~150 lines Rust) | 1,790 ms | 1.7× |
+
+Equivalency: output dicts compared byte-for-byte (hosts + tasks_failed). At realistic scale (13 hosts × 5,000 tasks / 13 MiB) the same ratios hold (305 / 169 / 176 ms). See section 6 for why PyO3 was evaluated and rejected.
+
+**Cost:** ~1.8× wall-time penalty on the parse path across the whole run, growing linearly with event count. At 700k events it's measured as ~1.4 seconds of avoidable CPU. Crucially independent of all other hot spots — the win compounds with HS-1..HS-8.
+
 ### HS-1: `_render_status_panel` called on every JSONL event
 **Location:** `src/ansible_aom/compact/renderer.py:235`, called from `update_state` at line 215.
 
@@ -68,6 +85,21 @@ The loop to build `host_statuses` (lines 258–262) iterates P × T × H and all
 
 ## 2. Proposed fixes
 
+### Fix for HS-0: Swap stdlib `json` → `orjson` on the parse path
+
+**Mechanism:** Add `orjson>=3.10` to `[project.dependencies]` in `pyproject.toml`. Replace `json.loads` calls in:
+
+- `core/parser.py`: `JsonLineStream.feed_line` (line 92), `_is_jsonl_start_event` (line 260), `_is_jsonl_stats_event` (line 276), `_is_json` (line 286), `_parse_and_return` (line 208), `_parse_json` (line 293).
+- `formats/json.py`: replace `summary.model_dump_json()` (line 241) with `orjson.dumps(summary.model_dump()).decode()` (or write bytes directly to stdout).
+
+Catch `orjson.JSONDecodeError` where the code currently catches `json.JSONDecodeError`. Both inherit from `ValueError`, so catching `ValueError` (or aliasing the import) avoids dual-exception-class handling.
+
+**Where it lives:** `core/parser.py` and `formats/json.py`. No API change. No new dependency on Rust toolchain — orjson ships pre-built wheels for every supported platform.
+
+**Out of scope for this fix:** parser de-duplication (the three-times-parse pattern in `_is_jsonl_stats_event` → `_is_json` → `_parse_and_return`). Leaving it for now because the orjson swap makes each parse cheap enough that the duplication's wall-cost falls below the dirty-flag (HS-1) and per-event panel-recompute (HS-3) costs that dominate the budget. Revisit if profiling after Phase A0 still shows parse-path in the top 3.
+
+**Why not PyO3:** Evaluated with a prototype (`experiments/pyo3-prototype/`). Result tied with orjson (1.7× vs 1.8× speedup), costs a Rust toolchain in CI, multi-arch wheel builds, and dual-language debugging. Documented as a non-goal in section 6.
+
 ### Fix for HS-1, HS-8: Dirty-flag gating on `_render_status_panel`
 
 **Mechanism:** Add a boolean `_panel_dirty` flag to `CompactRenderer`. Set it to `True` in `update_state` and `set_definitions`. In `_render_status_panel`, if `_panel_dirty` is `False` and the elapsed-time change is < 1s since the last render, return immediately. Reset the flag after a successful render.
@@ -128,6 +160,7 @@ Phase ordering is driven by two rules: (1) no change should break a currently-gr
 
 **Phase A — Safe, independent (can land in parallel):**
 
+- **A0:** Fix HS-0 — swap `json` → `orjson` on the parse path. Pure substitution; no API change; covered by existing parser test suite plus the equivalency tests below. Smallest diff in the plan, ships first to lock in the 1.8× parse win independent of any compact-renderer work.
 - **A1:** Fix HS-4 — batch `print_log` per event. Touches only `_emit_event_log`; no state changes; trivial to test with snapshot assertions.
 - **A2:** Fix HS-5+HS-6 — add `_task_def_index` and `_play_def_by_name` to `RunState`. Pure `core/` change; tested in isolation by existing and new unit tests.
 
@@ -143,6 +176,12 @@ Phase ordering is driven by two rules: (1) no change should break a currently-gr
 ## 4. Tests to write first
 
 Test file naming follows the existing convention: unit tests in `tests/unit/`, compact-renderer tests in `tests/compact/`.
+
+### A0 tests — `tests/unit/test_parser_orjson_swap.py`
+
+- `TC-PERF-005`: For each fixture in `tests/fixtures/*.jsonl`, assert `JsonLineStream.feed_line` returns dicts equal to a reference parse using stdlib `json` line-by-line. Locks in byte-equal behaviour across the parser swap.
+- `TC-PERF-006`: Malformed JSON (truncated `{"foo":`) still triggers the carry-buffer path and is stashed in `_carry`, identical to stdlib behaviour. Catch-class regression test.
+- `TC-PERF-007`: A line that is JSON but not a dict (e.g. `"42"` or `[1,2]`) is rejected with no `_event` log warning, matching today's `_parse_and_return` behaviour. orjson's `loads` is stricter about top-level types than stdlib in some edge cases — pin the contract.
 
 ### A1 tests — `tests/compact/test_emit_event_log_batching.py`
 
@@ -181,11 +220,14 @@ Test file naming follows the existing convention: unit tests in `tests/unit/`, c
 | `_projection: TreeProjection \| None` | `compact/renderer.py` | `compact/` | Lifecycle optimization for the renderer; `TreeProjection` is already `core/`. |
 | `_panel_dirty: bool` | `compact/renderer.py` | `compact/` | Pure rendering throttle; no domain semantics. |
 | Batched log-line assembly | `compact/renderer.py:_emit_event_log` | `compact/` | String joining for terminal output is an infrastructure concern. |
+| `orjson` import + `loads` call sites | `core/parser.py`, `formats/json.py` | `core/` + infra | Drop-in replacement; orjson is a runtime dep, not architectural — no layer change. |
 
 The `format.count_completed_tasks` and `format.count_total_tasks_seen` functions in `compact/format.py` are NOT removed — they remain as the test oracle for the incremental counters (TC-PERF-030) and are still used by `handle_completion` which runs only once.
 
 ## 6. Out of scope / explicit non-goals
 
+- **Rust/PyO3 rewrite of the parse + aggregate path.** Prototyped (`experiments/pyo3-prototype/`, ~150 lines of Rust exposing `aggregate_jsonl(str) → dict` via PyO3). Benchmarked at 13 hosts × 50,000 tasks (130 MiB / 700k events): Rust extension tied with `orjson` (1.7× vs 1.8× over stdlib). The bottleneck for both is materialising Python objects from parsed JSON, which PyO3 has no structural advantage over a hand-tuned C extension like orjson. A Rust extension would buy nothing measurable while costing: Rust toolchain in CI, multi-arch wheel builds per release, abi3 maintenance, and dual-language debugging. Decision: pick orjson (Fix HS-0). Prototype kept under `experiments/` for reference, not promoted.
+- **Full Rust rewrite of aom.** Same data rules it out on performance grounds: at 10× the user's failure scale, even today's stdlib-Python aggregate finishes in 3.1 s. The failures that motivated this plan are quadratic-in-state walks (HS-1..HS-3) and unbatched terminal writes (HS-4), neither of which moves under a language swap. Defensible only on distribution grounds (single static binary), which is a separate conversation.
 - **TUI-side parity.** `AOMApp.update_state` has no rendering hot path to speak of (it just increments `_dirty` and lets Textual's event loop handle refresh). No TUI changes in this round.
 - **Async I/O or threading.** The bottleneck is CPU on Python dict/list iteration, not I/O wait. Adding threads would introduce GIL contention and new synchronization bugs with no throughput gain.
 - **Switching compact mode to Textual.** Not motivated by this data.
