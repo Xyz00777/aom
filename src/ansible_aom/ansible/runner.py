@@ -27,7 +27,7 @@ import pexpect
 
 from ansible_aom.core.models import WarningType
 from ansible_aom.core.parser import _ANSI_SGR_RE, PtyStreamParser
-from ansible_aom.core.preflight import run_preflight
+from ansible_aom.ansible.preflight import run_preflight
 from ansible_aom.core.session import SessionManager
 from ansible_aom.renderer.protocol import Renderer
 

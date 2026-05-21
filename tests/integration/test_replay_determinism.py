@@ -28,7 +28,7 @@ from unittest.mock import patch
 import pytest
 
 from ansible_aom.compact.renderer import CompactRenderer
-from ansible_aom.core.preflight import PreParseResult
+from ansible_aom.ansible.preflight import PreParseResult
 from ansible_aom.formats.json import JsonRenderer
 from ansible_aom.replay import replay_session
 from ansible_aom.ansible.runner import run_playbook

@@ -42,7 +42,7 @@ def _make_fake_ansible(
 def test_run_preflight_runs_both_commands_and_assembles_definitions(
     tmp_path: Path, list_tasks_output: str, list_hosts_output: str
 ) -> None:
-    from ansible_aom.core.preflight import run_preflight
+    from ansible_aom.ansible.preflight import run_preflight
 
     fake = _make_fake_ansible(
         tmp_path,
@@ -64,7 +64,7 @@ def test_run_preflight_runs_both_commands_and_assembles_definitions(
 
 
 def test_run_preflight_executable_not_found_records_error(tmp_path: Path) -> None:
-    from ansible_aom.core.preflight import run_preflight
+    from ansible_aom.ansible.preflight import run_preflight
 
     result = run_preflight(
         playbook="site.yml",
@@ -80,7 +80,7 @@ def test_run_preflight_executable_not_found_records_error(tmp_path: Path) -> Non
 def test_run_preflight_list_hosts_failure_yields_definitions_without_resolved_hosts(
     tmp_path: Path, list_tasks_output: str
 ) -> None:
-    from ansible_aom.core.preflight import run_preflight
+    from ansible_aom.ansible.preflight import run_preflight
 
     fake = _make_fake_ansible(
         tmp_path,
@@ -118,7 +118,7 @@ def test_run_preflight_sets_ansible_nocolor_env(tmp_path: Path) -> None:
     script.write_text(body)
     script.chmod(0o755)
 
-    from ansible_aom.core.preflight import run_preflight
+    from ansible_aom.ansible.preflight import run_preflight
 
     run_preflight(playbook="site.yml", ansible_args=[], executable=str(script))
 
@@ -128,7 +128,7 @@ def test_run_preflight_sets_ansible_nocolor_env(tmp_path: Path) -> None:
 
 def test_run_preflight_trims_argparse_help_wall_from_error(tmp_path: Path) -> None:
     """When ansible-playbook fails with an argparse error, only the error line surfaces."""
-    from ansible_aom.core.preflight import run_preflight
+    from ansible_aom.ansible.preflight import run_preflight
 
     fake_stderr = (
         "usage: ansible-playbook [-h] [--version]\n"
@@ -155,7 +155,7 @@ def test_run_preflight_trims_argparse_help_wall_from_error(tmp_path: Path) -> No
 
 def test_run_preflight_passes_ansible_args(tmp_path: Path) -> None:
     """Args like -i inventory.ini must reach both subprocess invocations."""
-    from ansible_aom.core.preflight import run_preflight
+    from ansible_aom.ansible.preflight import run_preflight
 
     log = tmp_path / "args.log"
     script = tmp_path / "ansible-playbook"
