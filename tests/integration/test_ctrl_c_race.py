@@ -47,7 +47,7 @@ class TestCtrlCDuringRun:
 
     def test_keyboard_interrupt_during_drive_returns_130(self) -> None:
         """Variant A: signal arrives mid-stream, completion never happens."""
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         # Simulate SIGINT mid-stream: the renderer's update_state raises
@@ -65,7 +65,7 @@ class TestCtrlCDuringRun:
             exit_code=0,
         )
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             exit_code = run_playbook("playbook.yml", [], renderer, timeout=0.5)
 
         assert exit_code == 130, (
@@ -98,7 +98,7 @@ class TestCtrlCAfterCompletionDocumentsCurrentBehavior:
     def test_signal_after_drive_still_maps_to_130(self) -> None:
         """The run completed cleanly (exit 0). SIGINT arrives during the
         ``renderer.handle_completion`` call. Current behavior: 130 wins."""
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         # Run completes; SIGINT fires when the renderer renders the final
@@ -115,7 +115,7 @@ class TestCtrlCAfterCompletionDocumentsCurrentBehavior:
             exit_code=0,
         )
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             exit_code = run_playbook("playbook.yml", [], renderer, timeout=0.5)
 
         # SPEC GAP: ideally completion would win (exit 0). Today the
@@ -137,7 +137,7 @@ class TestCtrlCAfterCompletionDocumentsCurrentBehavior:
         succeeded with the recorded exit code. KeyboardInterrupt from
         finally propagates out of ``run_playbook`` unchanged.
         """
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         renderer.stop.side_effect = KeyboardInterrupt()
@@ -154,7 +154,7 @@ class TestCtrlCAfterCompletionDocumentsCurrentBehavior:
         # returns 130. The CONTRACT here is: by the time stop() runs the
         # run result is already known.
         try:
-            with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+            with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
                 run_playbook("playbook.yml", [], renderer, timeout=0.5)
         except KeyboardInterrupt:
             pass

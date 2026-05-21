@@ -31,7 +31,7 @@ from ansible_aom.compact.renderer import CompactRenderer
 from ansible_aom.core.preflight import PreParseResult
 from ansible_aom.formats.json import JsonRenderer
 from ansible_aom.replay import replay_session
-from ansible_aom.runner import run_playbook
+from ansible_aom.ansible.runner import run_playbook
 from tests._utils import normalize_json_summary, normalize_render_output
 
 
@@ -220,8 +220,8 @@ def _record_live_compact(
     renderer = CompactRenderer(is_tty=False)
     cmd, args = _fake_ansible_command(events, exit_code=0)
     with (
-        patch("ansible_aom.runner._build_command", return_value=(cmd, args)),
-        patch("ansible_aom.runner.run_preflight", return_value=_empty_preflight()),
+        patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)),
+        patch("ansible_aom.ansible.runner.run_preflight", return_value=_empty_preflight()),
     ):
         run_playbook("playbook.yml", [], renderer, session_dir=tmp_path)
     session_id = next(tmp_path.iterdir()).name
@@ -242,8 +242,8 @@ def _record_live_json(
     renderer = JsonRenderer()
     cmd, args = _fake_ansible_command(events, exit_code=0)
     with (
-        patch("ansible_aom.runner._build_command", return_value=(cmd, args)),
-        patch("ansible_aom.runner.run_preflight", return_value=_empty_preflight()),
+        patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)),
+        patch("ansible_aom.ansible.runner.run_preflight", return_value=_empty_preflight()),
     ):
         run_playbook("playbook.yml", [], renderer, session_dir=tmp_path)
     session_id = next(tmp_path.iterdir()).name

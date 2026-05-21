@@ -40,7 +40,7 @@ class TestSessionRecordingHappyPath:
     """A normal run produces a session directory with events + meta."""
 
     def test_creates_session_directory_with_events_and_meta(self, tmp_path: Path) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         cmd, args = _fake_ansible_command(
@@ -51,7 +51,7 @@ class TestSessionRecordingHappyPath:
             exit_code=0,
         )
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             exit_code = run_playbook("playbook.yml", [], renderer, session_dir=tmp_path)
 
         assert exit_code == 0
@@ -63,7 +63,7 @@ class TestSessionRecordingHappyPath:
         assert (session_path / "stderr.log").exists()
 
     def test_records_every_jsonl_event_seen_by_runner(self, tmp_path: Path) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         events = [
@@ -77,7 +77,7 @@ class TestSessionRecordingHappyPath:
         ]
         cmd, args = _fake_ansible_command(events, exit_code=0)
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             run_playbook("playbook.yml", [], renderer, session_dir=tmp_path)
 
         session_path = next(tmp_path.iterdir())
@@ -89,7 +89,7 @@ class TestSessionRecordingHappyPath:
         ]
 
     def test_meta_records_status_completed_on_success(self, tmp_path: Path) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         cmd, args = _fake_ansible_command(
@@ -97,7 +97,7 @@ class TestSessionRecordingHappyPath:
             exit_code=0,
         )
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             run_playbook("playbook.yml", [], renderer, session_dir=tmp_path)
 
         session_path = next(tmp_path.iterdir())
@@ -109,7 +109,7 @@ class TestSessionRecordingHappyPath:
         assert meta["end_time"]
 
     def test_meta_records_status_failed_on_nonzero_exit(self, tmp_path: Path) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         cmd, args = _fake_ansible_command(
@@ -117,7 +117,7 @@ class TestSessionRecordingHappyPath:
             exit_code=2,
         )
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             exit_code = run_playbook("playbook.yml", [], renderer, session_dir=tmp_path)
 
         assert exit_code == 2
@@ -131,7 +131,7 @@ class TestSessionRecordingFailureModes:
 
     def test_unwritable_session_dir_does_not_crash_run(self, tmp_path: Path) -> None:
         """If session_dir can't be written to, the playbook still runs and exits cleanly."""
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         # Point session_dir at a file instead of a directory: trying to
         # create subdirs underneath will OSError. The runner must absorb
@@ -145,7 +145,7 @@ class TestSessionRecordingFailureModes:
             exit_code=0,
         )
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             exit_code = run_playbook("playbook.yml", [], renderer, session_dir=blocker)
 
         # The run itself still succeeds.
@@ -159,7 +159,7 @@ class TestSessionRecordingDisableOnDiskError:
     warning so the user sees what happened — without losing the run."""
 
     def test_oserror_during_record_event_disables_sink_and_warns_once(self, tmp_path: Path) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
 
@@ -200,7 +200,7 @@ class TestSessionRecordingDisableOnDiskError:
         original_record = SessionManager.record_event
 
         with (
-            patch("ansible_aom.runner._build_command", return_value=(cmd, args)),
+            patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)),
             patch.object(SessionManager, "record_event", fail_after_two),
         ):
             exit_code = run_playbook("playbook.yml", [], renderer, session_dir=tmp_path)
@@ -238,10 +238,10 @@ class TestSessionRecordingDefaults:
         helper to a per-test tmp dir; we override it again here to
         point at this test's ``tmp_path`` so we can assert against it.
         """
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         default_dir = tmp_path / ".local" / "state" / "aom" / "sessions"
-        monkeypatch.setattr("ansible_aom.runner._default_session_dir", lambda: default_dir)
+        monkeypatch.setattr("ansible_aom.ansible.runner._default_session_dir", lambda: default_dir)
 
         renderer = MagicMock()
         cmd, args = _fake_ansible_command(
@@ -249,7 +249,7 @@ class TestSessionRecordingDefaults:
             exit_code=0,
         )
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             run_playbook("playbook.yml", [], renderer)
 
         assert default_dir.exists()
@@ -262,7 +262,7 @@ class TestSessionRecordingPersistsArgs:
 
     def test_runner_records_ansible_args_in_meta(self, tmp_path: Path) -> None:
         """run_playbook persists the ansible_args it was invoked with into meta.json."""
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         cmd, args = _fake_ansible_command(
@@ -270,7 +270,7 @@ class TestSessionRecordingPersistsArgs:
             exit_code=0,
         )
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             run_playbook(
                 "site.yml",
                 ["-i", "inv.ini", "--tags", "web"],

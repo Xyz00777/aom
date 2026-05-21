@@ -35,7 +35,7 @@ class TestRunnerHappyPath:
     """Runner spawns the subprocess and pumps events to the renderer."""
 
     def test_run_playbook_calls_renderer_start_and_completion(self) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         cmd, args = _fake_ansible_command(
@@ -46,7 +46,7 @@ class TestRunnerHappyPath:
             exit_code=0,
         )
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             exit_code = run_playbook("playbook.yml", [], renderer)
 
         assert exit_code == 0
@@ -58,7 +58,7 @@ class TestRunnerHappyPath:
         renderer.stop.assert_called_once()
 
     def test_run_playbook_forwards_jsonl_events_to_update_state(self) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         events: list[dict[str, Any]] = [
@@ -72,7 +72,7 @@ class TestRunnerHappyPath:
         ]
         cmd, args = _fake_ansible_command(events, exit_code=0)
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             run_playbook("playbook.yml", [], renderer)
 
         update_calls = renderer.update_state.call_args_list
@@ -89,7 +89,7 @@ class TestRunnerFailureExit:
     """Non-zero subprocess exit becomes 'failed' state."""
 
     def test_run_playbook_marks_failed_on_nonzero_exit(self) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         cmd, args = _fake_ansible_command(
@@ -97,7 +97,7 @@ class TestRunnerFailureExit:
             exit_code=2,
         )
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             exit_code = run_playbook("playbook.yml", [], renderer)
 
         assert exit_code == 2
@@ -110,12 +110,12 @@ class TestRunnerCommandNotFound:
     """Missing ansible-playbook surfaces as exit 127 without crashing."""
 
     def test_run_playbook_returns_127_when_command_missing(self) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         # Path that definitely doesn't exist.
         with patch(
-            "ansible_aom.runner._build_command",
+            "ansible_aom.ansible.runner._build_command",
             return_value=("/nonexistent/ansible-playbook-xxx", []),
         ):
             exit_code = run_playbook("playbook.yml", [], renderer)
@@ -132,7 +132,7 @@ class TestRunnerPreflight:
     """Runner calls run_preflight before spawning and forwards its result."""
 
     def test_run_playbook_calls_preflight_and_forwards_definitions(self) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         captured_defs: list = []
 
@@ -161,10 +161,10 @@ class TestRunnerPreflight:
 
         with (
             patch(
-                "ansible_aom.runner.run_preflight",
+                "ansible_aom.ansible.runner.run_preflight",
                 return_value=fake_pre_result,
             ),
-            patch("ansible_aom.runner._build_command", return_value=(cmd, args)),
+            patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)),
         ):
             exit_code = run_playbook("playbook.yml", [], StubRenderer())
 
@@ -172,7 +172,7 @@ class TestRunnerPreflight:
         assert captured_defs == ["DEF1", "DEF2"]
 
     def test_run_playbook_forwards_preflight_errors_as_warnings(self) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         received_warnings: list[tuple[str, bool]] = []
 
@@ -202,10 +202,10 @@ class TestRunnerPreflight:
 
         with (
             patch(
-                "ansible_aom.runner.run_preflight",
+                "ansible_aom.ansible.runner.run_preflight",
                 return_value=fake_pre_result,
             ),
-            patch("ansible_aom.runner._build_command", return_value=(cmd, args)),
+            patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)),
         ):
             run_playbook("playbook.yml", [], StubRenderer())
 
@@ -218,7 +218,7 @@ class TestRunnerPreflight:
         renderer is responsible for deciding how many lines to actually print
         (it dedupes repeated message text on its own).
         """
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         received: list[str] = []
 
@@ -250,8 +250,8 @@ class TestRunnerPreflight:
         )
 
         with (
-            patch("ansible_aom.runner.run_preflight", return_value=fake_pre_result),
-            patch("ansible_aom.runner._build_command", return_value=(cmd, args)),
+            patch("ansible_aom.ansible.runner.run_preflight", return_value=fake_pre_result),
+            patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)),
         ):
             run_playbook("playbook.yml", [], StubRenderer())
 

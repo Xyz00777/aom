@@ -1,6 +1,6 @@
 """The runner prints a `Session …  aom inspect` footer on termination."""
 
-from ansible_aom.runner import _print_session_footer
+from ansible_aom.ansible.runner import _print_session_footer
 
 
 def test_footer_prints_short_id_and_inspect_hint(capsys):

@@ -135,7 +135,7 @@ class TestAOMAppInteractivePromptDuringRun:
             renderer.handle_completion(0, "completed")  # type: ignore[attr-defined]
             return 0
 
-        monkeypatch.setattr("ansible_aom.runner.run_playbook", fake_run_playbook)
+        monkeypatch.setattr("ansible_aom.ansible.runner.run_playbook", fake_run_playbook)
         # Patch input() globally — the worker thread will call it.
         monkeypatch.setattr("builtins.input", lambda *_: "yes")
 
@@ -199,7 +199,7 @@ class TestWorkerKickoff:
             renderer.handle_completion(0, "completed")  # type: ignore[attr-defined]
             return 0
 
-        monkeypatch.setattr("ansible_aom.runner.run_playbook", fake_run_playbook)
+        monkeypatch.setattr("ansible_aom.ansible.runner.run_playbook", fake_run_playbook)
 
         app = AOMApp(playbook="site.yml", ansible_args=["-v"], session_dir=tmp_path)
 

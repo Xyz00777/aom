@@ -60,7 +60,7 @@ def _fake_ansible_hangs_after_stats(
 def test_runner_returns_within_bounded_time_when_child_hangs_after_stats() -> None:
     """The runner should not wait indefinitely on a hung child once the
     final stats event has been consumed."""
-    from ansible_aom.runner import run_playbook
+    from ansible_aom.ansible.runner import run_playbook
 
     renderer = MagicMock()
     cmd, args = _fake_ansible_hangs_after_stats(
@@ -76,7 +76,7 @@ def test_runner_returns_within_bounded_time_when_child_hangs_after_stats() -> No
     result: dict[str, int | None] = {"exit_code": None}
 
     def _drive_runner() -> None:
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             # Short per-read timeout so the worker thread can react,
             # but the run as a whole should still complete bounded.
             result["exit_code"] = run_playbook("playbook.yml", [], renderer, timeout=0.5)
@@ -96,7 +96,7 @@ def test_runner_finishes_promptly_on_clean_eof() -> None:
     """Sanity baseline: when the child cleanly exits after emitting all
     events, the runner returns quickly. Pairs with the xfail above so the
     contrast (clean EOF vs hung EOF) is documented in one place."""
-    from ansible_aom.runner import run_playbook
+    from ansible_aom.ansible.runner import run_playbook
 
     renderer = MagicMock()
     payload = json.dumps(
@@ -114,7 +114,7 @@ def test_runner_finishes_promptly_on_clean_eof() -> None:
     )
 
     start = time.monotonic()
-    with patch("ansible_aom.runner._build_command", return_value=(sys.executable, ["-c", code])):
+    with patch("ansible_aom.ansible.runner._build_command", return_value=(sys.executable, ["-c", code])):
         exit_code = run_playbook("playbook.yml", [], renderer, timeout=0.5)
     elapsed = time.monotonic() - start
 

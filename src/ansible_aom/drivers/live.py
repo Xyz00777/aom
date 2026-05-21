@@ -1,6 +1,6 @@
 """LiveDriver — :class:`EventSource` that runs a real ``ansible-playbook``.
 
-A thin facade over :func:`ansible_aom.runner.run_playbook`. The
+A thin facade over :func:`ansible_aom.ansible.runner.run_playbook`. The
 heavy-lifting subprocess/pexpect loop still lives there until §7.2
 relocates it to ``ansible/runner.py``; the driver owns parameter
 storage and the ``drive()`` boundary so ``cli.py`` only sees the
@@ -17,7 +17,7 @@ from ansible_aom.renderer.protocol import Renderer
 class LiveDriver:
     """Spawns ``ansible-playbook`` and pumps its JSONL output.
 
-    Parameters mirror :func:`ansible_aom.runner.run_playbook` so the
+    Parameters mirror :func:`ansible_aom.ansible.runner.run_playbook` so the
     driver can be constructed once at the CLI composition root and
     handed off to a renderer (or, in the TUI case, to a worker thread
     that calls :meth:`drive` from off the event loop).
@@ -45,7 +45,7 @@ class LiveDriver:
         return list(self._ansible_args)
 
     def drive(self, renderer: Renderer) -> int:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         return run_playbook(
             self._playbook,

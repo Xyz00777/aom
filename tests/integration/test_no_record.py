@@ -28,7 +28,7 @@ def _fake_ansible_command(events: list[dict], exit_code: int = 0) -> tuple[str, 
 
 class TestNoRecordIntegration:
     def test_record_false_writes_no_session_dir(self, tmp_path: Path) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         cmd, args = _fake_ansible_command(
@@ -39,7 +39,7 @@ class TestNoRecordIntegration:
             exit_code=0,
         )
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             exit_code = run_playbook(
                 "playbook.yml", [], renderer, session_dir=tmp_path, record=False
             )
@@ -50,7 +50,7 @@ class TestNoRecordIntegration:
 
     def test_record_false_does_not_touch_default_state_dir(self, tmp_path: Path) -> None:
         """Even if session_dir is None, record=False must not create the default."""
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         cmd, args = _fake_ansible_command(
@@ -59,8 +59,8 @@ class TestNoRecordIntegration:
         )
 
         with (
-            patch("ansible_aom.runner._build_command", return_value=(cmd, args)),
-            patch("ansible_aom.runner.Path.home", return_value=tmp_path),
+            patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)),
+            patch("ansible_aom.ansible.runner.Path.home", return_value=tmp_path),
         ):
             run_playbook("playbook.yml", [], renderer, record=False)
 

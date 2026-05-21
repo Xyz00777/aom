@@ -24,7 +24,7 @@ class TestRunPlaybookRecordParameter:
     """run_playbook accepts a record=bool kwarg; default is True."""
 
     def test_record_false_skips_session_directory(self, tmp_path: Path) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         cmd, args = _fake_ansible_command(
@@ -32,7 +32,7 @@ class TestRunPlaybookRecordParameter:
             exit_code=0,
         )
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             exit_code = run_playbook(
                 "playbook.yml", [], renderer, session_dir=tmp_path, record=False
             )
@@ -42,7 +42,7 @@ class TestRunPlaybookRecordParameter:
         assert list(tmp_path.iterdir()) == []
 
     def test_record_true_default_still_writes(self, tmp_path: Path) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         cmd, args = _fake_ansible_command(
@@ -50,7 +50,7 @@ class TestRunPlaybookRecordParameter:
             exit_code=0,
         )
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             run_playbook("playbook.yml", [], renderer, session_dir=tmp_path)
 
         sessions = list(tmp_path.iterdir())
@@ -82,7 +82,7 @@ class TestNoRecordCompactPlumbing:
         from ansible_aom.cli import main
 
         with (
-            patch("ansible_aom.runner.run_playbook", return_value=0) as mock_run,
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0) as mock_run,
             patch("ansible_aom.renderer.factory.create_renderer"),
             patch("sys.argv", ["aom", "--no-record", "playbook.yml"]),
         ):
@@ -96,7 +96,7 @@ class TestNoRecordCompactPlumbing:
         from ansible_aom.cli import main
 
         with (
-            patch("ansible_aom.runner.run_playbook", return_value=0) as mock_run,
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0) as mock_run,
             patch("ansible_aom.renderer.factory.create_renderer"),
             patch("sys.argv", ["aom", "playbook.yml"]),
         ):

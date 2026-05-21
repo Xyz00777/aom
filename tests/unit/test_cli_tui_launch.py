@@ -26,7 +26,7 @@ class TestTuiLaunchPath:
 
         with (
             patch("ansible_aom.tui.app.AOMApp", return_value=fake_app) as ctor,
-            patch("ansible_aom.runner.run_playbook") as legacy_runner,
+            patch("ansible_aom.ansible.runner.run_playbook") as legacy_runner,
             patch("sys.argv", ["aom", "--tui", "site.yml"]),
         ):
             exit_code = main()
@@ -78,7 +78,7 @@ class TestCompactModePathUnchanged:
         from ansible_aom.cli import main
 
         with (
-            patch("ansible_aom.runner.run_playbook", return_value=0) as legacy_runner,
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0) as legacy_runner,
             patch("ansible_aom.renderer.factory.create_renderer") as renderer_factory,
             patch("sys.argv", ["aom", "site.yml"]),
         ):

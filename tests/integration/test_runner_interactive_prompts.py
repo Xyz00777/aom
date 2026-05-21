@@ -50,7 +50,7 @@ class TestPausePromptDetected:
     """The classic ansible.builtin.pause prompt is caught and forwarded."""
 
     def test_pause_prompt_triggers_handle_interactive_prompt(self, tmp_path: Path) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         renderer.handle_interactive_prompt.return_value = "yes"
@@ -60,7 +60,7 @@ class TestPausePromptDetected:
             captured,
         )
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             exit_code = run_playbook(
                 "playbook.yml", [], renderer, timeout=0.2, session_dir=tmp_path
             )
@@ -73,14 +73,14 @@ class TestPausePromptDetected:
 
     def test_pause_prompt_answer_forwarded_to_child(self, tmp_path: Path) -> None:
         """The renderer's returned answer must reach the child's stdin."""
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         renderer.handle_interactive_prompt.return_value = "yes"
         captured = tmp_path / "captured.txt"
         cmd, args = _fake_pause_prompt_command("[pause]\nPress Enter to continue: ", captured)
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             run_playbook("playbook.yml", [], renderer, timeout=0.2, session_dir=tmp_path)
 
         assert captured.exists(), "fake never wrote the captured input file"
@@ -92,14 +92,14 @@ class TestVarsPromptDetected:
 
     def test_question_mark_prompt_is_caught(self, tmp_path: Path) -> None:
         """A trailing '?' is a strong enough signal on its own."""
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         renderer.handle_interactive_prompt.return_value = "production"
         captured = tmp_path / "captured.txt"
         cmd, args = _fake_pause_prompt_command("Which environment? ", captured)
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             run_playbook("playbook.yml", [], renderer, timeout=0.2, session_dir=tmp_path)
 
         renderer.handle_interactive_prompt.assert_called_once()
@@ -108,14 +108,14 @@ class TestVarsPromptDetected:
 
     def test_default_bracketed_format_is_caught(self, tmp_path: Path) -> None:
         """vars_prompt's default format is ``[name]: `` with no custom text."""
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         renderer.handle_interactive_prompt.return_value = "staging"
         captured = tmp_path / "captured.txt"
         cmd, args = _fake_pause_prompt_command("[deploy_env]: ", captured)
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             run_playbook("playbook.yml", [], renderer, timeout=0.2, session_dir=tmp_path)
 
         renderer.handle_interactive_prompt.assert_called_once()
@@ -127,14 +127,14 @@ class TestConfirmationPromptDetected:
     """(yes/no) and [y/N] style prompts get the interactive treatment."""
 
     def test_yes_no_prompt_triggers_handler(self, tmp_path: Path) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         renderer.handle_interactive_prompt.return_value = "y"
         captured = tmp_path / "captured.txt"
         cmd, args = _fake_pause_prompt_command("Continue? (yes/no): ", captured)
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             run_playbook("playbook.yml", [], renderer, timeout=0.2, session_dir=tmp_path)
 
         renderer.handle_interactive_prompt.assert_called_once()
@@ -156,7 +156,7 @@ class TestRealAnsiblePauseFormat:
     """
 
     def test_full_real_ansible_pause_round_trip(self, tmp_path: Path) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         renderer.handle_interactive_prompt.return_value = ""  # user pressed Enter
@@ -173,7 +173,7 @@ class TestRealAnsiblePauseFormat:
         )
         cmd, args = _fake_pause_prompt_command(coloured_prompt, captured)
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             exit_code = run_playbook(
                 "playbook.yml", [], renderer, timeout=0.2, session_dir=tmp_path
             )
@@ -188,7 +188,7 @@ class TestRealAnsiblePauseFormat:
     def test_custom_pause_prompt_without_press_enter_phrasing(self, tmp_path: Path) -> None:
         """Even when the prompt text doesn't include 'Press Enter',
         the bracketed task-name header identifies it."""
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         renderer.handle_interactive_prompt.return_value = "go"
@@ -198,7 +198,7 @@ class TestRealAnsiblePauseFormat:
         prompt = "[Confirm rollback]\nReally proceed: "
         cmd, args = _fake_pause_prompt_command(prompt, captured)
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             run_playbook("playbook.yml", [], renderer, timeout=0.2, session_dir=tmp_path)
 
         renderer.handle_interactive_prompt.assert_called_once()
@@ -236,7 +236,7 @@ class TestNewlineTerminatedPromptPath:
         return sys.executable, ["-c", code]
 
     def test_real_ansible_pause_newline_terminated_round_trip(self, tmp_path: Path) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         renderer.handle_interactive_prompt.return_value = ""  # Enter
@@ -253,7 +253,7 @@ class TestNewlineTerminatedPromptPath:
         )
         cmd, args = self._fake_newline_terminated_prompt(prompt, captured)
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             exit_code = run_playbook(
                 "playbook.yml", [], renderer, timeout=0.2, session_dir=tmp_path
             )
@@ -264,7 +264,7 @@ class TestNewlineTerminatedPromptPath:
         assert captured.read_text() == ""
 
     def test_newline_terminated_vars_prompt_round_trip(self, tmp_path: Path) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         renderer.handle_interactive_prompt.return_value = "staging"
@@ -273,7 +273,7 @@ class TestNewlineTerminatedPromptPath:
         prompt = "[deploy_env]: \r\n"
         cmd, args = self._fake_newline_terminated_prompt(prompt, captured)
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             run_playbook("playbook.yml", [], renderer, timeout=0.2, session_dir=tmp_path)
 
         renderer.handle_interactive_prompt.assert_called_once()
@@ -292,7 +292,7 @@ class TestKeyboardInterruptDuringPromptAborts:
     """
 
     def test_ctrl_c_at_prompt_returns_130_not_zero(self, tmp_path: Path) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         # Simulate Ctrl+C: the renderer's handler raises rather than
@@ -304,7 +304,7 @@ class TestKeyboardInterruptDuringPromptAborts:
         prompt = "[Confirm deployment]\r\nReally? Press Enter to continue: \r\n"
         cmd, args = self._fake_pause_with_capture(prompt, captured)
 
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             exit_code = run_playbook(
                 "playbook.yml", [], renderer, timeout=0.2, session_dir=tmp_path
             )
@@ -344,7 +344,7 @@ class TestNoPromptNoSpuriousInteractiveCall:
     """A normal run with no prompts must NOT call handle_interactive_prompt."""
 
     def test_normal_jsonl_run_does_not_call_interactive_prompt(self) -> None:
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
         # Fake emits two JSONL events terminated by newlines — no stall.
@@ -356,7 +356,7 @@ class TestNoPromptNoSpuriousInteractiveCall:
         )
         cmd = (sys.executable, ["-c", code])
 
-        with patch("ansible_aom.runner._build_command", return_value=cmd):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=cmd):
             exit_code = run_playbook("playbook.yml", [], renderer, timeout=0.1)
 
         assert exit_code == 0

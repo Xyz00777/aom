@@ -66,7 +66,7 @@ def test_aom_rerun_failed_spawns_with_correct_limit(tmp_path: Path) -> None:
 
     from ansible_aom.rerun.cli import main as rerun_main
 
-    with patch("ansible_aom.runner._build_command", side_effect=fake_build_command):
+    with patch("ansible_aom.ansible.runner._build_command", side_effect=fake_build_command):
         rc = rerun_main(
             argv=[
                 "--state-dir",
@@ -117,7 +117,7 @@ def test_aom_rerun_no_failures_exits_1_without_spawning(tmp_path: Path) -> None:
 
     from ansible_aom.rerun.cli import main as rerun_main
 
-    with patch("ansible_aom.runner._build_command", side_effect=fake_build_command):
+    with patch("ansible_aom.ansible.runner._build_command", side_effect=fake_build_command):
         rc = rerun_main(
             argv=[
                 "--state-dir",

@@ -593,7 +593,7 @@ class TestExitCodes:
         """
         from ansible_aom.cli import main
 
-        with patch("ansible_aom.runner.run_playbook", return_value=127) as mock_run:
+        with patch("ansible_aom.ansible.runner.run_playbook", return_value=127) as mock_run:
             with patch("sys.argv", ["aom", "playbook.yml"]):
                 result = main()
                 assert result == 127
@@ -628,7 +628,7 @@ class TestVerboseDiagnostics:
         with (
             patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
-            patch("ansible_aom.runner.run_playbook", return_value=0),
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
             patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
             patch("builtins.print") as mock_print,
         ):
@@ -645,7 +645,7 @@ class TestVerboseDiagnostics:
         with (
             patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
-            patch("ansible_aom.runner.run_playbook", return_value=0),
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
             patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
             patch("builtins.print") as mock_print,
         ):
@@ -660,7 +660,7 @@ class TestVerboseDiagnostics:
         with (
             patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
-            patch("ansible_aom.runner.run_playbook", return_value=0),
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
             patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
             patch("builtins.print") as mock_print,
         ):
@@ -686,7 +686,7 @@ class TestVerboseDiagnostics:
         with (
             patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
-            patch("ansible_aom.runner.run_playbook", return_value=0),
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
             patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
             patch("builtins.print") as mock_print,
         ):
@@ -709,7 +709,7 @@ class TestVerboseDebugLogging:
         with (
             patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
-            patch("ansible_aom.runner.run_playbook", return_value=0),
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
             patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
         ):
             main()
@@ -740,7 +740,7 @@ class TestVerboseDebugLogging:
             with (
                 patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
                 patch("ansible_aom.renderer.factory.create_renderer"),
-                patch("ansible_aom.runner.run_playbook", return_value=0),
+                patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
                 patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
             ):
                 main()
@@ -761,7 +761,7 @@ class TestVerboseDebugLogging:
         with (
             patch("sys.argv", ["aom", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
-            patch("ansible_aom.runner.run_playbook", return_value=0),
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
         ):
             main()
 
@@ -1077,7 +1077,7 @@ class TestFormatFlag:
             return 0
 
         with (
-            patch("ansible_aom.runner.run_playbook", side_effect=fake_run_playbook),
+            patch("ansible_aom.ansible.runner.run_playbook", side_effect=fake_run_playbook),
             patch("sys.argv", ["aom", "--format", "json", "playbook.yml"]),
         ):
             result = main()

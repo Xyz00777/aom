@@ -325,7 +325,7 @@ class TestPeriodicRefresh:
             renderer.handle_completion(0, "completed")
             return 0
 
-        monkeypatch.setattr("ansible_aom.runner.run_playbook", fake_run_playbook)
+        monkeypatch.setattr("ansible_aom.ansible.runner.run_playbook", fake_run_playbook)
 
         app = AOMApp(playbook="site.yml", ansible_args=[], session_dir=tmp_path)
 
@@ -365,7 +365,7 @@ class TestPeriodicRefresh:
             renderer.handle_completion(0, "completed")
             return 0
 
-        monkeypatch.setattr("ansible_aom.runner.run_playbook", fake_run_playbook)
+        monkeypatch.setattr("ansible_aom.ansible.runner.run_playbook", fake_run_playbook)
 
         app = AOMApp(playbook="site.yml", ansible_args=[], session_dir=tmp_path)
 
@@ -403,7 +403,7 @@ class TestCallFromThreadRouting:
             renderer.handle_completion(0, "completed")
             return 0
 
-        monkeypatch.setattr("ansible_aom.runner.run_playbook", fake_run_playbook)
+        monkeypatch.setattr("ansible_aom.ansible.runner.run_playbook", fake_run_playbook)
 
         app = AOMApp(playbook="site.yml", ansible_args=[], session_dir=tmp_path)
 
@@ -444,7 +444,7 @@ class TestCompletionTitleUpdate:
             done.set()
             return 0
 
-        monkeypatch.setattr("ansible_aom.runner.run_playbook", fake_run_playbook)
+        monkeypatch.setattr("ansible_aom.ansible.runner.run_playbook", fake_run_playbook)
 
         app = AOMApp(playbook="site.yml", ansible_args=[], session_dir=tmp_path)
 
@@ -476,7 +476,7 @@ class TestCompletionTitleUpdate:
             done.set()
             return 2
 
-        monkeypatch.setattr("ansible_aom.runner.run_playbook", fake_run_playbook)
+        monkeypatch.setattr("ansible_aom.ansible.runner.run_playbook", fake_run_playbook)
 
         app = AOMApp(playbook="site.yml", ansible_args=[], session_dir=tmp_path)
 
@@ -552,7 +552,7 @@ class TestEndToEndThreeTasks:
             renderer.handle_completion(0, "completed")
             return 0
 
-        monkeypatch.setattr("ansible_aom.runner.run_playbook", fake_run_playbook)
+        monkeypatch.setattr("ansible_aom.ansible.runner.run_playbook", fake_run_playbook)
 
         app = AOMApp(playbook="site.yml", ansible_args=[], session_dir=tmp_path)
 

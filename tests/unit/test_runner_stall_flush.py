@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from ansible_aom.runner import (
+from ansible_aom.ansible.runner import (
     _STALL_FLUSH_TIMEOUTS,
     _STALL_HINT_TIMEOUTS,
     _handle_timeout_branch,

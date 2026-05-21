@@ -29,7 +29,7 @@ def _fake_ansible_command(events: list[dict], exit_code: int = 0) -> tuple[str, 
 class TestRecordThenReplay:
     def test_record_then_replay_produces_same_event_sequence(self, tmp_path: Path) -> None:
         from ansible_aom.replay import replay_session
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         events = [
             {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-08T10:00:00Z"},
@@ -59,7 +59,7 @@ class TestRecordThenReplay:
         # ----- Record -----
         record_renderer = MagicMock()
         cmd, args = _fake_ansible_command(events, exit_code=0)
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             exit_code = run_playbook("playbook.yml", [], record_renderer, session_dir=tmp_path)
         assert exit_code == 0
 
@@ -93,13 +93,13 @@ class TestRecordThenReplay:
         """A recorded failure (exit 2) writes meta.status=failed; replay
         forwards that status to handle_completion."""
         from ansible_aom.replay import replay_session
-        from ansible_aom.runner import run_playbook
+        from ansible_aom.ansible.runner import run_playbook
 
         events = [{"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-08T10:00:00Z"}]
         cmd, args = _fake_ansible_command(events, exit_code=2)
 
         record_renderer = MagicMock()
-        with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             run_playbook("playbook.yml", [], record_renderer, session_dir=tmp_path)
 
         session_id = next(tmp_path.iterdir()).name

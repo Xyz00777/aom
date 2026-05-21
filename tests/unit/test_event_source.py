@@ -249,19 +249,19 @@ def test_live_driver_drives_renderer_with_fake_subprocess(
         spawned["args"] = args
         return FakeSpawn()
 
-    monkeypatch.setattr("ansible_aom.runner.pexpect.spawn", fake_spawn)
+    monkeypatch.setattr("ansible_aom.ansible.runner.pexpect.spawn", fake_spawn)
     # Restore the canonical command builder. Other tests in the
     # integration suite patch it via context managers, but if pytest is
     # mid-teardown when this test runs the patch can momentarily leak.
     # Asserting against a known builder makes the test order-independent.
     monkeypatch.setattr(
-        "ansible_aom.runner._build_command",
+        "ansible_aom.ansible.runner._build_command",
         lambda playbook, ansible_args: ("ansible-playbook", [playbook, *ansible_args]),
     )
     # Skip the real preflight subprocess (no ansible-playbook available
     # in unit-test env). The driver only needs the smoke loop to fire.
     monkeypatch.setattr(
-        "ansible_aom.runner.run_preflight",
+        "ansible_aom.ansible.runner.run_preflight",
         lambda playbook, ansible_args: type(
             "PR", (), {"definitions": [], "errors": []}
         )(),

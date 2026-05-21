@@ -26,7 +26,7 @@ the capture shim.
 
 Decision points:
 
-- We patch ``ansible_aom.runner._build_command`` at the module level
+- We patch ``ansible_aom.ansible.runner._build_command`` at the module level
   rather than relying on PATH manipulation; that's the same trick the
   existing ``test_runner_session_recording.py`` uses, and it avoids
   the "shutil.which sees a real ansible-playbook on the developer
@@ -94,16 +94,16 @@ def _record_live_session(
     events: list[dict],
 ) -> str:
     """Drive ``run_playbook`` against a fake shim and return the session ID."""
-    from ansible_aom.runner import run_playbook
+    from ansible_aom.ansible.runner import run_playbook
 
     renderer = MagicMock()
     cmd, args = _fake_ansible_command(events, exit_code=0)
 
-    with patch("ansible_aom.runner._build_command", return_value=(cmd, args)):
+    with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
         # run_preflight tries to talk to ansible-playbook; mock it out
         # so the test doesn't shell out for --list-tasks/--list-hosts.
         with patch(
-            "ansible_aom.runner.run_preflight",
+            "ansible_aom.ansible.runner.run_preflight",
             return_value=MagicMock(definitions=[], errors=[]),
         ):
             run_playbook(
@@ -230,11 +230,11 @@ class TestRerunRoundtripFailed:
         from ansible_aom.rerun.cli import main as rerun_main
 
         with patch(
-            "ansible_aom.runner._build_command",
+            "ansible_aom.ansible.runner._build_command",
             side_effect=fake_build,
         ):
             with patch(
-                "ansible_aom.runner.run_preflight",
+                "ansible_aom.ansible.runner.run_preflight",
                 return_value=MagicMock(definitions=[], errors=[]),
             ):
                 rc = rerun_main(
@@ -287,11 +287,11 @@ class TestRerunRoundtripUnreachable:
         from ansible_aom.rerun.cli import main as rerun_main
 
         with patch(
-            "ansible_aom.runner._build_command",
+            "ansible_aom.ansible.runner._build_command",
             side_effect=fake_build,
         ):
             with patch(
-                "ansible_aom.runner.run_preflight",
+                "ansible_aom.ansible.runner.run_preflight",
                 return_value=MagicMock(definitions=[], errors=[]),
             ):
                 rc = rerun_main(
@@ -331,11 +331,11 @@ class TestRerunRoundtripChangesOnly:
         from ansible_aom.rerun.cli import main as rerun_main
 
         with patch(
-            "ansible_aom.runner._build_command",
+            "ansible_aom.ansible.runner._build_command",
             side_effect=fake_build,
         ):
             with patch(
-                "ansible_aom.runner.run_preflight",
+                "ansible_aom.ansible.runner.run_preflight",
                 return_value=MagicMock(definitions=[], errors=[]),
             ):
                 rc = rerun_main(
@@ -388,11 +388,11 @@ class TestRerunRoundtripRefusal:
         from ansible_aom.rerun.cli import main as rerun_main
 
         with patch(
-            "ansible_aom.runner._build_command",
+            "ansible_aom.ansible.runner._build_command",
             side_effect=fake_build,
         ):
             with patch(
-                "ansible_aom.runner.run_preflight",
+                "ansible_aom.ansible.runner.run_preflight",
                 return_value=MagicMock(definitions=[], errors=[]),
             ):
                 rc = rerun_main(
@@ -445,7 +445,7 @@ class TestRerunRoundtripRefusal:
         from ansible_aom.rerun.cli import main as rerun_main
 
         with patch(
-            "ansible_aom.runner._build_command",
+            "ansible_aom.ansible.runner._build_command",
             side_effect=fake_build,
         ):
             rc = rerun_main(

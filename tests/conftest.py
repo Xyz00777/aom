@@ -30,7 +30,7 @@ def isolated_state_dir(
     state = state_root / "sessions"
     state.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(
-        "ansible_aom.runner._default_session_dir",
+        "ansible_aom.ansible.runner._default_session_dir",
         lambda: state,
     )
     monkeypatch.setattr(
