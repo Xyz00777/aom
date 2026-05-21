@@ -350,8 +350,16 @@ def run_playbook(
             return 127
         diagnostics.lifecycle_mark("spawn")
 
-        exit_code = _drive(child, parser, renderer, timeout, sink, diag=diag)
+        profiler = diagnostics.get_profiler()
+        if profiler is not None:
+            profiler.enable()
+        try:
+            exit_code = _drive(child, parser, renderer, timeout, sink, diag=diag)
+        finally:
+            if profiler is not None:
+                profiler.disable()
         diagnostics.lifecycle_mark("last_event")
+        diagnostics.record_tracemalloc_peak()
         state = "completed" if exit_code == 0 else "failed"
         sink.end(
             state,

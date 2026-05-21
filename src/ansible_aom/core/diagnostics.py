@@ -37,12 +37,15 @@ return immediately. Tests call ``_reset_for_testing()`` to clear state.
 
 from __future__ import annotations
 
+import cProfile
 import faulthandler
 import logging
 import os
 import time
+import tracemalloc
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 _LOGGER_NAME = "ansible_aom"
@@ -54,6 +57,10 @@ _trace_pexpect: bool = False
 _trace_events: bool = False
 _watchdog_seconds: int | None = None
 _lifecycle_marks: list[tuple[str, int]] = []
+_profile_enabled: bool = False
+_tracemalloc_enabled: bool = False
+_profiler: cProfile.Profile | None = None
+_tracemalloc_peak_kb: int | None = None
 
 
 def _is_truthy(value: str | None) -> bool:
@@ -93,6 +100,7 @@ def install_from_env(env: Mapping[str, str] | None = None) -> None:
     - ``AOM_TRACE_EVENTS``  → flips :func:`is_trace_events` to True.
     """
     global _installed, _debug, _trace_pexpect, _trace_events, _watchdog_seconds
+    global _profile_enabled, _tracemalloc_enabled, _profiler
 
     if _installed:
         return
@@ -111,6 +119,8 @@ def install_from_env(env: Mapping[str, str] | None = None) -> None:
     )
     _trace_events = _is_truthy(source.get("AOM_TRACE_EVENTS"))
     _watchdog_seconds = _parse_watchdog(source.get("AOM_WATCHDOG"))
+    _profile_enabled = _is_truthy(source.get("AOM_PROFILE"))
+    _tracemalloc_enabled = _is_truthy(source.get("AOM_TRACEMALLOC"))
 
     if _debug:
         logging.getLogger(_LOGGER_NAME).setLevel(logging.DEBUG)
@@ -119,6 +129,15 @@ def install_from_env(env: Mapping[str, str] | None = None) -> None:
         # ``repeat=True`` so a long-running stuck process keeps producing
         # stacks (every N seconds), not just one dump.
         faulthandler.dump_traceback_later(_watchdog_seconds, repeat=True)
+
+    if _profile_enabled:
+        # Created here but not yet enabled — the runner enables it
+        # around ``_drive`` so we only profile the hot path, not import
+        # bootstrapping or argparse.
+        _profiler = cProfile.Profile()
+
+    if _tracemalloc_enabled and not tracemalloc.is_tracing():
+        tracemalloc.start()
 
 
 def _reset_for_testing() -> None:
@@ -130,11 +149,14 @@ def _reset_for_testing() -> None:
     """
     global _installed, _debug, _trace_pexpect, _trace_events, _watchdog_seconds
     global _last_run_diagnostics, _last_renderer_stats
+    global _profile_enabled, _tracemalloc_enabled, _profiler, _tracemalloc_peak_kb
     if _watchdog_seconds is not None:
         try:
             faulthandler.cancel_dump_traceback_later()
         except Exception:
             pass
+    if tracemalloc.is_tracing():
+        tracemalloc.stop()
     _installed = False
     _debug = False
     _trace_pexpect = False
@@ -143,6 +165,10 @@ def _reset_for_testing() -> None:
     _lifecycle_marks.clear()
     _last_run_diagnostics = None
     _last_renderer_stats = None
+    _profile_enabled = False
+    _tracemalloc_enabled = False
+    _profiler = None
+    _tracemalloc_peak_kb = None
 
 
 def is_debug() -> bool:
@@ -250,6 +276,54 @@ def set_last_renderer_stats(stats: "RendererStats | None") -> None:
 
 def get_last_renderer_stats() -> "RendererStats | None":
     return _last_renderer_stats
+
+
+def is_profile() -> bool:
+    return _profile_enabled
+
+
+def is_tracemalloc() -> bool:
+    return _tracemalloc_enabled
+
+
+def get_profiler() -> cProfile.Profile | None:
+    """Return the global cProfile instance when ``AOM_PROFILE=1``, else None.
+
+    Callers enable/disable around the section they want to profile.
+    Created once in :func:`install_from_env`; the runner enables it
+    around ``_drive`` so import-time bootstrap doesn't pollute the
+    sample set.
+    """
+    return _profiler
+
+
+def dump_profile(target: Path) -> None:
+    """Write the cProfile stats to ``target`` in pstats binary format.
+
+    No-op when ``AOM_PROFILE`` is off or the profiler is None.
+    """
+    if _profiler is None:
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    _profiler.dump_stats(str(target))
+
+
+def record_tracemalloc_peak() -> None:
+    """Snapshot the current ``tracemalloc`` peak and stash it for later.
+
+    Reads ``tracemalloc.get_traced_memory()[1]`` which is the running
+    peak since ``tracemalloc.start()``. Stored as KB rounded down so
+    the JSON record stays small. No-op when tracing isn't active.
+    """
+    global _tracemalloc_peak_kb
+    if not _tracemalloc_enabled or not tracemalloc.is_tracing():
+        return
+    _, peak_bytes = tracemalloc.get_traced_memory()
+    _tracemalloc_peak_kb = peak_bytes // 1024
+
+
+def get_tracemalloc_peak_kb() -> int | None:
+    return _tracemalloc_peak_kb
 
 
 @dataclass(frozen=True)

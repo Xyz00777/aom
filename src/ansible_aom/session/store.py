@@ -274,6 +274,15 @@ class SessionManager:
         except OSError as exc:
             logger.debug("diagnostics.json write failed for %s: %s", session_id, exc)
 
+        # Dump cProfile output when AOM_PROFILE=1 (phase 7). Lands in
+        # ~/.local/state/aom/profile/ rather than the session dir so
+        # the session is easy to ship without the (much larger) pstats.
+        try:
+            profile_dir = Path.home() / ".local" / "state" / "aom" / "profile"
+            diagnostics.dump_profile(profile_dir / f"{session_id}.pstats")
+        except OSError as exc:
+            logger.debug("profile dump failed for %s: %s", session_id, exc)
+
     def _write_diagnostics_json(
         self,
         *,
@@ -307,6 +316,7 @@ class SessionManager:
             pty_bytes=pty_bytes,
             stall_count_max=stall_count_max,
             pexpect_timeouts=pexpect_timeouts,
+            tracemalloc_peak_kb=diagnostics.get_tracemalloc_peak_kb(),
         )
 
         env_snapshot = {
