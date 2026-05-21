@@ -18,7 +18,7 @@ from textual.app import App
 from textual.binding import Binding
 
 from ansible_aom.core.models import RunState
-from ansible_aom.runner import run_playbook
+from ansible_aom.drivers.protocol import EventSource
 from ansible_aom.tui.keybindings import KEYBINDINGS, KeyContext
 from ansible_aom.tui.widgets import DebugPanel
 
@@ -51,6 +51,7 @@ class AOMApp(App[None]):
         ansible_args: list[str] | None = None,
         session_dir: Path | None = None,
         record: bool = True,
+        driver: EventSource | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the AOMApp with optional playbook context.
@@ -63,15 +64,25 @@ class AOMApp(App[None]):
             session_dir: Override for the session recording location.
                 ``None`` lets the runner pick the spec default
                 ``~/.local/state/aom/sessions/``.
-            record: When False, the worker calls ``run_playbook`` with
-                ``record=False`` so no session directory is written
-                (F3 --no-record).
+            record: When False the worker uses a driver with recording
+                disabled (F3 --no-record). Ignored when ``driver`` is
+                supplied — the caller picks the driver's behaviour.
+            driver: Optional pre-built :class:`EventSource`. When passed,
+                the worker calls ``driver.drive(self)`` directly. When
+                ``None`` (legacy path), a :class:`LiveDriver` is
+                constructed from ``playbook`` / ``ansible_args`` /
+                ``session_dir`` / ``record``.
         """
         super().__init__(**kwargs)
         self._playbook: str | None = playbook
         self._args: list[str] = list(ansible_args) if ansible_args is not None else []
         self._session_dir: Path | None = session_dir
         self._record: bool = record
+        # Stored as ``_event_source`` (not ``_driver``) to avoid the
+        # name collision with Textual's ``App._driver`` (the terminal
+        # input/output driver). Textual swaps that out for HeadlessDriver
+        # in ``run_test()`` — our event source would get clobbered.
+        self._event_source: EventSource | None = driver
         self._state: str = "IDLE"
         self._exit_code: int | None = None
         self._final_state: str | None = None
@@ -320,16 +331,20 @@ class AOMApp(App[None]):
         ``self``; widgets that need to redraw are kicked via
         ``call_from_thread`` from inside those callbacks.
         """
-        if self._playbook is None:
-            return
-        try:
-            run_playbook(
+        driver = self._event_source
+        if driver is None:
+            if self._playbook is None:
+                return
+            from ansible_aom.drivers.live import LiveDriver
+
+            driver = LiveDriver(
                 self._playbook,
                 self._args,
-                self,
                 session_dir=self._session_dir,
                 record=self._record,
             )
+        try:
+            driver.drive(self)
         except Exception as exc:
             # Surface unexpected failures into final_state instead of
             # leaving the user with a frozen UI and no explanation.
@@ -397,10 +412,10 @@ class AOMApp(App[None]):
         # counter and only refreshes widgets when it has advanced.
         self.set_interval(0.2, self._refresh_widgets)
 
-        # Auto-start only when constructed with a playbook target. The
+        # Auto-start only when constructed with something to drive. The
         # protocol smoke tests still build a bare AOMApp() and never
         # call run() — they must not trigger a worker.
-        if self._playbook is not None:
+        if self._event_source is not None or self._playbook is not None:
             self.run_worker(self._run_playbook_worker, thread=True, exclusive=True)
 
     async def action_quit(self) -> None:

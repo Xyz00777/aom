@@ -124,6 +124,7 @@ class TestNoRecordTUIPlumbing:
         assert app.record is True
 
     def test_tui_main_propagates_no_record_to_app(self) -> None:
+        """``--no-record --tui`` builds a LiveDriver with recording off."""
         from ansible_aom.cli import main
 
         captured: dict[str, object] = {}
@@ -142,4 +143,8 @@ class TestNoRecordTUIPlumbing:
         ):
             assert main() == 0
 
-        assert captured.get("record") is False
+        driver = captured.get("driver")
+        assert driver is not None, f"AOMApp was not built with a driver; got {captured!r}"
+        # LiveDriver stores the record flag privately; assert it flowed
+        # through from --no-record at the CLI all the way to the driver.
+        assert getattr(driver, "_record") is False

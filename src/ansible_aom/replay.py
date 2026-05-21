@@ -206,12 +206,13 @@ def cli_main(argv: list[str]) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
+    from ansible_aom.drivers.replay import ReplayDriver
+
     tui_mode = args.mode == "tui"
     renderer = create_renderer(tui_mode=tui_mode, is_tty=sys.stdout.isatty())
-
-    return replay_session(
+    driver = ReplayDriver(
         session_dir=args.state_dir,
         session_id=args.session_id,
-        renderer=renderer,
         speed=float(args.speed),
     )
+    return driver.drive(renderer)

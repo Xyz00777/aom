@@ -285,16 +285,15 @@ def _run_compact(
     record: bool = True,
     format: str = "compact",
 ) -> int:
-    """Spawn the streaming renderer (compact ANSI or end-of-run JSON) via ``run_playbook``.
+    """Spawn the streaming renderer (compact ANSI or end-of-run JSON) via a LiveDriver.
 
-    Both compact and JSON renderers are synchronous — ``run_playbook``
-    owns the pexpect loop. The renderer chosen by the factory decides
-    whether anything streams to stdout during the run.
+    The composition root pattern: one EventSource (LiveDriver), one
+    Renderer (factory-built), one call. See ARCHITECTURE.md §4.
     """
     from typing import cast
 
+    from ansible_aom.drivers.live import LiveDriver
     from ansible_aom.renderer.factory import RenderFormat, create_renderer
-    from ansible_aom.runner import run_playbook
 
     try:
         renderer = create_renderer(
@@ -302,7 +301,8 @@ def _run_compact(
             is_tty=sys.stdout.isatty(),
             format=cast(RenderFormat, format),
         )
-        return run_playbook(playbook, ansible_args, renderer, record=record)
+        driver = LiveDriver(playbook, ansible_args, record=record)
+        return driver.drive(renderer)
     except KeyboardInterrupt:
         print("Cancelled by user", file=sys.stderr)
         return 130
@@ -312,19 +312,22 @@ def _run_compact(
 
 
 def _run_tui(playbook: str, ansible_args: list[str], record: bool = True) -> int:
-    """Launch the Textual TUI and let it drive the runner.
+    """Launch the Textual TUI driven by a LiveDriver.
 
     AOMApp owns its own event loop (``app.run()``) and pumps the
-    pexpect runner from a worker thread. The exit code is whatever
-    ``run_playbook`` returned, reachable on ``app.exit_code`` after
-    ``app.run()`` returns. ``None`` (user quit before completion) maps
-    to exit 1 — we treat an aborted-by-quit run as non-success without
-    pretending to know the playbook's true outcome.
+    driver from a worker thread; the driver wraps the same pexpect
+    runner the compact path uses. ``app.exit_code`` is whatever
+    ``driver.drive`` returned, reachable after ``app.run()`` exits.
+    ``None`` (user quit before completion) maps to exit 1 — we treat
+    an aborted-by-quit run as non-success without pretending to know
+    the playbook's true outcome.
     """
+    from ansible_aom.drivers.live import LiveDriver
     from ansible_aom.tui.app import AOMApp
 
     try:
-        app = AOMApp(playbook=playbook, ansible_args=ansible_args, record=record)
+        driver = LiveDriver(playbook, ansible_args, record=record)
+        app = AOMApp(driver=driver, playbook=playbook, ansible_args=ansible_args)
         app.run()
     except KeyboardInterrupt:
         print("Cancelled by user", file=sys.stderr)
