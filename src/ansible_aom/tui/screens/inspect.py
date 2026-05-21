@@ -349,8 +349,11 @@ class _NavTree(Tree):
                 node.expand()
                 return
             # Already expanded — move cursor to first child if any.
+            # ``move_cursor`` (not ``select_node``) so we don't fire a
+            # ``NodeSelected`` message that would be interpreted by the
+            # App's Enter-handler as "drill into Detail" and steal focus.
             if node.children:
-                self.select_node(node.children[0])
+                self.move_cursor(node.children[0])
                 return
         # Leaf (or expanded with no children) — hand off to Detail pane.
         app = self.app
@@ -373,7 +376,11 @@ class _NavTree(Tree):
             if isinstance(app, InspectApp):
                 app.focus_runs()
             return
-        self.select_node(parent)
+        # ``move_cursor`` rather than ``select_node`` — see action_deeper.
+        # Without this, walking up to a parent would post NodeSelected,
+        # which the App's Enter-handler routes to ``focus_detail()``,
+        # making Left arrow appear to jump to the Detail pane.
+        self.move_cursor(parent)
 
 
 class InspectApp(App):

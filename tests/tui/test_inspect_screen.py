@@ -255,6 +255,60 @@ async def test_enter_on_task_focuses_detail_pane(state_dir: Path):
 
 
 @pytest.mark.asyncio
+async def test_left_does_not_steal_focus_to_detail_pane(state_dir: Path):
+    """Pressing Left in the Tasks pane must not move focus to the Detail pane.
+
+    Regression: ``_NavTree.action_shallower`` used to call
+    ``select_node(parent)`` which posts ``NodeSelected``. The App's
+    Enter-handler interprets that message as "drill into Detail" and
+    moved focus there — so collapsing a role / walking up the tree
+    silently jumped focus to the Detail pane. ``move_cursor`` doesn't
+    post the message.
+    """
+    from ansible_aom.tui.screens.inspect import InspectApp, _NavTree
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        tree = app.query_one("#tasks-tree")
+        assert isinstance(tree, _NavTree)
+        tree.focus()
+        await pilot.pause()
+        # Position the cursor on a host node under the *failing* task —
+        # that path is auto-expanded so the host node is visible (and
+        # therefore has a valid line index for move_cursor).
+        host_node = None
+        play = tree.root.children[0]
+        for group in play.children:
+            for task in group.children:
+                if getattr(task.data, "stats", None) and task.data.stats.failed > 0:
+                    if task.children:
+                        host_node = task.children[0]
+                        break
+            if host_node:
+                break
+        assert host_node is not None, "failed_loop fixture should have a failing host"
+        tree.move_cursor(host_node)
+        await pilot.pause()
+        assert tree.cursor_node is host_node, "cursor failed to land on host node"
+
+        # Two Lefts: host → parent task; then task collapses (if expanded)
+        # or → parent group. Either way, focus must stay in tasks-tree
+        # since we're still well below the top-level play.
+        for _ in range(2):
+            await pilot.press("left")
+            await pilot.pause()
+            ids: list[str | None] = []
+            node = app.focused
+            while node is not None:
+                ids.append(getattr(node, "id", None))
+                node = getattr(node, "parent", None)
+            assert "tasks-tree" in ids, (
+                f"Left arrow stole focus out of Tasks pane; got {ids!r}"
+            )
+
+
+@pytest.mark.asyncio
 async def test_left_arrow_collapses_or_walks_up_tree(state_dir: Path):
     """Right expands a collapsed node; Left collapses an expanded node."""
     from ansible_aom.tui.screens.inspect import InspectApp, _NavTree
