@@ -3,6 +3,6 @@ PLAY [Setup webservers] **************************************************
 
 TASK [Install nginx] **************************************************
 ok: [web1] (3.0s)
-[10:01:00] Install nginx — 58.0s (cum 1m00s)
+[10:01:00] Install nginx — 58.0s (1m00s)
 site.yml | 1/1 hosts | 1/1 tasks | 0:00:00 *
   web1: * 1 ok

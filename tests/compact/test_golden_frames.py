@@ -30,7 +30,7 @@ The renderer pulls two non-deterministic inputs that the test pins:
 * Wall clock — ``time.time()`` is monkey-patched to return a fixed
   instant aligned with the first event's ``_timestamp``. That keeps the
   status bar's elapsed counter at ``0:00:00`` and the cumulative
-  ``(cum N)`` figure stable across runs.
+  cumulative ``(N)`` figure stable across runs.
 
 * Local timezone — the renderer renders timestamp prefixes via
   ``datetime.fromtimestamp(now).strftime(...)``, which uses the system

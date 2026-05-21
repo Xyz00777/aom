@@ -1292,12 +1292,13 @@ class CompactRenderer:
         header so the user sees the duration of *the previous task*
         directly under that task's output. Format:
 
-            [HH:MM:SS] <task name> — N.Ns (cum H:MM:SS)
+            [HH:MM:SS] <task name> — N.Ns (H:MM:SS)
 
         Where the timestamp is the wall-clock at the moment the new
         task started (which is also when the old task ended in
         linear strategy), ``N.Ns`` is the previous task's duration,
-        and ``cum`` is the cumulative playbook elapsed time.
+        and the parenthesized value is the cumulative playbook
+        elapsed time.
 
         Cumulative is dimmed so the per-task duration is the
         eye-catching figure; the timestamp prefix is dimmed for the
@@ -1314,7 +1315,7 @@ class CompactRenderer:
 
         wall = datetime.fromtimestamp(now).strftime("%H:%M:%S")
         prefix = _wrap(f"[{wall}]", _DIM, self._colorize)
-        cum_str = _wrap(f"(cum {self._format_duration(cum)})", _DIM, self._colorize)
+        cum_str = _wrap(f"({self._format_duration(cum)})", _DIM, self._colorize)
         duration_str = _wrap(self._format_duration(duration), _CYAN, self._colorize)
         self._display.print_log(f"{prefix} {self._last_task_name} — {duration_str} {cum_str}")
 

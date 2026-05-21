@@ -73,6 +73,36 @@ async def test_tab_cycles_focus_between_panes(state_dir: Path):
 
 
 @pytest.mark.asyncio
+async def test_run_row_renders_local_timezone(state_dir: Path, monkeypatch):
+    """Run-row date string respects the local timezone, not UTC.
+
+    The fixture's ``start_time`` is recorded as UTC ``11:24`` in the
+    ``failed_loop`` session. With a Europe/Berlin (+02:00) timezone the
+    display should read ``13:24``. We force a known TZ and check.
+    """
+    monkeypatch.setenv("TZ", "Europe/Berlin")
+    # ``time.tzset`` is the cross-fixture way to pick up the new TZ env
+    # var on POSIX systems; without it the cached zone stays UTC.
+    import time as _time
+
+    if hasattr(_time, "tzset"):
+        _time.tzset()
+
+    from ansible_aom.tui.screens.inspect import InspectApp, _RunRow, _render_run_lines
+
+    app = InspectApp(state_dir=state_dir)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        listview = app.query_one("#runs-list")
+        row = listview.children[0]
+        assert isinstance(row, _RunRow)
+        line1, _line2, _line3 = _render_run_lines(row.summary)
+        # 2026-05-20T11:24:09Z in CEST → 2026-05-20 13:24
+        assert "13:24" in line1
+        assert "11:24" not in line1
+
+
+@pytest.mark.asyncio
 async def test_run_row_renders_multi_line_content(state_dir: Path):
     """Each Runs-pane entry should render 3 distinct lines of info."""
     from ansible_aom.tui.screens.inspect import InspectApp, _RunRow

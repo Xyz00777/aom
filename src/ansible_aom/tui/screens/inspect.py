@@ -159,7 +159,10 @@ def _summarise_hosts(host_counts) -> str:
 
 
 def _render_run_lines(summary: RunSummary) -> tuple[str, str, str]:
-    date = summary.start_time.strftime("%Y-%m-%d %H:%M") if summary.start_time else "—"
+    # JSONL ``_timestamp`` is UTC; ``.astimezone()`` (no arg) renders in
+    # the local system timezone — which is what the user actually wants
+    # to see when scanning recent runs.
+    date = summary.start_time.astimezone().strftime("%Y-%m-%d %H:%M") if summary.start_time else "—"
     icon = _STATUS_ICON.get(summary.status, "?")
     icon_color = _RUN_STATUS_COLOR.get(summary.status, "")
     icon_markup = f"[{icon_color}]{icon}[/]" if icon_color else icon

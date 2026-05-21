@@ -5,19 +5,19 @@ TASK [Install common packages] *************************************************
 ok: [web1] (8.0s)
 ok: [web2] (8.0s)
 ok: [web3] (8.0s)
-[10:00:15] Install common packages — 13.0s (cum 15.0s)
+[10:00:15] Install common packages — 13.0s (15.0s)
 
 TASK [Configure firewall] **************************************************
 changed: [web1] (5.0s)
 fatal: [web2] (10.0s): FAILED! => Firewall service not available
 skipping: [web3]
-[10:00:30] Configure firewall — 15.0s (cum 30.0s)
+[10:00:30] Configure firewall — 15.0s (30.0s)
 
 TASK [Deploy application] **************************************************
 fatal: [web1] (5.0s): UNREACHABLE! => SSH connection timed out
 changed: [web2] (10.0s)
 ok: [web3] (15.0s)
-[10:01:00] Deploy application — 30.0s (cum 1m00s)
+[10:01:00] Deploy application — 30.0s (1m00s)
 site.yml | 2/3 hosts | 3/3 tasks | 0:00:00 X failed
   web1: * 1 ok + 1 changed O 1 unreachable
   web2: * 1 ok + 1 changed X 1 failed

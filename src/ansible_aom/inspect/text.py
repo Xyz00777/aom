@@ -51,14 +51,16 @@ def _host_counts_line(host: str, counts: StatusCounts) -> str:
 
 
 def _render_header(summary: RunSummary) -> list[str]:
+    # JSONL timestamps are UTC; convert to the local system timezone for
+    # display so users don't have to do the offset arithmetic in their head.
     lines = [
         f"Session  {summary.session_id}",
         f"Playbook {summary.playbook}",
     ]
     if summary.start_time:
-        lines.append(f"Started  {summary.start_time.isoformat().replace('+00:00', 'Z')}")
+        lines.append(f"Started  {summary.start_time.astimezone().isoformat(timespec='seconds')}")
     if summary.end_time:
-        lines.append(f"Ended    {summary.end_time.isoformat().replace('+00:00', 'Z')}")
+        lines.append(f"Ended    {summary.end_time.astimezone().isoformat(timespec='seconds')}")
     dur = summary.duration.total_seconds() if summary.duration else None
     lines.append(f"Duration {_fmt_duration(dur)}")
     lines.append(f"Status   {summary.status}")
@@ -172,7 +174,7 @@ def render_session_list(summaries: Iterable[RunSummary]) -> str:
     rows = ["Date              Playbook                Dur   Status"]
     rows.append("─" * 64)
     for s in summaries:
-        date = s.start_time.strftime("%Y-%m-%d %H:%M") if s.start_time else "—"
+        date = s.start_time.astimezone().strftime("%Y-%m-%d %H:%M") if s.start_time else "—"
         dur = _fmt_duration(s.duration.total_seconds() if s.duration else None)
         playbook = s.playbook if len(s.playbook) <= 22 else s.playbook[:19] + "..."
         rows.append(f"{date:<17} {playbook:<22}  {dur:>5}  {s.status}")

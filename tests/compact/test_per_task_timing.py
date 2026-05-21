@@ -10,7 +10,7 @@ end of the run), a one-line summary of the just-finished task lands
 between the previous task's output and the next ``TASK [...]``
 header:
 
-    [14:10:48] Install nginx — 2.3s (cum 0:00:09)
+    [14:10:48] Install nginx — 2.3s (0:00:09)
 
 Both pieces fall back gracefully when timing data is missing.
 """
@@ -144,10 +144,10 @@ class TestPreviousTaskSummary:
         r._last_task_uuid = "t1"
         r._last_task_name = "First"
         r._last_task_start_time = 1000.0
-        # Now next task at +12s → cum 12s.
+        # Now next task at +12s → cumulative 12s.
         r._emit_previous_task_summary(1012.0)
         logged = _logged(r)
-        assert any("cum" in line and "12" in line for line in logged)
+        assert any("(12" in line for line in logged)
 
     def test_summary_emitted_on_stats_for_final_task(self):
         r = _renderer()
