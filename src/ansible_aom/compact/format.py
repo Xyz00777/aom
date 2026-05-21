@@ -15,9 +15,9 @@ from __future__ import annotations
 
 import os
 import re
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
+from ansible_aom.core.duration import format_age, format_duration_compact
 from ansible_aom.core.heartbeat import LivenessState
 from ansible_aom.core.icons import (
     STATUS_ICONS,
@@ -510,35 +510,6 @@ def format_tree_block(
     return out
 
 
-def _format_duration_compact(seconds: float) -> str:
-    """Format a duration as the most compact human form ("42s", "1m23s", "1h05m").
-
-    Used for the "Last run" line in the preflight summary, where the
-    horizontal budget is one line so we trade precision for brevity.
-    """
-    if seconds < 60:
-        return f"{int(round(seconds))}s"
-    if seconds < 3600:
-        m, s = divmod(int(round(seconds)), 60)
-        return f"{m}m{s:02d}s"
-    h, rem = divmod(int(round(seconds)), 3600)
-    m = rem // 60
-    return f"{h}h{m:02d}m"
-
-
-def _format_age(end_time: datetime) -> str:
-    """Format an absolute UTC ``end_time`` as a relative "Xs/m/h/d ago" string."""
-    delta = datetime.now(timezone.utc) - end_time
-    secs = int(delta.total_seconds())
-    if secs < 60:
-        return f"{secs}s ago"
-    if secs < 3600:
-        return f"{secs // 60}m ago"
-    if secs < 86400:
-        return f"{secs // 3600}h ago"
-    return f"{secs // 86400}d ago"
-
-
 def _count_tasks(play: PlayDefinition) -> int:
     """Count leaf TaskDefinitions in a play, expanding any RoleGroupDefinition."""
     total = 0
@@ -672,8 +643,8 @@ def format_preflight_summary(
         tasks_word = "task" if prior_run.task_count == 1 else "tasks"
         lines.append(
             f"Last run: {prior_run.task_count} {tasks_word} in "
-            f"{_format_duration_compact(prior_run.duration_seconds)} "
-            f"({_format_age(prior_run.end_time)})"
+            f"{format_duration_compact(prior_run.duration_seconds)} "
+            f"({format_age(prior_run.end_time)})"
         )
 
     return "\n".join(lines)

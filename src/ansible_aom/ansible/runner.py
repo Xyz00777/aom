@@ -277,10 +277,15 @@ def run_playbook(
     parser = PtyStreamParser()
     renderer.start(playbook, ansible_args)
 
+    # Resolve once so the sink and the history lookup can never see
+    # different directories — and so a future env-var-driven default
+    # would land consistently in both places.
+    resolved_session_dir = session_dir or _default_session_dir()
+
     sink: _SessionSink | _NullSink
     if record:
         sink = _SessionSink(
-            session_dir or _default_session_dir(),
+            resolved_session_dir,
             playbook,
             ansible_args=ansible_args,
             renderer=renderer,
@@ -305,11 +310,7 @@ def run_playbook(
     # Must be pushed BEFORE ``set_definitions`` so the hint is part of
     # the one-shot startup summary the compact renderer prints there.
     key = build_run_config_key(playbook=playbook, ansible_args=ansible_args)
-    prior = find_previous_run(
-        session_dir or _default_session_dir(),
-        key,
-        host_count=resolved_host_count,
-    )
+    prior = find_previous_run(resolved_session_dir, key, host_count=resolved_host_count)
     renderer.set_prior_run(prior)
     renderer.set_definitions(pre_result.definitions)
 
