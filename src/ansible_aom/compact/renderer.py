@@ -745,6 +745,13 @@ class CompactRenderer:
         # task_start; flushed by the next task_start or stats.
         self._pending_skipped_hosts: list[str] = []
         self._current_task_had_nonskipped_result: bool = False
+        # Hosts that produced a per-host result line carrying an inline
+        # duration suffix for the *currently running* task. Used by the
+        # post-task summary to suppress its own duration when exactly
+        # one host already displayed it on its result line — avoiding
+        # duplication on single-host runs (and on run_once / delegated
+        # tasks in multi-host runs).
+        self._current_task_inline_duration_hosts: set[str] = set()
 
     def start(self, playbook: str, args: list[str]) -> None:
         """Start rendering a playbook run.
@@ -1316,8 +1323,16 @@ class CompactRenderer:
         wall = datetime.fromtimestamp(now).strftime("%H:%M:%S")
         prefix = _wrap(f"[{wall}]", _DIM, self._colorize)
         cum_str = _wrap(f"({self._format_duration(cum)})", _DIM, self._colorize)
-        duration_str = _wrap(self._format_duration(duration), _CYAN, self._colorize)
-        self._display.print_log(f"{prefix} {self._last_task_name} — {duration_str} {cum_str}")
+        # Drop the per-task duration when exactly one host already
+        # displayed it on its inline result line — keeping the cleaner
+        # ``— (cum)`` shape for single-host runs and run_once tasks.
+        if len(self._current_task_inline_duration_hosts) == 1:
+            self._display.print_log(f"{prefix} {self._last_task_name} — {cum_str}")
+        else:
+            duration_str = _wrap(self._format_duration(duration), _CYAN, self._colorize)
+            self._display.print_log(
+                f"{prefix} {self._last_task_name} — {duration_str} {cum_str}"
+            )
 
     def _flush_pending_skips(self, *, force_individual: bool) -> None:
         """Drain the per-task skipped-host buffer.
@@ -1397,6 +1412,8 @@ class CompactRenderer:
             # header — keeps it visually attached to its own output.
             if event_time is not None:
                 self._emit_previous_task_summary(event_time)
+            # Now safe to discard the previous task's host set.
+            self._current_task_inline_duration_hosts = set()
             self._display.print_log(f"\nTASK [{task_name}] " + "*" * 50)
             self._maybe_emit_pause_seconds_hint(task)
             # Stash timing for the inline-duration logic below and for
@@ -1416,6 +1433,8 @@ class CompactRenderer:
             self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
             for host, result in event.get("hosts", {}).items():
+                if suffix:
+                    self._current_task_inline_duration_hosts.add(host)
                 if result.get("changed"):
                     self._display.print_log(
                         _wrap(f"changed: [{host}]{suffix}", _YELLOW, self._colorize)
@@ -1427,6 +1446,8 @@ class CompactRenderer:
             self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
             for host, result in event.get("hosts", {}).items():
+                if suffix:
+                    self._current_task_inline_duration_hosts.add(host)
                 msg = _truncate_msg(result.get("msg", "") or "")
                 self._display.print_log(
                     _wrap(
@@ -1440,6 +1461,8 @@ class CompactRenderer:
             self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
             for host, result in event.get("hosts", {}).items():
+                if suffix:
+                    self._current_task_inline_duration_hosts.add(host)
                 msg = _truncate_msg(result.get("msg", "") or "")
                 self._display.print_log(
                     _wrap(

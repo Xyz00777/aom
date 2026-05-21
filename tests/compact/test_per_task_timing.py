@@ -129,12 +129,40 @@ class TestPreviousTaskSummary:
         assert task_header_indices, f"no second TASK header in {logged}"
         assert summary_indices[0] < task_header_indices[0]
 
-    def test_summary_contains_task_duration(self):
+    def test_summary_contains_task_duration_when_no_per_host_duration(self):
+        """No runner events → no per-host duration shown → summary keeps duration."""
         r = _renderer()
         r._emit_event_log(_task_start("2026-05-11T14:10:00Z", name="First"))
         r._emit_event_log(_task_start("2026-05-11T14:10:03Z", name="Second", uuid="t2"))
         # First task took 3.0s (from its start to the next task start).
         assert any("First" in line and "3.0s" in line for line in _logged(r))
+
+    def test_summary_drops_duration_for_single_host_task(self):
+        """Single-host tasks already show duration on the per-host line; the
+        summary line drops it to avoid duplication."""
+        r = _renderer()
+        r._emit_event_log(_task_start("2026-05-11T14:10:00Z", name="First"))
+        r._emit_event_log(_runner_ok("2026-05-11T14:10:02.5Z", host="web1"))
+        r._emit_event_log(_task_start("2026-05-11T14:10:03Z", name="Second", uuid="t2"))
+        # Summary for First should NOT contain the per-task duration (3.0s).
+        summary_lines = [line for line in _logged(r) if "First" in line and "—" in line]
+        assert summary_lines, "expected summary line for First"
+        assert not any("3.0s" in line for line in summary_lines)
+        # …but the per-host line still carries the inline duration.
+        assert any("ok: [web1] (2.5s)" in line for line in _logged(r))
+
+    def test_summary_keeps_duration_for_multi_host_task(self):
+        """When multiple hosts ran the task, per-host durations may differ —
+        the summary's task duration remains useful, so keep it."""
+        r = _renderer()
+        r._emit_event_log(_task_start("2026-05-11T14:10:00Z", name="First"))
+        r._emit_event_log(_runner_ok("2026-05-11T14:10:01.0Z", host="web1"))
+        r._emit_event_log(_runner_ok("2026-05-11T14:10:02.5Z", host="web2"))
+        r._emit_event_log(_task_start("2026-05-11T14:10:03Z", name="Second", uuid="t2"))
+        summary_lines = [line for line in _logged(r) if "First" in line and "—" in line]
+        assert summary_lines, "expected summary line for First"
+        # 3.0s is the task duration (start→next start).
+        assert any("3.0s" in line for line in summary_lines)
 
     def test_summary_contains_cumulative(self):
         r = _renderer()
@@ -154,8 +182,9 @@ class TestPreviousTaskSummary:
         r._emit_event_log(_task_start("2026-05-11T14:10:00Z", name="Last"))
         r._emit_event_log(_runner_ok("2026-05-11T14:10:01.0Z"))
         r._emit_event_log(_stats("2026-05-11T14:10:02.0Z"))
-        # The Last task should get its own summary at stats time.
-        assert any("Last" in line and "2.0s" in line for line in _logged(r))
+        # The Last task should get its own summary at stats time. Single-host
+        # task → per-task duration is dropped, only the cumulative remains.
+        assert any("Last" in line and "—" in line and "(2.0s)" in line for line in _logged(r))
 
     def test_no_summary_when_no_prior_task(self):
         """First task_start has no predecessor to summarise."""

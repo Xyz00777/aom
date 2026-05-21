@@ -250,6 +250,8 @@ Inside Tasks tree
   ←           collapse, or jump to parent if already collapsed
   →           expand, or jump to first child if already expanded
   Space       toggle expand / collapse
+  e           expand every node in the tree
+  c           collapse every node in the tree
 
 Runs filter
   f           toggle failed-only
@@ -341,7 +343,27 @@ class _NavTree(Tree):
     BINDINGS = Tree.BINDINGS + [
         Binding("right", "deeper", "Expand / drill", show=False),
         Binding("left", "shallower", "Collapse / back", show=False),
+        # Bulk expand / collapse the whole tree.
+        Binding("e", "expand_all", "Expand all", show=True),
+        Binding("c", "collapse_all", "Collapse all", show=True),
     ]
+
+    def action_expand_all(self) -> None:
+        """Expand every node in the tree (root downward)."""
+        for child in self.root.children:
+            child.expand_all()
+
+    def action_collapse_all(self) -> None:
+        """Collapse every node in the tree, then keep top-level plays visible.
+
+        Fully collapsing would hide everything except play headers. That's
+        usually what the user wants — a one-line-per-play overview — so
+        we leave plays themselves at the cursor's reach but collapse all
+        their descendants.
+        """
+        for child in self.root.children:
+            child.collapse_all()
+            child.collapse()
 
     def action_deeper(self) -> None:
         node = self.cursor_node

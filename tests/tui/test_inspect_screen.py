@@ -285,6 +285,48 @@ async def test_enter_on_task_focuses_detail_pane(state_dir: Path):
 
 
 @pytest.mark.asyncio
+async def test_e_expands_all_and_c_collapses_all(state_dir: Path):
+    """`e` expands every node in the tree; `c` collapses everything.
+
+    Use the multi_host fixture (3 hosts under one task) so we can
+    observe the task→host level toggle.
+    """
+    from ansible_aom.tui.screens.inspect import InspectApp, _NavTree
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["multi_host"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        tree = app.query_one("#tasks-tree")
+        assert isinstance(tree, _NavTree)
+        tree.focus()
+        await pilot.pause()
+
+        await pilot.press("e")
+        await pilot.pause()
+
+        def walk(n):
+            yield n
+            for c in n.children:
+                yield from walk(c)
+
+        expandables = [
+            n
+            for n in walk(tree.root)
+            if n is not tree.root and n.allow_expand
+        ]
+        assert expandables, "fixture should have at least one expandable node"
+        assert all(n.is_expanded for n in expandables), (
+            "After `e`, every expandable node should be expanded"
+        )
+
+        await pilot.press("c")
+        await pilot.pause()
+        assert all(not n.is_expanded for n in expandables), (
+            "After `c`, every expandable node should be collapsed"
+        )
+
+
+@pytest.mark.asyncio
 async def test_left_does_not_steal_focus_to_detail_pane(state_dir: Path):
     """Pressing Left in the Tasks pane must not move focus to the Detail pane.
 
