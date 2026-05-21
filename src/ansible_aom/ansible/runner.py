@@ -703,11 +703,18 @@ def _feed(
     if diag is not None:
         diag.note_pty_bytes(len(line))
 
+    trace_events = diagnostics.is_trace_events()
     for event in parser.feed_line(line):
         sink.record_event(event)
         renderer.update_state(event)
         if diag is not None:
-            diag.note_event(event.get("_event", "<unknown>"))
+            event_type = event.get("_event", "<unknown>")
+            diag.note_event(event_type)
+            if trace_events and diag.events_received % 100 == 0:
+                sys.stderr.write(
+                    f"[aom-trace-events] count={diag.events_received} type={event_type}\n"
+                )
+                sys.stderr.flush()
 
     for warning in parser.drain_warnings():
         sink.record_stderr(warning.message)
