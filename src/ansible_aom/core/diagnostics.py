@@ -129,7 +129,7 @@ def _reset_for_testing() -> None:
     production behavior (where it stays on for the process lifetime).
     """
     global _installed, _debug, _trace_pexpect, _trace_events, _watchdog_seconds
-    global _last_run_diagnostics
+    global _last_run_diagnostics, _last_renderer_stats
     if _watchdog_seconds is not None:
         try:
             faulthandler.cancel_dump_traceback_later()
@@ -142,6 +142,7 @@ def _reset_for_testing() -> None:
     _watchdog_seconds = None
     _lifecycle_marks.clear()
     _last_run_diagnostics = None
+    _last_renderer_stats = None
 
 
 def is_debug() -> bool:
@@ -218,6 +219,7 @@ class RunDiagnostics:
 
 
 _last_run_diagnostics: RunDiagnostics | None = None
+_last_renderer_stats: "RendererStats | None" = None
 
 
 def set_last_run_diagnostics(diag: RunDiagnostics | None) -> None:
@@ -233,6 +235,21 @@ def set_last_run_diagnostics(diag: RunDiagnostics | None) -> None:
 
 def get_last_run_diagnostics() -> RunDiagnostics | None:
     return _last_run_diagnostics
+
+
+def set_last_renderer_stats(stats: "RendererStats | None") -> None:
+    """Publish a renderer's final activity snapshot.
+
+    Renderers call this from :py:meth:`stop` so phase 5 can fold the
+    counters into ``diagnostics.json`` without a tighter coupling
+    between session/store and the renderer.
+    """
+    global _last_renderer_stats
+    _last_renderer_stats = stats
+
+
+def get_last_renderer_stats() -> "RendererStats | None":
+    return _last_renderer_stats
 
 
 @dataclass(frozen=True)

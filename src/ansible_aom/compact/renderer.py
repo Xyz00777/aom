@@ -48,6 +48,7 @@ from ansible_aom.compact.format import (
     format_tree_block,
 )
 from ansible_aom.compact.password import handle_password_prompt as do_handle_password_prompt
+from ansible_aom.core import diagnostics
 from ansible_aom.core.heartbeat import HeartbeatTracker, LivenessState  # noqa: F401
 from ansible_aom.core.icons import is_unicode_terminal
 from ansible_aom.core.models import RunState, Status
@@ -121,6 +122,13 @@ class CompactRenderer:
         # :meth:`set_definitions` so the hint is included in the
         # one-shot startup summary.
         self._prior_run: "PriorRun | None" = None
+        # Phase 4 (diagnostics): per-renderer activity counters published
+        # via :py:meth:`collect_stats` at :py:meth:`stop`. Render bumps
+        # land in :py:meth:`_render_status_panel`; log-write bumps in
+        # :py:meth:`print_log`. Both increment unconditionally — the
+        # cost is one int add and the post-mortem signal is worth it.
+        self._render_calls: int = 0
+        self._log_writes: int = 0
 
     def start(self, playbook: str, args: list[str]) -> None:
         """Start rendering a playbook run.
@@ -246,6 +254,11 @@ class CompactRenderer:
         """
         if self._state is None:
             return
+
+        # Counted after the early-return so a state-less call (e.g. an
+        # update_state that hit a renderer that already stopped) doesn't
+        # inflate the metric.
+        self._render_calls += 1
 
         # --- Region 1: status bar (existing logic) -------------------------
         # Per-host status: last terminal state wins. We skip RUNNING
@@ -400,6 +413,7 @@ class CompactRenderer:
         preflight errors verbatim — these are too important to hide
         behind just a counter.
         """
+        self._log_writes += 1
         self._display.print_log(message)
 
     def add_warning(self, message: str, is_deprecation: bool = False) -> None:
@@ -608,12 +622,26 @@ class CompactRenderer:
             for hostname, counts in host_counts.items()
         ]
 
+    def collect_stats(self) -> diagnostics.RendererStats:
+        """Return an immutable snapshot of this renderer's activity counters.
+
+        Called from :py:meth:`stop` and surfaced via
+        :func:`diagnostics.get_last_renderer_stats` so phase 5
+        (``diagnostics.json``) can fold the numbers into the run record
+        without coupling the session layer to the renderer.
+        """
+        return diagnostics.RendererStats(
+            render_calls=self._render_calls,
+            log_writes=self._log_writes,
+        )
+
     def stop(self) -> None:
         """Stop rendering and clean up resources.
 
         Restores terminal state, flushes output, and cleans up
         any running Rich Live display.
         """
+        diagnostics.set_last_renderer_stats(self.collect_stats())
         self._display.stop()
         self._state = None
 
