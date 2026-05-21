@@ -9,6 +9,7 @@ See SPECIFICATION.md Section 6.3 for the on-disk layout.
 
 import json
 import logging
+import os
 import shutil
 import time
 import uuid
@@ -16,7 +17,27 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from ansible_aom import __version__ as _AOM_VERSION
+from ansible_aom.core import diagnostics
+
 logger = logging.getLogger(__name__)
+
+# Env vars worth snapshotting alongside the session diagnostics. Kept
+# deliberately small to avoid leaking sensitive shell env into a
+# user-visible JSON; AOM_* flags answer "what diagnostics knobs was the
+# user running with" and ANSIBLE_STDOUT_CALLBACK + TERM answer "what
+# was the rendering pipeline".
+_DIAGNOSTICS_ENV_SNAPSHOT_KEYS = (
+    "TERM",
+    "ANSIBLE_STDOUT_CALLBACK",
+    "AOM_DEBUG",
+    "AOM_TRACE",
+    "AOM_TRACE_PEXPECT",
+    "AOM_TRACE_EVENTS",
+    "AOM_WATCHDOG",
+    "AOM_PROFILE",
+    "AOM_TRACEMALLOC",
+)
 
 
 _uuidv7_counter = 0
@@ -240,6 +261,74 @@ class SessionManager:
 
         with open(meta_file, "w") as f:
             json.dump(meta, f)
+
+        # Write diagnostics.json (phase 5). Best-effort: if disk write
+        # fails the run already succeeded, so swallow OSError rather
+        # than turn a clean run into a crashed one.
+        try:
+            self._write_diagnostics_json(
+                session_id=session_id,
+                preflight_task_count=preflight_task_count,
+                resolved_host_count=resolved_host_count,
+            )
+        except OSError as exc:
+            logger.debug("diagnostics.json write failed for %s: %s", session_id, exc)
+
+    def _write_diagnostics_json(
+        self,
+        *,
+        session_id: str,
+        preflight_task_count: int | None,
+        resolved_host_count: int | None,
+    ) -> None:
+        """Build and write ``diagnostics.json`` next to ``meta.json``.
+
+        Reads the in-process diagnostics module for the most recent run's
+        accumulator and renderer snapshot — both default to fresh zeroed
+        values when nothing was published (e.g. a recording-disabled
+        codepath or an early-failure run that never got a renderer).
+        """
+        run_diag = diagnostics.get_last_run_diagnostics()
+        renderer_stats = diagnostics.get_last_renderer_stats()
+
+        events_received = run_diag.events_received if run_diag is not None else 0
+        pty_bytes = run_diag.pty_bytes if run_diag is not None else 0
+        pexpect_timeouts = run_diag.pexpect_timeouts if run_diag is not None else 0
+        stall_count_max = run_diag.stall_count_max if run_diag is not None else 0
+        event_histogram = dict(run_diag.event_histogram) if run_diag is not None else {}
+
+        render_calls = renderer_stats.render_calls if renderer_stats is not None else 0
+        log_writes = renderer_stats.log_writes if renderer_stats is not None else 0
+
+        stats = diagnostics.RendererStats(
+            events_received=events_received,
+            render_calls=render_calls,
+            log_writes=log_writes,
+            pty_bytes=pty_bytes,
+            stall_count_max=stall_count_max,
+            pexpect_timeouts=pexpect_timeouts,
+        )
+
+        env_snapshot = {
+            key: os.environ[key]
+            for key in _DIAGNOSTICS_ENV_SNAPSHOT_KEYS
+            if key in os.environ
+        }
+
+        record = diagnostics.build_diagnostics_record(
+            session_id=session_id,
+            aom_version=_AOM_VERSION,
+            lifecycle_marks_ns=diagnostics.get_lifecycle_marks(),
+            stats=stats,
+            event_histogram=event_histogram,
+            env_snapshot=env_snapshot,
+            host_count=resolved_host_count,
+            playbook_task_count=preflight_task_count,
+        )
+
+        diag_file = self._active_sessions[session_id]["session_path"] / "diagnostics.json"
+        with open(diag_file, "w") as f:
+            json.dump(record, f)
 
     def create_artifact(self, session_id: str) -> Path:
         """Create .aom artifact file from session.
@@ -489,6 +578,19 @@ def load_session(session_id: str, session_dir: Path) -> dict[str, Any] | None:
             result["stderr"] = f.read().splitlines()
     else:
         result["stderr"] = []
+
+    # diagnostics.json arrived in phase 5 — older sessions don't have it.
+    # Missing or unreadable → None, so callers can branch on presence
+    # rather than dealing with exceptions.
+    diag_file = session_path / "diagnostics.json"
+    if diag_file.exists():
+        try:
+            with open(diag_file) as f:
+                result["diagnostics"] = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            result["diagnostics"] = None
+    else:
+        result["diagnostics"] = None
 
     result["session_id"] = session_id
 
