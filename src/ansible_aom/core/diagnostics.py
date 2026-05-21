@@ -61,6 +61,8 @@ _profile_enabled: bool = False
 _tracemalloc_enabled: bool = False
 _profiler: cProfile.Profile | None = None
 _tracemalloc_peak_kb: int | None = None
+_session_recording_disabled: bool = False
+_session_disable_reason: str | None = None
 
 
 def _is_truthy(value: str | None) -> bool:
@@ -150,6 +152,7 @@ def _reset_for_testing() -> None:
     global _installed, _debug, _trace_pexpect, _trace_events, _watchdog_seconds
     global _last_run_diagnostics, _last_renderer_stats
     global _profile_enabled, _tracemalloc_enabled, _profiler, _tracemalloc_peak_kb
+    global _session_recording_disabled, _session_disable_reason
     if _watchdog_seconds is not None:
         try:
             faulthandler.cancel_dump_traceback_later()
@@ -169,6 +172,8 @@ def _reset_for_testing() -> None:
     _tracemalloc_enabled = False
     _profiler = None
     _tracemalloc_peak_kb = None
+    _session_recording_disabled = False
+    _session_disable_reason = None
 
 
 def is_debug() -> bool:
@@ -223,8 +228,13 @@ class RunDiagnostics:
     pty_bytes: int = 0
     pexpect_timeouts: int = 0
     stall_count_max: int = 0
+    preflight_ms: int = 0
     event_histogram: dict[str, int] = field(default_factory=dict)
     _first_event_marked: bool = False
+
+    def note_preflight_elapsed_ms(self, ms: int) -> None:
+        """Record total preflight elapsed time (parallel list-tasks + list-hosts)."""
+        self.preflight_ms = ms
 
     def note_event(self, event_type: str) -> None:
         if not self._first_event_marked:
@@ -326,6 +336,27 @@ def get_tracemalloc_peak_kb() -> int | None:
     return _tracemalloc_peak_kb
 
 
+def set_session_recording_disabled(reason: str) -> None:
+    """Flag that session recording was disabled mid-run with ``reason``.
+
+    Called by :class:`ansible_aom.ansible.runner._SessionSink` when a
+    write OSError forced it to give up. The flag + reason are surfaced
+    in ``diagnostics.json`` so post-mortem can tell "recording stopped
+    here" from "recording never started".
+    """
+    global _session_recording_disabled, _session_disable_reason
+    _session_recording_disabled = True
+    _session_disable_reason = reason
+
+
+def session_recording_disabled() -> bool:
+    return _session_recording_disabled
+
+
+def session_disable_reason() -> str | None:
+    return _session_disable_reason
+
+
 @dataclass(frozen=True)
 class RendererStats:
     """Counters collected by the renderer over a run.
@@ -340,6 +371,7 @@ class RendererStats:
     pty_bytes: int = 0
     stall_count_max: int = 0
     pexpect_timeouts: int = 0
+    preflight_ms: int = 0
     state_size_bytes: int | None = None
     max_rss_kb: int | None = None
     tracemalloc_peak_kb: int | None = None
@@ -411,6 +443,7 @@ def build_diagnostics_record(
         "pty_bytes": stats.pty_bytes,
         "stall_count_max": stats.stall_count_max,
         "pexpect_timeouts": stats.pexpect_timeouts,
+        "preflight_ms": stats.preflight_ms,
         "session_recording_disabled": session_recording_disabled,
         "session_disable_reason": session_disable_reason,
     }

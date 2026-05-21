@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -134,6 +135,7 @@ class _SessionSink:
         if self._disabled:
             return
         self._disabled = True
+        diagnostics.set_session_recording_disabled(reason)
         if self._renderer is not None:
             add_warning = getattr(self._renderer, "add_warning", None)
             if callable(add_warning):
@@ -302,7 +304,9 @@ def run_playbook(
     # the JSONL run so the renderer can show plays/tasks/host count from
     # the very first frame. Failures are non-fatal — surfaced as warnings.
     diagnostics.lifecycle_mark("preflight_start")
+    _preflight_t0 = time.monotonic_ns()
     pre_result = run_preflight(playbook=playbook, ansible_args=ansible_args)
+    diag.note_preflight_elapsed_ms((time.monotonic_ns() - _preflight_t0) // 1_000_000)
     diagnostics.lifecycle_mark("preflight_end")
 
     # Union of resolved hosts across plays — preflight is best-effort,

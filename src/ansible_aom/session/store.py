@@ -304,6 +304,7 @@ class SessionManager:
         pty_bytes = run_diag.pty_bytes if run_diag is not None else 0
         pexpect_timeouts = run_diag.pexpect_timeouts if run_diag is not None else 0
         stall_count_max = run_diag.stall_count_max if run_diag is not None else 0
+        preflight_ms = run_diag.preflight_ms if run_diag is not None else 0
         event_histogram = dict(run_diag.event_histogram) if run_diag is not None else {}
 
         render_calls = renderer_stats.render_calls if renderer_stats is not None else 0
@@ -316,6 +317,7 @@ class SessionManager:
             pty_bytes=pty_bytes,
             stall_count_max=stall_count_max,
             pexpect_timeouts=pexpect_timeouts,
+            preflight_ms=preflight_ms,
             tracemalloc_peak_kb=diagnostics.get_tracemalloc_peak_kb(),
         )
 
@@ -334,6 +336,8 @@ class SessionManager:
             env_snapshot=env_snapshot,
             host_count=resolved_host_count,
             playbook_task_count=preflight_task_count,
+            session_recording_disabled=diagnostics.session_recording_disabled(),
+            session_disable_reason=diagnostics.session_disable_reason(),
         )
 
         diag_file = self._active_sessions[session_id]["session_path"] / "diagnostics.json"
