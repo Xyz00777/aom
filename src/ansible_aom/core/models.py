@@ -180,6 +180,43 @@ class RunState:
     # with no _event field at all are degenerate (not "future-version
     # drift") and aren't counted here.
     unknown_events: dict[str, int] = field(default_factory=dict)
+    # HS-5/HS-6: name → definition lookup dicts, built once when
+    # ``definitions`` is assigned. They replace the per-event linear
+    # scans in ``_graft_or_match_task`` and ``_resolve_play_hosts``.
+    # Marked as Optional and rebuilt via __setattr__ so reassignment of
+    # ``definitions`` (e.g. across replay invocations) refreshes both.
+    _task_def_index: dict[str, "TaskDefinition"] | None = field(
+        default=None, init=False, repr=False
+    )
+    _play_def_by_name: dict[str, PlayDefinition] | None = field(
+        default=None, init=False, repr=False
+    )
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        super().__setattr__(name, value)
+        # Rebuild the lookup dicts whenever ``definitions`` is (re)assigned.
+        # Cheap: O(P_def + T_def), happens once per run after preflight.
+        if name == "definitions":
+            self._rebuild_definition_indexes()
+
+    def _rebuild_definition_indexes(self) -> None:
+        """(Re)populate ``_task_def_index`` and ``_play_def_by_name``.
+
+        Called whenever ``definitions`` is reassigned. Empty definitions
+        produce empty dicts (not ``None``) so the lookup paths never need
+        a None-check.
+        """
+        task_index: dict[str, TaskDefinition] = {}
+        for leaf in _iter_leaf_task_defs(self.definitions):
+            # First-write wins — matches the prior linear scan's behaviour
+            # of returning the first match for duplicate names.
+            task_index.setdefault(leaf.name, leaf)
+        super().__setattr__("_task_def_index", task_index)
+
+        play_index: dict[str, PlayDefinition] = {}
+        for play_def in self.definitions:
+            play_index.setdefault(play_def.name, play_def)
+        super().__setattr__("_play_def_by_name", play_index)
 
     def handle_event(self, event: dict[str, Any]) -> None:
         """Process a JSONL event and update state."""
@@ -261,8 +298,13 @@ class RunState:
         if not self.definitions or not task_name or task_id in self._grafted_uuids:
             return
 
-        for leaf in _iter_leaf_task_defs(self.definitions):
-            if leaf.name == task_name:
+        # HS-5: name → leaf lookup via the precomputed index (built when
+        # ``definitions`` was assigned). Falls back to scanning only if the
+        # index is somehow stale, which __setattr__ rules out.
+        index = self._task_def_index
+        if index is not None:
+            leaf = index.get(task_name)
+            if leaf is not None:
                 self._last_matched_task_def = leaf
                 return
 
@@ -341,9 +383,15 @@ class RunState:
         We match by name instead. Returns an empty list when no
         definition matches (no preflight data, or play name mismatch) —
         callers should treat that as "no per-host signal available".
+
+        HS-6: name → PlayDefinition via precomputed index, built when
+        ``definitions`` is assigned. Avoids the O(P_def) scan that ran
+        on every task-start event.
         """
-        for play_def in self.definitions:
-            if play_def.name == play.name:
+        index = self._play_def_by_name
+        if index is not None:
+            play_def = index.get(play.name)
+            if play_def is not None:
                 return list(play_def.resolved_hosts)
         return []
 
