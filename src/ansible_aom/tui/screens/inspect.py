@@ -82,13 +82,14 @@ _STATUS_ICON = {
 #   changed   — yellow (touched but not failure)
 #   failed    — bold red (high signal)
 #   unreachable — bold magenta (something different; not "module fail")
-#   skipped   — dim (low signal)
+#   skipped   — cyan (informational; deliberately not "muted/dim" so the
+#               counts stay visible on transparent terminals)
 _STATUS_COLOR = {
     "ok": "green",
     "changed": "yellow",
     "failed": "bold red",
     "unreachable": "bold magenta",
-    "skipped": "dim",
+    "skipped": "cyan",
 }
 
 # Per-run-status colour for the icon column on Runs rows.
