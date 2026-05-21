@@ -85,6 +85,10 @@ class JsonRenderer:
         self._state: RunState | None = None
         self._wall_start: float = 0.0
         self._wall_end: float = 0.0
+        # Phase 12: publish a (mostly zero) RendererStats snapshot so
+        # post-mortem can distinguish "JSON mode ran" from "no renderer".
+        self._render_calls: int = 0
+        self._log_writes: int = 0
 
     def start(self, playbook: str, args: list[str]) -> None:
         """Capture playbook + args; initialise empty RunState. No output."""
@@ -243,5 +247,12 @@ class JsonRenderer:
         sys.stdout.flush()
 
     def stop(self) -> None:
-        """No-op — no display to tear down."""
-        return
+        """Publish a RendererStats snapshot so diagnostics.json reflects this run."""
+        from ansible_aom.core import diagnostics
+
+        diagnostics.set_last_renderer_stats(
+            diagnostics.RendererStats(
+                render_calls=self._render_calls,
+                log_writes=self._log_writes,
+            )
+        )

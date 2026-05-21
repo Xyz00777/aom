@@ -90,6 +90,9 @@ class AOMApp(App[None]):
         self._warnings_count: int = 0
         self._deprecations_count: int = 0
         self._log_lines: list[str] = []
+        # Phase 12: renderer activity counters published at completion.
+        self._render_calls: int = 0
+        self._log_writes: int = 0
         # F1: worker→UI signalling. _dirty is incremented by every
         # renderer callback that mutates state; the periodic tick in
         # on_mount() refreshes widgets only when the value advances.
@@ -197,6 +200,7 @@ class AOMApp(App[None]):
             self._pending_log_lines.append(message)
             self._dirty += 1
 
+        self._log_writes += 1
         self._safe_call_from_thread(_enqueue)
 
     def _safe_call_from_thread(self, fn) -> None:
@@ -232,6 +236,7 @@ class AOMApp(App[None]):
         refresh that depends on it should be scheduled via
         ``call_from_thread``.
         """
+        self._render_calls += 1
         self._run_state.handle_event(event)
         event_type = event.get("_event", "")
         if event_type == "v2_playbook_on_start":
@@ -286,6 +291,15 @@ class AOMApp(App[None]):
         refresh happen on the main thread (the runner worker calls
         this from a non-UI thread).
         """
+
+        from ansible_aom.core import diagnostics
+
+        diagnostics.set_last_renderer_stats(
+            diagnostics.RendererStats(
+                render_calls=self._render_calls,
+                log_writes=self._log_writes,
+            )
+        )
 
         def _finish() -> None:
             self._exit_code = exit_code
