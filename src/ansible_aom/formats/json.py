@@ -101,6 +101,10 @@ class JsonRenderer:
         """Store preflight definitions. No output."""
         self._definitions = list(definitions)
 
+    def set_prior_run(self, prior_run: object) -> None:  # noqa: ARG002
+        """No-op — JSON mode doesn't show the prior-run hint."""
+        return
+
     def update_state(self, event: dict) -> None:
         """Drive RunState from a JSONL event. No output."""
         if self._state is None:

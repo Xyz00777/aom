@@ -27,7 +27,9 @@ import pexpect
 from ansible_aom.ansible.preflight import run_preflight
 from ansible_aom.core.models import WarningType, count_leaf_tasks
 from ansible_aom.core.parser import PtyStreamParser
+from ansible_aom.core.run_config import build_run_config_key
 from ansible_aom.renderer.protocol import Renderer
+from ansible_aom.session.history import find_previous_run
 from ansible_aom.session.store import SessionManager
 
 logger = logging.getLogger(__name__)
@@ -290,7 +292,6 @@ def run_playbook(
     # the JSONL run so the renderer can show plays/tasks/host count from
     # the very first frame. Failures are non-fatal — surfaced as warnings.
     pre_result = run_preflight(playbook=playbook, ansible_args=ansible_args)
-    renderer.set_definitions(pre_result.definitions)
 
     # Union of resolved hosts across plays — preflight is best-effort,
     # so a play with no resolved_hosts simply contributes nothing.
@@ -298,6 +299,19 @@ def run_playbook(
         {host for play in pre_result.definitions for host in play.resolved_hosts}
     )
     preflight_task_count = count_leaf_tasks(pre_result.definitions)
+
+    # Look up a matching prior completed run (same run-config + host
+    # count) so the compact renderer can surface "Last run: N tasks in T".
+    # Must be pushed BEFORE ``set_definitions`` so the hint is part of
+    # the one-shot startup summary the compact renderer prints there.
+    key = build_run_config_key(playbook=playbook, ansible_args=ansible_args)
+    prior = find_previous_run(
+        session_dir or _default_session_dir(),
+        key,
+        host_count=resolved_host_count,
+    )
+    renderer.set_prior_run(prior)
+    renderer.set_definitions(pre_result.definitions)
 
     # add_warning prints the message above the panel AND bumps the counter.
     # The renderer's own dedupe handles repeats so it's safe to forward

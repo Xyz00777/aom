@@ -74,7 +74,10 @@ def find_previous_run(
         none of the sessions qualify (including when ``session_dir``
         does not exist).
     """
-    if not session_dir.exists():
+    if not session_dir.is_dir():
+        # Includes both "doesn't exist" and "exists but is a file" — a
+        # broken/blocker path on disk shouldn't crash the startup hint
+        # lookup.
         return None
 
     best: tuple[datetime, PriorRun] | None = None

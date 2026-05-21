@@ -163,6 +163,10 @@ class AOMApp(App[None]):
         self._run_state.definitions = list(definitions)
         self._dirty += 1
 
+    def set_prior_run(self, prior_run: object) -> None:  # noqa: ARG002
+        """Renderer Protocol no-op — the TUI doesn't surface the prior-run hint yet."""
+        return
+
     def add_warning(self, message: str, is_deprecation: bool = False) -> None:
         """Renderer Protocol: bump counters; widgets can read them.
 

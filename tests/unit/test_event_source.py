@@ -47,6 +47,9 @@ class FakeRenderer:
     def set_definitions(self, definitions: list[Any]) -> None:
         self.definitions = list(definitions)
 
+    def set_prior_run(self, prior_run: object) -> None:
+        self.prior_run = prior_run
+
     def update_state(self, event: dict[str, Any]) -> None:
         self.events.append(event)
 

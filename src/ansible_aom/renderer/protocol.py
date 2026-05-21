@@ -24,6 +24,7 @@ Method                         Mandatory for                  May no-op for
 ``stop``                       every renderer                 (none)
 ``set_definitions``            every renderer                 (none — empty list
                                                               still permitted)
+``set_prior_run``              compact                        tui, json, replay
 ``update_state``               every renderer                 (none)
 ``handle_completion``          every renderer                 (none)
 ``add_warning``                live (compact + tui)           json, replay-only
@@ -47,7 +48,10 @@ methods so a misuse is loud rather than silent.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from ansible_aom.session.history import PriorRun
 
 
 @runtime_checkable
@@ -102,6 +106,22 @@ class Renderer(Protocol):
         ``v2_playbook_on_task_start`` events. The replay driver
         deliberately does NOT call this method — recorded sessions
         don't carry the preflight summary.
+        """
+        ...
+
+    def set_prior_run(self, prior_run: "PriorRun | None") -> None:
+        """Optional. Provide stats from the most-recent matching prior run.
+
+        **Mandatory for compact** (drives the "Last run: N tasks in T"
+        hint line above the preflight summary). **TUI, JSON, and replay
+        renderers may no-op** — they don't display the hint.
+
+        **Must be called before** :meth:`set_definitions` for the
+        compact renderer to include the hint in its one-shot startup
+        summary. The runner calls them in that order.
+
+        ``None`` means either no matching history exists or the caller
+        chose not to look one up — the hint is silently omitted.
         """
         ...
 

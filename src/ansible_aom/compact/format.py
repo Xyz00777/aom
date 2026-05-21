@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import os
 import re
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from ansible_aom.core.heartbeat import LivenessState
 from ansible_aom.core.icons import (
@@ -30,6 +32,9 @@ from ansible_aom.core.models import (
     Status,
 )
 from ansible_aom.core.tree import TreeProjection
+
+if TYPE_CHECKING:
+    from ansible_aom.session.history import PriorRun
 
 # =============================================================================
 # ANSI color helpers
@@ -505,6 +510,35 @@ def format_tree_block(
     return out
 
 
+def _format_duration_compact(seconds: float) -> str:
+    """Format a duration as the most compact human form ("42s", "1m23s", "1h05m").
+
+    Used for the "Last run" line in the preflight summary, where the
+    horizontal budget is one line so we trade precision for brevity.
+    """
+    if seconds < 60:
+        return f"{int(round(seconds))}s"
+    if seconds < 3600:
+        m, s = divmod(int(round(seconds)), 60)
+        return f"{m}m{s:02d}s"
+    h, rem = divmod(int(round(seconds)), 3600)
+    m = rem // 60
+    return f"{h}h{m:02d}m"
+
+
+def _format_age(end_time: datetime) -> str:
+    """Format an absolute UTC ``end_time`` as a relative "Xs/m/h/d ago" string."""
+    delta = datetime.now(timezone.utc) - end_time
+    secs = int(delta.total_seconds())
+    if secs < 60:
+        return f"{secs}s ago"
+    if secs < 3600:
+        return f"{secs // 60}m ago"
+    if secs < 86400:
+        return f"{secs // 3600}h ago"
+    return f"{secs // 86400}d ago"
+
+
 def _count_tasks(play: PlayDefinition) -> int:
     """Count leaf TaskDefinitions in a play, expanding any RoleGroupDefinition."""
     total = 0
@@ -585,7 +619,11 @@ def collect_tags(definitions: list[PlayDefinition]) -> list[str]:
     return sorted(seen)
 
 
-def format_preflight_summary(definitions: list[PlayDefinition]) -> str | None:
+def format_preflight_summary(
+    definitions: list[PlayDefinition],
+    *,
+    prior_run: "PriorRun | None" = None,
+) -> str | None:
     """Render a one-shot startup summary of plays/tasks/hosts from preflight.
 
     Printed once before any JSONL events flow, giving the user a sense
@@ -600,6 +638,14 @@ def format_preflight_summary(definitions: list[PlayDefinition]) -> str | None:
     The bracketed name comes from the play's `name`. Host count uses
     `resolved_hosts` when populated; falls back to the raw `hosts`
     pattern when --list-hosts failed for that play.
+
+    When ``prior_run`` is supplied (a completed session with matching
+    run-config + host count, looked up by
+    :func:`ansible_aom.session.history.find_previous_run`), a
+    "Last run: N tasks in T (D ago)" line is appended below the
+    per-play summary. ``None`` for ``prior_run`` means either no
+    matching history exists, or the caller chose not to look one up —
+    the line is silently omitted in both cases.
     """
     if not definitions:
         return None
@@ -621,6 +667,14 @@ def format_preflight_summary(definitions: list[PlayDefinition]) -> str | None:
     tags = collect_tags(definitions)
     if tags:
         lines.append(f"Tags: {', '.join(tags)}")
+
+    if prior_run is not None:
+        tasks_word = "task" if prior_run.task_count == 1 else "tasks"
+        lines.append(
+            f"Last run: {prior_run.task_count} {tasks_word} in "
+            f"{_format_duration_compact(prior_run.duration_seconds)} "
+            f"({_format_age(prior_run.end_time)})"
+        )
 
     return "\n".join(lines)
 

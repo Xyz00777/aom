@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import shutil
 import time
+from typing import TYPE_CHECKING
 
 from ansible_aom.compact.display import Display
 from ansible_aom.compact.exit_code import determine_exit_code  # noqa: F401 — re-export
@@ -51,6 +52,9 @@ from ansible_aom.core.heartbeat import HeartbeatTracker, LivenessState  # noqa: 
 from ansible_aom.core.icons import is_unicode_terminal
 from ansible_aom.core.models import RunState, Status
 from ansible_aom.core.tree import TreeProjection
+
+if TYPE_CHECKING:
+    from ansible_aom.session.history import PriorRun
 
 
 class CompactRenderer:
@@ -112,6 +116,11 @@ class CompactRenderer:
         # duplication on single-host runs (and on run_once / delegated
         # tasks in multi-host runs).
         self._current_task_inline_duration_hosts: set[str] = set()
+        # Optional prior-run stats for the preflight "Last run" hint.
+        # Must be set via :meth:`set_prior_run` BEFORE
+        # :meth:`set_definitions` so the hint is included in the
+        # one-shot startup summary.
+        self._prior_run: "PriorRun | None" = None
 
     def start(self, playbook: str, args: list[str]) -> None:
         """Start rendering a playbook run.
@@ -148,6 +157,15 @@ class CompactRenderer:
         )
         self._display.update(status_bar)
 
+    def set_prior_run(self, prior_run: "PriorRun | None") -> None:
+        """Store the matching prior-run stats for the preflight summary.
+
+        Must be called before :meth:`set_definitions` so the hint line
+        is included in the one-shot startup summary. ``None`` means no
+        matching prior run — the line is silently omitted.
+        """
+        self._prior_run = prior_run
+
     def set_definitions(self, definitions: list) -> None:
         """Store preflight definitions and emit the startup summary.
 
@@ -160,7 +178,7 @@ class CompactRenderer:
         """
         self._definitions = list(definitions)
 
-        summary = format_preflight_summary(self._definitions)
+        summary = format_preflight_summary(self._definitions, prior_run=self._prior_run)
         if summary is not None:
             self._display.print_log(summary)
 
