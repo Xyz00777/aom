@@ -751,15 +751,12 @@ class TestTaskCompletionLifecycle:
         p = TreeProjection.from_run_state(state)
         assert p.is_tree_visible() is True
 
-    def test_tree_sticky_between_tasks_shows_last_task(self):
-        """Spec: while the playbook is in flight, the tree should stay
-        visible — when no task is currently RUNNING (transient gap
-        between tasks), it falls back to the most recently active task
-        with its final per-host status. Avoids the brief flicker for
-        fast-executing tasks. Regression guard for: user reported
-        'tree view becomes hidden for a bit for fast tasks'."""
-        # Build a state where task t1 has fully completed (all hosts OK)
-        # and no new task has started yet. Playbook hasn't ended.
+    def test_tree_does_not_show_completed_task_between_tasks(self):
+        """Completed tasks are intentionally dropped from the tree — the
+        streaming log above the panel already carries them. Between
+        tasks the tree's job is to show pending work, not replay history.
+        Regression guard for the post-redesign contract: 'show only the
+        currently-running task and everything still to come.'"""
         state = RunState(playbook="site.yml")
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
         state.handle_event(
@@ -791,17 +788,10 @@ class TestTaskCompletionLifecycle:
             "tree should remain visible between tasks while playbook is in flight"
         )
         lines = p.tree_lines(budget=25)
-        kinds = [ln.kind for ln in lines]
-        assert "task" in kinds, "expected the just-completed task to remain"
-        task_line = next(ln for ln in lines if ln.kind == "task")
-        assert "Install nginx" in task_line.label
-        # Hosts under the sticky task are terminal — they show terminal
-        # status icons, not the RUNNING animation glyph.
-        host_lines = [ln for ln in lines if ln.kind == "host"]
-        assert len(host_lines) == 2
-        for hl in host_lines:
-            assert hl.status == Status.OK
-            assert hl.status != Status.RUNNING
+        # No preflight definitions + only completed runtime tasks → the
+        # play yields nothing to show. The tree degrades to just the
+        # playbook header line until the next task starts.
+        assert all(ln.label != "Install nginx" for ln in lines if ln.kind == "task"), lines
 
     def test_tree_hidden_after_playbook_stats(self):
         """Once v2_playbook_on_stats fires, RunState.status becomes

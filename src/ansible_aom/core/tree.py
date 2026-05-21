@@ -18,6 +18,8 @@ from typing import Literal
 
 from ansible_aom.core.models import (
     HostRunState,
+    PlayDefinition,
+    PlayRunState,
     RoleGroupDefinition,
     RunState,
     Status,
@@ -311,7 +313,13 @@ class TreeProjection:
         return collapsed
 
     def _tree_lines_unbounded(self, now: datetime) -> list[TreeLine]:
-        """Project full tree (no pruning). See `tree_lines` for entry point."""
+        """Project full tree (no pruning). See ``tree_lines`` for entry point.
+
+        Layout rule: each play shows tasks that are currently RUNNING and
+        every task still to come (pending). Completed tasks are dropped —
+        they already appear in the streaming log above the panel, so the
+        tree's job is just "what's happening now and what's next".
+        """
         if not self.is_tree_visible():
             return []
 
@@ -327,32 +335,9 @@ class TreeProjection:
         ]
 
         for play in self._state.plays.values():
-            # A task is "currently running" iff at least one of its hosts
-            # is in RUNNING state. See `is_tree_visible` docstring for why
-            # we cannot trust `task.status`.
-            running_tasks = [
-                t
-                for t in play.tasks.values()
-                if any(hs.status == Status.RUNNING for hs in t.hosts.values())
-            ]
-
-            # Sticky fallback: when no task is currently RUNNING but the
-            # playbook hasn't ended (`is_tree_visible` would not have
-            # called us otherwise), keep showing the most recently active
-            # task with its terminal host states. This bridges the gap
-            # between fast-completing tasks so the tree doesn't flicker.
-            if running_tasks:
-                tasks_to_emit = running_tasks
-                running_mode = True
-            else:
-                most_recent = None
-                for t in play.tasks.values():
-                    if t.hosts:
-                        most_recent = t
-                if most_recent is None:
-                    continue
-                tasks_to_emit = [most_recent]
-                running_mode = False
+            play_items = self._play_running_and_pending(play)
+            if not play_items:
+                continue
 
             lines.append(
                 TreeLine(
@@ -364,42 +349,31 @@ class TreeProjection:
                     elapsed_s=None,
                 )
             )
-            # Group tasks by role (or None for play-level tasks).
-            # Ordering preserves first-encounter order — under linear
-            # that's ansible source order; under free that's per-task
-            # start order.
-            tasks_by_role: dict[str | None, list[TaskRunState]] = {}
-            order: list[str | None] = []
-            for task in tasks_to_emit:
-                role = self._task_role(task.name)
-                if role not in tasks_by_role:
-                    tasks_by_role[role] = []
-                    order.append(role)
-                tasks_by_role[role].append(task)
 
-            for role in order:
-                task_depth = 2
-                if role is not None:
-                    lines.append(
-                        TreeLine(
-                            depth=2,
-                            kind="role",
-                            label=f"role: {role}",
-                            glyph=None,
-                            status=None,
-                            elapsed_s=None,
-                            identity=role,
+            current_role: str | None = None
+            role_open = False
+            for item_kind, name, role, runtime in play_items:
+                if role != current_role:
+                    current_role = role
+                    role_open = role is not None
+                    if role_open:
+                        lines.append(
+                            TreeLine(
+                                depth=2,
+                                kind="role",
+                                label=f"role: {role}",
+                                glyph=None,
+                                status=None,
+                                elapsed_s=None,
+                                identity=role,
+                            )
                         )
-                    )
-                    task_depth = 3
-                for task in tasks_by_role[role]:
-                    lines.append(self._task_line(task, depth=task_depth))
-                    for hostname, hs in task.hosts.items():
-                        # In running mode, only currently-RUNNING hosts
-                        # appear as leaves (spec: "running-only pruning"
-                        # for the active state). In sticky mode all host
-                        # entries appear with their terminal status.
-                        if running_mode and hs.status != Status.RUNNING:
+                task_depth = 3 if role_open else 2
+
+                if item_kind == "running" and runtime is not None:
+                    lines.append(self._task_line(runtime, depth=task_depth))
+                    for hostname, hs in runtime.hosts.items():
+                        if hs.status != Status.RUNNING:
                             continue
                         elapsed = (
                             (now - hs.start_time).total_seconds()
@@ -416,8 +390,95 @@ class TreeProjection:
                                 elapsed_s=elapsed,
                             )
                         )
+                else:  # pending
+                    lines.append(
+                        TreeLine(
+                            depth=task_depth,
+                            kind="task",
+                            label=name,
+                            glyph=None,
+                            status=Status.PENDING,
+                            elapsed_s=None,
+                        )
+                    )
 
         return lines
+
+    def _play_running_and_pending(
+        self, play: "PlayRunState"
+    ) -> list[tuple[str, str, str | None, TaskRunState | None]]:
+        """Enumerate (kind, name, role, runtime) for a play's running and
+        pending tasks, in execution order.
+
+        ``kind`` is ``"running"`` (task has at least one RUNNING host) or
+        ``"pending"`` (task hasn't started, or runtime has no hosts yet).
+        Completed tasks — runtime has hosts and no host is RUNNING — are
+        dropped from the result.
+
+        Order: preflight order first (when ``definitions`` is available),
+        with any runtime-only tasks (dynamic ``include_tasks``) appended
+        in runtime-arrival order.
+        """
+        runtime_by_name: dict[str, TaskRunState] = {}
+        for task in play.tasks.values():
+            runtime_by_name.setdefault(task.name, task)
+
+        play_def = self._play_def_for(play)
+
+        items: list[tuple[str, str, str | None, TaskRunState | None]] = []
+        emitted_names: set[str] = set()
+
+        def _classify(runtime: TaskRunState | None) -> str:
+            """Return ``"running"`` / ``"pending"`` / ``"completed"``.
+
+            ``"completed"`` is filtered out before items reach the caller,
+            but the helper still returns it so the drop site can branch
+            on a single classification result.
+            """
+            if runtime is None or not runtime.hosts:
+                return "pending"
+            if any(hs.status == Status.RUNNING for hs in runtime.hosts.values()):
+                return "running"
+            return "completed"
+
+        if play_def is not None:
+            for entry in play_def.tasks:
+                if isinstance(entry, RoleGroupDefinition):
+                    role: str | None = entry.role
+                    task_defs = entry.tasks
+                else:
+                    role = None
+                    task_defs = [entry]
+                for tdef in task_defs:
+                    runtime = runtime_by_name.get(tdef.name)
+                    kind = _classify(runtime)
+                    emitted_names.add(tdef.name)
+                    if kind == "completed":
+                        continue
+                    items.append((kind, tdef.name, role, runtime))
+
+        # Runtime-only tasks (dynamic include_tasks, or no preflight at all).
+        for task in play.tasks.values():
+            if task.name in emitted_names:
+                continue
+            kind = _classify(task)
+            if kind == "completed":
+                continue
+            items.append((kind, task.name, self._task_role(task.name), task))
+
+        return items
+
+    def _play_def_for(self, play: "PlayRunState") -> "PlayDefinition | None":
+        """Return the matching preflight PlayDefinition, or None.
+
+        Preflight defs key by play number; runtime plays key by UUID, so
+        the only viable join is by name. ``RunState`` already maintains
+        ``_play_def_by_name`` for the runner — reuse it here.
+        """
+        index = self._state._play_def_by_name
+        if index is None:
+            return None
+        return index.get(play.name)
 
     def _task_role(self, task_name: str) -> str | None:
         """Return the role name a task belongs to, or None.
