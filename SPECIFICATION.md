@@ -47,32 +47,38 @@ AOM combines the best of all approaches: robust JSONL parsing, interactive TUI w
                          │
          ┌───────────────┼───────────────┐
          ▼               ▼               ▼
-┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-│  Pre-Parser │ │   Runner    │ │   Session   │
-│(--list-tasks)│ │  (pexpect)  │ │   Manager   │
-└──────┬──────┘ └──────┬──────┘ └──────┬──────┘
-       │               │               │
-       └───────────────┴───────────────┘
-                       │
+┌──────────────────────┐ ┌──────────────────────┐
+│  EventSource port    │ │  Renderer port       │
+│  (drivers/protocol)  │ │ (renderer/protocol)  │
+└──────────┬───────────┘ └──────────┬───────────┘
+           │                        │
+   ┌───────┴───────┐         ┌──────┴────────────┐
+   ▼               ▼         ▼          ▼        ▼
+LiveDriver    ReplayDriver  compact   tui   formats/json
+(ansible/      (session/
+ runner +       store)
+ preflight)
+           │                        │
+           └───────────┬────────────┘
                        ▼
 ┌─────────────────────────────────────────────┐
-│         Backend-Agnostic Core               │
+│         Pure domain core (core/)             │
 │  ┌────────────────────────────────────────┐  │
-│  │ State Machine (plays, tasks, hosts)    │  │
+│  │ models.py — RunState aggregate +       │  │
+│  │   plays / tasks / hosts entities        │  │
 │  ├────────────────────────────────────────┤  │
-│  │ JSONL Parser (json_stream.py)          │  │
+│  │ parser.py — JSONL + --list-* parsing   │  │
 │  ├────────────────────────────────────────┤  │
-│  │ Models (dataclass definitions)         │  │
+│  │ state_machine.py — ExecutionState FSM  │  │
 │  ├────────────────────────────────────────┤  │
-│  │ Session Manager (artifact writer)       │  │
+│  │ tree, heartbeat, overhead, redaction,  │  │
+│  │ inspect_model, parity, prompts, icons  │  │
 │  └────────────────────────────────────────┘  │
-└──────────────────────┬──────────────────────┘
+└─────────────────────────────────────────────┘
+                       ▲
                        │
-         ┌─────────────┴─────────────┐
-         ▼                           ▼
-┌─────────────────────┐    ┌─────────────────────┐
-│   ANSI Renderer     │    │   Textual Frontend   │
-│   (Compact Mode)    │    │   (--tui mode)      │
+              Compact / TUI / JSON
+              renderers read this
 ├─────────────────────┤    ├─────────────────────┤
 │ • Rich Console      │    │ • Textual App        │
 │ • ANSI cursor ctrl   │    │ • Multi-panel UI    │
@@ -84,74 +90,71 @@ AOM combines the best of all approaches: robust JSONL parsing, interactive TUI w
 
 ### 2.2 Component Responsibilities
 
-**CLI Layer** (`cli.py`, `__main__.py`)
-- Parse CLI arguments
-- Check ansible.posix availability
-- Initialize session
-- Route to compact (ANSI) or full TUI (Textual) renderer
+Module layout and inter-package dependencies are owned by
+[`ARCHITECTURE.md`](ARCHITECTURE.md) — see §3 (Module Map) and §6 (Architectural
+Decisions). This section restates only the responsibilities that affect
+externally observable behavior.
 
-**Pre-Parser** (`services/pre_parser.py`)
-- Run `ansible-playbook --list-tasks`
-- Parse output into play/task tree structure
-- Group consecutive role tasks (threshold: 5)
+**CLI layer** (`cli.py`, `__main__.py`)
+- Parse CLI arguments and check ansible.posix availability.
+- Compose one `EventSource` (live vs replay) with one `Renderer` (compact, TUI,
+  or JSON). The CLI is the only place that knows concrete adapters.
 
-**Runner** (`services/runner.py`)
-- Spawn ansible-playbook via pexpect PTY
-- Stream JSONL output
-- Detect password prompts
-- Handle signals and cancellation
+**Live driver** (`drivers/live.py` wrapping `ansible/runner.py`)
+- Run `ansible-playbook --list-tasks` and `--list-hosts` in parallel.
+- Spawn `ansible-playbook` under a pexpect PTY with the JSONL callback.
+- Detect password / interactive prompts; route them to the renderer.
+- Handle signals and cancellation; emit a final completion event.
 
-**Backend-Agnostic Core**
-- **State Machine** (`state.py`): Process JSONL events, track play/task/host status, calculate aggregates
-- **JSONL Parser** (`json_stream.py`): Parse JSON events, handle non-JSON lines
-- **Models** (`models.py`): Dataclass definitions for definitions and run states
-- **Session Manager** (`artifacts/`): Record events to session directory, create .aom artifacts
+**Replay driver** (`drivers/replay.py`)
+- Read a recorded session artifact via `session/store.py` and re-emit the
+  recorded events through the same `Renderer` interface as the live driver.
 
-**Compact View (ANSI Renderer)**
-- Direct ANSI output via Rich Console
-- Fixed nom-style status panel at bottom
-- Scrolling logs above
-- ANSI cursor manipulation for bottom panel
-- Passive rendering (no interactive widgets)
+**Domain core** (`core/`)
+- `models.py` — `RunState` aggregate, `PlayRunState`/`TaskRunState`/`HostRunState`
+  entities, definition value objects, `Status` and `WarningType` enums.
+- `state_machine.py` — `ExecutionState` lifecycle FSM.
+- `parser.py` — JSONL stream parsing, `--list-tasks` / `--list-hosts` parsing.
+- `tree.py`, `heartbeat.py`, `overhead.py`, `inspect_model.py` — pure
+  projections of state into render-ready shapes.
+- `redaction.py`, `prompts.py`, `icons.py`, `config.py` — pure services.
 
-**Full TUI (Textual Frontend)**
-- Multi-panel interactive interface
-- Tree view with keyboard navigation
-- Log panel with search
-- Summary panel with stats
-- Status bar (configurable)
-- Help overlay, settings screen
+**Compact renderer** (`compact/`)
+- ANSI output via Rich Console + ANSI cursor manipulation.
+- Fixed nom-style status panel at the bottom, scrolling logs above.
+- Pure formatters in `compact/format.py`; lifecycle in `compact/renderer.py`.
+
+**Textual TUI** (`tui/`)
+- Multi-panel interactive interface, tree navigation, log panel with search,
+  summary panel, configurable status bar, help overlay, settings screen.
+
+**JSON renderer** (`formats/json.py`)
+- Emits the `RunSummary v1` JSON schema for non-interactive consumers.
 
 ### 2.3 Renderer Protocol
 
-The Renderer Protocol defines the interface that both CompactRenderer and AOMApp must satisfy, enabling the shared core to work with either backend:
+The `Renderer` Protocol defines the sink that the compact, TUI, and JSON
+renderers all satisfy. The full method surface — including
+`set_definitions`, `add_warning`, `print_log`, `tick`, `note_pty_bytes`,
+`note_subprocess_active`, and `handle_interactive_prompt` — is defined in
+[`src/ansible_aom/renderer/protocol.py`](src/ansible_aom/renderer/protocol.py),
+which is the source of truth. See [`ARCHITECTURE.md`](ARCHITECTURE.md) §4.1 for
+the architectural role of the Protocol.
+
+The minimal surface every renderer implements is:
 
 ```python
-from typing import Protocol
-
 class Renderer(Protocol):
-    """Protocol that both CompactRenderer and AOMApp satisfy."""
-    
-    def start(self, playbook: str, args: list[str]) -> None:
-        """Start rendering a playbook run."""
-        ...
-    
-    def update_state(self, event: dict) -> None:
-        """Handle a new JSONL event."""
-        ...
-    
-    def handle_password_prompt(self, prompt_text: str) -> str:
-        """Handle a password prompt. Returns the password."""
-        ...
-    
-    def handle_completion(self, exit_code: int, state: str) -> None:
-        """Handle playbook completion (success/failure/crash)."""
-        ...
-    
-    def stop(self) -> None:
-        """Stop rendering and clean up."""
-        ...
+    def start(self, playbook: str, args: list[str]) -> None: ...
+    def set_definitions(self, definitions: list[PlayDefinition]) -> None: ...
+    def update_state(self, event: dict) -> None: ...
+    def handle_password_prompt(self, prompt_text: str) -> str: ...
+    def handle_completion(self, exit_code: int, state: str) -> None: ...
+    def stop(self) -> None: ...
 ```
+
+The Protocol is paired with an `EventSource` Protocol (`drivers/protocol.py`)
+that produces the events fed into the renderer — see ARCHITECTURE.md §4.2.
 
 **Factory Function:**
 
@@ -2871,12 +2874,12 @@ Install with:
 **Milestones:**
 1. Project structure and dependencies
 2. CLI parsing and entry point
-3. JSONL stream parser (json_stream.py from aomp)
-4. State machine (state.py, models.py)
-5. Pre-parser for --list-tasks
-6. Basic pexpect runner
-7. Compact view rendering
-8. Session recording
+3. JSONL stream parser (`core/parser.py`)
+4. State machine and models (`core/state_machine.py`, `core/models.py`)
+5. Pre-parser for `--list-tasks` / `--list-hosts` (`ansible/preflight.py`)
+6. Basic pexpect runner (`ansible/runner.py`)
+7. Compact view rendering (`compact/`)
+8. Session recording (`session/store.py`)
 
 **Tests:** Unit tests for parser, state machine, models
 

@@ -60,10 +60,16 @@ Each test case follows this format:
 **Section:** 2.1, 2.2
 **Category:** unit
 **Priority:** high
-**Description:** Verify core modules exist at expected paths
-**Test:** Assert files exist: `cli.py`, `__main__.py`, `services/pre_parser.py`, `services/runner.py`, `state.py`, `json_stream.py`, `models.py`
+**Description:** Verify core modules exist at the paths declared in ARCHITECTURE.md §3.
+**Test:** Assert files exist for the target layout: `cli.py`, `__main__.py`,
+`core/models.py`, `core/state_machine.py`, `core/parser.py`,
+`ansible/runner.py`, `ansible/preflight.py`, `session/store.py`,
+`renderer/protocol.py`, `drivers/protocol.py`.
 **Fixture/Setup:** Source tree
 **Edge Cases:** None
+**Notes:** Pair with the layering test from ARCHITECTURE.md §7.8
+(`tests/unit/test_layering.py`) — together they pin both presence and
+direction of dependencies.
 
 ### TC-004: Renderer Protocol Implementation
 **Section:** 2.3
@@ -4532,7 +4538,7 @@ Each test case follows this format:
 **Section:** 15
 **Category:** integration
 **Priority:** critical
-**Description:** Phase 1 implements JSONL stream parser (json_stream.py)
+**Description:** Phase 1 implements the JSONL stream parser (`core/parser.py`)
 **Test:** Verify parser processes all 10 event types
 **Fixture/Setup:** JSONL event fixtures
 **Edge Cases:** Invalid JSONL lines
