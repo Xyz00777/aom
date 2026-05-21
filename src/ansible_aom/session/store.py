@@ -199,7 +199,7 @@ class SessionManager:
         session_id: str,
         status: str,
         *,
-        task_count: int | None = None,
+        preflight_task_count: int | None = None,
         resolved_host_count: int | None = None,
     ) -> None:
         """Finalize session and update metadata.
@@ -207,11 +207,13 @@ class SessionManager:
         Args:
             session_id: The session ID.
             status: Final status ("completed", "failed", "crashed").
-            task_count: Preflight-derived task count (sum across plays).
-                Persisted to ``meta.json`` so a future run with the same
-                run configuration can show "last run: N tasks in T".
-                ``None`` when preflight didn't yield definitions (e.g.
-                early failure).
+            preflight_task_count: Preflight-derived task count (sum
+                across plays). Persisted to ``meta.json`` so a future
+                run with the same run configuration can show
+                "last run: N tasks in T". ``None`` when preflight
+                didn't yield definitions (e.g. early failure). Named to
+                match the persisted field — the value comes from
+                ``--list-tasks``, not from a post-run event tally.
             resolved_host_count: Union of ``resolved_hosts`` across all
                 plays from preflight. Used as a secondary filter when
                 matching prior runs — two runs with the same config but
@@ -233,7 +235,7 @@ class SessionManager:
         meta["status"] = status
         meta["end_time"] = end_time.isoformat().replace("+00:00", "Z")
         meta["duration_seconds"] = duration
-        meta["preflight_task_count"] = task_count
+        meta["preflight_task_count"] = preflight_task_count
         meta["resolved_host_count"] = resolved_host_count
 
         with open(meta_file, "w") as f:
