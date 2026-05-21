@@ -74,18 +74,37 @@ def inspect_prune(state_dir: Path, days: int) -> int:
     return 0
 
 
-def inspect_debug(state_dir: Path, session_id: str | None = None) -> int:
-    """Print the diagnostics.json contents for ``session_id`` (or latest)."""
+def inspect_debug(
+    state_dir: Path,
+    session_id: str | None = None,
+    *,
+    as_json: bool = False,
+) -> int:
+    """Print the diagnostics.json contents for ``session_id`` (or latest).
+
+    ``as_json=True`` emits the raw record (or ``null`` for legacy
+    sessions) to stdout for jq pipelines. The human-readable path
+    keeps its session-header line for context.
+    """
+    import json as _json
+
     target = session_id or find_latest_session(state_dir)
     if target is None:
-        print(f"No sessions found in {state_dir}")
+        if as_json:
+            print(_json.dumps(None))
+        else:
+            print(f"No sessions found in {state_dir}")
         return 0
     session = load_session(target, state_dir)
     if session is None:
         print(f"Session not found: {target}", file=sys.stderr)
         return 1
+    record = session.get("diagnostics")
+    if as_json:
+        print(_json.dumps(record))
+        return 0
     print(f"Session {target}")
-    print(format_diagnostics_section(session.get("diagnostics")), end="")
+    print(format_diagnostics_section(record), end="")
     return 0
 
 
@@ -113,6 +132,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "timeline, event histogram, counters) and exit.",
     )
     parser.add_argument(
+        "--json",
+        dest="as_json",
+        action="store_true",
+        help="With --debug, emit the raw diagnostics.json record on stdout "
+        "instead of the human-readable summary (for jq pipelines).",
+    )
+    parser.add_argument(
         "--session",
         dest="session_id",
         default=None,
@@ -138,7 +164,7 @@ def main(argv: list[str] | None = None) -> int:
         return inspect_prune(args.state_dir, args.days)
 
     if args.debug:
-        return inspect_debug(args.state_dir, args.session_id)
+        return inspect_debug(args.state_dir, args.session_id, as_json=args.as_json)
 
     use_text = args.text or not _stdout_is_tty()
     if use_text:

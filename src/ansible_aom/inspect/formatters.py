@@ -81,6 +81,13 @@ def format_diagnostics_section(record: dict[str, Any] | None) -> str:
     lines: list[str] = []
     schema = record.get("schema_version", "?")
     lines.append(f"Diagnostics (schema v{schema})")
+
+    warnings = record.get("warnings") or []
+    if warnings:
+        lines.append("")
+        lines.append("Warnings:")
+        for w in warnings:
+            lines.append(f"  ! {w}")
     aom_version = record.get("aom_version")
     if aom_version:
         lines.append(f"  aom version: {aom_version}")

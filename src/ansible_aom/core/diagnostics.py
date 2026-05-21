@@ -347,6 +347,34 @@ class RendererStats:
 
 SCHEMA_VERSION = 1
 
+# Render-storm heuristic. Triggered when render_calls / events_received
+# is implausibly large — i.e. the renderer is doing redundant work the
+# user is unlikely to see. Threshold chosen so a 5 Hz panel refresh
+# during a fast run (50ms tasks) doesn't trip the warning; pathological
+# cases (per-host per-event redraws) blow past 10x easily.
+_RENDER_STORM_RATIO_THRESHOLD = 5.0
+_RENDER_STORM_MIN_EVENTS = 50
+
+
+def render_storm_warning(stats: RendererStats) -> str | None:
+    """Detect render-call inflation vs. event rate.
+
+    Returns a one-line warning when the renderer is redrawing far more
+    often than the runner emits events; ``None`` otherwise (including
+    short runs where the ratio is statistically noise).
+    """
+    if stats.events_received < _RENDER_STORM_MIN_EVENTS:
+        return None
+    ratio = stats.render_calls / stats.events_received
+    if ratio < _RENDER_STORM_RATIO_THRESHOLD:
+        return None
+    return (
+        f"render-storm detected: {stats.render_calls} panel renders for "
+        f"{stats.events_received} events (ratio {ratio:.1f}× — see "
+        f"docs/superpowers/specs/2026-05-21-render-state-perf-design.md "
+        f"HS-1 / HS-8)."
+    )
+
 
 def build_diagnostics_record(
     *,
@@ -393,6 +421,11 @@ def build_diagnostics_record(
         "tracemalloc_peak_kb": stats.tracemalloc_peak_kb,
     }
 
+    warnings: list[str] = []
+    storm = render_storm_warning(stats)
+    if storm is not None:
+        warnings.append(storm)
+
     return {
         "schema_version": SCHEMA_VERSION,
         "session_id": session_id,
@@ -404,4 +437,5 @@ def build_diagnostics_record(
         "env_snapshot": dict(env_snapshot),
         "host_count": host_count,
         "playbook_task_count": playbook_task_count,
+        "warnings": warnings,
     }

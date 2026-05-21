@@ -214,3 +214,27 @@ def test_inspect_debug_no_sessions(tmp_path: Path) -> None:
         rc = inspect_main(["--debug", "--state-dir", str(tmp_path)])
     assert rc == 0
     assert "no session" in buf.getvalue().lower()
+
+
+def test_inspect_debug_json_emits_raw_record(tmp_path: Path) -> None:
+    """``--debug --json`` writes the diagnostics record as a single JSON
+    object for jq pipelines. No human-readable framing."""
+    _write_session(tmp_path, "019e4ba7-c0ca-7000-9250-e869f2f45843")
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        rc = inspect_main(["--debug", "--json", "--state-dir", str(tmp_path)])
+    assert rc == 0
+    parsed = json.loads(buf.getvalue())
+    assert parsed["schema_version"] == 1
+    assert parsed["event_histogram"]["v2_runner_on_ok"] == 400
+
+
+def test_inspect_debug_json_legacy_session_outputs_null(tmp_path: Path) -> None:
+    _write_session(tmp_path, "legacy-id", with_diagnostics=False)
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        rc = inspect_main(["--debug", "--json", "--state-dir", str(tmp_path)])
+    assert rc == 0
+    assert json.loads(buf.getvalue()) is None

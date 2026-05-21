@@ -189,10 +189,37 @@ Shell completion:
   flags, and recorded session IDs.
 
 Debugging:
-  AOM_TRACE=1 aom site.yml  — dumps every pexpect loop transition to
-  stderr (TIMEOUT branches, newline matches, buffer contents). Useful
-  when an interactive prompt doesn't seem to fire — share the trace
-  output and the bytes AOM is receiving become obvious.
+  faulthandler is enabled unconditionally so a SIGSEGV in pexpect /
+  ptyprocess / any C extension dumps a Python + C stack to stderr
+  before the process dies. No flag needed; the cost is one syscall
+  at startup.
+
+  AOM_DEBUG=1          DEBUG-level logging on the `ansible_aom`
+                       logger plus lifecycle marks (preflight start /
+                       end, spawn, first / last event, completion).
+                       Marks are persisted into the session's
+                       diagnostics.json — read with
+                       `aom inspect --debug`.
+  AOM_TRACE_PEXPECT=1  Per-loop pexpect trace (TIMEOUT branches,
+                       newline matches, buffer contents). Useful when
+                       an interactive prompt doesn't seem to fire.
+                       Legacy name AOM_TRACE=1 still works.
+  AOM_TRACE_EVENTS=1   Log every Nth JSONL event type with running
+                       counters — for spotting event storms.
+  AOM_WATCHDOG=<secs>  Periodic stack dump every N seconds via
+                       faulthandler.dump_traceback_later. Catches
+                       hangs without a fault.
+  AOM_PROFILE=1        cProfile around the runner's _drive loop.
+                       Dumps to ~/.local/state/aom/profile/<sid>.pstats
+                       — open with `python -m pstats <file>` or
+                       snakeviz.
+  AOM_TRACEMALLOC=1    tracemalloc snapshot at completion; peak KB
+                       lands in diagnostics.json under
+                       `resources.tracemalloc_peak_kb`.
+
+  Every recorded session also writes diagnostics.json next to
+  meta.json (lifecycle timestamps, event histogram, per-renderer
+  counters). Inspect with `aom inspect --debug [--session ID]`.
 
 File locations:
   Sessions:    ~/.local/state/aom/sessions/<uuidv7>/
