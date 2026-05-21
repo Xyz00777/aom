@@ -22,6 +22,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from ansible_aom.inspect.formatters import format_diagnostics_section
 from ansible_aom.inspect.text import render_session
 from ansible_aom.session.store import (
     cleanup_old_sessions,
@@ -73,6 +74,21 @@ def inspect_prune(state_dir: Path, days: int) -> int:
     return 0
 
 
+def inspect_debug(state_dir: Path, session_id: str | None = None) -> int:
+    """Print the diagnostics.json contents for ``session_id`` (or latest)."""
+    target = session_id or find_latest_session(state_dir)
+    if target is None:
+        print(f"No sessions found in {state_dir}")
+        return 0
+    session = load_session(target, state_dir)
+    if session is None:
+        print(f"Session not found: {target}", file=sys.stderr)
+        return 1
+    print(f"Session {target}")
+    print(format_diagnostics_section(session.get("diagnostics")), end="")
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="aom inspect",
@@ -89,6 +105,18 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Render output as plain text instead of launching the TUI "
         "(also implied when stdout is not a TTY).",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Print the session's diagnostics.json summary (lifecycle "
+        "timeline, event histogram, counters) and exit.",
+    )
+    parser.add_argument(
+        "--session",
+        dest="session_id",
+        default=None,
+        help="Specific session ID (default: most recent). Used with --debug.",
     )
     sub = parser.add_subparsers(dest="command", help="Subcommand")
 
@@ -108,6 +136,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "prune":
         return inspect_prune(args.state_dir, args.days)
+
+    if args.debug:
+        return inspect_debug(args.state_dir, args.session_id)
 
     use_text = args.text or not _stdout_is_tty()
     if use_text:
