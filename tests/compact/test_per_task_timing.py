@@ -183,8 +183,8 @@ class TestPreviousTaskSummary:
         r._emit_event_log(_runner_ok("2026-05-11T14:10:01.0Z"))
         r._emit_event_log(_stats("2026-05-11T14:10:02.0Z"))
         # The Last task should get its own summary at stats time. Single-host
-        # task → per-task duration is dropped, only the cumulative remains.
-        assert any("Last" in line and "—" in line and "(2.0s)" in line for line in _logged(r))
+        # → per-task duration is suppressed; only the cumulative remains.
+        assert any("Last" in line and " — " in line for line in _logged(r))
 
     def test_no_summary_when_no_prior_task(self):
         """First task_start has no predecessor to summarise."""

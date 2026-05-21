@@ -1330,9 +1330,7 @@ class CompactRenderer:
             self._display.print_log(f"{prefix} {self._last_task_name} — {cum_str}")
         else:
             duration_str = _wrap(self._format_duration(duration), _CYAN, self._colorize)
-            self._display.print_log(
-                f"{prefix} {self._last_task_name} — {duration_str} {cum_str}"
-            )
+            self._display.print_log(f"{prefix} {self._last_task_name} — {duration_str} {cum_str}")
 
     def _flush_pending_skips(self, *, force_individual: bool) -> None:
         """Drain the per-task skipped-host buffer.
