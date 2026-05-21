@@ -567,15 +567,21 @@ class TestSessionRotation:
         session_dir = tmp_path / "sessions"
         session_dir.mkdir(parents=True)
 
+        # Use dates relative to "now" so the test doesn't go stale as
+        # wall-clock drifts past the hardcoded threshold.
+        now = datetime.now(timezone.utc)
+        old_ts = (now - timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        new_ts = (now - timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
         old_session = session_dir / "old_session"
         old_session.mkdir()
-        old_meta = {"playbook": "old.yml", "start_time": "2026-03-01T10:00:00Z"}
+        old_meta = {"playbook": "old.yml", "start_time": old_ts}
         with open(old_session / "meta.json", "w") as f:
             json.dump(old_meta, f)
 
         new_session = session_dir / "new_session"
         new_session.mkdir()
-        new_meta = {"playbook": "new.yml", "start_time": "2026-04-20T10:00:00Z"}
+        new_meta = {"playbook": "new.yml", "start_time": new_ts}
         with open(new_session / "meta.json", "w") as f:
             json.dump(new_meta, f)
 
