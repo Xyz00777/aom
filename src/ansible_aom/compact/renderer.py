@@ -836,45 +836,52 @@ class CompactRenderer:
             self._flush_pending_skips(force_individual=True)
             self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
+            lines: list[str] = []
             for host, result in event.get("hosts", {}).items():
                 if suffix:
                     self._current_task_inline_duration_hosts.add(host)
                 if result.get("changed"):
-                    self._display.print_log(
-                        _wrap(f"changed: [{host}]{suffix}", _YELLOW, self._colorize)
-                    )
+                    lines.append(_wrap(f"changed: [{host}]{suffix}", _YELLOW, self._colorize))
                 else:
-                    self._display.print_log(_wrap(f"ok: [{host}]{suffix}", _GREEN, self._colorize))
+                    lines.append(_wrap(f"ok: [{host}]{suffix}", _GREEN, self._colorize))
+            if lines:
+                self._display.print_log("\n".join(lines))
         elif name == "v2_runner_on_failed":
             self._flush_pending_skips(force_individual=True)
             self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
+            lines = []
             for host, result in event.get("hosts", {}).items():
                 if suffix:
                     self._current_task_inline_duration_hosts.add(host)
                 msg = _truncate_msg(result.get("msg", "") or "")
-                self._display.print_log(
+                lines.append(
                     _wrap(
                         f"fatal: [{host}]{suffix}: FAILED! => {msg}",
                         _RED,
                         self._colorize,
                     )
                 )
+            if lines:
+                self._display.print_log("\n".join(lines))
         elif name == "v2_runner_on_unreachable":
             self._flush_pending_skips(force_individual=True)
             self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
+            lines = []
             for host, result in event.get("hosts", {}).items():
                 if suffix:
                     self._current_task_inline_duration_hosts.add(host)
                 msg = _truncate_msg(result.get("msg", "") or "")
-                self._display.print_log(
+                lines.append(
                     _wrap(
                         f"fatal: [{host}]{suffix}: UNREACHABLE! => {msg}",
                         _MAGENTA,
                         self._colorize,
                     )
                 )
+            if lines:
+                self._display.print_log("\n".join(lines))
         elif name == "v2_runner_on_skipped":
             # Hold individual skipping lines until we know whether
             # they're worth printing one-by-one (mixed-result task)
