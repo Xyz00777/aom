@@ -16,11 +16,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-# Flags that take a value but contribute nothing to the runtime identity.
-# Listed explicitly so the parser still consumes their argument and does not
-# leak it into the unknown-token fallthrough.
-_IGNORED_VALUE_FLAGS: frozenset[str] = frozenset()
-
 # Verbosity flags and other no-op-for-identity boolean flags.
 _IGNORED_BOOL_FLAGS: frozenset[str] = frozenset(
     {
@@ -88,11 +83,6 @@ def build_run_config_key(*, playbook: str, ansible_args: list[str]) -> RunConfig
 
         if token in _IGNORED_BOOL_FLAGS:
             i += 1
-            continue
-
-        if token in _IGNORED_VALUE_FLAGS:
-            # Consume the flag *and* its value if present.
-            i += 2 if i + 1 < n else 1
             continue
 
         if token in ("-i", "--inventory", "--inventory-file"):
