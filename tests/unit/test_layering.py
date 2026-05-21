@@ -103,10 +103,10 @@ def test_core_does_not_depend_on_infrastructure() -> None:
         "ansible_aom.inspect.",
         "ansible_aom.rerun.",
         "ansible_aom.formats.",
-        # top-level infra modules still living at package root pre-§7.2
+        # Top-level infra modules still living at package root pre-§7.2.
+        # Removed as each module relocates into its target subpackage.
         "ansible_aom.runner",
         "ansible_aom.replay",
-        "ansible_aom.json_renderer",
         "ansible_aom.cli",
     )
     violations = _violations("core", forbidden)
@@ -127,7 +127,6 @@ def test_renderer_protocol_does_not_import_concrete_renderers() -> None:
         "ansible_aom.compact.",
         "ansible_aom.tui.",
         "ansible_aom.formats.",
-        "ansible_aom.json_renderer",
     )
     imports = _imports_in(SRC_ROOT / "renderer" / "protocol.py")
     bad = sorted({imp for imp in imports for p in forbidden if imp == p.rstrip(".") or imp.startswith(p)})
@@ -142,14 +141,8 @@ def test_renderer_protocol_does_not_import_concrete_renderers() -> None:
 @pytest.mark.parametrize(
     "subpkg, forbidden_siblings",
     [
-        (
-            "compact",
-            ("ansible_aom.tui.", "ansible_aom.formats.", "ansible_aom.json_renderer"),
-        ),
-        (
-            "tui",
-            ("ansible_aom.compact.", "ansible_aom.formats.", "ansible_aom.json_renderer"),
-        ),
+        ("compact", ("ansible_aom.tui.", "ansible_aom.formats.")),
+        ("tui", ("ansible_aom.compact.", "ansible_aom.formats.")),
     ],
 )
 def test_concrete_renderers_do_not_cross_import(
@@ -180,7 +173,6 @@ def test_drivers_do_not_depend_on_concrete_renderers() -> None:
         "ansible_aom.compact.",
         "ansible_aom.tui.",
         "ansible_aom.formats.",
-        "ansible_aom.json_renderer",
     )
     violations = _violations("drivers", forbidden)
     assert violations == [], (

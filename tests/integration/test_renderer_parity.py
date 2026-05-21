@@ -26,7 +26,7 @@ import pytest
 
 from ansible_aom.compact.renderer import CompactRenderer
 from ansible_aom.core.parity import reduce_state_for_parity
-from ansible_aom.json_renderer import JsonRenderer
+from ansible_aom.formats.json import JsonRenderer
 from ansible_aom.tui.app import AOMApp
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"

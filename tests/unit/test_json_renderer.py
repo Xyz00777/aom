@@ -5,7 +5,7 @@ from __future__ import annotations
 
 def test_run_summary_model_has_pinned_schema():
     """RunSummary captures every field the schema spec requires."""
-    from ansible_aom.json_renderer import HostCounts, RunSummary, TaskFailure
+    from ansible_aom.formats.json import HostCounts, RunSummary, TaskFailure
 
     summary = RunSummary(
         schema_version=1,
@@ -31,7 +31,7 @@ def test_run_summary_schema_version_is_literal_one():
     """schema_version refuses any value other than 1 — guards against accidental drift."""
     from pydantic import ValidationError
 
-    from ansible_aom.json_renderer import RunSummary
+    from ansible_aom.formats.json import RunSummary
 
     try:
         RunSummary.model_validate(
@@ -53,7 +53,7 @@ def test_run_summary_schema_version_is_literal_one():
 
 def test_json_renderer_satisfies_renderer_protocol():
     """JsonRenderer is structurally a Renderer (runtime_checkable Protocol)."""
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
     from ansible_aom.renderer.protocol import Renderer
 
     renderer = JsonRenderer()
@@ -62,7 +62,7 @@ def test_json_renderer_satisfies_renderer_protocol():
 
 def test_json_renderer_start_records_playbook_and_args():
     """start() captures the playbook path and ansible args without printing."""
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
 
     renderer = JsonRenderer()
     renderer.start("site.yml", ["-i", "inv.ini"])
@@ -72,7 +72,7 @@ def test_json_renderer_start_records_playbook_and_args():
 
 def test_json_renderer_set_definitions_stores_them(capsys):
     """set_definitions stores the list and prints nothing."""
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
 
     renderer = JsonRenderer()
     renderer.set_definitions([])
@@ -84,7 +84,7 @@ def test_json_renderer_set_definitions_stores_them(capsys):
 
 def test_json_renderer_noop_methods_emit_nothing(capsys):
     """add_warning, print_log, tick must not write to stdout/stderr in JSON mode."""
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
 
     renderer = JsonRenderer()
     renderer.start("site.yml", [])
@@ -141,7 +141,7 @@ def _state_two_hosts_one_failure():
 
 def test_handle_completion_emits_one_json_object(capsys):
     """The renderer prints exactly one JSON object on stdout."""
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
 
     renderer = JsonRenderer()
     renderer.start("site.yml", [])
@@ -154,7 +154,7 @@ def test_handle_completion_emits_one_json_object(capsys):
 
 
 def test_handle_completion_schema_version_is_one(capsys):
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
 
     renderer = JsonRenderer()
     renderer.start("site.yml", [])
@@ -166,7 +166,7 @@ def test_handle_completion_schema_version_is_one(capsys):
 
 
 def test_handle_completion_records_playbook_and_exit_code(capsys):
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
 
     renderer = JsonRenderer()
     renderer.start("site.yml", [])
@@ -180,7 +180,7 @@ def test_handle_completion_records_playbook_and_exit_code(capsys):
 
 def test_handle_completion_uses_state_timestamps(capsys):
     """started_at / ended_at come from RunState when present."""
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
 
     renderer = JsonRenderer()
     renderer.start("site.yml", [])
@@ -195,7 +195,7 @@ def test_handle_completion_uses_state_timestamps(capsys):
 
 def test_handle_completion_aggregates_per_host_counts(capsys):
     """Hosts dict has one entry per host with summed counts across tasks."""
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
 
     renderer = JsonRenderer()
     renderer.start("site.yml", [])
@@ -211,7 +211,7 @@ def test_handle_completion_aggregates_per_host_counts(capsys):
 
 def test_handle_completion_lists_failed_tasks(capsys):
     """tasks_failed names host, task, and the failure message."""
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
 
     renderer = JsonRenderer()
     renderer.start("site.yml", [])
@@ -231,7 +231,7 @@ def test_handle_completion_unreachable_lands_in_tasks_failed(capsys):
         Status,
         TaskRunState,
     )
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
 
     state = RunState(playbook="site.yml")
     play = PlayRunState(play_id="1", name="p", status=Status.RUNNING)
@@ -257,7 +257,7 @@ def test_handle_completion_unreachable_lands_in_tasks_failed(capsys):
 
 def test_handle_completion_empty_state_emits_zero_exit(capsys):
     """An empty RunState produces a valid JSON with exit_code=0 and empty hosts."""
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
 
     renderer = JsonRenderer()
     renderer.start("empty.yml", [])
@@ -282,7 +282,7 @@ def test_handle_completion_falls_back_to_wall_clock_when_state_lacks_timestamps(
         Status,
         TaskRunState,
     )
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
 
     state = RunState(playbook="site.yml")
     play = PlayRunState(play_id="1", name="p", status=Status.RUNNING)
@@ -311,7 +311,7 @@ def test_handle_completion_falls_back_to_wall_clock_when_state_lacks_timestamps(
 
 
 def test_factory_returns_json_renderer_for_json_format():
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
     from ansible_aom.renderer.factory import create_renderer
 
     renderer = create_renderer(tui_mode=False, format="json")
@@ -350,7 +350,7 @@ def test_factory_tui_mode_still_wins_over_format():
 
 def test_json_renderer_through_full_lifecycle(capsys):
     """Drive JsonRenderer through the same call sequence run_playbook uses."""
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
 
     renderer = JsonRenderer()
     renderer.start("site.yml", ["-i", "inv.ini"])
@@ -419,7 +419,7 @@ def test_json_renderer_through_full_lifecycle(capsys):
 
 def test_password_prompt_refuses_to_stderr(capsys):
     """Password prompts under --format json are refused with empty string + stderr message."""
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
 
     renderer = JsonRenderer()
     result = renderer.handle_password_prompt("BECOME password: ")
@@ -433,7 +433,7 @@ def test_password_prompt_refuses_to_stderr(capsys):
 
 def test_interactive_prompt_refuses_to_stderr(capsys):
     """Pause/vars_prompt prompts under --format json are also refused."""
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
 
     renderer = JsonRenderer()
     result = renderer.handle_interactive_prompt("Press Enter to continue: ")
@@ -446,7 +446,7 @@ def test_interactive_prompt_refuses_to_stderr(capsys):
 
 def test_prompt_refusal_does_not_corrupt_completion_json(capsys):
     """Even after a prompt refusal, handle_completion still emits valid JSON on stdout."""
-    from ansible_aom.json_renderer import JsonRenderer
+    from ansible_aom.formats.json import JsonRenderer
 
     renderer = JsonRenderer()
     renderer.start("site.yml", [])

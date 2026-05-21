@@ -1068,7 +1068,7 @@ class TestFormatFlag:
     def test_main_dispatches_json_renderer_when_format_json(self):
         """`aom --format json playbook.yml` constructs a JsonRenderer."""
         from ansible_aom.cli import main
-        from ansible_aom.json_renderer import JsonRenderer
+        from ansible_aom.formats.json import JsonRenderer
 
         captured_renderer: dict = {}
 

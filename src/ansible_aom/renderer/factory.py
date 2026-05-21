@@ -42,7 +42,7 @@ def create_renderer(
 
         return AOMApp()
     if format == "json":
-        from ansible_aom.json_renderer import JsonRenderer
+        from ansible_aom.formats.json import JsonRenderer
 
         return JsonRenderer()
     from ansible_aom.compact.renderer import CompactRenderer

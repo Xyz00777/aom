@@ -40,7 +40,7 @@ from pathlib import Path
 import jsonschema
 import pytest
 
-from ansible_aom.json_renderer import RunSummary
+from ansible_aom.formats.json import RunSummary
 
 # Repository root, derived from this file's location. Used to locate
 # ``schemas/run_summary.v1.json`` without depending on the test CWD.

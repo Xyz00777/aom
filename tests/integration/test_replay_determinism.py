@@ -29,7 +29,7 @@ import pytest
 
 from ansible_aom.compact.renderer import CompactRenderer
 from ansible_aom.core.preflight import PreParseResult
-from ansible_aom.json_renderer import JsonRenderer
+from ansible_aom.formats.json import JsonRenderer
 from ansible_aom.replay import replay_session
 from ansible_aom.runner import run_playbook
 from tests._utils import normalize_json_summary, normalize_render_output
