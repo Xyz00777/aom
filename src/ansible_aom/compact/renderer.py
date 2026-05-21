@@ -571,10 +571,14 @@ class CompactRenderer:
         # The parser keeps the raw `[WARNING]: ...` / `[DEPRECATION WARNING]: ...`
         # prefix on the message. Don't double it up.
         if message.startswith("["):
-            self._display.print_log(message)
+            text = message
         else:
             prefix = "DEPRECATION" if is_deprecation else "WARNING"
-            self._display.print_log(f"[{prefix}] {message}")
+            text = f"[{prefix}] {message}"
+        # Match ansible's default callback colouring: warnings and
+        # deprecations render in magenta so they stand out from ordinary
+        # ok/changed/skipping log lines.
+        self._display.print_log(_wrap(text, _MAGENTA, self._colorize))
 
     def handle_completion(self, exit_code: int, state: str) -> None:
         """Handle playbook completion (success/failure/crash).
