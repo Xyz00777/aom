@@ -155,6 +155,12 @@ class CompactRenderer:
         self._tasks_seen: int = 0
         self._tasks_completed: int = 0
         self._completed_task_ids: set[str] = set()
+        # Tasks whose TASK [..] header has already been printed. Under
+        # the free strategy ansible.posix.jsonl emits v2_runner_on_start
+        # per host instead of one v2_playbook_on_task_start up front, so
+        # the header is emitted from either event — whichever arrives
+        # first. This set keeps us from printing it twice when both fire.
+        self._announced_task_uuids: set[str] = set()
         # HS-1/HS-8: dirty-flag + compute throttle on the status panel.
         # The flag turns on when state changes; the panel computation
         # is throttled to the same 0.25 s window Display.update uses
@@ -186,6 +192,7 @@ class CompactRenderer:
         self._tasks_seen = 0
         self._tasks_completed = 0
         self._completed_task_ids = set()
+        self._announced_task_uuids = set()
 
         # Initialize RunState
         self._state = RunState(playbook=playbook)
@@ -907,6 +914,47 @@ class CompactRenderer:
         # aggregate, not an individual host record.
         self._display.print_log(_wrap(line, _CYAN, self._colorize))
 
+    def _announce_task(
+        self,
+        *,
+        task_uuid: str,
+        task_name: str,
+        event_time: float | None,
+        task_meta: dict,
+    ) -> None:
+        """Emit the TASK [..] header and reset per-task bookkeeping.
+
+        Called from either ``v2_playbook_on_task_start`` (linear
+        strategy) or the first ``v2_runner_on_start`` for a task
+        (free strategy). Idempotent on ``task_uuid``.
+        """
+        if task_uuid and task_uuid in self._announced_task_uuids:
+            return
+        # First: dispose of any skipped-host buffer left over from the
+        # previous task. If that task only ever produced skipped
+        # results, collapse them; otherwise (the buffer would have been
+        # drained by an earlier non-skipped result), this is a no-op.
+        self._flush_pending_skips(force_individual=self._current_task_had_nonskipped_result)
+        # Reset per-task state for the task we're about to print.
+        self._current_task_had_nonskipped_result = False
+        # Summary for the previous task lands BEFORE the new TASK
+        # header — keeps it visually attached to its own output.
+        if event_time is not None:
+            self._emit_previous_task_summary(event_time)
+        # Now safe to discard the previous task's host set.
+        self._current_task_inline_duration_hosts = set()
+        self._display.print_log(f"\nTASK [{task_name}] " + "*" * 50)
+        self._maybe_emit_pause_seconds_hint(task_meta)
+        # Stash timing for the inline-duration logic below and for the
+        # *next* summary line.
+        if event_time is not None:
+            self._task_start_times[task_uuid] = event_time
+            self._last_task_uuid = task_uuid
+            self._last_task_name = task_name
+            self._last_task_start_time = event_time
+        if task_uuid:
+            self._announced_task_uuids.add(task_uuid)
+
     def _emit_event_log(self, event: dict) -> None:
         """Print one nom-style log line for a JSONL event.
 
@@ -937,31 +985,26 @@ class CompactRenderer:
             self._display.print_log(f"\nPLAY [{play_name}] " + "*" * 50)
         elif name == "v2_playbook_on_task_start":
             task = event.get("task", {})
-            task_name = task.get("name", "") or "(unnamed)"
+            self._announce_task(
+                task_uuid=task.get("id", ""),
+                task_name=task.get("name", "") or "(unnamed)",
+                event_time=event_time,
+                task_meta=task,
+            )
+        elif name == "v2_runner_on_start":
+            # Free strategy: no v2_playbook_on_task_start before runner
+            # events. Use the first runner_start per task as the
+            # fallback signal for the TASK header so the streaming log
+            # is still anchored to a task name.
+            task = event.get("task", {})
             task_uuid = task.get("id", "")
-            # First: dispose of any skipped-host buffer left over from
-            # the previous task. If that task only ever produced
-            # skipped results, collapse them; otherwise (the buffer
-            # would have been drained by an earlier non-skipped
-            # result), this is a no-op.
-            self._flush_pending_skips(force_individual=self._current_task_had_nonskipped_result)
-            # Reset per-task state for the task we're about to print.
-            self._current_task_had_nonskipped_result = False
-            # Summary for the previous task lands BEFORE the new TASK
-            # header — keeps it visually attached to its own output.
-            if event_time is not None:
-                self._emit_previous_task_summary(event_time)
-            # Now safe to discard the previous task's host set.
-            self._current_task_inline_duration_hosts = set()
-            self._display.print_log(f"\nTASK [{task_name}] " + "*" * 50)
-            self._maybe_emit_pause_seconds_hint(task)
-            # Stash timing for the inline-duration logic below and for
-            # the *next* summary line.
-            if event_time is not None:
-                self._task_start_times[task_uuid] = event_time
-                self._last_task_uuid = task_uuid
-                self._last_task_name = task_name
-                self._last_task_start_time = event_time
+            if task_uuid and task_uuid not in self._announced_task_uuids:
+                self._announce_task(
+                    task_uuid=task_uuid,
+                    task_name=task.get("name", "") or "(unnamed)",
+                    event_time=event_time,
+                    task_meta=task,
+                )
         elif name == "v2_runner_on_ok":
             # A non-skipped result arrived: any buffered skipping lines
             # for this task should print individually (mixed-result
