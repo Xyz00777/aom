@@ -416,6 +416,13 @@ _TREE_LAST_UNICODE = "└─ "
 _TREE_MID_UNICODE = "├─ "
 _TREE_LAST_ASCII = "\\- "
 _TREE_MID_ASCII = "+- "
+# Vertical-spine continuation: drawn under non-last ancestors so the
+# child's branch glyph connects visually to its parent. Plain spaces
+# under a last ancestor (its subtree is the only one left at that depth,
+# so no spine is needed).
+_TREE_PIPE_UNICODE = "│  "
+_TREE_PIPE_ASCII = "|  "
+_TREE_GAP = "   "
 
 # Map status-colour names (from core.icons.get_status_color) to SGR codes
 # defined in this module. Keys must match the strings returned by
@@ -466,11 +473,34 @@ def format_tree_block(
 
     last_glyph = _TREE_LAST_ASCII if ascii_mode else _TREE_LAST_UNICODE
     mid_glyph = _TREE_MID_ASCII if ascii_mode else _TREE_MID_UNICODE
+    pipe_glyph = _TREE_PIPE_ASCII if ascii_mode else _TREE_PIPE_UNICODE
     icons = STATUS_ICONS_ASCII if ascii_mode else STATUS_ICONS
 
+    def _ancestor_chain_indent(idx: int) -> str:
+        """Render the indent prefix for line ``idx`` as a chain of
+        ``│  `` / ``   `` segments — one per ancestor depth (1..D-1).
+
+        For each ancestor depth, walk backwards to the most recent line
+        at that depth and consult its precomputed ``is_last`` flag. A
+        non-last ancestor contributes the vertical spine; a last
+        ancestor contributes plain spaces.
+        """
+        target = lines[idx]
+        segments: list[str] = []
+        for d in range(1, target.depth):
+            ancestor_is_last = True
+            for k in range(idx - 1, -1, -1):
+                if lines[k].depth == d:
+                    ancestor_is_last = is_last[k]
+                    break
+                if lines[k].depth < d:
+                    break
+            segments.append(_TREE_GAP if ancestor_is_last else pipe_glyph)
+        return "".join(segments)
+
     out: list[str] = []
-    for ln, last in zip(lines, is_last):
-        indent = "   " * max(ln.depth - 1, 0)
+    for i, (ln, last) in enumerate(zip(lines, is_last)):
+        indent = _ancestor_chain_indent(i)
         # Branch glyph: depth 0 has none; depth>0 normally has ├─ / └─ EXCEPT
         # host leaves under a task, which render as plain-indented children
         # (spec section "Tree leaf shape" — the user-approved preview shows
