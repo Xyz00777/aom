@@ -205,6 +205,210 @@ async def test_highlighting_successful_task_updates_detail(state_dir: Path):
 
 
 @pytest.mark.asyncio
+async def test_enter_on_run_row_focuses_tasks_pane(state_dir: Path):
+    """Pressing Enter on a Runs row drills into the Tasks pane."""
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        # Focus the runs ListView first so Enter is routed to it.
+        app.focus_runs()
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        # Focus should now be inside the Tasks pane.
+        node = app.focused
+        ids: list[str | None] = []
+        while node is not None:
+            ids.append(getattr(node, "id", None))
+            node = getattr(node, "parent", None)
+        assert "tasks-tree" in ids, f"Expected focus to land in tasks-tree, got {ids!r}"
+
+
+@pytest.mark.asyncio
+async def test_enter_on_task_focuses_detail_pane(state_dir: Path):
+    """Pressing Enter on a Task tree node drills into the Detail pane."""
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.focus_tasks()
+        await pilot.pause()
+        # The tree auto-jumped its cursor to the first failure; pressing
+        # Enter triggers Tree.action_select_cursor, which fires our
+        # on_tree_node_selected → focus_detail().
+        await pilot.press("enter")
+        await pilot.pause()
+        node = app.focused
+        ids: list[str | None] = []
+        while node is not None:
+            ids.append(getattr(node, "id", None))
+            node = getattr(node, "parent", None)
+        assert "detail-body" in ids or "detail-pane" in ids, (
+            f"Expected focus to land in detail pane, got {ids!r}"
+        )
+
+
+@pytest.mark.asyncio
+async def test_left_arrow_collapses_or_walks_up_tree(state_dir: Path):
+    """Right expands a collapsed node; Left collapses an expanded node."""
+    from ansible_aom.tui.screens.inspect import InspectApp, _NavTree
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        tree = app.query_one("#tasks-tree")
+        assert isinstance(tree, _NavTree)
+        tree.focus()
+        await pilot.pause()
+        # Move cursor to the first top-level node (a play). Direct
+        # cursor_line assignment avoids ``select_node()`` which can
+        # interact with auto_expand even when it's disabled.
+        if tree.root.children:
+            tree.cursor_line = 0
+        await pilot.pause()
+        first_top = tree.cursor_node
+        assert first_top is not None and first_top.allow_expand
+        # The play auto-expanded on load; Left should collapse it.
+        assert first_top.is_expanded
+        await pilot.press("left")
+        await pilot.pause()
+        assert not first_top.is_expanded, "Left should collapse the expanded node"
+        # Right should expand it again.
+        await pilot.press("right")
+        await pilot.pause()
+        assert first_top.is_expanded, "Right should re-expand the collapsed node"
+
+
+@pytest.mark.asyncio
+async def test_d_opens_confirm_then_y_deletes(state_dir: Path):
+    """`d` opens a confirm modal; pressing `y` actually deletes the session dir."""
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    target_dir = state_dir / _ALIASES["failed_loop"]
+    assert target_dir.exists()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.focus_runs()
+        await pilot.pause()
+        await pilot.press("d")
+        await pilot.pause()
+        # Confirm modal is up; press y to confirm.
+        await pilot.press("y")
+        await pilot.pause()
+    assert not target_dir.exists(), "Session directory should have been deleted"
+
+
+@pytest.mark.asyncio
+async def test_delete_auto_selects_next_session(state_dir: Path):
+    """After deleting a session, the next entry in the list takes focus.
+
+    Without auto-advance, the user is left looking at an empty Tasks
+    pane after every delete — they'd have to manually re-select.
+    """
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        listview = app.query_one("#runs-list")
+        before = len(listview.children)
+        # Note the second session_id (newest-first ordering puts it at index 1).
+        second_sid = listview.children[1].session_id  # type: ignore[attr-defined]
+        app.focus_runs()
+        await pilot.pause()
+        await pilot.press("d")
+        await pilot.pause()
+        await pilot.press("y")
+        # The dismiss callback runs after the modal closes; an extra
+        # pause cycle gives it room to land.
+        await pilot.pause()
+        await pilot.pause()
+        after = len(listview.children)
+        assert after == before - 1
+        # The session that was at index 1 is now at index 0 and selected.
+        assert app.selected_session_id == second_sid
+        # Tasks tree has been refreshed for the new selection (not empty
+        # unless that session genuinely has no tasks).
+        # (The clean_run fixture has 2 tasks, so the tree should be non-empty.)
+        tree = app.query_one("#tasks-tree")
+        assert len(tree.root.children) > 0
+
+
+@pytest.mark.asyncio
+async def test_d_cancel_keeps_session(state_dir: Path):
+    """`d` then Esc cancels — session stays on disk."""
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    target_dir = state_dir / _ALIASES["failed_loop"]
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.focus_runs()
+        await pilot.pause()
+        await pilot.press("d")
+        await pilot.pause()
+        await pilot.press("escape")
+        await pilot.pause()
+    assert target_dir.exists(), "Session should still exist after canceling"
+
+
+@pytest.mark.asyncio
+async def test_question_mark_opens_help(state_dir: Path):
+    """`?` opens the help overlay."""
+    from ansible_aom.tui.screens.inspect import InspectApp, _HelpScreen
+
+    app = InspectApp(state_dir=state_dir)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("question_mark")
+        await pilot.pause()
+        # The active screen should now be a _HelpScreen.
+        assert isinstance(app.screen, _HelpScreen)
+
+
+@pytest.mark.asyncio
+async def test_r_reloads_runs_from_disk(state_dir: Path):
+    """`r` re-reads the state dir; deleting a session out-of-band is reflected."""
+    import shutil as _shutil
+
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        listview = app.query_one("#runs-list")
+        before = len(listview.children)
+        # Delete one session directly from disk.
+        _shutil.rmtree(state_dir / _ALIASES["multi_host"])
+        await pilot.press("r")
+        await pilot.pause()
+        after = len(listview.children)
+        assert after == before - 1, (
+            f"Expected reload to drop one row; before={before} after={after}"
+        )
+
+
+@pytest.mark.asyncio
+async def test_focused_pane_gets_visual_class(state_dir: Path):
+    """The focused pane carries the ``--focused-pane`` CSS class."""
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.focus_tasks()
+        await pilot.pause()
+        tasks_pane = app.query_one("#tasks-pane")
+        runs_pane = app.query_one("#runs-pane")
+        assert "--focused-pane" in tasks_pane.classes
+        assert "--focused-pane" not in runs_pane.classes
+
+
+@pytest.mark.asyncio
 async def test_y_yanks_detail(state_dir: Path, monkeypatch):
     copied: list[str] = []
     monkeypatch.setattr(

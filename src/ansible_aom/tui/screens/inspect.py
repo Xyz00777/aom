@@ -2,32 +2,45 @@
 
 Pane layout (Horizontal, each pane sized 1fr so they scale with terminal
 width):
-- Runs (left)   : ListView. Each entry spans 3 lines (date+playbook,
-                  duration+host count+status, short session_id) with a
-                  trailing blank line.
-- Tasks (mid)   : Tree, hierarchical (play → role/group → task → host);
-                  failure paths auto-expanded, all-OK groups collapsed
-                  by default.
-- Detail (right): Static, failure-first body for the focused (task, host).
 
-Keybindings:
-  q          quit
-  Tab / S-Tab cycle pane focus
-  f          toggle failed-only filter
-  g          jump to first failure in current run
-  R          copy rerun command for focused (task, host) to clipboard
-  y          yank current detail body to clipboard
+- Runs (left)   : ListView. Each entry spans 3 lines (icon+date+playbook,
+                  duration+status+host roll-up, short session_id).
+- Tasks (mid)   : Tree, hierarchical (play → role/group → task → host);
+                  failure paths auto-expanded, all-OK groups collapsed.
+- Detail (right): Scrollable Static, failure-first body for the focused
+                  (task, host) pair.
+
+Navigation model — drill in / step back:
+  Enter / →   move focus one pane to the right (drill in)
+  Esc / ←     move focus one pane to the left (step back)
+  Tab / S-Tab alternative cycle (forward / back)
+
+Inside the Tasks tree, Left and Right do the classic file-manager thing:
+  ←  collapse the current node, or jump to its parent if already collapsed
+  →  expand the current node, or jump to its first child if already expanded
+
+Other shortcuts:
+  q   quit
+  f   toggle failed-only filter
+  g   first failure   n  next failure   N  prev failure
+  d   delete focused session (with confirm)
+  r   reload runs from disk
+  R   copy rerun command for focused task to clipboard
+  y   yank Detail body to clipboard
+  ?   help overlay
 """
 
 from __future__ import annotations
 
 import base64
+import shutil
 import sys
 from pathlib import Path
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.screen import ModalScreen
 from textual.widgets import Footer, Header, Label, ListItem, ListView, Static, Tree
 
 from ansible_aom.core.inspect_model import (
@@ -63,13 +76,7 @@ _STATUS_ICON = {
 
 
 def _copy_to_clipboard(text: str) -> None:
-    """Best-effort clipboard copy: try pyperclip, then OSC52, then no-op.
-
-    OSC52 is the lowest-common-denominator fallback that most modern
-    terminal emulators (kitty, iTerm, Alacritty, recent xterm, recent
-    tmux) support — important for users running ``aom inspect`` over SSH
-    where no local clipboard daemon exists.
-    """
+    """Best-effort clipboard copy: try pyperclip, then OSC52, then no-op."""
     try:
         import pyperclip  # type: ignore[import-untyped]
 
@@ -98,19 +105,13 @@ def _stats_label(stats: StatusCounts) -> str:
 
 
 def _summarise_hosts(host_counts) -> str:
-    """One-line per-host roll-up: 'caeli 22✓ 1✖, web2 8✓'."""
     if not host_counts:
-        return "(no hosts)"
+        return ""
     pieces = [f"{h} {_stats_label(c) or '—'}" for h, c in host_counts.items()]
     return ", ".join(pieces)
 
 
 def _render_run_lines(summary: RunSummary) -> tuple[str, str, str]:
-    """Three lines per run row.
-
-    Designed so each line stays informative even when the column is
-    narrow — date is always first, status icon hugs the right.
-    """
     date = summary.start_time.strftime("%Y-%m-%d %H:%M") if summary.start_time else "—"
     icon = _STATUS_ICON.get(summary.status, "?")
     dur = _fmt_duration_short(summary.duration.total_seconds() if summary.duration else None)
@@ -120,7 +121,7 @@ def _render_run_lines(summary: RunSummary) -> tuple[str, str, str]:
     line2 = f"   {dur}  {summary.status}"
     if summary.failed_task_count:
         line2 += f"  {summary.failed_task_count}✖ tasks"
-    host_summary = _summarise_hosts(summary.host_counts) if summary.host_counts else ""
+    host_summary = _summarise_hosts(summary.host_counts)
     if host_summary:
         line2 += f"  · {host_summary}"
     line3 = f"   id {summary.short_id}"
@@ -128,8 +129,6 @@ def _render_run_lines(summary: RunSummary) -> tuple[str, str, str]:
 
 
 class _RunRow(ListItem):
-    """One ListView entry: three label lines + blank spacer for breathing room."""
-
     DEFAULT_CSS = """
     _RunRow { padding: 0 1; height: 4; }
     _RunRow > .run-line1 { text-style: bold; }
@@ -149,61 +148,232 @@ class _RunRow(ListItem):
         yield Label(line3, classes="run-line3")
 
 
+class _ConfirmDelete(ModalScreen[bool]):
+    """Yes/no confirmation for session deletion."""
+
+    DEFAULT_CSS = """
+    _ConfirmDelete { align: center middle; }
+    _ConfirmDelete > Vertical {
+        width: 60; height: 7; padding: 1 2;
+        border: thick $error;
+        background: $surface;
+    }
+    _ConfirmDelete .hint { color: $text-muted; }
+    """
+
+    BINDINGS = [
+        Binding("y", "confirm", "Delete", show=True),
+        Binding("n,escape,q", "cancel", "Cancel", show=True),
+    ]
+
+    def __init__(self, short_id: str, playbook: str) -> None:
+        super().__init__()
+        self._short_id = short_id
+        self._playbook = playbook
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Label(f"Delete session {self._short_id} ({self._playbook})?")
+            yield Label("")
+            yield Label("y to delete · n / Esc to cancel", classes="hint")
+
+    def action_confirm(self) -> None:
+        self.dismiss(True)
+
+    def action_cancel(self) -> None:
+        self.dismiss(False)
+
+
+_HELP_TEXT = """\
+Navigation
+  Enter / →   drill into the next pane (Runs → Tasks → Detail)
+  Esc / ←     step back one pane
+
+Inside Tasks tree
+  ↑ / ↓       move cursor
+  ←           collapse, or jump to parent if already collapsed
+  →           expand, or jump to first child if already expanded
+  Space       toggle expand / collapse
+
+Runs filter
+  f           toggle failed-only
+
+Failures
+  g           jump to first failure
+  n / N       next / previous failure
+
+Session management
+  d           delete focused session (with confirm)
+  r           reload runs from disk
+
+Clipboard
+  R           copy rerun command to clipboard
+  y           yank Detail to clipboard
+
+Other
+  ?           this help
+  q           quit
+"""
+
+
+class _HelpScreen(ModalScreen[None]):
+    DEFAULT_CSS = """
+    _HelpScreen { align: center middle; }
+    _HelpScreen > VerticalScroll {
+        width: 70; height: 80%; padding: 1 2;
+        border: thick $accent;
+        background: $surface;
+    }
+    """
+
+    BINDINGS = [Binding("escape,q,question_mark", "dismiss", "Close", show=True)]
+
+    def compose(self) -> ComposeResult:
+        with VerticalScroll():
+            yield Static(_HELP_TEXT, expand=True)
+
+
+class _NavTree(Tree):
+    """Tree that adds Left / Right bindings for hierarchical navigation.
+
+    Default Textual ``Tree`` reserves Shift+Left/Right for parent / sibling
+    navigation; the plain arrow keys aren't bound. We add:
+
+    * ``Right``: if the cursor is on a collapsed branch, expand it; if it's
+      already expanded, move to its first child; if it's a leaf and the
+      Tree's host is an ``InspectApp``, hand off to the Detail pane.
+    * ``Left``: if expanded → collapse; if already collapsed → jump to
+      parent. On a top-level node with no parent → hand back to Runs.
+
+    Falling out of the tree at the edges is a convenience: it makes the
+    same arrow keys do the right thing without requiring users to learn
+    a separate "leave pane" shortcut.
+
+    ``BINDINGS`` is concatenated with ``Tree.BINDINGS`` rather than
+    replacing them — the parent class binds Enter / Space / arrows that
+    we still want.
+    """
+
+    BINDINGS = Tree.BINDINGS + [
+        Binding("right", "deeper", "Expand / drill", show=False),
+        Binding("left", "shallower", "Collapse / back", show=False),
+    ]
+
+    def action_deeper(self) -> None:
+        node = self.cursor_node
+        if node is None:
+            return
+        if node.allow_expand:
+            if not node.is_expanded:
+                node.expand()
+                return
+            # Already expanded — move cursor to first child if any.
+            if node.children:
+                self.select_node(node.children[0])
+                return
+        # Leaf (or expanded with no children) — hand off to Detail pane.
+        app = self.app
+        if isinstance(app, InspectApp):
+            app.focus_detail()
+
+    def action_shallower(self) -> None:
+        node = self.cursor_node
+        if node is None:
+            return
+        if node.allow_expand and node.is_expanded:
+            node.collapse()
+            return
+        parent = node.parent
+        # Walk past the (hidden) root: any node whose parent is the
+        # tree's root is "top-level"; collapsing/parent-jumping further
+        # should leave the pane.
+        if parent is None or parent is self.root:
+            app = self.app
+            if isinstance(app, InspectApp):
+                app.focus_runs()
+            return
+        self.select_node(parent)
+
+
 class InspectApp(App):
     """Three-pane inspector app."""
 
-    # ``ansi`` is Textual's literal pass-through to the terminal default
-    # background. Combined with ``ansi_color=True`` on the App, the
-    # user's terminal background (including any transparency, image, or
-    # gradient) shows straight through.
     CSS = """
     Screen { background: ansi_default; }
     Header, Footer { background: ansi_default; }
 
     Horizontal { height: 1fr; }
 
-    /* Equal-weight panes — adapt naturally to terminal width. */
+    /* Equal-weight panes — adapt naturally to terminal width.
+       Each pane has a one-cell top border that switches colour when the
+       pane holds focus, so "which pane am I in" is unmissable. */
     #runs-pane, #tasks-pane, #detail-pane {
         width: 1fr;
         background: ansi_default;
+        border-top: tall $panel;
+    }
+    #runs-pane.--focused-pane,
+    #tasks-pane.--focused-pane,
+    #detail-pane.--focused-pane {
+        border-top: tall $accent;
     }
 
-    /* Pane separators are subtle borders rather than solid backgrounds
-       so the terminal's own background shows through. */
+    /* Subtle separators between panes — narrower than the focus border. */
     #runs-pane    { border-right: tall $panel; }
     #tasks-pane   { border-right: tall $panel; }
     #detail-pane  { padding: 0 1; }
 
-    #runs-list, #tasks-tree, #detail-body {
-        background: ansi_default;
-    }
-
-    /* List items pick up the App background too, except the highlighted
-       row which keeps a subtle accent so the cursor remains visible. */
+    #runs-list, #tasks-tree, #detail-body { background: ansi_default; }
     _RunRow { background: ansi_default; }
-    ListView > ListItem.--highlight { background: $accent 40%; }
+
+    /* Selected/highlighted rows — bright enough to be readable on a
+       transparent terminal background. */
+    ListView > ListItem.-highlight {
+        background: $accent 30%;
+    }
+    ListView:focus > ListItem.-highlight {
+        background: $accent 60%;
+        text-style: bold;
+    }
+    Tree > .tree--cursor {
+        background: $accent 30%;
+    }
+    Tree:focus > .tree--cursor {
+        background: $accent 60%;
+        text-style: bold;
+    }
     """
 
     BINDINGS = [
         Binding("q", "quit", "Quit"),
-        Binding("tab", "focus_next_pane", "Next pane", show=True),
+        # Pane navigation
+        Binding("tab", "focus_next_pane", "Next pane", show=False),
         Binding("shift+tab", "focus_prev_pane", "Prev pane", show=False),
+        # Filter / failures / help
         Binding("f", "toggle_failed", "Failed-only"),
-        Binding("g", "show_first_failure", "First failure"),
-        Binding("n", "next_failure", "Next failure"),
-        Binding("N", "prev_failure", "Prev failure"),
-        Binding("R", "copy_rerun", "Copy rerun"),
+        Binding("g", "show_first_failure", "First fail"),
+        Binding("n", "next_failure", "Next fail"),
+        Binding("N", "prev_failure", "Prev fail"),
+        Binding("question_mark", "help", "Help"),
+        # Session management
+        Binding("d", "delete_session", "Delete"),
+        Binding("r", "reload_runs", "Reload"),
+        # Clipboard
+        Binding("R", "copy_rerun", "Rerun"),
         Binding("y", "yank_detail", "Yank"),
     ]
 
-    # IDs in tab order. action_focus_next_pane / prev cycles through these.
-    _PANE_ORDER: tuple[str, ...] = ("runs-list", "tasks-tree", "detail-pane")
+    _PANE_ORDER: tuple[str, ...] = ("runs-pane", "tasks-pane", "detail-pane")
+    # Map pane container → focusable widget inside it. ``detail-pane`` is
+    # the VerticalScroll itself (its inner Static is not focusable), so
+    # focus stays on the scrollable container and PgUp/PgDn just work.
+    _PANE_TARGETS: dict[str, str] = {
+        "runs-pane": "runs-list",
+        "tasks-pane": "tasks-tree",
+        "detail-pane": "detail-pane",
+    }
 
     def __init__(self, *, state_dir: Path, initial_session_id: str | None = None) -> None:
-        # ``ansi_color=True`` keeps Textual from substituting its theme
-        # palette for ANSI default colors, so the user's terminal
-        # background shows through wherever the app uses
-        # ``background: $background`` or ``transparent``.
         super().__init__(ansi_color=True)
         self.state_dir = state_dir
         self.initial_session_id = initial_session_id
@@ -214,8 +384,6 @@ class InspectApp(App):
         self._current_tree: TaskTreeNode | None = None
         self._focused_task: TaskTreeNode | None = None
         self._focused_host: TaskTreeNode | None = None
-        # Mirror of the detail-pane content. Static doesn't expose a
-        # stable read-back; the mirror is used by yank and tests.
         self._detail_text: str = "Select a task to see details."
 
     def compose(self) -> ComposeResult:
@@ -224,14 +392,19 @@ class InspectApp(App):
             with Vertical(id="runs-pane"):
                 yield ListView(id="runs-list")
             with Vertical(id="tasks-pane"):
-                yield Tree("Tasks", id="tasks-tree")
-            with VerticalScroll(id="detail-pane"):
-                yield Static("Select a run to see details.", id="detail-body", expand=True)
+                yield _NavTree("Tasks", id="tasks-tree")
+            with VerticalScroll(id="detail-pane", can_focus=True):
+                yield Static(self._detail_text, id="detail-body", expand=True)
         yield Footer()
 
     def on_mount(self) -> None:
-        tree = self.query_one("#tasks-tree", Tree)
+        tree = self.query_one("#tasks-tree", _NavTree)
         tree.show_root = False
+        # ``auto_expand`` toggles a node on every NodeSelected message.
+        # We use NodeSelected as the "Enter pressed → drill into Detail"
+        # signal, so disable the implicit toggle. Space / Left / Right
+        # still expand and collapse explicitly.
+        tree.auto_expand = False
         self._reload_runs()
         sid = self.initial_session_id or (
             self._all_summaries[0].session_id if self._all_summaries else None
@@ -239,34 +412,79 @@ class InspectApp(App):
         if sid:
             self._select_session(sid)
             self._load_tasks_for(sid)
+        # Visual focus indicator
+        self._refresh_pane_focus_classes()
 
-    # ── Pane navigation ──────────────────────────────────────────────────
+    # ── Pane focus ──────────────────────────────────────────────────────
 
-    def _focus_pane(self, offset: int) -> None:
-        """Move focus N positions through ``_PANE_ORDER`` (wrapping)."""
-        current = self.focused
-        # Walk up to find which top-level pane currently holds focus.
-        current_idx = -1
-        node = current
+    def _current_pane(self) -> str | None:
+        node = self.focused
         while node is not None:
             ident = getattr(node, "id", None)
             if ident in self._PANE_ORDER:
-                current_idx = self._PANE_ORDER.index(ident)
-                break
-            node = getattr(node, "parent", None)
-        next_idx = (current_idx + offset) % len(self._PANE_ORDER)
-        target_id = self._PANE_ORDER[next_idx]
+                return ident
+            parent = getattr(node, "parent", None)
+            # Some widget hierarchies expose ``.parent`` as a property;
+            # if it's the same node, bail to avoid an infinite loop.
+            if parent is node:
+                return None
+            node = parent
+        return None
+
+    def _focus_pane_id(self, pane_id: str) -> None:
+        target = self._PANE_TARGETS.get(pane_id)
+        if not target:
+            return
         try:
-            widget = self.query_one(f"#{target_id}")
+            widget = self.query_one(f"#{target}")
         except Exception:
             return
         widget.focus()
+        self._refresh_pane_focus_classes()
+
+    def _refresh_pane_focus_classes(self) -> None:
+        current = self._current_pane()
+        for pid in self._PANE_ORDER:
+            try:
+                pane = self.query_one(f"#{pid}")
+            except Exception:
+                continue
+            if pid == current:
+                pane.add_class("--focused-pane")
+            else:
+                pane.remove_class("--focused-pane")
+
+    def on_descendant_focus(self, _event) -> None:  # noqa: ANN001
+        self._refresh_pane_focus_classes()
+
+    def focus_runs(self) -> None:
+        self._focus_pane_id("runs-pane")
+
+    def focus_tasks(self) -> None:
+        # Make sure the tree has a visible cursor before focus lands on
+        # it — Tree.action_select_cursor is a no-op when cursor_line < 0,
+        # which means Enter would silently do nothing on the very first
+        # entry to the pane.
+        try:
+            tree = self.query_one("#tasks-tree", _NavTree)
+        except Exception:
+            tree = None
+        if tree is not None and tree.cursor_line < 0 and tree.root.children:
+            tree.cursor_line = 0
+        self._focus_pane_id("tasks-pane")
+
+    def focus_detail(self) -> None:
+        self._focus_pane_id("detail-pane")
 
     def action_focus_next_pane(self) -> None:
-        self._focus_pane(+1)
+        current = self._current_pane() or self._PANE_ORDER[0]
+        idx = self._PANE_ORDER.index(current)
+        self._focus_pane_id(self._PANE_ORDER[(idx + 1) % len(self._PANE_ORDER)])
 
     def action_focus_prev_pane(self) -> None:
-        self._focus_pane(-1)
+        current = self._current_pane() or self._PANE_ORDER[0]
+        idx = self._PANE_ORDER.index(current)
+        self._focus_pane_id(self._PANE_ORDER[(idx - 1) % len(self._PANE_ORDER)])
 
     # ── Runs pane ────────────────────────────────────────────────────────
 
@@ -310,12 +528,29 @@ class InspectApp(App):
             self._select_session(visible[0].session_id)
             self._load_tasks_for(visible[0].session_id)
 
-    def on_list_view_highlighted(self, event) -> None:
+    def action_reload_runs(self) -> None:
+        self._reload_runs()
+        self.notify(f"{len(self._all_summaries)} sessions on disk")
+
+    def on_list_view_highlighted(self, event) -> None:  # noqa: ANN001
         item = event.item
         sid = getattr(item, "session_id", None)
-        if sid and sid != self.selected_session_id:
+        if not sid:
+            return
+        # Drop events that arrive after a refresh / delete — the queued
+        # message can carry a reference to a row that no longer exists
+        # in the model. Without this filter, deleting a session causes a
+        # stale highlight event to immediately re-select the just-removed
+        # row.
+        if not any(s.session_id == sid for s in self._all_summaries):
+            return
+        if sid != self.selected_session_id:
             self.selected_session_id = sid
             self._load_tasks_for(sid)
+
+    def on_list_view_selected(self, _event) -> None:  # noqa: ANN001
+        """Enter on a Runs row → drill into the Tasks pane."""
+        self.focus_tasks()
 
     # ── Tasks pane ───────────────────────────────────────────────────────
 
@@ -331,17 +566,20 @@ class InspectApp(App):
             parent.add_leaf(label, data=node)
             return
         sub = parent.add(label, data=node)
-        if self._should_auto_expand(node, depth):
-            sub.expand()
         for child in node.children:
             self._add_node(sub, child, depth=depth + 1)
+        # Expand after children exist — Textual's ``expand()`` is a no-op
+        # on a node with no children yet (it doesn't carry the "should be
+        # expanded once children arrive" intent forward).
+        if self._should_auto_expand(node, depth):
+            sub.expand()
 
     def _load_tasks_for(self, session_id: str) -> None:
         session = load_session(session_id, self.state_dir)
         if session is None:
             return
         self._current_session = session
-        tree_widget = self.query_one("#tasks-tree", Tree)
+        tree_widget = self.query_one("#tasks-tree", _NavTree)
         tree_widget.clear()
         model = build_task_tree(session)
         self._current_tree = model
@@ -357,6 +595,29 @@ class InspectApp(App):
         else:
             for child in node.children:
                 yield from self._iter_failures(child)
+
+    def on_tree_node_highlighted(self, event) -> None:  # noqa: ANN001
+        data = getattr(event.node, "data", None)
+        if not isinstance(data, TaskTreeNode):
+            return
+        if data.kind == "host":
+            self._focused_host = data
+            parent_widget = event.node.parent
+            if parent_widget is not None and isinstance(
+                getattr(parent_widget, "data", None), TaskTreeNode
+            ):
+                self._focused_task = parent_widget.data
+        elif data.kind == "task":
+            self._focused_task = data
+            self._focused_host = data.children[0] if data.children else None
+        else:
+            self._focused_task = None
+            self._focused_host = None
+        self._update_detail()
+
+    def on_tree_node_selected(self, _event) -> None:  # noqa: ANN001
+        """Enter on a Task node → drill into the Detail pane."""
+        self.focus_detail()
 
     # ── Detail pane ──────────────────────────────────────────────────────
 
@@ -408,23 +669,26 @@ class InspectApp(App):
         self._detail_text = self._render_detail_block(block)
         detail.update(self._detail_text)
 
+    # ── Failures navigation ─────────────────────────────────────────────
+
     def _failure_pairs(self) -> list[tuple[TaskTreeNode, TaskTreeNode]]:
         if self._current_tree is None:
             return []
         return list(self._iter_failures(self._current_tree))
 
     def _current_failure_index(self) -> int:
-        """Return the index of the focused (task, host) pair in the failure list, or -1."""
         pairs = self._failure_pairs()
         if not pairs or self._focused_task is None or self._focused_host is None:
             return -1
         for idx, (task, host) in enumerate(pairs):
-            if task.task_id == self._focused_task.task_id and host.label == self._focused_host.label:
+            if (
+                task.task_id == self._focused_task.task_id
+                and host.label == self._focused_host.label
+            ):
                 return idx
         return -1
 
     def _focus_failure_at(self, index: int) -> None:
-        """Move the Detail pane focus to the failure at ``index`` (wrapping)."""
         pairs = self._failure_pairs()
         if not pairs:
             self._focused_task = None
@@ -434,7 +698,6 @@ class InspectApp(App):
         idx = index % len(pairs)
         self._focused_task, self._focused_host = pairs[idx]
         self._update_detail()
-        # Surface a toast so the user knows where they are when many failures exist.
         if len(pairs) > 1:
             self.notify(f"Failure {idx + 1} of {len(pairs)}")
 
@@ -442,8 +705,7 @@ class InspectApp(App):
         self._focus_failure_at(0)
 
     def action_next_failure(self) -> None:
-        pairs = self._failure_pairs()
-        if not pairs:
+        if not self._failure_pairs():
             self.notify("No failures in this run")
             return
         current = self._current_failure_index()
@@ -457,26 +719,67 @@ class InspectApp(App):
         current = self._current_failure_index()
         self._focus_failure_at(current - 1 if current >= 0 else len(pairs) - 1)
 
-    def on_tree_node_highlighted(self, event) -> None:
-        data = getattr(event.node, "data", None)
-        if not isinstance(data, TaskTreeNode):
-            return
-        if data.kind == "host":
-            self._focused_host = data
-            parent_widget = event.node.parent
-            if parent_widget is not None and isinstance(
-                getattr(parent_widget, "data", None), TaskTreeNode
-            ):
-                self._focused_task = parent_widget.data
-        elif data.kind == "task":
-            self._focused_task = data
-            self._focused_host = data.children[0] if data.children else None
-        else:
-            self._focused_task = None
-            self._focused_host = None
-        self._update_detail()
+    # ── Session management ─────────────────────────────────────────────
 
-    # ── Clipboard actions ────────────────────────────────────────────────
+    def action_delete_session(self) -> None:
+        if not self.selected_session_id:
+            self.notify("No session selected")
+            return
+        # Find the summary for the confirm modal label.
+        summary = next(
+            (s for s in self._all_summaries if s.session_id == self.selected_session_id),
+            None,
+        )
+        if summary is None:
+            return
+        short = summary.short_id
+        playbook = summary.playbook or "(no playbook)"
+
+        # Capture the deleted session's position BEFORE the modal so the
+        # closure can pick the next sibling regardless of what happens
+        # to the visible list while the modal is up.
+        old_index = next(
+            (
+                i
+                for i, s in enumerate(self._visible_summaries())
+                if s.session_id == self.selected_session_id
+            ),
+            0,
+        )
+
+        def _after_confirm(confirmed: bool | None) -> None:
+            if not confirmed:
+                return
+            sid = self.selected_session_id
+            if not sid:
+                return
+            target = self.state_dir / sid
+            try:
+                if target.is_dir():
+                    shutil.rmtree(target)
+            except OSError as exc:
+                self.notify(f"Delete failed: {exc}", severity="error")
+                return
+            self.notify(f"Deleted {short}")
+            self._reload_runs()
+            visible = self._visible_summaries()
+            if visible:
+                next_sid = visible[min(old_index, len(visible) - 1)].session_id
+                self._select_session(next_sid)
+                self._load_tasks_for(next_sid)
+                self.focus_runs()
+            else:
+                self.selected_session_id = None
+                self._current_session = None
+                self._current_tree = None
+                self._focused_task = None
+                self._focused_host = None
+                self.query_one("#tasks-tree", _NavTree).clear()
+                self._update_detail()
+
+        self.push_screen(_ConfirmDelete(short, playbook), _after_confirm)
+
+    # ── Clipboard actions ──────────────────────────────────────────────
 
     def _build_rerun_command(self) -> str:
         session = self._current_session or {}
@@ -500,3 +803,6 @@ class InspectApp(App):
     def action_yank_detail(self) -> None:
         _copy_to_clipboard(self._detail_text)
         self.notify("Detail yanked to clipboard")
+
+    def action_help(self) -> None:
+        self.push_screen(_HelpScreen())
