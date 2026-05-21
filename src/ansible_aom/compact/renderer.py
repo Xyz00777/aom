@@ -58,6 +58,15 @@ if TYPE_CHECKING:
     from ansible_aom.session.history import PriorRun
 
 
+# HS-1/HS-8: status-panel compute throttle. Aligned with Display.update's
+# write throttle (0.25 s) so a compute whose output Display would
+# coalesce is short-circuited entirely. The 1 s tick-refresh threshold
+# is the upper bound on how long the elapsed-clock segment can stay
+# frozen during a quiet period when nothing else has changed.
+_PANEL_COMPUTE_THROTTLE_S = 0.25
+_PANEL_TICK_REFRESH_S = 1.0
+
+
 class CompactRenderer:
     """ANSI-based compact renderer satisfying the Renderer Protocol.
 
@@ -129,6 +138,32 @@ class CompactRenderer:
         # cost is one int add and the post-mortem signal is worth it.
         self._render_calls: int = 0
         self._log_writes: int = 0
+        # HS-3: cached TreeProjection. ``TreeProjection`` memoizes its
+        # role-index per instance, so keeping the same instance alive
+        # across renders survives the O(P_def × T_def) role-resolve
+        # build cost. Invalidated (set to ``None``) on state-shape
+        # mutating events; rebuilt lazily at the next render.
+        self._projection: TreeProjection | None = None
+        # HS-2: incremental task counters. The format-layer functions
+        # ``count_completed_tasks`` / ``count_total_tasks_seen`` walked
+        # the full state on every render — fine for handle_completion
+        # but quadratic per event. The counters here are bumped in
+        # ``update_state`` and read directly by the status bar.
+        # ``_completed_task_ids`` guards against double-counting when a
+        # terminal event arrives more than once for the same task
+        # (e.g. host-by-host events under the free strategy).
+        self._tasks_seen: int = 0
+        self._tasks_completed: int = 0
+        self._completed_task_ids: set[str] = set()
+        # HS-1/HS-8: dirty-flag + compute throttle on the status panel.
+        # The flag turns on when state changes; the panel computation
+        # is throttled to the same 0.25 s window Display.update uses
+        # to coalesce stdout writes — beyond that window the compute
+        # output is invisible anyway. A 1 s "clock advance" threshold
+        # lets the elapsed-time segment in the status bar keep ticking
+        # during quiet periods without computing on every tick().
+        self._panel_dirty: bool = False
+        self._last_panel_compute_time: float = 0.0
 
     def start(self, playbook: str, args: list[str]) -> None:
         """Start rendering a playbook run.
@@ -144,6 +179,13 @@ class CompactRenderer:
         self._args = args
         self._start_time = time.time()
         self._mode_label = _compute_mode_label(args, self._colorize)
+
+        # Reset the incremental counters so a re-used renderer instance
+        # (e.g. ``aom replay`` driving a fresh run on the same object)
+        # starts at zero rather than carrying state over.
+        self._tasks_seen = 0
+        self._tasks_completed = 0
+        self._completed_task_ids = set()
 
         # Initialize RunState
         self._state = RunState(playbook=playbook)
@@ -197,6 +239,12 @@ class CompactRenderer:
         # per-host RUNNING entries under linear strategy, where the
         # JSONL callback does not emit v2_runner_on_start).
         self._state.definitions = list(self._definitions)
+        # HS-3: definitions changed → invalidate the cached projection
+        # so role-index memoization rebuilds from the new tree shape.
+        self._projection = None
+        # HS-1/HS-8: mark dirty so the next render computes against the
+        # fresh definitions.
+        self._panel_dirty = True
         self._render_status_panel()
 
     def update_state(self, event: dict) -> None:
@@ -219,8 +267,64 @@ class CompactRenderer:
         # Update RunState with the event
         self._state.handle_event(event)
 
+        # HS-3: any event arrival mutates state — invalidate the cached
+        # projection so the next render rebuilds from the updated tree.
+        self._projection = None
+
+        # HS-2: bump the incremental counters using the freshly-mutated
+        # state. Done after ``handle_event`` so the task's hosts dict
+        # reflects the event we just processed.
+        self._bump_task_counters(event)
+
+        # HS-1/HS-8: mark the panel as needing recompute. The actual
+        # decision to compute is gated inside ``_render_status_panel``.
+        self._panel_dirty = True
+
         # Refresh the status panel with current state + elapsed time.
         self._render_status_panel()
+
+    def _bump_task_counters(self, event: dict) -> None:
+        """Update ``_tasks_seen`` / ``_tasks_completed`` from a single event.
+
+        Tracks the same ground truth as ``count_completed_tasks`` but at
+        per-event cost — at most one task lookup plus an O(H) walk over
+        that task's hosts. ``_completed_task_ids`` keeps the count
+        idempotent across replayed or per-host-fanned-out events.
+        """
+        if self._state is None:
+            return
+        event_type = event.get("_event", "")
+        if event_type == "v2_playbook_on_task_start":
+            self._tasks_seen += 1
+            return
+        if event_type not in (
+            "v2_runner_on_ok",
+            "v2_runner_on_failed",
+            "v2_runner_on_skipped",
+            "v2_runner_on_unreachable",
+        ):
+            return
+        task_id = event.get("task", {}).get("id", "")
+        if not task_id or task_id in self._completed_task_ids:
+            return
+        play_id = self._state._resolve_play_id(event)
+        play = self._state.plays.get(play_id) if play_id else None
+        if play is None:
+            # Fallback: scan plays for the task. Free-strategy events
+            # may carry no usable play_id at all; the lookup degrades
+            # but stays O(P) rather than O(P×T).
+            for candidate in self._state.plays.values():
+                if task_id in candidate.tasks:
+                    play = candidate
+                    break
+        if play is None:
+            return
+        task = play.tasks.get(task_id)
+        if task is None or not task.hosts:
+            return
+        if all(hs.status != Status.RUNNING for hs in task.hosts.values()):
+            self._completed_task_ids.add(task_id)
+            self._tasks_completed += 1
 
     def tick(self) -> None:
         """Refresh the status panel without processing an event.
@@ -254,6 +358,21 @@ class CompactRenderer:
         """
         if self._state is None:
             return
+
+        # HS-1/HS-8: skip the heavy compute when its output would either
+        # be coalesced away by Display.update (within the same 0.25 s
+        # write window) or would just re-render the previous picture
+        # (no state change, no meaningful clock advance).
+        now = time.monotonic()
+        last = self._last_panel_compute_time
+        if last > 0.0:
+            elapsed_since_compute = now - last
+            if self._panel_dirty:
+                if elapsed_since_compute < _PANEL_COMPUTE_THROTTLE_S:
+                    return
+            else:
+                if elapsed_since_compute < _PANEL_TICK_REFRESH_S:
+                    return
 
         # Counted after the early-return so a state-less call (e.g. an
         # update_state that hit a renderer that already stopped) doesn't
@@ -296,8 +415,11 @@ class CompactRenderer:
             warnings=self._warnings_count,
             deprecations=self._deprecations_count,
             elapsed_seconds=elapsed,
-            tasks_completed=count_completed_tasks(self._state),
-            tasks_total=count_total_tasks_seen(self._definitions, self._state),
+            tasks_completed=self._tasks_completed,
+            tasks_total=max(
+                count_total_tasks(self._definitions),
+                self._tasks_seen,
+            ),
             ascii_mode=self._ascii_mode,
             colorize=self._colorize,
             mode_label=self._mode_label,
@@ -305,7 +427,12 @@ class CompactRenderer:
         )
 
         # --- Regions 2 & 3: tree + host rows -------------------------------
-        projection = TreeProjection.from_run_state(self._state)
+        # HS-3: reuse the cached projection between renders. It's
+        # invalidated by ``update_state`` and ``set_definitions`` when
+        # the state shape can change.
+        if self._projection is None or self._projection._state is not self._state:
+            self._projection = TreeProjection.from_run_state(self._state)
+        projection = self._projection
         cols, rows = shutil.get_terminal_size((80, 24))
         active_hosts = sum(1 for s in host_statuses.values() if s == Status.RUNNING)
         budget = _compute_tree_budget(rows, active_hosts)
@@ -335,6 +462,10 @@ class CompactRenderer:
             parts.append("\n".join(host_lines))
         parts.append(status_bar)
         self._display.update("\n".join(parts))
+        # HS-1/HS-8: record successful compute and clear the dirty flag
+        # so the next call's gate evaluates against this timestamp.
+        self._panel_dirty = False
+        self._last_panel_compute_time = now
 
     def _render_status_bar(self) -> None:
         """Deprecated alias — kept for any test references that still call

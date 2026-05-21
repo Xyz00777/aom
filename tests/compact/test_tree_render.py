@@ -309,6 +309,11 @@ def test_render_status_panel_includes_tree_when_task_running(
     r.update_state(event_play_start)
     r.update_state(event_task_start)
     r.update_state(event_runner_start)
+    # Bypass the compute-throttle (HS-1/HS-8) so this direct render
+    # always fires — without this the burst above already used up the
+    # window and the spied update would never see a call.
+    r._last_panel_compute_time = 0.0
+    r._panel_dirty = True
     with patch.object(r._display, "update") as m:
         r._render_status_panel()
     args, kwargs = m.call_args
@@ -371,6 +376,9 @@ def test_render_status_panel_status_bar_is_last_line(
     r.update_state(event_play_start)
     r.update_state(event_task_start)
     r.update_state(event_runner_start)
+    # Bypass the compute-throttle (HS-1/HS-8) — see sibling test.
+    r._last_panel_compute_time = 0.0
+    r._panel_dirty = True
     with patch.object(r._display, "update") as m:
         r._render_status_panel()
     args, kwargs = m.call_args

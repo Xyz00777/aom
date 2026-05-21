@@ -312,12 +312,39 @@ def test_renderer_status_bar_reflects_task_progress(monkeypatch):
     renderer.set_definitions([play_def])
 
     assert renderer._state is not None
-    play = PlayRunState(play_id="1", name="web", status=Status.RUNNING)
-    done = TaskRunState(task_id="t1", name="a", status=Status.OK)
-    done.hosts["w1"] = HostRunState(hostname="w1", status=Status.OK)
-    play.tasks["t1"] = done
-    renderer._state.plays["1"] = play
+    # Drive the renderer through the same event flow it sees in
+    # production: play_start → task_start → runner_on_ok. The
+    # incremental ``_tasks_completed`` counter is bumped from these
+    # event handlers (HS-2), so directly mutating ``state.plays``
+    # would no longer reflect in the status bar.
+    renderer.update_state(
+        {
+            "_event": "v2_playbook_on_play_start",
+            "_timestamp": "2026-05-11T10:00:00Z",
+            "play": {"id": "1", "name": "web"},
+        }
+    )
+    renderer.update_state(
+        {
+            "_event": "v2_playbook_on_task_start",
+            "_timestamp": "2026-05-11T10:00:01Z",
+            "task": {"id": "t1", "name": "a"},
+            "play": {"id": "1"},
+        }
+    )
+    renderer.update_state(
+        {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "2026-05-11T10:00:02Z",
+            "task": {"id": "t1"},
+            "play": {"id": "1"},
+            "hosts": {"w1": {"changed": False}},
+        }
+    )
 
+    # Reset the compute-throttle so the final tick definitely renders;
+    # otherwise the burst above used up the 0.25 s window.
+    renderer._last_panel_compute_time = 0.0
     renderer.tick()
 
     assert any("1/3 tasks" in frame for frame in captured), captured

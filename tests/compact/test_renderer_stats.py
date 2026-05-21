@@ -35,13 +35,15 @@ def test_update_state_increments_render_calls() -> None:
     renderer = CompactRenderer(is_tty=False)
     renderer.start("site.yml", [])
 
+    # Three events in quick succession. The compute-throttle (HS-1/HS-8)
+    # coalesces bursts inside the 0.25 s window, so we assert the
+    # counter advanced *at least once* — the exact value depends on how
+    # the throttle gate evaluates wall-clock between calls.
     renderer.update_state(_ok_event("web1"))
     renderer.update_state(_ok_event("web1"))
     renderer.update_state(_ok_event("web2"))
 
-    # update_state triggers _emit_event_log (writes log lines) AND
-    # _render_status_panel — the latter is what render_calls counts.
-    assert renderer._render_calls >= 3
+    assert renderer._render_calls >= 1
 
 
 def test_print_log_increments_log_writes() -> None:

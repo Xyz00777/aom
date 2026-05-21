@@ -1128,7 +1128,14 @@ class TestRefreshStrategy:
     """Tests for TC-054 to TC-058: Refresh strategy."""
 
     def test_event_driven_refresh_triggers(self):
-        """TC-054: Status panel re-renders on state change events."""
+        """TC-054: Status panel re-renders on state change events.
+
+        With the HS-1/HS-8 compute throttle, events arriving inside the
+        same 0.25 s window coalesce to one panel compute (and one
+        ``Display.update`` call). The throttle is bypassed between
+        events to keep this test about the per-event refresh contract
+        rather than the throttle semantics (which have their own test).
+        """
         from ansible_aom.compact.renderer import CompactRenderer
 
         renderer = CompactRenderer(is_tty=False)
@@ -1165,6 +1172,10 @@ class TestRefreshStrategy:
                     "v2_runner_on_unreachable",
                 ):
                     event["hosts"] = {"web1": {"ok": True}}
+                # Reset the compute-throttle clock so each event in
+                # this fixture exercises the refresh path, not the
+                # coalescing gate (covered separately).
+                renderer._last_panel_compute_time = 0.0
                 renderer.update_state(event)
 
             assert update_call_count == len(events)
@@ -1194,18 +1205,26 @@ class TestRefreshStrategy:
         display.stop()
 
     def test_event_driven_refresh_calls_display_update(self):
-        """TC-054: Each state change event triggers a display.update() call."""
+        """TC-054: Each state change event triggers a display.update() call.
+
+        The HS-1/HS-8 compute throttle skips bursts inside the 0.25 s
+        window — the test resets the throttle clock between events so
+        we still verify the one-update-per-event contract for events
+        spaced beyond the window.
+        """
         from ansible_aom.compact.renderer import CompactRenderer
 
         renderer = CompactRenderer(is_tty=False)
         renderer.start("site.yml", [])
 
         with patch.object(renderer._display, "update") as mock_update:
+            renderer._last_panel_compute_time = 0.0
             renderer.update_state(
                 {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
             )
             assert mock_update.call_count == 1
 
+            renderer._last_panel_compute_time = 0.0
             renderer.update_state(
                 {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:01Z"}
             )
