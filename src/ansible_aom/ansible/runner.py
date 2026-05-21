@@ -25,7 +25,7 @@ from typing import Any
 import pexpect
 
 from ansible_aom.ansible.preflight import run_preflight
-from ansible_aom.core.models import WarningType
+from ansible_aom.core.models import PlayDefinition, RoleGroupDefinition, WarningType
 from ansible_aom.core.parser import PtyStreamParser
 from ansible_aom.renderer.protocol import Renderer
 from ansible_aom.session.store import SessionManager
@@ -75,7 +75,13 @@ class _NullSink:
     def record_stderr(self, line: str) -> None:  # noqa: ARG002
         return None
 
-    def end(self, status: str) -> None:  # noqa: ARG002
+    def end(
+        self,
+        status: str,  # noqa: ARG002
+        *,
+        preflight_task_count: int | None = None,  # noqa: ARG002
+        resolved_host_count: int | None = None,  # noqa: ARG002
+    ) -> None:
         return None
 
 
@@ -148,11 +154,22 @@ class _SessionSink:
             logger.debug("session stderr write failed: %s", exc)
             self._disable(str(exc))
 
-    def end(self, status: str) -> None:
+    def end(
+        self,
+        status: str,
+        *,
+        preflight_task_count: int | None = None,
+        resolved_host_count: int | None = None,
+    ) -> None:
         if self._disabled or self._manager is None or self._session_id is None:
             return
         try:
-            self._manager.end_session(self._session_id, status)
+            self._manager.end_session(
+                self._session_id,
+                status,
+                preflight_task_count=preflight_task_count,
+                resolved_host_count=resolved_host_count,
+            )
         except OSError as exc:
             logger.debug("session end failed: %s", exc)
 
@@ -222,6 +239,17 @@ def _trace(label: str, **fields: object) -> None:
 from ansible_aom.core.prompts import looks_like_interactive_prompt as _looks_like_interactive_prompt
 
 
+def _count_preflight_tasks(play: PlayDefinition) -> int:
+    """Count leaf TaskDefinitions in a play, unwrapping any RoleGroupDefinition."""
+    total = 0
+    for entry in play.tasks:
+        if isinstance(entry, RoleGroupDefinition):
+            total += len(entry.tasks)
+        else:
+            total += 1
+    return total
+
+
 def _build_command(playbook: str, ansible_args: list[str]) -> tuple[str, list[str]]:
     """Return the (executable, args) pair to spawn.
 
@@ -274,6 +302,14 @@ def run_playbook(
     # the very first frame. Failures are non-fatal — surfaced as warnings.
     pre_result = run_preflight(playbook=playbook, ansible_args=ansible_args)
     renderer.set_definitions(pre_result.definitions)
+
+    # Union of resolved hosts across plays — preflight is best-effort,
+    # so a play with no resolved_hosts simply contributes nothing.
+    resolved_host_count = len(
+        {host for play in pre_result.definitions for host in play.resolved_hosts}
+    )
+    preflight_task_count = sum(_count_preflight_tasks(play) for play in pre_result.definitions)
+
     # add_warning prints the message above the panel AND bumps the counter.
     # The renderer's own dedupe handles repeats so it's safe to forward
     # every error here without extra filtering.
@@ -294,13 +330,21 @@ def run_playbook(
             )
         except pexpect.exceptions.ExceptionPexpect, FileNotFoundError, OSError:
             # Command not found / not executable — surface as 127.
-            sink.end("crashed")
+            sink.end(
+                "crashed",
+                preflight_task_count=preflight_task_count,
+                resolved_host_count=resolved_host_count,
+            )
             renderer.handle_completion(127, "crashed")
             return 127
 
         exit_code = _drive(child, parser, renderer, timeout, sink)
         state = "completed" if exit_code == 0 else "failed"
-        sink.end(state)
+        sink.end(
+            state,
+            preflight_task_count=preflight_task_count,
+            resolved_host_count=resolved_host_count,
+        )
         renderer.handle_completion(exit_code, state)
         return exit_code
 
@@ -313,7 +357,11 @@ def run_playbook(
                 child.close(force=True)
             except Exception:
                 pass
-        sink.end("crashed")
+        sink.end(
+            "crashed",
+            preflight_task_count=preflight_task_count,
+            resolved_host_count=resolved_host_count,
+        )
         renderer.handle_completion(130, "crashed")
         return 130
     finally:

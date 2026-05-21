@@ -150,8 +150,12 @@ class TestRunnerPreflight:
             def note_pty_bytes(self) -> None: ...
             def note_subprocess_active(self, active: bool) -> None: ...
 
+        from ansible_aom.core.models import PlayDefinition
+
+        def_1 = PlayDefinition(id="p1", name="P1", hosts="all")
+        def_2 = PlayDefinition(id="p2", name="P2", hosts="all")
         fake_pre_result = MagicMock()
-        fake_pre_result.definitions = ["DEF1", "DEF2"]
+        fake_pre_result.definitions = [def_1, def_2]
         fake_pre_result.errors = []
 
         cmd, args = _fake_ansible_command(
@@ -169,7 +173,7 @@ class TestRunnerPreflight:
             exit_code = run_playbook("playbook.yml", [], StubRenderer())
 
         assert exit_code == 0
-        assert captured_defs == ["DEF1", "DEF2"]
+        assert captured_defs == [def_1, def_2]
 
     def test_run_playbook_forwards_preflight_errors_as_warnings(self) -> None:
         from ansible_aom.ansible.runner import run_playbook
