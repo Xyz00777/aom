@@ -4,7 +4,8 @@ PLAY [Optional tweaks] **************************************************
 TASK [Apply tuning] **************************************************
 … 3 hosts skipped: host-a, host-b, host-c
 [10:00:05] Apply tuning — 3.0s (5.0s)
+host    ok  changed  skipped  failed  on
+host-a   0        0        1       0  (idle)
+host-b   0        0        1       0  (idle)
+host-c   0        0        1       0  (idle)
 site.yml | 3/3 hosts | 1/1 tasks | 0:00:00 *
-  host-a: o 1 skipped
-  host-b: o 1 skipped
-  host-c: o 1 skipped

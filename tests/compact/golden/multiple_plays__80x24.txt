@@ -10,6 +10,7 @@ PLAY [Configure db tier] **************************************************
 TASK [Install postgres] **************************************************
 ok: [db1] (5.0s)
 [10:00:15] Install postgres — (15.0s)
+host  ok  changed  failed  on
+web1   0        1       0  (idle)
+db1    1        0       0  (idle)
 site.yml | 2/2 hosts | 2/2 tasks | 0:00:00 *
-  web1: + 1 changed
-  db1: * 1 ok

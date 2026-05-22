@@ -42,7 +42,7 @@ from ansible_aom.compact.format import (
     count_total_tasks_seen,
     format_failure_recap,
     format_host_rows,
-    format_host_summary,
+    format_host_summary,  # noqa: F401 — re-exported for test access
     format_preflight_summary,
     format_status_bar,
     format_tree_block,
@@ -686,14 +686,9 @@ class CompactRenderer:
         indicator = _wrap(f"{icon}{label}", indicator_color, self._colorize)
         final_status = f"{status_bar} {indicator}"
 
-        # Capture a frozen tree + host snapshot for non-clean exits BEFORE
-        # display.stop() wipes the live panel. On Ctrl-C / failure the
-        # user needs to see what was in flight at the moment of the
-        # cancel for post-mortem debugging — without this the screen
-        # would show only the final status bar and the per-host counts.
-        snapshot_lines: list[str] = []
-        if exit_code != 0:
-            snapshot_lines = self._capture_panel_snapshot()
+        # Capture frozen host-table and (on failure) tree lines BEFORE
+        # display.stop() wipes the live panel.
+        snapshot_tree, snapshot_host = self._capture_panel_snapshot()
 
         # Last in-panel update — visible briefly during stop() in TTY mode,
         # a no-op in non-TTY. Throttling can swallow this; the print() below
@@ -703,10 +698,14 @@ class CompactRenderer:
         # Wipe the panel and release the cursor.
         self._display.stop()
 
-        # Replay the captured snapshot AFTER stop() so the tree + host
-        # rows land in scrollback at the panel's old position, exactly
-        # as the user last saw them. The final status bar prints below.
-        for line in snapshot_lines:
+        # On failure, replay the tree + host table so the user can see what
+        # was in flight at the moment of failure. On success the tree is
+        # omitted — running-task spinners would be misleading when the run
+        # is already complete.
+        if exit_code != 0:
+            for line in snapshot_tree:
+                print(line)
+        for line in snapshot_host:
             print(line)
 
         # Print the final summary OUTSIDE any DEC-2026 frame so the panel
@@ -715,12 +714,6 @@ class CompactRenderer:
         # outcome as the last visible line. In non-TTY (pipes, CI) it's
         # the only output Display ever produces (PQ6).
         print(final_status)
-
-        # Per-host breakdown underneath. With one host this is barely
-        # different from the aggregate, but with N hosts it's the only
-        # way to see who succeeded vs who failed at a glance.
-        for line in self._format_per_host_lines():
-            print(f"  {line}")
 
         # On a non-clean exit, also list which (host, task) pairs failed.
         # The aggregate counts answer "did it work?"; the recap answers
@@ -745,16 +738,15 @@ class CompactRenderer:
             total = sum(self._state.unknown_events.values())
             print(f"  ({total} unknown events: {parts})")
 
-    def _capture_panel_snapshot(self) -> list[str]:
-        """Render the current tree + host overview as static lines.
+    def _capture_panel_snapshot(self) -> tuple[list[str], list[str]]:
+        """Render the current tree and host overview as static lines.
 
-        Used by ``handle_completion`` on non-clean exits so the user
-        keeps a record of what was in flight at the moment of failure
-        or cancel. Uses ``animation_frame=0`` — the captured tree is
-        frozen, not a live animation that happens to never advance.
+        Returns a ``(tree_lines, host_lines)`` tuple. Callers print tree
+        lines only on failure (stale running spinners are misleading on
+        success) but always print host lines for the per-host breakdown.
         """
         if self._state is None:
-            return []
+            return [], []
         if self._projection is None or self._projection._state is not self._state:
             self._projection = TreeProjection.from_run_state(self._state)
         projection = self._projection
@@ -784,50 +776,7 @@ class CompactRenderer:
                 colorize=self._colorize,
                 animation_frame=0,
             )
-        return tree_lines + host_lines
-
-    def _format_per_host_lines(self) -> list[str]:
-        """Build one summary line per host, ordered by first-seen.
-
-        Aggregates per-host status counts across every task in every
-        play, then renders each host through `format_host_summary`.
-        Returns an empty list when no hosts have any state — keeps the
-        completion output clean in preflight-only-failure scenarios.
-        """
-        if self._state is None:
-            return []
-
-        host_counts: dict[str, dict[str, int]] = {}
-        for play in self._state.plays.values():
-            for task in play.tasks.values():
-                for hostname, host_state in task.hosts.items():
-                    counts = host_counts.setdefault(
-                        hostname, {"ok": 0, "changed": 0, "skipped": 0, "failed": 0, "unreachable": 0}
-                    )
-                    if host_state.status == Status.OK:
-                        counts["ok"] += 1
-                    elif host_state.status == Status.CHANGED:
-                        counts["changed"] += 1
-                    elif host_state.status == Status.SKIPPED:
-                        counts["skipped"] += 1
-                    elif host_state.status == Status.FAILED:
-                        counts["failed"] += 1
-                    elif host_state.status == Status.UNREACHABLE:
-                        counts["unreachable"] += 1
-
-        return [
-            format_host_summary(
-                hostname=hostname,
-                ok=counts["ok"],
-                changed=counts["changed"],
-                skipped=counts["skipped"],
-                failed=counts["failed"],
-                unreachable=counts["unreachable"],
-                ascii_mode=self._ascii_mode,
-                colorize=self._colorize,
-            )
-            for hostname, counts in host_counts.items()
-        ]
+        return tree_lines, host_lines
 
     def collect_stats(self) -> diagnostics.RendererStats:
         """Return an immutable snapshot of this renderer's activity counters.

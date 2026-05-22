@@ -23,8 +23,5 @@ web1   1        1        0       0            1  unreachable
 web2   1        1        0       1            0  (idle)
 web3   2        0        1       0            0  (idle)
 site.yml | 2/3 hosts | 3/3 tasks | 0:00:00 X failed
-  web1: * 1 ok + 1 changed O 1 unreachable
-  web2: * 1 ok + 1 changed X 1 failed
-  web3: * 2 ok o 1 skipped
   FAILED: web2 — Configure firewall
   UNREACHABLE: web1 — Deploy application

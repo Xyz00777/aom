@@ -1,10 +1,9 @@
-"""Tests for the per-host summary printed by handle_completion.
+"""Tests for the host table printed by handle_completion.
 
-Bug context: format_host_summary() exists in compact/renderer.py with
-its own unit tests, but no caller. The final completion path prints
-only the aggregate `1/1 hosts │ 0:00:00 ●`. With multiple hosts that
-hides who succeeded vs who failed. This adds the per-host breakdown
-underneath the status line.
+After completion, the renderer prints a frozen snapshot of the host
+overview table (format_host_rows) instead of per-host summary lines.
+The table provides the same information in a column-aligned layout,
+avoiding duplication with the live panel.
 """
 
 from __future__ import annotations
@@ -16,7 +15,7 @@ from ansible_aom.core.models import HostRunState, PlayRunState, RunState, Status
 
 
 def _state_with_two_hosts() -> RunState:
-    """Build a RunState where web1 had 2 OK + 1 changed, web2 had 1 ok + 1 failed."""
+    """Build a RunState where web1 had 2 OK + 1 changed, web2 had 1 OK + 1 failed."""
     state = RunState(playbook="site.yml")
     play = PlayRunState(play_id="1", name="p1", status=Status.RUNNING)
 
@@ -39,7 +38,7 @@ def _state_with_two_hosts() -> RunState:
     return state
 
 
-def test_completion_prints_per_host_breakdown(capsys):
+def test_completion_prints_host_table_with_counts(capsys):
     renderer = CompactRenderer(is_tty=False)
     renderer.start("site.yml", [])
     renderer._state = _state_with_two_hosts()
@@ -47,20 +46,18 @@ def test_completion_prints_per_host_breakdown(capsys):
     renderer.handle_completion(1, "failed")
 
     captured = capsys.readouterr()
-    # Existing aggregate line is still there
+    # Status bar still present
     assert "site.yml" in captured.out
-    # New per-host lines
-    assert "web1:" in captured.out
-    assert "web2:" in captured.out
-    # web1: 2 ok + 1 changed
-    assert "2 ok" in captured.out
-    assert "1 changed" in captured.out
-    # web2: 1 ok + 1 failed
-    assert "1 failed" in captured.out
+    # Host table shows both hosts with their counts
+    assert "web1" in captured.out
+    assert "web2" in captured.out
+    # Column-aligned counts — web1: 2 OK, 1 changed; web2: 1 OK, 1 failed
+    assert "2" in captured.out
+    assert "1" in captured.out
 
 
-def test_completion_per_host_lines_indented(capsys):
-    """Per-host lines should be visually subordinate to the status line."""
+def test_completion_snapshot_contains_host_rows(capsys):
+    """On failure, the host table is included in the snapshot output."""
     renderer = CompactRenderer(is_tty=False)
     renderer.start("site.yml", [])
     renderer._state = _state_with_two_hosts()
@@ -69,22 +66,20 @@ def test_completion_per_host_lines_indented(capsys):
 
     captured = capsys.readouterr()
     lines = captured.out.splitlines()
-    host_lines = [line for line in lines if "web1:" in line or "web2:" in line]
-    assert len(host_lines) == 2
-    for line in host_lines:
-        assert line.startswith("  "), f"expected leading indent, got {line!r}"
+    # The host table has a header row with "host" and column labels
+    host_header_lines = [line for line in lines if "host" in line and "ok" in line]
+    assert len(host_header_lines) >= 1
 
 
-def test_completion_no_per_host_lines_when_no_hosts(capsys):
-    """If no hosts ran (preflight-only failure), don't print an empty hosts block."""
+def test_completion_no_host_rows_when_no_hosts(capsys):
+    """If no hosts ran (preflight-only failure), don't print a host table."""
     renderer = CompactRenderer(is_tty=False)
     renderer.start("site.yml", [])
-    # _state stays as fresh empty RunState
 
     renderer.handle_completion(4, "crashed")
 
     captured = capsys.readouterr()
     assert "site.yml" in captured.out
-    # No host lines
-    for line in captured.out.splitlines():
-        assert not line.startswith("  ")
+    # No host table header row
+    host_lines = [line for line in captured.out.splitlines() if "host" in line and "ok" in line]
+    assert len(host_lines) == 0

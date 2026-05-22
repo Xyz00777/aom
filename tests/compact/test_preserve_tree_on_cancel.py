@@ -83,17 +83,16 @@ def test_tree_printed_after_failure(capsys) -> None:
 
 
 def test_tree_not_duplicated_on_clean_exit(capsys) -> None:
-    """A clean exit doesn't need the snapshot — the live panel was empty
-    by that point anyway (run completed before this call) and the final
-    summary plus per-host breakdown already tells the success story.
-    Avoid printing a stale running-task snapshot in that case."""
+    """A clean exit omits the tree snapshot — the host table still prints
+    for per-host counts, but the tree (which would show stale running-task
+    spinners) is skipped."""
     r = _renderer_with_running_task()
     r.handle_completion(exit_code=0, state="completed")
     out = capsys.readouterr().out
-    # The currently-running task should NOT be re-printed for a clean
-    # exit — by the time exit_code is 0 the run is fully finished and
-    # the tree snapshot would be misleading (claiming a task is still
-    # running when it isn't).
-    # We expect the final status bar but not the snapshot lines.
-    lines_with_task = [ln for ln in out.splitlines() if "Install nginx" in ln]
-    assert lines_with_task == [], lines_with_task
+    # The *tree* should NOT appear on clean exit — stale running-task
+    # spinners would be misleading. Lines like "├─ ◐ Install nginx"
+    # (tree format) must be absent.
+    tree_lines = [ln for ln in out.splitlines() if "├─" in ln or "└─" in ln]
+    assert tree_lines == [], tree_lines
+    # The host table IS printed on clean exit (per-host counts).
+    assert "web1" in out
