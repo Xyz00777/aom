@@ -60,11 +60,11 @@ if TYPE_CHECKING:
 
 # HS-1/HS-8: status-panel compute throttle. Aligned with Display.update's
 # write throttle (0.25 s) so a compute whose output Display would
-# coalesce is short-circuited entirely. The 1 s tick-refresh threshold
-# is the upper bound on how long the elapsed-clock segment can stay
-# frozen during a quiet period when nothing else has changed.
+# coalesce is short-circuited entirely. The clean-tick refresh uses the
+# same 0.25 s window so the spinner glyph (◐→◓→◑→◒) and elapsed-time
+# segment animate at 4 FPS during quiet periods.
 _PANEL_COMPUTE_THROTTLE_S = 0.25
-_PANEL_TICK_REFRESH_S = 1.0
+_PANEL_TICK_REFRESH_S = 0.25
 
 
 class CompactRenderer:
@@ -443,12 +443,17 @@ class CompactRenderer:
         cols, rows = shutil.get_terminal_size((80, 24))
         active_hosts = sum(1 for s in host_statuses.values() if s == Status.RUNNING)
         budget = _compute_tree_budget(rows, active_hosts)
+        # Spinner frame derived from wall clock so the running glyph
+        # actually animates between renders. 4 FPS matches the panel
+        # refresh budget — anything faster would tear past the throttle.
+        frame = int(now * 4)
         tree_lines = format_tree_block(
             projection,
             budget=budget,
             width=cols,
             ascii_mode=self._ascii_mode,
             colorize=self._colorize,
+            animation_frame=frame,
         )
         host_lines: list[str] = []
         if projection.is_host_summary_visible():
@@ -457,6 +462,7 @@ class CompactRenderer:
                 width=cols,
                 ascii_mode=self._ascii_mode,
                 colorize=self._colorize,
+                animation_frame=frame,
             )
 
         # Status bar is the BOTTOM line so it stays anchored where the

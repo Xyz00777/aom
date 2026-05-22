@@ -366,6 +366,7 @@ def format_host_rows(
     width: int,
     ascii_mode: bool = False,
     colorize: bool = False,
+    animation_frame: int = 0,
 ) -> list[str]:
     """Render the per-host summary table.
 
@@ -396,7 +397,7 @@ def format_host_rows(
             suffix = _wrap("(idle)", _DIM, colorize)
         else:
             elapsed = int(row.current_elapsed_s or 0)
-            glyph = get_running_frame(0)  # static frame in the per-host row
+            glyph = get_running_frame(animation_frame)
             suffix = f"on: {row.current_task}  {_wrap(f'{glyph} {elapsed}s', _CYAN, colorize)}"
 
         # Two spaces between count cells and the current-task suffix for visual
@@ -444,6 +445,7 @@ def format_tree_block(
     width: int,
     ascii_mode: bool = False,
     colorize: bool = False,
+    animation_frame: int = 0,
 ) -> list[str]:
     """Render the tree block as a list of lines.
 
@@ -519,7 +521,7 @@ def format_tree_block(
                 # get_running_frame returns a Unicode quadrant glyph; only
                 # safe outside ASCII mode. ASCII mode falls through to the
                 # plain icon map (which uses "@" for RUNNING).
-                g = get_running_frame(0)
+                g = get_running_frame(animation_frame)
             else:
                 g = icons.get(ln.status, "?")
             color_name = get_status_color(ln.status)
