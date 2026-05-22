@@ -47,7 +47,6 @@
             uv
             ruff
             mypy
-            python.pkgs.ansible-core
             stdenv.cc
           ] ++ (with python.pkgs; [
             pytest
@@ -56,6 +55,7 @@
             pytest-cov
             textual-dev
             inline-snapshot
+            ansible-core
           ]);
 
           shellHook = ''
