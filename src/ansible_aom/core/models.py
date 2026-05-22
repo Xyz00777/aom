@@ -8,12 +8,15 @@ See SPECIFICATION.md Section 6.1 for model definitions.
 """
 
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+_JINJA_RE = re.compile(r"\{\{.*?\}\}")
 
 
 def strip_role_prefix(name: str) -> str:
@@ -318,6 +321,27 @@ class RunState:
             leaf = index.get(task_name)
             if leaf is None:
                 leaf = index.get(strip_role_prefix(task_name))
+            if leaf is None:
+                # Try template-variable match: runtime "Get ID for
+                # angie-sidecar" vs preflight "Get ID for {{ user }}".
+                for preflight_name, tdef in index.items():
+                    if "{{" not in preflight_name:
+                        continue
+                    skeleton = re.sub(r"\s+", " ", _JINJA_RE.sub("", preflight_name)).strip()
+                    if not skeleton:
+                        leaf = tdef
+                        break
+                    # Subsequence match: every skeleton word must appear
+                    # in order in the runtime name.
+                    skeleton_words = skeleton.split()
+                    runtime_words = task_name.split()
+                    si = 0
+                    for rw in runtime_words:
+                        if si < len(skeleton_words) and rw == skeleton_words[si]:
+                            si += 1
+                    if si == len(skeleton_words):
+                        leaf = tdef
+                        break
             if leaf is not None:
                 self._last_matched_task_def = leaf
                 return

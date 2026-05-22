@@ -29,6 +29,48 @@ from ansible_aom.core.models import (
 
 TreeKind = Literal["playbook", "play", "role", "task", "host"]
 
+_TEMPLATE_RE = __import__("re").compile(r"\{\{.*?\}\}")
+
+
+def _template_skeleton(name: str) -> str:
+    """Strip ``{{ ... }}`` from a task name, yielding the static parts.
+
+    ``--list-tasks`` preserves Jinja2 templates verbatim
+    (e.g. ``"Get ID for {{ user }}"``). The JSONL callback sends
+    the resolved value (``"Get ID for angie-sidecar"``).
+    ``_template_skeleton`` returns ``"Get ID for"`` — the parts
+    that are guaranteed identical between preflight and runtime.
+    Multiple whitespace runs are collapsed so that ``"user  exists"``
+    (from stripping ``{{ username }}``) becomes ``"user exists"``."""
+    return __import__("re").sub(r"\s+", " ", _TEMPLATE_RE.sub("", name)).strip()
+
+
+def _is_template_match(preflight_name: str, runtime_name: str) -> bool:
+    """Return True if ``runtime_name`` could be a resolved version of
+    ``preflight_name`` (which may contain ``{{ ... }}`` templates).
+
+    The match is structural: strip ``{{ ... }}`` from the preflight
+    name to get the "skeleton" (static text), then check that every
+    non-empty word of the skeleton appears as a subsequence in the
+    runtime name. This handles templates at the start, middle, or end
+    of the name, and works even when the resolved value inserts text
+    between skeleton fragments."""
+    if "{{" not in preflight_name:
+        return False
+    skeleton = _template_skeleton(preflight_name)
+    if not skeleton:
+        return True
+    # All skeleton words must appear in order (subsequence) in the
+    # runtime name. This is robust against resolved variables that
+    # insert text between skeleton fragments.
+    skeleton_words = skeleton.split()
+    runtime_words = runtime_name.split()
+    si = 0
+    for rw in runtime_words:
+        if si < len(skeleton_words) and rw == skeleton_words[si]:
+            si += 1
+    return si == len(skeleton_words)
+
 
 @dataclass(frozen=True)
 class TreeLine:
@@ -547,6 +589,7 @@ class TreeProjection:
             return "completed"
 
         if play_def is not None:
+            matched_runtime_tasks: set[str] = set()
             for entry in play_def.tasks:
                 if isinstance(entry, RoleGroupDefinition):
                     role: str | None = entry.role
@@ -556,8 +599,39 @@ class TreeProjection:
                     task_defs = [entry]
                 for tdef in task_defs:
                     runtime = runtime_by_name.get(tdef.name)
+                    if runtime is None and "{{" in tdef.name:
+                        # Preflight name has unresolved Jinja2 template —
+                        # try to find a runtime task whose resolved name
+                        # matches the template skeleton.
+                        for rt_name, rt in runtime_by_name.items():
+                            if rt_name in matched_runtime_tasks:
+                                continue
+                            if _is_template_match(tdef.name, rt_name):
+                                runtime = rt
+                                matched_runtime_tasks.add(rt_name)
+                                break
+                        if runtime is not None:
+                            # Also try with role prefix stripped
+                            for rt_name, rt in runtime_by_name.items():
+                                if rt_name in matched_runtime_tasks:
+                                    continue
+                                stripped_rt = strip_role_prefix(rt_name)
+                                if (
+                                    stripped_rt != rt_name
+                                    and _is_template_match(tdef.name, stripped_rt)
+                                ):
+                                    runtime = rt
+                                    matched_runtime_tasks.add(rt_name)
+                                    break
                     kind = _classify(runtime)
                     emitted_names.add(tdef.name)
+                    if runtime is not None:
+                        # Emit under the runtime (resolved) name so host
+                        # leaves and status are correct.
+                        emitted_names.add(runtime.name)
+                        stripped = strip_role_prefix(runtime.name)
+                        if stripped != runtime.name:
+                            emitted_names.add(stripped)
                     if kind == "completed":
                         continue
                     items.append((kind, tdef.name, role, runtime))
@@ -611,6 +685,12 @@ class TreeProjection:
         result = self._role_index.get(task_name)
         if result is None:
             result = self._role_index.get(strip_role_prefix(task_name))
+        if result is None:
+            # Try template-variable match: runtime name "Get ID for
+            # angie-sidecar" vs index key "Get ID for {{ username }}".
+            for preflight_name, role_name in self._role_index.items():
+                if _is_template_match(preflight_name, task_name):
+                    return role_name
         return result
 
     @staticmethod
