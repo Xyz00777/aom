@@ -467,12 +467,12 @@ class TreeProjection:
         if not play_items:
             return
 
-        # Stable partition: running items first, then pending.
-        # This ensures the active task and its host leaves are near the
-        # top of the tree, so truncation-from-end cuts pending content
-        # rather than the currently running task.
         running_items = [(k, n, r, rt) for k, n, r, rt in play_items if k == "running"]
         pending_items = [(k, n, r, rt) for k, n, r, rt in play_items if k != "running"]
+
+        if not running_items and not pending_items:
+            return
+
         play_items = running_items + pending_items
 
         lines.append(

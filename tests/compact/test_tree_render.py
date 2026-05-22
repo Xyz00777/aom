@@ -421,8 +421,8 @@ def test_compute_tree_budget_math():
     assert _compute_tree_budget(rows=24, active_hosts=12) == 16
     # Lower clamp: tiny terminal, 0 hosts → 8
     assert _compute_tree_budget(rows=10, active_hosts=0) == 8
-    # Upper clamp: huge values → 40
-    assert _compute_tree_budget(rows=200, active_hosts=200) == 40
+    # Upper clamp: huge values → 60
+    assert _compute_tree_budget(rows=200, active_hosts=200) == 60
 
 
 def _full_panel(state: RunState) -> str:
