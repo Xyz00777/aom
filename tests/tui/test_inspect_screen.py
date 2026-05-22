@@ -653,3 +653,67 @@ async def test_y_yanks_detail(state_dir: Path, monkeypatch):
         await pilot.pause()
     assert copied
     assert "One or more items failed" in copied[0]
+
+
+@pytest.mark.asyncio
+async def test_detail_pane_handles_huge_stdout_quickly(state_dir: Path):
+    """Switching between tasks must stay snappy even with very long output.
+
+    Regression: the detail pane used to be a ``Static`` whose content was
+    a single ``Content`` object. Textual computes a Static's height by
+    wrapping the entire body on every layout-triggering refresh, which is
+    O(N) in the number of lines. On a failed task whose stdout/stderr ran
+    into the tens of thousands of lines this took several seconds and
+    made the inspect TUI appear to freeze every time the cursor moved
+    between tasks. ``RichLog`` stores per-line strips, so the same body
+    paginates in O(visible).
+    """
+    import time
+
+    from ansible_aom.core.inspect_model import TaskTreeNode, build_task_tree
+    from ansible_aom.session.store import load_session
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        session = load_session(_ALIASES["failed_loop"], state_dir)
+        assert session is not None
+        # Inject a huge stdout on the focused-task's raw event so the
+        # detail renderer produces tens of thousands of lines. This
+        # exercises the exact path that used to wrap the whole body on
+        # every refresh.
+        tree = build_task_tree(session)
+
+        def find_failed(node: TaskTreeNode) -> TaskTreeNode | None:
+            if node.kind == "task" and node.stats.failed > 0:
+                return node
+            for c in node.children:
+                hit = find_failed(c)
+                if hit is not None:
+                    return hit
+            return None
+
+        failed = find_failed(tree)
+        assert failed is not None and failed.raw_event is not None
+        host_label = next(iter(failed.raw_event["hosts"]))
+        big_stdout = "\n".join(f"line {i} of synthetic stdout" for i in range(20_000))
+        failed.raw_event["hosts"][host_label]["stdout"] = big_stdout
+        app._current_session = session
+        app._focused_task = failed
+        app._focused_host = failed.children[0] if failed.children else None
+
+        start = time.perf_counter()
+        app._update_detail()
+        await pilot.pause()
+        elapsed = time.perf_counter() - start
+        # The Static-based implementation took ~2s for 20k lines. RichLog
+        # writes per-line strips so it stays well under that even on
+        # slow CI. Generous bound (1.5s) leaves room for CI variance but
+        # still catches a regression to the old wrap-everything path.
+        assert elapsed < 1.5, (
+            f"Detail update for {big_stdout.count(chr(10)) + 1} lines took "
+            f"{elapsed:.2f}s — the detail pane is back to wrapping the whole "
+            f"body on every refresh."
+        )

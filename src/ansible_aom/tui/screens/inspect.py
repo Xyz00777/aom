@@ -42,7 +42,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Footer, Header, Label, ListItem, ListView, Static, Tree
+from textual.widgets import Footer, Header, Label, ListItem, ListView, RichLog, Static, Tree
 
 from ansible_aom.core.inspect_model import (
     DetailBlock,
@@ -306,10 +306,22 @@ class _RunsListView(ListView):
             app.focus_tasks()
 
 
-class _DetailScroll(VerticalScroll):
-    """VerticalScroll that uses Left / Escape to step back to Tasks pane."""
+class _DetailLog(RichLog):
+    """RichLog used as the Detail pane.
 
-    BINDINGS = VerticalScroll.BINDINGS + [
+    Replaces an earlier ``VerticalScroll`` containing a ``Static`` whose
+    body was the whole detail text. ``Static`` stores its content as a
+    single ``Content`` object whose ``get_height`` wraps the entire body
+    on every layout-triggering refresh — an O(N) cost that visibly froze
+    the UI for seconds on failed tasks with tens of thousands of stderr
+    lines. ``RichLog`` stores each line as a pre-rendered ``Strip`` so
+    scrolling stays O(visible) and updates are O(lines written).
+
+    Left / Escape step back to the Tasks pane, matching the
+    drill-in / step-back navigation model used by the other panes.
+    """
+
+    BINDINGS = RichLog.BINDINGS + [
         Binding("left", "step_back", "Back", show=False),
         Binding("escape", "step_back", "Back", show=False),
     ]
@@ -437,7 +449,7 @@ class InspectApp(App):
     #tasks-pane   { border-right: tall $panel; }
     #detail-pane  { padding: 0 1; }
 
-    #runs-list, #tasks-tree, #detail-body { background: ansi_default; }
+    #runs-list, #tasks-tree, #detail-pane { background: ansi_default; }
     _RunRow { background: ansi_default; }
 
     /* Selected/highlighted rows — bright enough to be readable on a
@@ -502,6 +514,11 @@ class InspectApp(App):
         self._focused_task: TaskTreeNode | None = None
         self._focused_host: TaskTreeNode | None = None
         self._detail_text: str = "Select a task to see details."
+        # Cache key for the last detail body we rendered: (task_id,
+        # host_label, session_id). Re-rendering only when the key changes
+        # protects us from the burst of tree-highlight messages Textual
+        # fires when the cursor moves over the same node multiple times.
+        self._detail_key: tuple[object, object, object] | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -510,8 +527,7 @@ class InspectApp(App):
                 yield _RunsListView(id="runs-list")
             with Vertical(id="tasks-pane"):
                 yield _NavTree("Tasks", id="tasks-tree")
-            with _DetailScroll(id="detail-pane", can_focus=True):
-                yield Static(self._detail_text, id="detail-body", expand=True, markup=True)
+            yield _DetailLog(id="detail-pane", markup=True, wrap=True, auto_scroll=False)
         yield Footer()
 
     def on_mount(self) -> None:
@@ -819,14 +835,35 @@ class InspectApp(App):
         return "\n".join(lines)
 
     def _update_detail(self) -> None:
-        detail = self.query_one("#detail-body", Static)
+        detail = self.query_one("#detail-pane", _DetailLog)
+        # Skip the rebuild when the focused (task, host) pair has not
+        # actually changed. Tree highlight messages fire for every cursor
+        # tick — including ones that select the same node we're already
+        # showing — and re-rendering a long error log each time was the
+        # second half of the stutter the user reported.
+        key = (
+            None if self._focused_task is None else self._focused_task.task_id,
+            None if self._focused_host is None else self._focused_host.label,
+            None if self._current_session is None else self._current_session.get("session_id"),
+        )
+        if key == self._detail_key:
+            return
+        self._detail_key = key
+
+        detail.clear()
         if self._current_session is None or self._focused_task is None:
             self._detail_text = "Select a task to see details."
-            detail.update(self._detail_text)
+            detail.write(self._detail_text)
             return
         block = build_detail_block(self._current_session, self._focused_task, self._focused_host)
         self._detail_text = self._render_detail_block(block)
-        detail.update(self._detail_text)
+        # One write, not one per line: each write does its own measure +
+        # console.render + virtual-size update, so per-line writes add a
+        # ~100 µs overhead that becomes seconds on long stderr. The body
+        # already contains literal newlines — RichLog will split them
+        # into per-line Strips itself.
+        detail.write(self._detail_text)
+        detail.scroll_home(animate=False)
 
     # ── Failures navigation ─────────────────────────────────────────────
 
