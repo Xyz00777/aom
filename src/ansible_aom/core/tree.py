@@ -1,6 +1,6 @@
 """Pure projection of RunState into renderable tree + host-row data.
 
-This module contains *no* I/O, no ANSI, no terminal awareness — it is
+This module contains *no* I/O, no ANSI, no terminal awareness. It is
 the data layer the compact (and future TUI) renderers consume. See
 docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md.
 
@@ -24,6 +24,7 @@ from ansible_aom.core.models import (
     RunState,
     Status,
     TaskRunState,
+    strip_role_prefix,
 )
 
 TreeKind = Literal["playbook", "play", "role", "task", "host"]
@@ -511,6 +512,13 @@ class TreeProjection:
         runtime_by_name: dict[str, TaskRunState] = {}
         for task in play.tasks.values():
             runtime_by_name.setdefault(task.name, task)
+            # Ansible sends task names with the "role : " prefix at
+            # runtime (e.g. "podman : Install"). Preflight definitions
+            # use the stripped form ("Install"). Index both so that
+            # lookups by either form succeed.
+            stripped = strip_role_prefix(task.name)
+            if stripped != task.name:
+                runtime_by_name.setdefault(stripped, task)
 
         play_def = self._play_def_for(play)
 
@@ -556,7 +564,7 @@ class TreeProjection:
 
         # Runtime-only tasks (dynamic include_tasks, or no preflight at all).
         for task in play.tasks.values():
-            if task.name in emitted_names:
+            if task.name in emitted_names or strip_role_prefix(task.name) in emitted_names:
                 continue
             kind = _classify(task)
             if kind == "completed":
@@ -584,6 +592,11 @@ class TreeProjection:
         ``RoleGroupDefinition`` (grouped, 5+ consecutive same-role) and
         ``TaskDefinition.role`` (ungrouped, <5 tasks). First match wins.
         Memoised on first call.
+
+        Runtime task names may carry the ``"role : "`` prefix
+        (e.g. ``"podman : Install Podman"``); the stripped form is
+        also tried so that lookups succeed against the preflight index
+        which stores bare task names.
         """
         if self._role_index is None:
             idx: dict[str, str] = {}
@@ -595,7 +608,10 @@ class TreeProjection:
                     elif entry.role is not None:
                         idx.setdefault(entry.name, entry.role)
             self._role_index = idx
-        return self._role_index.get(task_name)
+        result = self._role_index.get(task_name)
+        if result is None:
+            result = self._role_index.get(strip_role_prefix(task_name))
+        return result
 
     @staticmethod
     def _task_line(task: TaskRunState, depth: int) -> TreeLine:

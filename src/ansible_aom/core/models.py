@@ -16,6 +16,18 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+def strip_role_prefix(name: str) -> str:
+    """Strip the ``"role : "`` prefix that ansible adds to task names at
+    runtime. Preflight definitions already have this stripped (by
+    ``parse_list_tasks_output``), so ``TaskDefinition.name`` never contains
+    it. ``TaskRunState.name`` does. Callers that match runtime names to
+    preflight names should use this to normalise the lookup key."""
+    if " : " in name:
+        _, stripped = name.split(" : ", 1)
+        return stripped.strip()
+    return name
+
+
 class Status(Enum):
     """Task/host execution status."""
 
@@ -304,6 +316,8 @@ class RunState:
         index = self._task_def_index
         if index is not None:
             leaf = index.get(task_name)
+            if leaf is None:
+                leaf = index.get(strip_role_prefix(task_name))
             if leaf is not None:
                 self._last_matched_task_def = leaf
                 return
