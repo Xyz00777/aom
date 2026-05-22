@@ -368,29 +368,89 @@ def format_host_rows(
     colorize: bool = False,
     animation_frame: int = 0,
 ) -> list[str]:
-    """Render the per-host summary table.
+    """Render the per-host overview as a column-aligned table.
 
-    One line per host: hostname (worst-status coloured) + count cells +
-    current-task suffix. Idle / unreachable / finished hosts get the
-    appropriate suffix; the projection has already classified them.
+    Header row + one row per host. Columns:
+
+        host  ok  changed  failed  [unreachable]  on
+
+    The ``unreachable`` column is omitted unless at least one host has a
+    non-zero unreachable count — keeps the common multi-host case
+    tight. Counts are right-aligned; hostname and ``on:`` suffix are
+    left-aligned.
     """
+    rows = projection.host_rows()
+    if not rows:
+        return []
+
+    include_unreachable = any(row.counts.get(Status.UNREACHABLE, 0) > 0 for row in rows)
+
+    # Column widths: header label vs widest value, whichever is longer.
+    hostname_width = max(len("host"), *(len(r.hostname) for r in rows))
+    ok_width = max(len("ok"), *(len(str(r.counts.get(Status.OK, 0))) for r in rows))
+    changed_width = max(len("changed"), *(len(str(r.counts.get(Status.CHANGED, 0))) for r in rows))
+    failed_width = max(len("failed"), *(len(str(r.counts.get(Status.FAILED, 0))) for r in rows))
+    unreachable_width = (
+        max(len("unreachable"), *(len(str(r.counts.get(Status.UNREACHABLE, 0))) for r in rows))
+        if include_unreachable
+        else 0
+    )
+
     out: list[str] = []
-    for row in projection.host_rows():
+
+    # --- Header ----------------------------------------------------------
+    header_parts: list[str] = [
+        f"{'host':<{hostname_width}}",
+        f"{'ok':>{ok_width}}",
+        f"{'changed':>{changed_width}}",
+        f"{'failed':>{failed_width}}",
+    ]
+    if include_unreachable:
+        header_parts.append(f"{'unreachable':>{unreachable_width}}")
+    header_parts.append("on")
+    header_line = "  ".join(header_parts)
+    if colorize:
+        header_line = _wrap(header_line, _DIM, colorize)
+    if len(_strip_sgr(header_line)) > width:
+        header_line = _truncate_visible(header_line, width, colorize=colorize)
+    out.append(header_line)
+
+    # --- Data rows -------------------------------------------------------
+    for row in rows:
         hostname_color = _HOSTNAME_COLOR_BY_WORST.get(row.worst_status or Status.OK)
-        hostname_seg = (
-            _wrap(row.hostname, hostname_color, colorize) if hostname_color else row.hostname
-        )
+        host_text = f"{row.hostname:<{hostname_width}}"
+        host_seg = _wrap(host_text, hostname_color, colorize) if hostname_color else host_text
 
-        cells = _format_count_cells(
-            ok=row.counts.get(Status.OK, 0),
-            changed=row.counts.get(Status.CHANGED, 0),
-            failed=row.counts.get(Status.FAILED, 0),
-            unreachable=row.counts.get(Status.UNREACHABLE, 0),
-            ascii_mode=ascii_mode,
-            colorize=colorize,
-        )
+        cells = [
+            _count_cell(
+                row.counts.get(Status.OK, 0),
+                width=ok_width,
+                color=_GREEN,
+                colorize=colorize,
+            ),
+            _count_cell(
+                row.counts.get(Status.CHANGED, 0),
+                width=changed_width,
+                color=_YELLOW,
+                colorize=colorize,
+            ),
+            _count_cell(
+                row.counts.get(Status.FAILED, 0),
+                width=failed_width,
+                color=_RED,
+                colorize=colorize,
+            ),
+        ]
+        if include_unreachable:
+            cells.append(
+                _count_cell(
+                    row.counts.get(Status.UNREACHABLE, 0),
+                    width=unreachable_width,
+                    color=_MAGENTA,
+                    colorize=colorize,
+                )
+            )
 
-        # Current-task suffix.
         if row.worst_status == Status.UNREACHABLE and row.current_task is None:
             suffix = _wrap("unreachable", _MAGENTA, colorize)
         elif row.current_task is None:
@@ -398,17 +458,27 @@ def format_host_rows(
         else:
             elapsed = int(row.current_elapsed_s or 0)
             glyph = get_running_frame(animation_frame)
-            suffix = f"on: {row.current_task}  {_wrap(f'{glyph} {elapsed}s', _CYAN, colorize)}"
+            suffix = f"{row.current_task}  {_wrap(f'{glyph} {elapsed}s', _CYAN, colorize)}"
 
-        # Two spaces between count cells and the current-task suffix for visual
-        # separation; `" ".join` over [hostname_seg, *cells] gives the single
-        # spaces inside that group.
-        left = " ".join([hostname_seg, *cells])
-        line = f"{left}  {suffix}"
+        line = "  ".join([host_seg, *cells, suffix])
         if len(_strip_sgr(line)) > width:
             line = _truncate_visible(line, width, colorize=colorize)
         out.append(line)
+
     return out
+
+
+def _count_cell(value: int, *, width: int, color: str, colorize: bool) -> str:
+    """Right-align ``value`` in a fixed-width cell; dim zero values.
+
+    A literal zero painted in the count's normal colour fights with the
+    hostname for attention even though it carries no information; dim
+    the zero so the eye lands on actual non-zero outcomes.
+    """
+    text = f"{value:>{width}}"
+    if value == 0:
+        return _wrap(text, _DIM, colorize)
+    return _wrap(text, color, colorize)
 
 
 # Tree drawing glyphs. ASCII variants chosen to be unambiguous in plain

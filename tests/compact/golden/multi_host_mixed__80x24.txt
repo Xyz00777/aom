@@ -18,9 +18,10 @@ fatal: [web1] (5.0s): UNREACHABLE! => SSH connection timed out
 changed: [web2] (10.0s)
 ok: [web3] (15.0s)
 [10:01:00] Deploy application — 30.0s (1m00s)
-web1 * 1 ok + 1 changed O 1 unreachable  unreachable
-web2 * 1 ok + 1 changed X 1 failed  (idle)
-web3 * 2 ok  (idle)
+host  ok  changed  failed  unreachable  on
+web1   1        1       0            1  unreachable
+web2   1        1       1            0  (idle)
+web3   2        0       0            0  (idle)
 site.yml | 2/3 hosts | 3/3 tasks | 0:00:00 X failed
   web1: * 1 ok + 1 changed O 1 unreachable
   web2: * 1 ok + 1 changed X 1 failed

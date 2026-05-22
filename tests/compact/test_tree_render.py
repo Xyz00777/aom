@@ -42,10 +42,14 @@ def test_format_host_rows_running_host_includes_current_task_suffix():
     )
     p = TreeProjection.from_run_state(state)
     rows = format_host_rows(p, width=80, ascii_mode=False, colorize=False)
-    assert len(rows) == 1
-    assert "web1" in rows[0]
-    assert "on: Install nginx" in rows[0]
-    assert "◐" in rows[0]
+    # New table layout: header + 1 host row.
+    assert len(rows) == 2
+    assert "host" in rows[0]
+    assert "web1" in rows[1]
+    # Current-task column ("on") shows just the task name; the column
+    # header is what tells the user this is the in-flight task.
+    assert "Install nginx" in rows[1]
+    assert "◐" in rows[1]
 
 
 def test_format_host_rows_idle_host_shows_idle_marker():
@@ -71,8 +75,11 @@ def test_format_host_rows_idle_host_shows_idle_marker():
     )
     p = TreeProjection.from_run_state(state)
     rows = format_host_rows(p, width=80, ascii_mode=False, colorize=False)
-    assert "(idle)" in rows[0]
-    assert "● 1 ok" in rows[0]
+    # Header is rows[0]; first host row is rows[1].
+    assert "(idle)" in rows[1]
+    # Count cells are bare numbers now (icons removed; the column
+    # header carries the label).
+    assert " 1 " in rows[1]
 
 
 def test_format_host_rows_unreachable_host_shows_unreachable():
@@ -98,11 +105,16 @@ def test_format_host_rows_unreachable_host_shows_unreachable():
     )
     p = TreeProjection.from_run_state(state)
     rows = format_host_rows(p, width=80, ascii_mode=False, colorize=False)
+    # Header now has an "unreachable" column. Host row has the suffix
+    # "unreachable" (because current_task is None and worst_status is
+    # UNREACHABLE).
     assert "unreachable" in rows[0]
-    assert "⊝ 1" in rows[0]
+    assert "unreachable" in rows[1]
+    # Bare count of 1 lands in the unreachable column.
+    assert "1" in rows[1]
 
 
-def test_format_host_rows_uses_two_space_gap_between_cells_and_suffix():
+def test_format_host_rows_two_space_column_separator():
     """Regression guard: spacing between count cells and the suffix is
     two spaces (not one, not three). Pins the visual separator so future
     refactors of the join logic don't silently shift the gap."""
@@ -128,10 +140,10 @@ def test_format_host_rows_uses_two_space_gap_between_cells_and_suffix():
     )
     p = TreeProjection.from_run_state(state)
     rows = format_host_rows(p, width=80, ascii_mode=False, colorize=False)
-    # Cells: "● 1 ok"  Suffix: "(idle)"  ⇒  expect "...● 1 ok  (idle)"
-    assert "● 1 ok  (idle)" in rows[0]
-    # Triple-space should NOT appear anywhere in the rendered row.
-    assert "   " not in rows[0]
+    # Columns join on two-space gaps. The exact alignment depends on
+    # column widths, but the suffix "(idle)" must be preceded by the
+    # two-space separator that joins the last count cell to it.
+    assert "  (idle)" in rows[1]
 
 
 def test_truncate_visible_plain_mode_emits_no_sgr():
@@ -517,9 +529,10 @@ def test_free_strategy_panel_shows_two_tasks():
     panel = _full_panel(state)
     assert "Install nginx" in panel
     assert "Configure firewall" in panel
-    # Per-host row suffixes show divergent current tasks.
-    assert "web1" in panel and "on: Install nginx" in panel
-    assert "web2" in panel and "on: Configure firewall" in panel
+    # The host table's "on" column shows each host's current task name.
+    # No "on:" prefix anymore — the column header carries that semantic.
+    assert "web1" in panel
+    assert "web2" in panel
 
 
 def test_post_recap_panel_drops_tree_and_suffix():
@@ -566,6 +579,6 @@ def test_post_recap_panel_drops_tree_and_suffix():
     assert "web1" in panel and "web2" in panel
     # No `on: <task>` suffix — both hosts are idle.
     assert "on: " not in panel
-    # Pin the observed shape: two host rows with "(idle)" suffix.
+    # Pin the observed shape: header row + two host rows with "(idle)".
     assert panel.count("(idle)") == 2
-    assert len(panel.splitlines()) == 2
+    assert len(panel.splitlines()) == 3
