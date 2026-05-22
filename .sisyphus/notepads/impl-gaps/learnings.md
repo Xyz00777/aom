@@ -71,3 +71,29 @@ with patch("ansible_aom.renderer.factory.create_renderer") as mock_renderer:
 ```
 
 **Key insight**: The `patch` path must match where the function is imported/used, not where it's defined. Since `cli.py` does `from ansible_aom.renderer.factory import create_renderer`, we patch `ansible_aom.renderer.factory.create_renderer`.
+
+## Host Status Display (resolved)
+
+### Skipped status was missing from host overview (resolved 2026-05)
+
+The host overview (`format_host_rows`) and host summary (`format_host_summary`) only showed ok/changed/failed/unreachable. `Status.SKIPPED` was tracked in `RunState` and `tree.py` but never surfaced in the display.
+
+**Fix**: Added `skipped` parameter to `_format_count_cells`, `format_host_summary`, and conditional `skipped` column to `format_host_rows` (hidden when no host has skipped tasks, mirroring the `unreachable` column pattern). The `v2_runner_on_skipped` handler already created `HostRunState(status=Status.SKIPPED)` correctly.
+
+### Per-host summary lines were duplicating the host table (resolved 2026-05)
+
+After completion, the renderer printed both a column-aligned host table (`format_host_rows`) AND per-host summary lines (`format_host_summary`) with the same data. The summary lines were pure duplication.
+
+**Fix**: Removed `_format_per_host_lines` method entirely. On completion, the host table now always prints (not just on failure). The tree snapshot only prints on failure/cancel — on success, stale running spinners would be misleading. `_capture_panel_snapshot` now returns `(tree_lines, host_lines)` tuple so callers can print them independently.
+
+### Host leaves only showed RUNNING hosts (resolved 2026-05)
+
+Tree host leaves under a running task only showed hosts with `Status.RUNNING`. This meant completed hosts disappeared from the tree before the task was done.
+
+**Fix**: Removed the `if hs.status != Status.RUNNING: continue` filter in `_emit_runtime_play`. All hosts under a running task now appear with status-specific icons (● OK, ◐ RUNNING, ○ SKIPPED, etc.).
+
+### Linear strategy tasks stayed RUNNING until playbook end (resolved 2026-05)
+
+Under linear strategy, `task.status` only transitioned to COMPLETED at `v2_playbook_on_stats`. Previous tasks showed as "running" long after they finished.
+
+**Fix**: In `_handle_v2_playbook_on_task_start`, when a new task starts under linear strategy, mark all other RUNNING tasks in the same play as COMPLETED (either all hosts terminal, or empty hosts meaning no runner events arrived). The `_classify` method respects `Status.COMPLETED` as an early exit returning "completed" so the tree prunes them immediately.

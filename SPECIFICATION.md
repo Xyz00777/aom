@@ -299,18 +299,24 @@ Running: Install nginx on web1, Configure firewall on web2
 │ □ Start services                                          web1,web2 │
 └─────────────────────────────────────────────────────────────────────────┘
 
-┌─ Summary ────────────────────────────────────────────────────────────────┐
-│ web1: ● 2 ok, ◆ 0 changed, ✖ 0 failed, ⊝ 0 unreachable                 │
-│ web2: ◐ 1 running, ● 1 ok                                               │
-│ Elapsed: 0:04:23                                                        │
-└─────────────────────────────────────────────────────────────────────────┘
+host  ok  changed  failed  on
+web1   2        0       0  Configure firewall  ◐ 0s
+web2   1        0       0  (idle)
+
+site.yml │ 2/2 hosts │ 3/5 tasks │ 0:00:42 ●
 ```
+
+On playbook completion, the host table always prints (with a `skipped`
+column when any host has skipped tasks). On failure or cancel, the tree
+snapshot is also printed so the user can inspect what was in flight. On
+success, only the host table is printed (stale running indicators would
+be misleading).
 
 **Layout:**
 - Header: Playbook name with progress bar
 - Running: Currently executing tasks per host
 - Tree: Collapsible play/task structure with status icons
-- Summary: Per-host status and elapsed time
+- Host table: Per-host status counts in column-aligned rows
 - Status line: Warning ⚠ and deprecation ✱ counts displayed alongside host progress
 
 **Status Line Format (Compact Mode):**
@@ -399,7 +405,7 @@ Multi-panel interactive interface:
 │      ● Install nginx           web2    │                                 │
 │      ◐ Configure firewall      web1    │  Host Summary:                  │
 │      □ Configure firewall      web2    │  web1: ● 12 ok, ◆ 3 changed    │
-│      □ Start services          web1,2  │  web2: ◐ 1 running, ● 11 ok    │
+│      □ Start services          web1,2  │  web2: ◐ 1 running, ● 11 ok, ○ 2 skipped │
 │    □ Task: Deploy config               ├────────────────────────────────┤
 │                                        │  Log Panel                      │
 │                                        │  ───────────────────────────────│

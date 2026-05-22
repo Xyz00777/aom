@@ -317,7 +317,7 @@ direction of dependencies.
 **Section:** 4.1
 **Category:** unit
 **Priority:** high
-**Description:** Status icons display correctly: ● (ok), ◆ (changed), ✖ (failed), ⊝ (unreachable), ◐ (running), □ (pending/skipped)
+**Description:** Status icons display correctly: ● (ok), ◆ (changed), ✖ (failed), ⊝ (unreachable), ○ (skipped), ◐ (running), □ (pending)
 **Test:** Each status maps to correct Unicode character
 **Fixture/Setup:** Mock state with each status
 **Edge Cases:** Unicode fallback support
@@ -2702,14 +2702,14 @@ direction of dependencies.
 **Fixture/Setup:** SummaryPanel with start_time set
 **Edge Cases:** Zero elapsed, > 99 hours
 
-### TC-289: Summary Panel Per-Host Status Breakdown
+### TC-289: Host Table Per-Host Status Breakdown
 **Section:** 7.3
 **Category:** unit
 **Priority:** high
-**Description:** Verify per-host status line shows counts with icons (e.g., "web1: ● 12 ok, ◆ 3 changed, ✖ 0 failed")
-**Test:** Given host "web1" with 12 ok, 3 changed, 0 failed, assert summary line matches expected format with correct icons
-**Fixture/Setup:** SummaryPanel with HostRunState data
-**Edge Cases:** Host with all tasks pending, host with unreachable status
+**Description:** Verify per-host status table shows columns with icons and counts. On completion, the host table always prints (both success and failure). Columns: host, ok, changed, [skipped], failed, [unreachable], on. Skipped and unreachable columns appear only when any host has non-zero counts.
+**Test:** Given host "web1" with 12 ok, 3 changed, 0 failed, assert table row shows correct values. Given host with 2 skipped, assert skipped column appears.
+**Fixture/Setup:** TreeProjection with HostRunState data
+**Edge Cases:** Host with all tasks pending, host with unreachable status, host with skipped status
 
 ### TC-290: Status Bar Element Configuration
 **Section:** 7.4

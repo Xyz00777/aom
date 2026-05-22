@@ -16,10 +16,11 @@ changed: [web2]
 fatal: [web3]: FAILED! => SSH connection failed
                                        ─────────────────────────────────
  site.yml │ 2/3 hosts │ 8/16 tasks │ ⚠ 1 │ 0:00:42 ●
-   web1: ● 5 ok ◆ 3 changed
-   web2: ● 4 ok ◆ 4 changed
-   web3: ✖ 1 failed
-   FAILED: web3 — Install nginx
+  host  ok  changed  failed  on
+  web1   5        3       0  (idle)
+  web2   4        4       0  (idle)
+  web3   0        0       1  (idle)
+  FAILED: web3 — Install nginx
 ```
 
 Two render modes:
@@ -146,6 +147,7 @@ expected play layout from the very first frame.
 | `◆` | changed | `+` |
 | `✖` | failed | `X` |
 | `⊝` | unreachable | `!` |
+| `○` | skipped | `o` |
 | `◐` | running | `@` |
 | `□` | pending | `.` |
 

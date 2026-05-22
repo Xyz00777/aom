@@ -75,8 +75,10 @@ Iterates all `PlayDefinition` entries to match by play name. Called on every `v2
 
 **Cost:** O(P_def) per task-start event.
 
-### HS-7: `_format_per_host_lines` in `handle_completion` — O(P×T×H) full walk at teardown
-**Location:** `src/ansible_aom/compact/renderer.py:571`. Not on the hot path but worth noting — a huge state with millions of `HostRunState` entries (per spec limits: up to 1,000,000 total) is walked entirely at completion time to recompute counts from scratch rather than reading cached aggregates.
+### HS-7: ~~`_format_per_host_lines`~~ REMOVED — host table (`format_host_rows`) now used at completion
+**Original issue:** O(P×T×H) full walk at teardown. `_format_per_host_lines` walked all plays × tasks × hosts to recompute per-host counts from scratch.
+
+**Resolution (2026-05):** Removed `_format_per_host_lines` entirely. On completion, `format_host_rows` (already computed incrementally during renders) is used instead. The host table is now always printed on completion (not just on failure). Tree lines are only printed on failure/cancel.
 
 ### HS-8: `_render_status_panel` — triple-nested host status scan with dict-of-dict allocation
 **Location:** `src/ansible_aom/compact/renderer.py:256–270`.

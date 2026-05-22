@@ -70,12 +70,12 @@ derivation are pure transformations on `RunState`. No imports of
 `compact/` or anything Textual. The renderer is the only thing that
 knows about ANSI, glyph fallbacks, terminal width.
 
-## Decision: tree leaf shape (PQ2 — running-only pruning)
+## Decision: tree leaf shape (PQ2 — host leaves under running tasks)
 
-A running task is one line with a summary; only currently-running hosts
-get expanded child lines beneath. Done/skipped hosts collapse into the
-count summary. Tasks where no host is currently running disappear from
-the tree entirely.
+A running task shows all hosts as leaves with status-specific icons
+(● OK, ◐ RUNNING, ○ SKIPPED, etc.). Completed tasks (no RUNNING hosts)
+disappear from the tree entirely. Tasks where no host is currently
+running are pruned.
 
 ```
 site.yml
@@ -124,8 +124,10 @@ Format:
   `FAILED → red`, `UNREACHABLE → magenta`, `CHANGED → yellow`, otherwise
   the default foreground (counts cells already carry their own colours,
   so green for an all-ok host stays implicit).
-- **count_cells** reuses existing `format_host_summary` semantics: only
-  non-zero counts are emitted, each with its own colour.
+- **count_cells** reuses existing `_format_count_cells` semantics: only
+  non-zero counts are emitted, each with its own colour. The `skipped`
+  count is included (dim ○ icon), and the `skipped` column appears in
+  the table only when any host has a non-zero skipped count.
 - **current_task_suffix** is one of:
   - `on: <task name>  ◐ <elapsed>` — host is currently RUNNING a task
     (cyan, running animation frame for the glyph).

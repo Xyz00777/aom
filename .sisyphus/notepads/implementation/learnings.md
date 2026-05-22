@@ -1300,3 +1300,43 @@ new tests).
 All 14 items shipped. The remaining `.sisyphus/notepads/` items
 (TC-094/095/096 dynamic-task ordering tests, session-recording
 cleanup policy review) are tidy-up work, not blocking features.
+
+## 2026-05 Host Status Display Overhaul
+
+### Skipped status added to host overview
+
+`format_host_rows`, `format_host_summary`, and `_format_count_cells` now
+include a `skipped` parameter. The host table shows a conditional `skipped`
+column (hidden when no host has skipped tasks, mirroring `unreachable`).
+
+### Per-host summary lines removed from completion
+
+The `_format_per_host_lines` method was removed. On completion, the
+column-aligned host table (`format_host_rows`) now always prints (both
+success and failure). The per-host summary lines (`hostname: ● N ok ◆ M
+changed ○ K skipped`) were pure duplication with the host table.
+
+On failure/cancel: tree + host table + status bar + failure recap.
+On success: host table + status bar (no tree — stale running spinners
+would be misleading).
+
+### Linear strategy completion marking
+
+Under linear strategy, `v2_playbook_on_task_start` now marks any
+previously-running task in the same play as COMPLETED. This prevents
+stale "running" entries from lingering until `v2_playbook_on_stats`.
+
+### All hosts appear as tree leaves
+
+Under a running task, ALL hosts now appear as leaves (not just RUNNING).
+Completed hosts show ● (OK), skipped hosts show ○, etc. Only
+RUNNING hosts were shown before, which meant completed hosts vanished
+from the tree mid-playbook.
+
+### Role task count augmentation + prefix extraction
+
+`_emit_runtime_play` now counts runtime tasks per role that weren't in
+preflight (include_role tasks). `_task_role` extracts role from
+`"role : task"` prefix when the role name is in `_known_roles` (built
+from both preflight definitions and runtime task names). This makes
+dynamic roles like `podman` show correct "(N tasks)" counts.
