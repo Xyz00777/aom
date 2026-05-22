@@ -581,14 +581,18 @@ class TreeProjection:
         """
         runtime_by_name: dict[str, TaskRunState] = {}
         for task in play.tasks.values():
-            runtime_by_name.setdefault(task.name, task)
-            # Ansible sends task names with the "role : " prefix at
-            # runtime (e.g. "podman : Install"). Preflight definitions
-            # use the stripped form ("Install"). Index both so that
-            # lookups by either form succeed.
+            runtime_by_name[task.name] = task
             stripped = strip_role_prefix(task.name)
             if stripped != task.name:
-                runtime_by_name.setdefault(stripped, task)
+                runtime_by_name[stripped] = task
+        for p in self._state.plays.values():
+            if p.play_id == play.play_id:
+                continue
+            for task in p.tasks.values():
+                runtime_by_name.setdefault(task.name, task)
+                stripped = strip_role_prefix(task.name)
+                if stripped != task.name:
+                    runtime_by_name.setdefault(stripped, task)
 
         play_def = self._play_def_for(play)
 

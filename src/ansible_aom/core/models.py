@@ -417,18 +417,17 @@ class RunState:
         # task starts, any previous RUNNING task that is clearly done —
         # mark it COMPLETED so the tree can clear it.
         if play.detected_strategy == "linear":
-            for other_task in play.tasks.values():
-                if other_task.task_id == task_id:
-                    continue
-                if other_task.status != Status.RUNNING:
-                    continue
-                if not other_task.hosts:
-                    # Empty hosts + a new task starting means no runner
-                    # events ever arrived for the old task — it's done.
-                    other_task.status = Status.COMPLETED
-                    continue
-                if all(hs.status != Status.RUNNING for hs in other_task.hosts.values()):
-                    other_task.status = Status.COMPLETED
+            for p in self.plays.values():
+                for other_task in p.tasks.values():
+                    if other_task.task_id == task_id and p.play_id == play.play_id:
+                        continue
+                    if other_task.status != Status.RUNNING:
+                        continue
+                    if not other_task.hosts:
+                        other_task.status = Status.COMPLETED
+                        continue
+                    if all(hs.status != Status.RUNNING for hs in other_task.hosts.values()):
+                        other_task.status = Status.COMPLETED
 
     def _resolve_play_hosts(self, play: "PlayRunState") -> list[str]:
         """Look up preflight resolved_hosts for a runtime play.
