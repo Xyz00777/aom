@@ -267,16 +267,19 @@ def format_status_bar(
 def _format_count_cells(
     ok: int,
     changed: int,
+    skipped: int,
     failed: int,
     unreachable: int,
     *,
     ascii_mode: bool,
     colorize: bool,
 ) -> list[str]:
-    """Render non-zero status count cells. Order: ok, changed, failed, unreachable.
+    """Render non-zero status count cells.
+
+    Order: ok, changed, skipped, failed, unreachable.
 
     Returned as a list of styled segments so callers can space-join or
-    place them inside other layouts. Existing `format_host_summary`
+    place them inside other layouts. Existing ``format_host_summary``
     behaviour is preserved by joining with a single space.
     """
     icons = STATUS_ICONS_ASCII if ascii_mode else STATUS_ICONS
@@ -285,6 +288,8 @@ def _format_count_cells(
         cells.append(_wrap(f"{icons[Status.OK]} {ok} ok", _GREEN, colorize))
     if changed > 0:
         cells.append(_wrap(f"{icons[Status.CHANGED]} {changed} changed", _YELLOW, colorize))
+    if skipped > 0:
+        cells.append(_wrap(f"{icons[Status.SKIPPED]} {skipped} skipped", _DIM, colorize))
     if failed > 0:
         cells.append(_wrap(f"{icons[Status.FAILED]} {failed} failed", _RED, colorize))
     if unreachable > 0:
@@ -319,6 +324,7 @@ def format_host_summary(
     hostname: str,
     ok: int,
     changed: int,
+    skipped: int,
     failed: int,
     unreachable: int,
     ascii_mode: bool = False,
@@ -332,24 +338,26 @@ def format_host_summary(
         hostname: The hostname.
         ok: Number of OK tasks.
         changed: Number of changed tasks.
+        skipped: Number of skipped tasks.
         failed: Number of failed tasks.
         unreachable: Number of unreachable tasks.
         ascii_mode: Use ASCII fallback glyphs (no Unicode).
         colorize: Wrap each status segment in its semantic SGR
-            colour (ok=green, changed=yellow, failed=red,
-            unreachable=magenta). Hostname is dimmed. Off by
-            default to keep the function pure-string for tests.
+            colour (ok=green, changed=yellow, skipped=dim,
+            failed=red, unreachable=magenta). Hostname is dimmed.
+            Off by default to keep the function pure-string for tests.
 
     Returns:
         Formatted host summary with icons: "hostname: ● N ok, ◆ M changed, ..."
 
     Example:
-        >>> format_host_summary("web1", 12, 3, 0, 0)
-        'web1: ● 12 ok ◆ 3 changed'
+        >>> format_host_summary("web1", 12, 3, 1, 0, 0)
+        'web1: ● 12 ok ◆ 3 changed ○ 1 skipped'
     """
     cells = _format_count_cells(
         ok,
         changed,
+        skipped,
         failed,
         unreachable,
         ascii_mode=ascii_mode,
@@ -380,23 +388,29 @@ def format_host_rows(
 
     Header row + one row per host. Columns:
 
-        host  ok  changed  failed  [unreachable]  on
+        host  ok  changed  [skipped]  failed  [unreachable]  on
 
-    The ``unreachable`` column is omitted unless at least one host has a
-    non-zero unreachable count — keeps the common multi-host case
-    tight. Counts are right-aligned; hostname and ``on:`` suffix are
-    left-aligned.
+    The ``skipped`` and ``unreachable`` columns are omitted unless at
+    least one host has a non-zero count — keeps the common case
+    tight. Counts are right-aligned; hostname and ``on:`` suffix
+    are left-aligned.
     """
     rows = projection.host_rows()
     if not rows:
         return []
 
+    include_skipped = any(row.counts.get(Status.SKIPPED, 0) > 0 for row in rows)
     include_unreachable = any(row.counts.get(Status.UNREACHABLE, 0) > 0 for row in rows)
 
     # Column widths: header label vs widest value, whichever is longer.
     hostname_width = max(len("host"), *(len(r.hostname) for r in rows))
     ok_width = max(len("ok"), *(len(str(r.counts.get(Status.OK, 0))) for r in rows))
     changed_width = max(len("changed"), *(len(str(r.counts.get(Status.CHANGED, 0))) for r in rows))
+    skipped_width = (
+        max(len("skipped"), *(len(str(r.counts.get(Status.SKIPPED, 0))) for r in rows))
+        if include_skipped
+        else 0
+    )
     failed_width = max(len("failed"), *(len(str(r.counts.get(Status.FAILED, 0))) for r in rows))
     unreachable_width = (
         max(len("unreachable"), *(len(str(r.counts.get(Status.UNREACHABLE, 0))) for r in rows))
@@ -411,8 +425,10 @@ def format_host_rows(
         f"{'host':<{hostname_width}}",
         f"{'ok':>{ok_width}}",
         f"{'changed':>{changed_width}}",
-        f"{'failed':>{failed_width}}",
     ]
+    if include_skipped:
+        header_parts.append(f"{'skipped':>{skipped_width}}")
+    header_parts.append(f"{'failed':>{failed_width}}")
     if include_unreachable:
         header_parts.append(f"{'unreachable':>{unreachable_width}}")
     header_parts.append("on")
@@ -442,13 +458,24 @@ def format_host_rows(
                 color=_YELLOW,
                 colorize=colorize,
             ),
+        ]
+        if include_skipped:
+            cells.append(
+                _count_cell(
+                    row.counts.get(Status.SKIPPED, 0),
+                    width=skipped_width,
+                    color=_DIM,
+                    colorize=colorize,
+                )
+            )
+        cells.append(
             _count_cell(
                 row.counts.get(Status.FAILED, 0),
                 width=failed_width,
                 color=_RED,
                 colorize=colorize,
-            ),
-        ]
+            )
+        )
         if include_unreachable:
             cells.append(
                 _count_cell(

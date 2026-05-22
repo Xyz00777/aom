@@ -273,6 +273,7 @@ class TestHostStatusIndicators:
         hostname: str,
         ok: int,
         changed: int,
+        skipped: int,
         failed: int,
         unreachable: int,
     ) -> str:
@@ -285,6 +286,9 @@ class TestHostStatusIndicators:
         if changed > 0:
             icon = "◆"  # CHANGED icon
             parts.append(f"{icon} {changed} changed")
+        if skipped > 0:
+            icon = "○"  # SKIPPED icon
+            parts.append(f"{icon} {skipped} skipped")
         if failed > 0:
             icon = "✖"  # FAILED icon
             parts.append(f"{icon} {failed} failed")
@@ -300,6 +304,7 @@ class TestHostStatusIndicators:
             hostname="web1",
             ok=12,
             changed=0,
+            skipped=0,
             failed=0,
             unreachable=0,
         )
@@ -313,6 +318,7 @@ class TestHostStatusIndicators:
             hostname="web1",
             ok=2,
             changed=3,
+            skipped=0,
             failed=0,
             unreachable=0,
         )
@@ -324,6 +330,7 @@ class TestHostStatusIndicators:
             hostname="web1",
             ok=2,
             changed=0,
+            skipped=0,
             failed=1,
             unreachable=0,
         )
@@ -335,10 +342,23 @@ class TestHostStatusIndicators:
             hostname="web1",
             ok=2,
             changed=0,
+            skipped=0,
             failed=0,
             unreachable=1,
         )
         assert "⊝ 1 unreachable" in result
+
+    def test_host_summary_with_skipped(self):
+        """Host summary shows skipped count."""
+        result = self.format_host_summary(
+            hostname="web1",
+            ok=2,
+            changed=0,
+            skipped=3,
+            failed=0,
+            unreachable=0,
+        )
+        assert "○ 3 skipped" in result
 
 
 # ============================================================================

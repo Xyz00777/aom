@@ -10,6 +10,7 @@ Colour rules (when ``colorize=True``):
 - Per-host "◆ N changed": yellow
 - Per-host "✖ N failed": red
 - Per-host "⊝ N unreachable": magenta
+- Per-host "○ N skipped": dim
 - Failure recap labels: red (FAILED) / magenta (UNREACHABLE)
 
 ``colorize=False`` (the default) keeps the output free of escape
@@ -23,6 +24,7 @@ import io
 from contextlib import redirect_stdout
 
 from ansible_aom.compact.renderer import (
+    _DIM,
     _GREEN,
     _MAGENTA,
     _RED,
@@ -99,24 +101,28 @@ class TestStatusBarColors:
 
 class TestHostSummaryColors:
     def test_default_no_color(self):
-        line = format_host_summary("web1", 5, 0, 0, 0)
+        line = format_host_summary("web1", 5, 0, 0, 0, 0)
         assert "\x1b[" not in line
 
     def test_ok_segment_is_green(self):
-        line = format_host_summary("web1", 5, 0, 0, 0, colorize=True)
+        line = format_host_summary("web1", 5, 0, 0, 0, 0, colorize=True)
         assert _GREEN in line and "5 ok" in line
 
     def test_changed_segment_is_yellow(self):
-        line = format_host_summary("web1", 0, 3, 0, 0, colorize=True)
+        line = format_host_summary("web1", 0, 3, 0, 0, 0, colorize=True)
         assert _YELLOW in line and "3 changed" in line
 
     def test_failed_segment_is_red(self):
-        line = format_host_summary("web1", 0, 0, 2, 0, colorize=True)
+        line = format_host_summary("web1", 0, 0, 0, 2, 0, colorize=True)
         assert _RED in line and "2 failed" in line
 
     def test_unreachable_segment_is_magenta(self):
-        line = format_host_summary("web1", 0, 0, 0, 1, colorize=True)
+        line = format_host_summary("web1", 0, 0, 0, 0, 1, colorize=True)
         assert _MAGENTA in line and "1 unreachable" in line
+
+    def test_skipped_segment_is_dim(self):
+        line = format_host_summary("web1", 0, 0, 3, 0, 0, colorize=True)
+        assert _DIM in line and "3 skipped" in line
 
 
 class TestFailureRecapColors:

@@ -40,10 +40,11 @@ def _add_results(
     hostname: str,
     ok: int = 0,
     changed: int = 0,
+    skipped: int = 0,
     failed: int = 0,
     unreachable: int = 0,
 ) -> None:
-    """Synthesise OK/CHANGED/FAILED/UNREACHABLE results for a host."""
+    """Synthesise OK/CHANGED/SKIPPED/FAILED/UNREACHABLE results for a host."""
     play = state.plays.setdefault(
         "p1",
         PlayRunState(play_id="p1", name="deploy", status=Status.RUNNING),
@@ -52,6 +53,7 @@ def _add_results(
     for status, count in (
         (Status.OK, ok),
         (Status.CHANGED, changed),
+        (Status.SKIPPED, skipped),
         (Status.FAILED, failed),
         (Status.UNREACHABLE, unreachable),
     ):
@@ -77,6 +79,26 @@ def test_header_row_present() -> None:
     header = _strip_sgr(rows[0])
     for label in ("host", "ok", "changed", "failed"):
         assert label in header, header
+
+
+def test_skipped_column_hidden_when_no_skipped() -> None:
+    state = _state(["web1", "web2"])
+    _add_results(state, "web1", ok=3, changed=1)
+    _add_results(state, "web2", ok=5)
+    p = TreeProjection.from_run_state(state)
+    rows = format_host_rows(p, width=120, ascii_mode=False, colorize=False)
+    header = _strip_sgr(rows[0])
+    assert "skipped" not in header, header
+
+
+def test_skipped_column_visible_when_any_host_has_skipped() -> None:
+    state = _state(["web1", "web2"])
+    _add_results(state, "web1", ok=3)
+    _add_results(state, "web2", ok=2, skipped=1)
+    p = TreeProjection.from_run_state(state)
+    rows = format_host_rows(p, width=120, ascii_mode=False, colorize=False)
+    header = _strip_sgr(rows[0])
+    assert "skipped" in header, header
 
 
 def test_unreachable_column_hidden_when_no_unreachable() -> None:

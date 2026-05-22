@@ -94,7 +94,7 @@ def test_format_status_bar_unicode_mode_keeps_unicode_glyphs():
 
 def test_format_host_summary_ascii_mode_uses_ascii_icons():
     result = format_host_summary(
-        hostname="web1", ok=3, changed=1, failed=0, unreachable=0, ascii_mode=True
+        hostname="web1", ok=3, changed=1, skipped=0, failed=0, unreachable=0, ascii_mode=True
     )
     assert "●" not in result
     assert "◆" not in result
@@ -104,6 +104,6 @@ def test_format_host_summary_ascii_mode_uses_ascii_icons():
 
 
 def test_format_host_summary_unicode_mode_default():
-    result = format_host_summary(hostname="web1", ok=3, changed=1, failed=0, unreachable=0)
+    result = format_host_summary(hostname="web1", ok=3, changed=1, skipped=0, failed=0, unreachable=0)
     assert "● 3 ok" in result
     assert "◆ 1 changed" in result

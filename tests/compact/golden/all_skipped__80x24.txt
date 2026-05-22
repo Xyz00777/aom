@@ -5,6 +5,6 @@ TASK [Apply tuning] **************************************************
 … 3 hosts skipped: host-a, host-b, host-c
 [10:00:05] Apply tuning — 3.0s (5.0s)
 site.yml | 3/3 hosts | 1/1 tasks | 0:00:00 *
-  host-a:
-  host-b:
-  host-c:
+  host-a: o 1 skipped
+  host-b: o 1 skipped
+  host-c: o 1 skipped

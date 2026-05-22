@@ -802,12 +802,14 @@ class CompactRenderer:
             for task in play.tasks.values():
                 for hostname, host_state in task.hosts.items():
                     counts = host_counts.setdefault(
-                        hostname, {"ok": 0, "changed": 0, "failed": 0, "unreachable": 0}
+                        hostname, {"ok": 0, "changed": 0, "skipped": 0, "failed": 0, "unreachable": 0}
                     )
                     if host_state.status == Status.OK:
                         counts["ok"] += 1
                     elif host_state.status == Status.CHANGED:
                         counts["changed"] += 1
+                    elif host_state.status == Status.SKIPPED:
+                        counts["skipped"] += 1
                     elif host_state.status == Status.FAILED:
                         counts["failed"] += 1
                     elif host_state.status == Status.UNREACHABLE:
@@ -818,6 +820,7 @@ class CompactRenderer:
                 hostname=hostname,
                 ok=counts["ok"],
                 changed=counts["changed"],
+                skipped=counts["skipped"],
                 failed=counts["failed"],
                 unreachable=counts["unreachable"],
                 ascii_mode=self._ascii_mode,
