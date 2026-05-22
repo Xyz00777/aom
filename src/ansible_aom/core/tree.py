@@ -409,7 +409,7 @@ class TreeProjection:
 
         for runtime, play_def in ordered_plays:
             if runtime is not None:
-                if any_running and runtime.tasks:
+                if any_running:
                     items = self._play_running_and_pending(runtime)
                     if not any(k == "running" for k, _, _, _ in items):
                         continue
