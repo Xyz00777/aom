@@ -331,9 +331,11 @@ class TestTreeLinesBasic:
         assert "1 ok" in task_line.label
         assert "1 running" in task_line.label
 
-    def test_only_currently_running_hosts_appear_as_leaves(self):
+    def test_only_currently_running_hosts_appear_as_leaves_before_completion(self):
         state = self._running_task_state()
-        # Finish web1 — it should drop out of the host leaves.
+        # Finish web1 — when at least one host is still RUNNING
+        # (web2), both hosts appear under the task. web1 shows ● (OK),
+        # web2 shows ◐ (RUNNING).
         state.handle_event(
             {
                 "_event": "v2_runner_on_ok",
@@ -344,7 +346,12 @@ class TestTreeLinesBasic:
         )
         p = TreeProjection.from_run_state(state)
         host_lines = [ln for ln in p.tree_lines(budget=20) if ln.kind == "host"]
-        assert [ln.label for ln in host_lines] == ["web2"]
+        host_labels = [ln.label for ln in host_lines]
+        assert host_labels == ["web1", "web2"]
+        web1_hl = next(hl for hl in host_lines if hl.label == "web1")
+        web2_hl = next(hl for hl in host_lines if hl.label == "web2")
+        assert web1_hl.status == Status.OK
+        assert web2_hl.status == Status.RUNNING
 
     def test_no_lines_when_no_task_running(self):
         state = RunState(playbook="site.yml")

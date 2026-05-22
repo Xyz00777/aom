@@ -366,7 +366,7 @@ def parse_list_hosts_output(output: str) -> list[dict]:
                 result.append(current_play)
             play_number = int(play_match.group(1))
             hosts_pattern = play_match.group(2)
-            name = play_match.group(3)
+            name = play_match.group(3).strip()
             current_play = {
                 "play_number": play_number,
                 "name": name,
@@ -418,7 +418,7 @@ def parse_list_tasks_output(output: str) -> list[dict]:
             if current_play:
                 result.append(current_play)
             play_number = int(play_match.group(1))
-            name = play_match.group(3)
+            name = play_match.group(3).strip()
             current_play = {
                 "play_number": play_number,
                 "name": name,

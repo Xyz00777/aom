@@ -230,7 +230,7 @@ class RunState:
 
         play_index: dict[str, PlayDefinition] = {}
         for play_def in self.definitions:
-            play_index.setdefault(play_def.name, play_def)
+            play_index.setdefault(play_def.name.strip(), play_def)
         super().__setattr__("_play_def_by_name", play_index)
 
     def handle_event(self, event: dict[str, Any]) -> None:
@@ -268,7 +268,7 @@ class RunState:
         """Handle v2_playbook_on_play_start event."""
         play_data = event.get("play", {})
         play_id = play_data.get("id", "")
-        play_name = play_data.get("name", "")
+        play_name = play_data.get("name", "").strip()
 
         self._current_play_id = play_id
 
@@ -413,10 +413,27 @@ class RunState:
                     start_time=ts,
                 )
 
+        # Under linear strategy, tasks execute sequentially. When a new
+        # task starts, any previous RUNNING task that is clearly done —
+        # mark it COMPLETED so the tree can clear it.
+        if play.detected_strategy == "linear":
+            for other_task in play.tasks.values():
+                if other_task.task_id == task_id:
+                    continue
+                if other_task.status != Status.RUNNING:
+                    continue
+                if not other_task.hosts:
+                    # Empty hosts + a new task starting means no runner
+                    # events ever arrived for the old task — it's done.
+                    other_task.status = Status.COMPLETED
+                    continue
+                if all(hs.status != Status.RUNNING for hs in other_task.hosts.values()):
+                    other_task.status = Status.COMPLETED
+
     def _resolve_play_hosts(self, play: "PlayRunState") -> list[str]:
         """Look up preflight resolved_hosts for a runtime play.
 
-        Preflight assigns `PlayDefinition.id = str(play_number)` while
+        Preflight assigns ``PlayDefinition.id = str(play_number)`` while
         runtime events carry an opaque UUID, so the IDs don't match.
         We match by name instead. Returns an empty list when no
         definition matches (no preflight data, or play name mismatch) —
@@ -431,6 +448,13 @@ class RunState:
             play_def = index.get(play.name)
             if play_def is not None:
                 return list(play_def.resolved_hosts)
+            # Fallback: stripped-name match catches whitespace differences
+            # between --list-tasks output and JSONL event play names.
+            stripped = play.name.strip()
+            if stripped != play.name:
+                play_def = index.get(stripped)
+                if play_def is not None:
+                    return list(play_def.resolved_hosts)
         return []
 
     def _handle_v2_playbook_on_handler_task_start(
