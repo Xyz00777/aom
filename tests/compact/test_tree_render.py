@@ -415,14 +415,14 @@ def test_render_status_panel_status_bar_is_last_line(
 def test_compute_tree_budget_math():
     from ansible_aom.compact.renderer import _compute_tree_budget
 
-    # Baseline: 24 rows, 0 active hosts → 24//3 = 8
-    assert _compute_tree_budget(rows=24, active_hosts=0) == 8
-    # Host scaling: 24 rows, 12 active hosts → 8 + 4 = 12
-    assert _compute_tree_budget(rows=24, active_hosts=12) == 12
-    # Lower clamp: tiny terminal, 0 hosts → 5
-    assert _compute_tree_budget(rows=10, active_hosts=0) == 5
-    # Upper clamp: huge values → 25
-    assert _compute_tree_budget(rows=200, active_hosts=200) == 25
+    # Baseline: 24 rows, 0 active hosts → 24//2 = 12
+    assert _compute_tree_budget(rows=24, active_hosts=0) == 12
+    # Host scaling: 24 rows, 12 active hosts → 12 + 4 = 16
+    assert _compute_tree_budget(rows=24, active_hosts=12) == 16
+    # Lower clamp: tiny terminal, 0 hosts → 8
+    assert _compute_tree_budget(rows=10, active_hosts=0) == 8
+    # Upper clamp: huge values → 40
+    assert _compute_tree_budget(rows=200, active_hosts=200) == 40
 
 
 def _full_panel(state: RunState) -> str:

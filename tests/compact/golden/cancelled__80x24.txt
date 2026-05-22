@@ -4,5 +4,5 @@ PLAY [Long-running deploy] **************************************************
 TASK [Build artifact] **************************************************
 deploy.yml
 \- play: Long-running deploy
-   \- . Build artifact
+   \- @ Build artifact
 deploy.yml | 0/0 hosts | 0/1 tasks | 0:00:00 X cancelled by user

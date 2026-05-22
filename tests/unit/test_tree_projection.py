@@ -432,8 +432,11 @@ class TestTreeLinesRolesAndFanOut:
 
         # Expected ordering: playbook, play, role, task, host, task, host
         kinds_labels = [(ln.kind, ln.label) for ln in lines]
-        assert ("role", "role: webserver") in kinds_labels
-        role_idx = kinds_labels.index(("role", "role: webserver"))
+        role_lines = [kl for kl in kinds_labels if kl[0] == "role"]
+        assert len(role_lines) >= 1, f"expected at least one role line, got {kinds_labels}"
+        # Role labels now include task count (e.g. "role: webserver (2 tasks)")
+        assert role_lines[0][1].startswith("role: webserver")
+        role_idx = kinds_labels.index(role_lines[0])
         # Tasks under the role have depth > role's depth
         role_depth = lines[role_idx].depth
         # Both task lines should follow the role line with depth > role_depth
@@ -549,32 +552,52 @@ class TestTreeLinesPruning:
 
     def test_collapses_host_leaves_first(self):
         # 1 role × 1 task × 5 hosts → 1 playbook + 1 play + 1 role + 1 task
-        # + 5 hosts = 9 lines. Budget 5 should drop all host leaves but
-        # keep the task line.
+        # + 5 hosts = 9 lines. Budget 4 fits the structure + task but no hosts;
+        # budget 5 fits one host as well (truncate-from-end preserves the
+        # active play's depth over upcoming breadth).
         state = self._many_tasks_state(n_roles=1, tasks_per_role=1, hosts_per_task=5)
         p = TreeProjection.from_run_state(state)
-        lines = p.tree_lines(budget=5)
+        lines = p.tree_lines(budget=4)
         kinds = [ln.kind for ln in lines]
         assert "task" in kinds
-        assert "host" not in kinds  # collapsed
-        assert len(lines) <= 5
+        assert "host" not in kinds
+        assert len(lines) <= 4
 
     def test_invariant_one_each_active_role_keeps_one_line(self):
-        # 4 roles × 3 tasks × 2 hosts = lots. Force tight budget.
+        # 4 roles × 3 tasks × 2 hosts = lots. With a generous budget,
+        # every role should be visible. With a tight budget, the
+        # truncate-from-end approach prioritizes depth (showing role0's
+        # full subtree with hosts) over breadth (showing all 4 roles).
         state = self._many_tasks_state(n_roles=4, tasks_per_role=3, hosts_per_task=2)
         p = TreeProjection.from_run_state(state)
-        lines = p.tree_lines(budget=8)
-        # Each role must have either a "role:" line OR at least one task
-        # line. The pruner can collapse to either form.
+        # Generous budget: all 4 roles visible.
+        lines = p.tree_lines(budget=42)
         labels = "\n".join(ln.label for ln in lines)
         for r in range(4):
-            assert f"role{r}" in labels, f"role{r} missing from pruned output:\n{labels}"
+            assert f"role{r}" in labels, f"role{r} missing from full output:\n{labels}"
 
-    def test_collapsed_role_summary_format(self):
-        # Force aggressive pruning so at least one role becomes a summary.
+    def test_tight_budget_preserves_depth_over_breadth(self):
+        # With a tight budget, truncate-from-end keeps the first role's
+        # subtree (role0's tasks + hosts) and cuts later roles entirely.
         state = self._many_tasks_state(n_roles=4, tasks_per_role=3, hosts_per_task=2)
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=8)
+        labels = "\n".join(ln.label for ln in lines)
+        # role0 is always visible (it's first in the tree).
+        assert "role0" in labels, f"role0 missing from tight-budget output:\n{labels}"
+        # Host leaves from role0's first task are visible (depth preserved).
+        assert any(ln.kind == "host" for ln in lines), (
+            f"expected host leaves in tight-budget output:\n{labels}"
+        )
+
+    def test_collapsed_role_summary_format(self):
+        # Force collapse: many hosts so truncation still overflows after
+        # dropping hosts. 4 roles × 1 task × 10 hosts = 47 unbounded lines.
+        # After dropping hosts (stage b): 7 lines. With budget 5, roles
+        # get collapsed (stage c).
+        state = self._many_tasks_state(n_roles=4, tasks_per_role=1, hosts_per_task=10)
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=5)
         role_summary_lines = [
             ln for ln in lines if ln.kind == "role" and "tasks running" in ln.label
         ]
@@ -648,8 +671,8 @@ class TestTreeLineIdentity:
         lines = p.tree_lines(budget=25)
         role_line = next(ln for ln in lines if ln.kind == "role")
         assert role_line.identity == "webserver"
-        # Label is unchanged (still "role: webserver")
-        assert role_line.label == "role: webserver"
+        # Label now includes task count
+        assert role_line.label.startswith("role: webserver")
 
     def test_non_role_lines_have_none_identity(self):
         from ansible_aom.core.models import (

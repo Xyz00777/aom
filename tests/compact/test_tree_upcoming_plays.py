@@ -111,3 +111,100 @@ def test_no_preflight_no_upcoming_plays() -> None:
     assert "only play" in joined
     # Nothing else fabricated.
     assert "second play" not in joined
+
+
+def test_tree_lines_respects_budget_with_upcoming_plays():
+    """Tree must not exceed budget lines even when upcoming plays push
+    the unbounded tree over the limit.
+
+    Regression guard: the upcoming-plays feature added pending tasks
+    from future plays to the tree, but the pruning stages (a–c) only
+    cover host drops, per-role task limits, and role collapse. When
+    many plays with many pending tasks are projected, the pruned
+    result can still exceed budget — the tree would flood the terminal.
+    """
+    # 5 plays, each with 8 tasks = playbook + 5 plays + 40 tasks = 46 lines,
+    # far exceeding a budget of 10.
+    definitions = [
+        _play_def(str(i), f"play {i}", [f"p{i}t{j}" for j in range(8)])
+        for i in range(5)
+    ]
+    state = RunState(playbook="site.yml")
+    state.definitions = definitions
+    # First play in flight with one running task.
+    play1 = PlayRunState(play_id="p1", name="play 0", status=Status.RUNNING)
+    task = TaskRunState(task_id="t1", name="p0t0", status=Status.RUNNING)
+    task.hosts["web1"] = HostRunState(hostname="web1", status=Status.RUNNING)
+    play1.tasks["t1"] = task
+    state.plays["p1"] = play1
+
+    p = TreeProjection.from_run_state(state)
+    lines = p.tree_lines(budget=10)
+    assert len(lines) <= 10, (
+        f"tree_lines returned {len(lines)} lines for budget=10, "
+        f"expected <=10. Lines:\n" + "\n".join(f"  {ln.kind}: {ln.label}" for ln in lines)
+    )
+
+
+def test_tree_lines_respects_budget_with_many_pending_tasks():
+    """Even without multiple plays, a single play with many pending
+    tasks must be pruned to budget."""
+    definitions = [_play_def("1", "big play", [f"task_{i}" for i in range(30)])]
+    state = RunState(playbook="site.yml")
+    state.definitions = definitions
+    play1 = PlayRunState(play_id="p1", name="big play", status=Status.RUNNING)
+    task = TaskRunState(task_id="t1", name="task_0", status=Status.RUNNING)
+    task.hosts["web1"] = HostRunState(hostname="web1", status=Status.RUNNING)
+    play1.tasks["t1"] = task
+    state.plays["p1"] = play1
+
+    p = TreeProjection.from_run_state(state)
+    lines = p.tree_lines(budget=7)
+    assert len(lines) <= 7, (
+        f"tree_lines returned {len(lines)} lines for budget=7, "
+        f"expected <=7. Lines:\n" + "\n".join(f"  {ln.kind}: {ln.label}" for ln in lines)
+    )
+
+
+def test_host_leaves_preserved_when_budget_allows():
+    """Host leaves (web1, web2) must appear when budget is generous enough.
+
+    Regression guard: stage (a) of the pruner drops host leaves, but
+    only when the unbounded tree exceeds budget. A generous budget
+    should preserve host leaves so the user can see which host is
+    running which task.
+    """
+    state = _state_first_play_running()
+    p = TreeProjection.from_run_state(state)
+    # Unbounded tree for this state: playbook + play + task + host = 4 lines.
+    # Budget of 10 is plenty.
+    lines = p.tree_lines(budget=10)
+    host_lines = [ln for ln in lines if ln.kind == "host"]
+    assert len(host_lines) >= 1, (
+        f"expected at least 1 host leaf with budget=10, got {len(host_lines)}. "
+        f"Lines:\n" + "\n".join(f"  {ln.kind}: {ln.label}" for ln in lines)
+    )
+
+
+def test_host_leaves_dropped_when_budget_tight():
+    """Host leaves are dropped when budget cannot accommodate them."""
+    state = RunState(playbook="site.yml")
+    state.definitions = [
+        _play_def("1", "first play", ["t1.1", "t1.2"]),
+        _play_def("2", "second play", ["t2.1", "t2.2"]),
+        _play_def("3", "third play", ["t3.1"]),
+    ]
+    play1 = PlayRunState(play_id="p1", name="first play", status=Status.RUNNING)
+    task = TaskRunState(task_id="t1", name="t1.1", status=Status.RUNNING)
+    task.hosts["web1"] = HostRunState(hostname="web1", status=Status.RUNNING)
+    task.hosts["web2"] = HostRunState(hostname="web2", status=Status.RUNNING)
+    play1.tasks["t1"] = task
+    state.plays["p1"] = play1
+
+    p = TreeProjection.from_run_state(state)
+    # Budget=3 fits playbook + play + task but no hosts.
+    lines = p.tree_lines(budget=3)
+    assert all(ln.kind != "host" for ln in lines), (
+        f"expected no host leaves with budget=3, but found some. "
+        f"Lines:\n" + "\n".join(f"  {ln.kind}: {ln.label}" for ln in lines)
+    )
