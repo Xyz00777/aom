@@ -215,11 +215,16 @@ class TreeProjection:
         """Project + prune to fit `budget` lines.
 
         Pruning order:
-          (a) drop host leaves under tasks
-          (b) drop excess task lines within a role, keep first one
-          (c) collapse a role to "role: X  (N tasks running on K hosts)"
+          (a) truncate from the end (cut upcoming plays/tasks first)
+          (b) drop host leaves under tasks (if still over budget)
+          (c) collapse roles to "role: X  (N tasks running on K hosts)"
 
-        Invariant: every active role retains at least one visible line.
+        The unbounded tree is ordered active-play-first, so truncating
+        from the end preserves the deepest, most informative portion of
+        the tree (the running play's role → task → host subtree) while
+        upcoming plays get cut first. This is the key difference from
+        "structural lines first" approaches, which consume the entire
+        budget on play headers and leave no room for tasks or hosts.
         """
         if now is None:
             now = datetime.now(timezone.utc)
@@ -228,49 +233,23 @@ class TreeProjection:
         if len(lines) <= budget:
             return lines
 
-        # --- Stage (a): drop host leaves -----------------------------------
+        # --- Stage (a): truncate from the end --------------------------------
+        lines = lines[:budget]
+        if len(lines) <= budget:
+            return lines
+
+        # --- Stage (b): drop host leaves --------------------------------------
         lines = [ln for ln in lines if ln.kind != "host"]
         if len(lines) <= budget:
             return lines
 
-        # --- Stage (b): keep <=1 task per role bucket ----------------------
-        # Stage (b): keep ≤1 task line per role bucket. A role bucket starts
-        # at a role/play/playbook line.
-        #
-        # Tasks in the implicit "no role" bucket (depth=2, directly under
-        # `play` with no preceding `role` line) are also capped at one. The
-        # spec invariants only protect *active roles* — play-level tasks have
-        # no invariant — so capping them when over budget is allowed and gives
-        # the pruner more room. Plan-spec deviation accepted by review.
-        kept: list[TreeLine] = []
-        tasks_in_current_bucket = 0
-        for ln in lines:
-            if ln.kind in ("playbook", "play", "role"):
-                kept.append(ln)
-                tasks_in_current_bucket = 0
-            elif ln.kind == "task":
-                if tasks_in_current_bucket == 0:
-                    kept.append(ln)
-                tasks_in_current_bucket += 1
-            else:
-                kept.append(ln)
-        lines = kept
-        if len(lines) <= budget:
-            return lines
-
-        # --- Stage (c): collapse roles to summary lines --------------------
+        # --- Stage (c): collapse roles to summary lines -----------------------
         # Aggregate per-role running task count and unique running-host count
-        # from current RunState. Tasks with role=None aggregate under the
-        # None bucket but won't render as "role: ..." — they survive stage
-        # (b) already; if the suite is still over-budget here, the layout is
-        # too constrained to satisfy and the result will simply be shorter
-        # than the strict bound (acceptable degradation, never worse than
-        # playbook + play + 1 line per active role).
+        # from current RunState.
         tasks_per_role: dict[str | None, int] = defaultdict(int)
         hosts_per_role: dict[str | None, set[str]] = defaultdict(set)
         for play in self._state.plays.values():
             for task in play.tasks.values():
-                # Same "running iff any host is RUNNING" rule as the walker.
                 running_hosts = {
                     hostname for hostname, hs in task.hosts.items() if hs.status == Status.RUNNING
                 }
@@ -285,31 +264,33 @@ class TreeProjection:
         while i < len(lines):
             ln = lines[i]
             if ln.kind == "role":
-                # Use the structured role identity, not the rendered label —
-                # avoids coupling pruning to label format.
                 role_name = ln.identity or ln.label.removeprefix("role: ")
                 n_tasks = tasks_per_role.get(role_name, 0)
                 n_hosts = len(hosts_per_role.get(role_name, set()))
+                task_word = "task" if n_tasks == 1 else "tasks"
+                host_word = "host" if n_hosts == 1 else "hosts"
                 collapsed.append(
                     TreeLine(
                         depth=ln.depth,
                         kind="role",
-                        label=(f"role: {role_name}  ({n_tasks} tasks running on {n_hosts} hosts)"),
+                        label=(f"role: {role_name}  ({n_tasks} {task_word} running on {n_hosts} {host_word})"),
                         glyph=None,
                         status=None,
                         elapsed_s=None,
                         identity=role_name,
                     )
                 )
-                # Skip any immediately following task lines under this role.
                 i += 1
-                # Also consume any orphaned host lines so this code is correct
-                # regardless of whether stage (a) already pruned them.
                 while i < len(lines) and lines[i].kind in ("task", "host"):
                     i += 1
             else:
                 collapsed.append(ln)
                 i += 1
+
+        # Final hard-cap (safety net)
+        if len(collapsed) > budget:
+            collapsed = collapsed[:budget]
+
         return collapsed
 
     def _tree_lines_unbounded(self, now: datetime) -> list[TreeLine]:
@@ -390,11 +371,13 @@ class TreeProjection:
             if role != current_role:
                 current_role = role
                 if role is not None:
+                    n = len(task_defs)
+                    task_count = f" ({n} task{'s' if n != 1 else ''})" if n > 0 else ""
                     lines.append(
                         TreeLine(
                             depth=2,
                             kind="role",
-                            label=f"role: {role}",
+                            label=f"role: {role}{task_count}",
                             glyph=None,
                             status=None,
                             elapsed_s=None,
@@ -433,16 +416,29 @@ class TreeProjection:
 
         current_role: str | None = None
         role_open = False
+        # Count total tasks per role from definitions (not from play_items,
+        # which drops completed tasks and would undercount).
+        role_total_tasks: dict[str | None, int] = {}
+        play_def = self._play_def_for(play)
+        if play_def is not None:
+            for entry in play_def.tasks:
+                if isinstance(entry, RoleGroupDefinition):
+                    n = len(entry.tasks)
+                    role_total_tasks[entry.role] = role_total_tasks.get(entry.role, 0) + n
+                else:
+                    role_total_tasks[None] = role_total_tasks.get(None, 0) + 1
         for item_kind, name, role, runtime in play_items:
             if role != current_role:
                 current_role = role
                 role_open = role is not None
                 if role_open:
+                    n = role_total_tasks.get(role, 0)
+                    task_count = f" ({n} task{'s' if n != 1 else ''})" if n > 0 else ""
                     lines.append(
                         TreeLine(
                             depth=2,
                             kind="role",
-                            label=f"role: {role}",
+                            label=f"role: {role}{task_count}",
                             glyph=None,
                             status=None,
                             elapsed_s=None,
@@ -511,9 +507,17 @@ class TreeProjection:
             ``"completed"`` is filtered out before items reach the caller,
             but the helper still returns it so the drop site can branch
             on a single classification result.
+
+            A task with RUNNING status but no hosts yet (e.g. between
+            ``v2_playbook_on_task_start`` and the first
+            ``v2_runner_on_start``) is classified as ``"running"`` so the
+            tree shows the correct ◐ icon and makes room for host leaves
+            that will appear once runner events arrive.
             """
-            if runtime is None or not runtime.hosts:
+            if runtime is None:
                 return "pending"
+            if not runtime.hosts:
+                return "running" if runtime.status == Status.RUNNING else "pending"
             if any(hs.status == Status.RUNNING for hs in runtime.hosts.values()):
                 return "running"
             return "completed"

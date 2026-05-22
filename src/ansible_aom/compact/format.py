@@ -301,10 +301,18 @@ def _format_count_cells(
 def _compute_tree_budget(rows: int, active_hosts: int) -> int:
     """Tree height budget in lines.
 
-    Baseline ⅓ of terminal rows; +1 line per 3 active hosts; clamped to
-    [5, 25]. See spec §"Height budget & pruning".
+    Baseline ~½ of terminal rows; +1 line per 3 active hosts; clamped to
+    [8, 40]. The tree shares the bottom panel with the status bar (1 line)
+    and the host table (header + N host rows). For a 24-row terminal the
+    baseline is 12, which fits the active play structure with its running
+    hosts and shows several upcoming plays beyond.
+
+    Previous formula (`rows // 3`, max 25) gave only 8 lines on a 24-row
+    terminal — enough for 2–3 plays but not their tasks or host leaves.
+    The larger budget lets the tree show deeper structure while the log
+    area above still gets at least rows // 2 for streaming output.
     """
-    return max(5, min(25, rows // 3 + active_hosts // 3))
+    return max(8, min(40, rows // 2 + active_hosts // 3))
 
 
 def format_host_summary(
