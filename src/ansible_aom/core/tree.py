@@ -319,6 +319,10 @@ class TreeProjection:
         every task still to come (pending). Completed tasks are dropped —
         they already appear in the streaming log above the panel, so the
         tree's job is just "what's happening now and what's next".
+
+        Upcoming plays (preflight entries with no runtime counterpart yet)
+        are also emitted, in preflight order, so the user can see what
+        comes after the in-flight play.
         """
         if not self.is_tree_visible():
             return []
@@ -334,75 +338,148 @@ class TreeProjection:
             )
         ]
 
-        for play in self._state.plays.values():
-            play_items = self._play_running_and_pending(play)
-            if not play_items:
+        # Iterate preflight plays in declared order so upcoming plays
+        # land in the visual position the user will encounter them.
+        # Runtime plays drive their own task projection; preflight-only
+        # plays render their entire task list as pending. Any runtime
+        # play whose name isn't in preflight (defensive: unusual but
+        # possible) gets appended at the end.
+        runtime_by_name: dict[str, PlayRunState] = {}
+        for runtime_play in self._state.plays.values():
+            runtime_by_name.setdefault(runtime_play.name, runtime_play)
+        seen_runtime_names: set[str] = set()
+
+        ordered_plays: list[tuple[PlayRunState | None, "PlayDefinition | None"]] = []
+        for play_def in self._state.definitions:
+            runtime = runtime_by_name.get(play_def.name)
+            if runtime is not None:
+                seen_runtime_names.add(play_def.name)
+            ordered_plays.append((runtime, play_def))
+        for runtime_play in self._state.plays.values():
+            if runtime_play.name in seen_runtime_names:
                 continue
+            ordered_plays.append((runtime_play, None))
 
-            lines.append(
-                TreeLine(
-                    depth=1,
-                    kind="play",
-                    label=f"play: {play.name}",
-                    glyph=None,
-                    status=play.status,
-                    elapsed_s=None,
-                )
+        for runtime, play_def in ordered_plays:
+            if runtime is not None:
+                self._emit_runtime_play(lines, runtime, now)
+            elif play_def is not None:
+                self._emit_pending_play(lines, play_def)
+        return lines
+
+    def _emit_pending_play(self, lines: list[TreeLine], play_def: "PlayDefinition") -> None:
+        """Render an upcoming-only play: header + every preflight task as pending."""
+        lines.append(
+            TreeLine(
+                depth=1,
+                kind="play",
+                label=f"play: {play_def.name}",
+                glyph=None,
+                status=Status.PENDING,
+                elapsed_s=None,
             )
-
-            current_role: str | None = None
-            role_open = False
-            for item_kind, name, role, runtime in play_items:
-                if role != current_role:
-                    current_role = role
-                    role_open = role is not None
-                    if role_open:
-                        lines.append(
-                            TreeLine(
-                                depth=2,
-                                kind="role",
-                                label=f"role: {role}",
-                                glyph=None,
-                                status=None,
-                                elapsed_s=None,
-                                identity=role,
-                            )
-                        )
-                task_depth = 3 if role_open else 2
-
-                if item_kind == "running" and runtime is not None:
-                    lines.append(self._task_line(runtime, depth=task_depth))
-                    for hostname, hs in runtime.hosts.items():
-                        if hs.status != Status.RUNNING:
-                            continue
-                        elapsed = (
-                            (now - hs.start_time).total_seconds()
-                            if hs.start_time is not None
-                            else 0.0
-                        )
-                        lines.append(
-                            TreeLine(
-                                depth=task_depth + 1,
-                                kind="host",
-                                label=hostname,
-                                glyph=None,
-                                status=hs.status,
-                                elapsed_s=elapsed,
-                            )
-                        )
-                else:  # pending
+        )
+        current_role: str | None = None
+        for entry in play_def.tasks:
+            if isinstance(entry, RoleGroupDefinition):
+                role: str | None = entry.role
+                task_defs = entry.tasks
+            else:
+                role = None
+                task_defs = [entry]
+            if role != current_role:
+                current_role = role
+                if role is not None:
                     lines.append(
                         TreeLine(
-                            depth=task_depth,
-                            kind="task",
-                            label=name,
+                            depth=2,
+                            kind="role",
+                            label=f"role: {role}",
                             glyph=None,
-                            status=Status.PENDING,
+                            status=None,
                             elapsed_s=None,
+                            identity=role,
                         )
                     )
+            task_depth = 3 if role is not None else 2
+            for tdef in task_defs:
+                lines.append(
+                    TreeLine(
+                        depth=task_depth,
+                        kind="task",
+                        label=tdef.name,
+                        glyph=None,
+                        status=Status.PENDING,
+                        elapsed_s=None,
+                    )
+                )
 
-        return lines
+    def _emit_runtime_play(self, lines: list[TreeLine], play: PlayRunState, now: datetime) -> None:
+        """Render a play that's already in flight (or was)."""
+        play_items = self._play_running_and_pending(play)
+        if not play_items:
+            return
+
+        lines.append(
+            TreeLine(
+                depth=1,
+                kind="play",
+                label=f"play: {play.name}",
+                glyph=None,
+                status=play.status,
+                elapsed_s=None,
+            )
+        )
+
+        current_role: str | None = None
+        role_open = False
+        for item_kind, name, role, runtime in play_items:
+            if role != current_role:
+                current_role = role
+                role_open = role is not None
+                if role_open:
+                    lines.append(
+                        TreeLine(
+                            depth=2,
+                            kind="role",
+                            label=f"role: {role}",
+                            glyph=None,
+                            status=None,
+                            elapsed_s=None,
+                            identity=role,
+                        )
+                    )
+            task_depth = 3 if role_open else 2
+
+            if item_kind == "running" and runtime is not None:
+                lines.append(self._task_line(runtime, depth=task_depth))
+                for hostname, hs in runtime.hosts.items():
+                    if hs.status != Status.RUNNING:
+                        continue
+                    elapsed = (
+                        (now - hs.start_time).total_seconds() if hs.start_time is not None else 0.0
+                    )
+                    lines.append(
+                        TreeLine(
+                            depth=task_depth + 1,
+                            kind="host",
+                            label=hostname,
+                            glyph=None,
+                            status=hs.status,
+                            elapsed_s=elapsed,
+                        )
+                    )
+            else:  # pending
+                lines.append(
+                    TreeLine(
+                        depth=task_depth,
+                        kind="task",
+                        label=name,
+                        glyph=None,
+                        status=Status.PENDING,
+                        elapsed_s=None,
+                    )
+                )
 
     def _play_running_and_pending(
         self, play: "PlayRunState"
