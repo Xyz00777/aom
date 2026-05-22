@@ -366,12 +366,18 @@ class TreeProjection:
                 role: str | None = entry.role
                 task_defs = entry.tasks
             else:
-                role = None
+                role = entry.role
                 task_defs = [entry]
             if role != current_role:
                 current_role = role
                 if role is not None:
-                    n = len(task_defs)
+                    # For bare TaskDefinition entries with a role, count
+                    # all same-role entries across the play (not just the
+                    # current entry, which would always be 1).
+                    n = len(task_defs) if isinstance(entry, RoleGroupDefinition) else sum(
+                        1 for e in play_def.tasks
+                        if not isinstance(e, RoleGroupDefinition) and e.role == role
+                    )
                     task_count = f" ({n} task{'s' if n != 1 else ''})" if n > 0 else ""
                     lines.append(
                         TreeLine(
@@ -403,6 +409,14 @@ class TreeProjection:
         if not play_items:
             return
 
+        # Stable partition: running items first, then pending.
+        # This ensures the active task and its host leaves are near the
+        # top of the tree, so truncation-from-end cuts pending content
+        # rather than the currently running task.
+        running_items = [(k, n, r, rt) for k, n, r, rt in play_items if k == "running"]
+        pending_items = [(k, n, r, rt) for k, n, r, rt in play_items if k != "running"]
+        play_items = running_items + pending_items
+
         lines.append(
             TreeLine(
                 depth=1,
@@ -425,6 +439,8 @@ class TreeProjection:
                 if isinstance(entry, RoleGroupDefinition):
                     n = len(entry.tasks)
                     role_total_tasks[entry.role] = role_total_tasks.get(entry.role, 0) + n
+                elif entry.role is not None:
+                    role_total_tasks[entry.role] = role_total_tasks.get(entry.role, 0) + 1
                 else:
                     role_total_tasks[None] = role_total_tasks.get(None, 0) + 1
         for item_kind, name, role, runtime in play_items:
@@ -528,7 +544,7 @@ class TreeProjection:
                     role: str | None = entry.role
                     task_defs = entry.tasks
                 else:
-                    role = None
+                    role = entry.role
                     task_defs = [entry]
                 for tdef in task_defs:
                     runtime = runtime_by_name.get(tdef.name)
@@ -564,8 +580,10 @@ class TreeProjection:
     def _task_role(self, task_name: str) -> str | None:
         """Return the role name a task belongs to, or None.
 
-        Preflight `--list-tasks` records role membership via
-        RoleGroupDefinition; first match wins. Memoised on first call.
+        Preflight ``--list-tasks`` records role membership both via
+        ``RoleGroupDefinition`` (grouped, 5+ consecutive same-role) and
+        ``TaskDefinition.role`` (ungrouped, <5 tasks). First match wins.
+        Memoised on first call.
         """
         if self._role_index is None:
             idx: dict[str, str] = {}
@@ -574,8 +592,8 @@ class TreeProjection:
                     if isinstance(entry, RoleGroupDefinition):
                         for task_def in entry.tasks:
                             idx.setdefault(task_def.name, entry.role)
-            # Direct assignment is fine because TreeProjection is a regular
-            # @dataclass (not frozen).
+                    elif entry.role is not None:
+                        idx.setdefault(entry.name, entry.role)
             self._role_index = idx
         return self._role_index.get(task_name)
 
