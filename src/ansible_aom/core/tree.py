@@ -399,8 +399,20 @@ class TreeProjection:
                 continue
             ordered_plays.append((runtime_play, None))
 
+        any_running = False
+        for runtime, _ in ordered_plays:
+            if runtime is not None:
+                items = self._play_running_and_pending(runtime)
+                if any(k == "running" for k, _, _, _ in items):
+                    any_running = True
+                    break
+
         for runtime, play_def in ordered_plays:
             if runtime is not None:
+                if any_running and runtime.tasks:
+                    items = self._play_running_and_pending(runtime)
+                    if not any(k == "running" for k, _, _, _ in items):
+                        continue
                 self._emit_runtime_play(lines, runtime, now)
             elif play_def is not None:
                 self._emit_pending_play(lines, play_def)
