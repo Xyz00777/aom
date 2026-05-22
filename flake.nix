@@ -47,7 +47,8 @@
             uv
             ruff
             mypy
-            ansible-core
+            python.pkgs.ansible-core
+            stdenv.cc
           ] ++ (with python.pkgs; [
             pytest
             pytest-asyncio
