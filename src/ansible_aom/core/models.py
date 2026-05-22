@@ -578,7 +578,13 @@ class RunState:
         self.status = Status.FAILED
 
     def _handle_v2_playbook_on_stats(self, event: dict[str, Any], ts: datetime) -> None:
-        """Handle v2_playbook_on_stats event."""
+        """Handle v2_playbook_on_stats event.
+
+        Also clean up any hosts still stuck as RUNNING — this happens when
+        terminal events (v2_runner_on_ok etc.) are silently dropped because
+        play_id or task_id doesn't match. By the time we receive
+        v2_playbook_on_stats the playbook is finished, so no host should
+        still be RUNNING."""
         self.end_time = ts
 
         stats = event.get("stats", {})
@@ -597,3 +603,20 @@ class RunState:
             self.status = Status.FAILED
         else:
             self.status = Status.COMPLETED
+
+        # Clean up stale RUNNING hosts: the playbook is done, so any host
+        # still marked RUNNING has a missing terminal event.
+        for play in self.plays.values():
+            for task in play.tasks.values():
+                for hostname in list(task.hosts):
+                    hs = task.hosts[hostname]
+                    if hs.status == Status.RUNNING:
+                        task.hosts[hostname] = HostRunState(
+                            hostname=hostname,
+                            status=Status.OK,
+                            changed=False,
+                            start_time=hs.start_time,
+                            end_time=ts,
+                        )
+                if task.status == Status.RUNNING:
+                    task.status = Status.COMPLETED
