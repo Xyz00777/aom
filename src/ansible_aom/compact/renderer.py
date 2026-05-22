@@ -686,6 +686,15 @@ class CompactRenderer:
         indicator = _wrap(f"{icon}{label}", indicator_color, self._colorize)
         final_status = f"{status_bar} {indicator}"
 
+        # Capture a frozen tree + host snapshot for non-clean exits BEFORE
+        # display.stop() wipes the live panel. On Ctrl-C / failure the
+        # user needs to see what was in flight at the moment of the
+        # cancel for post-mortem debugging — without this the screen
+        # would show only the final status bar and the per-host counts.
+        snapshot_lines: list[str] = []
+        if exit_code != 0:
+            snapshot_lines = self._capture_panel_snapshot()
+
         # Last in-panel update — visible briefly during stop() in TTY mode,
         # a no-op in non-TTY. Throttling can swallow this; the print() below
         # is what guarantees the final state survives.
@@ -693,6 +702,12 @@ class CompactRenderer:
 
         # Wipe the panel and release the cursor.
         self._display.stop()
+
+        # Replay the captured snapshot AFTER stop() so the tree + host
+        # rows land in scrollback at the panel's old position, exactly
+        # as the user last saw them. The final status bar prints below.
+        for line in snapshot_lines:
+            print(line)
 
         # Print the final summary OUTSIDE any DEC-2026 frame so the panel
         # clear above can't erase it. In TTY mode this lands at the cursor
@@ -729,6 +744,47 @@ class CompactRenderer:
             )
             total = sum(self._state.unknown_events.values())
             print(f"  ({total} unknown events: {parts})")
+
+    def _capture_panel_snapshot(self) -> list[str]:
+        """Render the current tree + host overview as static lines.
+
+        Used by ``handle_completion`` on non-clean exits so the user
+        keeps a record of what was in flight at the moment of failure
+        or cancel. Uses ``animation_frame=0`` — the captured tree is
+        frozen, not a live animation that happens to never advance.
+        """
+        if self._state is None:
+            return []
+        if self._projection is None or self._projection._state is not self._state:
+            self._projection = TreeProjection.from_run_state(self._state)
+        projection = self._projection
+        cols, rows = shutil.get_terminal_size((80, 24))
+        active_hosts = sum(
+            1
+            for play in self._state.plays.values()
+            for task in play.tasks.values()
+            for hs in task.hosts.values()
+            if hs.status == Status.RUNNING
+        )
+        budget = _compute_tree_budget(rows, active_hosts)
+        tree_lines = format_tree_block(
+            projection,
+            budget=budget,
+            width=cols,
+            ascii_mode=self._ascii_mode,
+            colorize=self._colorize,
+            animation_frame=0,
+        )
+        host_lines: list[str] = []
+        if projection.is_host_summary_visible():
+            host_lines = format_host_rows(
+                projection,
+                width=cols,
+                ascii_mode=self._ascii_mode,
+                colorize=self._colorize,
+                animation_frame=0,
+            )
+        return tree_lines + host_lines
 
     def _format_per_host_lines(self) -> list[str]:
         """Build one summary line per host, ordered by first-seen.
