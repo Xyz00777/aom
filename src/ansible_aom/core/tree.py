@@ -72,17 +72,16 @@ def _is_template_match(preflight_name: str, runtime_name: str) -> bool:
     return si == len(skeleton_words)
 
 
-def _play_sibling_hostnames(play: "PlayRunState") -> set[str]:
-    """Collect hostnames from all tasks in a play (read-only, no mutation).
+def _all_known_hostnames(state: "RunState") -> set[str]:
+    """Collect hostnames from all tasks across all plays (read-only).
 
-    Used as a fallback when ``_resolve_play_hosts`` returns no hosts
-    (e.g. handler plays with no preflight match). Returns all hostnames
-    that have been seen in any task within the same play.
+    Used as fallback when _resolve_play_hosts returns no hosts.
     """
     hostnames: set[str] = set()
-    for t in play.tasks.values():
-        for hostname in t.hosts:
-            hostnames.add(hostname)
+    for play in state.plays.values():
+        for t in play.tasks.values():
+            for hostname in t.hosts:
+                hostnames.add(hostname)
     return hostnames
 
 
@@ -582,7 +581,7 @@ class TreeProjection:
                             )
                         )
                 else:
-                    for hostname in sorted(_play_sibling_hostnames(play)):
+                    for hostname in sorted(_all_known_hostnames(self._state)):
                         lines.append(
                             TreeLine(
                                 depth=task_depth + 1,
