@@ -72,16 +72,19 @@ def _is_template_match(preflight_name: str, runtime_name: str) -> bool:
     return si == len(skeleton_words)
 
 
-def _all_known_hostnames(state: "RunState") -> set[str]:
-    """Collect hostnames from all tasks across all plays (read-only).
+def _play_target_hostnames(play: "PlayRunState", play_def: "PlayDefinition | None") -> set[str]:
+    """Collect hostnames targeted by this play (read-only).
 
-    Used as fallback when _resolve_play_hosts returns no hosts.
+    Uses ``play_def.resolved_hosts`` when available (preflight targets).
+    Falls back to collecting hostnames from the play's runtime tasks.
+    Returns empty set only when no host data is available.
     """
+    if play_def is not None and play_def.resolved_hosts:
+        return set(play_def.resolved_hosts)
     hostnames: set[str] = set()
-    for play in state.plays.values():
-        for t in play.tasks.values():
-            for hostname in t.hosts:
-                hostnames.add(hostname)
+    for t in play.tasks.values():
+        for hostname in t.hosts:
+            hostnames.add(hostname)
     return hostnames
 
 
@@ -581,7 +584,8 @@ class TreeProjection:
                             )
                         )
                 else:
-                    for hostname in sorted(_all_known_hostnames(self._state)):
+                    elapsed = (now - runtime.start_time).total_seconds() if runtime.start_time else 0.0
+                    for hostname in sorted(_play_target_hostnames(play, play_def)):
                         lines.append(
                             TreeLine(
                                 depth=task_depth + 1,
@@ -589,7 +593,7 @@ class TreeProjection:
                                 label=hostname,
                                 glyph=None,
                                 status=Status.RUNNING,
-                                elapsed_s=0.0,
+                                elapsed_s=elapsed,
                             )
                         )
             else:  # pending
