@@ -72,6 +72,20 @@ def _is_template_match(preflight_name: str, runtime_name: str) -> bool:
     return si == len(skeleton_words)
 
 
+def _play_sibling_hostnames(play: "PlayRunState") -> set[str]:
+    """Collect hostnames from all tasks in a play (read-only, no mutation).
+
+    Used as a fallback when ``_resolve_play_hosts`` returns no hosts
+    (e.g. handler plays with no preflight match). Returns all hostnames
+    that have been seen in any task within the same play.
+    """
+    hostnames: set[str] = set()
+    for t in play.tasks.values():
+        for hostname in t.hosts:
+            hostnames.add(hostname)
+    return hostnames
+
+
 @dataclass(frozen=True)
 class TreeLine:
     """One rendered line in the tree.
@@ -538,20 +552,35 @@ class TreeProjection:
 
             if item_kind == "running" and runtime is not None:
                 lines.append(self._task_line(runtime, depth=task_depth))
-                for hostname, hs in runtime.hosts.items():
-                    elapsed = (
-                        (now - hs.start_time).total_seconds() if hs.start_time is not None else 0.0
-                    )
-                    lines.append(
-                        TreeLine(
-                            depth=task_depth + 1,
-                            kind="host",
-                            label=hostname,
-                            glyph=None,
-                            status=hs.status,
-                            elapsed_s=elapsed,
+                if runtime.hosts:
+                    for hostname, hs in runtime.hosts.items():
+                        elapsed = (
+                            (now - hs.start_time).total_seconds()
+                            if hs.start_time is not None
+                            else 0.0
                         )
-                    )
+                        lines.append(
+                            TreeLine(
+                                depth=task_depth + 1,
+                                kind="host",
+                                label=hostname,
+                                glyph=None,
+                                status=hs.status,
+                                elapsed_s=elapsed,
+                            )
+                        )
+                else:
+                    for hostname in sorted(_play_sibling_hostnames(play)):
+                        lines.append(
+                            TreeLine(
+                                depth=task_depth + 1,
+                                kind="host",
+                                label=hostname,
+                                glyph=None,
+                                status=Status.RUNNING,
+                                elapsed_s=0.0,
+                            )
+                        )
             else:  # pending
                 lines.append(
                     TreeLine(

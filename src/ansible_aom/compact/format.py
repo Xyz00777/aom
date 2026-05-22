@@ -317,7 +317,7 @@ def _compute_tree_budget(rows: int, active_hosts: int) -> int:
     The larger budget lets the tree show deeper structure while the log
     area above still gets at least rows // 2 for streaming output.
     """
-    return max(8, min(40, rows // 2 + active_hosts // 3))
+    return max(8, min(60, rows // 2 + active_hosts // 3))
 
 
 def format_host_summary(
