@@ -1378,3 +1378,499 @@ class TestCrossPlayLookupIsolation:
             f"Items without cross-play should be subset of items with, "
             f"without={names_without}, with={names_with}"
         )
+
+
+class TestStickyFallbackTreeRender:
+    """TC-STICKY: Tree projection must not flicker between "current running
+    play only" and "all completed plays" during transient multi-frame gaps
+    under linear strategy.
+
+    The fix: a sticky `_last_running_play_id` field persists across render
+    calls, so when `any_running` is False during a gap, the fallback shows
+    the most recent running play rather than all completed plays.
+    """
+
+    @staticmethod
+    def _two_play_state_play2_gap() -> RunState:
+        """Play 1 completed, Play 2 in gap (tasks exist, all hosts terminal).
+
+        Simulates the moment after one linear-strategy task finishes and
+        before the next task starts. Both plays have a runtime counterpart
+        (play_start fired), but no hosts are RUNNING anywhere.
+        """
+        from datetime import datetime, timezone
+
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Play One",
+                hosts="web",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Task 1A",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                ],
+            ),
+            PlayDefinition(
+                id="p2",
+                name="Play Two",
+                hosts="db",
+                resolved_hosts=["db1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Task 2A",
+                        role=None,
+                        tags=[],
+                        play_id="p2",
+                        play_order=1,
+                        task_order=0,
+                    ),
+                ],
+            ),
+        ]
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"}
+        )
+        # Play 1: start + complete its single task
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:01Z",
+                "play": {"id": "play-1", "name": "Play One"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:02Z",
+                "task": {"id": "t1", "name": "Task 1A"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-23T10:00:03Z",
+                "task": {"id": "t1", "name": "Task 1A"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-23T10:00:05Z",
+                "task": {"id": "t1", "name": "Task 1A"},
+                "hosts": {"web1": {"ok": True, "changed": False}},
+            }
+        )
+        # Play 2: started, task completed (gap state)
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:06Z",
+                "play": {"id": "play-2", "name": "Play Two"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:07Z",
+                "task": {"id": "t2", "name": "Task 2A"},
+                "play": {"id": "play-2"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-23T10:00:08Z",
+                "task": {"id": "t2", "name": "Task 2A"},
+                "host": "db1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-23T10:00:10Z",
+                "task": {"id": "t2", "name": "Task 2A"},
+                "hosts": {"db1": {"ok": True, "changed": False}},
+            }
+        )
+        return state
+
+    def test_sticky_1_gap_between_tasks_renders_most_recent_play(self):
+        """TC-STICKY-1: Gap between tasks — only the most recent
+        running play renders, not completed plays.
+
+        After Play 1 is fully done and Play 2 is in gap (tasks complete),
+        the tree must show Play 2 (sticky fallback), not Play 1.
+
+        Also verifies that the sticky ID persists across a second render
+        call — the gap doesn't cause a flip back to "all plays."
+        """
+        state = self._two_play_state_play2_gap()
+        p = TreeProjection.from_run_state(state)
+
+        # First render: Play 2 was the last running play (via the scan),
+        # so it should be the sticky winner.
+        lines1 = p.tree_lines(budget=60)
+        play_lines1 = {ln.label for ln in lines1 if ln.kind == "play"}
+        assert "play: Play Two" in play_lines1, (
+            f"Play 2 must render as sticky fallback, got: {play_lines1}"
+        )
+        assert "play: Play One" not in play_lines1, (
+            f"Completed Play 1 must be filtered, got: {play_lines1}"
+        )
+        # Verify sticky state persisted
+        assert p._last_running_play_id == "play-2", (
+            f"Sticky fallback should point to play-2, got {p._last_running_play_id}"
+        )
+
+        # Second render (simulating next frame): the gap persists.
+        lines2 = p.tree_lines(budget=60)
+        play_lines2 = {ln.label for ln in lines2 if ln.kind == "play"}
+        assert "play: Play Two" in play_lines2, (
+            "Second frame: Play 2 must still render via sticky fallback"
+        )
+        assert "play: Play One" not in play_lines2, (
+            "Second frame: completed Play 1 must stay filtered"
+        )
+
+    def test_sticky_2_two_plays_both_running(self):
+        """TC-STICKY-2: Two plays both running — both render in the tree.
+
+        When two plays each have a RUNNING task, both should appear.
+        The sticky fallback is set to the LATEST running play (play 2),
+        but play 1 still renders because it has its own running items.
+        """
+        from datetime import datetime, timezone
+
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy web",
+                hosts="web",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Install nginx",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                ],
+            ),
+            PlayDefinition(
+                id="p2",
+                name="Deploy db",
+                hosts="db",
+                resolved_hosts=["db1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Install postgres",
+                        role=None,
+                        tags=[],
+                        play_id="p2",
+                        play_order=1,
+                        task_order=0,
+                    ),
+                ],
+            ),
+        ]
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"}
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:01Z",
+                "play": {"id": "play-1", "name": "Deploy web"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-23T10:00:03Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:04Z",
+                "play": {"id": "play-2", "name": "Deploy db"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:05Z",
+                "task": {"id": "t2", "name": "Install postgres"},
+                "play": {"id": "play-2"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-23T10:00:06Z",
+                "task": {"id": "t2", "name": "Install postgres"},
+                "host": "db1",
+            }
+        )
+
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=60)
+        play_labels = {ln.label for ln in lines if ln.kind == "play"}
+        assert "play: Deploy web" in play_labels, "Both running plays should render"
+        assert "play: Deploy db" in play_labels, "Both running plays should render"
+        assert p._last_running_play_id == "play-2", (
+            "Sticky fallback should point to LATEST running play"
+        )
+
+    def test_sticky_3_no_plays_running_yet_renders_all_upcoming(self):
+        """TC-STICKY-3: No plays running yet — all plays render (no filter).
+
+        When no play has running items AND the sticky pointer is unset
+        (pre-first task), the tree must render all plays: runtime plays
+        with tasks and upcoming definition-only plays.
+
+        The gap test fixture fires events so tree is visible but no
+        host is RUNNING anywhere. Both the started play and the upcoming
+        play must appear.
+        """
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Setup",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Ping hosts",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                ],
+            ),
+            PlayDefinition(
+                id="p2",
+                name="Deploy",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Install app",
+                        role=None,
+                        tags=[],
+                        play_id="p2",
+                        play_order=1,
+                        task_order=0,
+                    ),
+                ],
+            ),
+        ]
+        # Fire events: start play 1 and complete its single task (gap state).
+        # Tree is visible because play 1 has tasks, but no running items.
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"}
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:01Z",
+                "play": {"id": "play-1", "name": "Setup"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:02Z",
+                "task": {"id": "t1", "name": "Ping hosts"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-23T10:00:03Z",
+                "task": {"id": "t1", "name": "Ping hosts"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-23T10:00:05Z",
+                "task": {"id": "t1", "name": "Ping hosts"},
+                "hosts": {"web1": {"ok": True, "changed": False}},
+            }
+        )
+
+        # Fresh projection: no _last_running_play_id, no running items.
+        # secondary fallback should kick in and set active_play_id to
+        # play-1 (last with tasks). But that's a single-play sticky —
+        # we still want upcoming plays.
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=60)
+        play_labels = {ln.label for ln in lines if ln.kind == "play"}
+        assert "play: Setup" in play_labels, "Started play should render"
+        assert "play: Deploy" in play_labels, "Upcoming play should render"
+        assert p._last_running_play_id == "play-1", (
+            "Secondary fallback should set sticky to play-1"
+        )
+
+    def test_sticky_4_play_transitions_from_running_to_gap(self):
+        """TC-STICKY-4: Play transitions from running to gap — tree
+        stays showing the play's last state, does NOT toggle to
+        showing completed plays.
+
+        This simulates two frames:
+        Frame 1: Play 2 has a RUNNING task → sticky set to play-2.
+        Frame 2: Play 2's task completes (gap) → sticky persists,
+        tree still shows Play 2, not completed Play 1.
+        """
+        from datetime import datetime, timezone
+
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Install deps",
+                hosts="web",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Apt update",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                ],
+            ),
+            PlayDefinition(
+                id="p2",
+                name="Start services",
+                hosts="web",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="systemctl start nginx",
+                        role=None,
+                        tags=[],
+                        play_id="p2",
+                        play_order=1,
+                        task_order=0,
+                    ),
+                ],
+            ),
+        ]
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"}
+        )
+        # Play 1: completed
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:01Z",
+                "play": {"id": "play-1", "name": "Install deps"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:02Z",
+                "task": {"id": "t1", "name": "Apt update"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-23T10:00:03Z",
+                "task": {"id": "t1", "name": "Apt update"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-23T10:00:05Z",
+                "task": {"id": "t1", "name": "Apt update"},
+                "hosts": {"web1": {"ok": True, "changed": False}},
+            }
+        )
+        # Play 2: RUNNING
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:06Z",
+                "play": {"id": "play-2", "name": "Start services"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:07Z",
+                "task": {"id": "t2", "name": "systemctl start nginx"},
+                "play": {"id": "play-2"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-23T10:00:08Z",
+                "task": {"id": "t2", "name": "systemctl start nginx"},
+                "host": "web1",
+            }
+        )
+
+        # Frame 1: Play 2 running → sticky set to play-2
+        p = TreeProjection.from_run_state(state)
+        lines1 = p.tree_lines(budget=60)
+        play_labels1 = {ln.label for ln in lines1 if ln.kind == "play"}
+        assert "play: Start services" in play_labels1
+        assert "play: Install deps" not in play_labels1
+        assert p._last_running_play_id == "play-2"
+
+        # Frame 2: Complete Play 2's task → gap state
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-23T10:00:10Z",
+                "task": {"id": "t2", "name": "systemctl start nginx"},
+                "hosts": {"web1": {"ok": True, "changed": True}},
+            }
+        )
+        # Same projection object (sticky state persists)
+        lines2 = p.tree_lines(budget=60)
+        play_labels2 = {ln.label for ln in lines2 if ln.kind == "play"}
+        assert "play: Start services" in play_labels2, (
+            "Sticky fallback must keep showing Play 2 during gap"
+        )
+        assert "play: Install deps" not in play_labels2, (
+            "Completed Play 1 must stay filtered even during gap"
+        )

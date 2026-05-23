@@ -146,6 +146,10 @@ class TreeProjection:
     _state: RunState
     _role_index: dict[str, str] | None = field(default=None, init=False, repr=False)
     _known_roles: set[str] | None = field(default=None, init=False, repr=False)
+    # Sticky fallback: the play_id of the most recent play with running
+    # tasks. Persists between render calls so the tree stays stable during
+    # transient gaps (e.g. between linear-strategy tasks).
+    _last_running_play_id: str | None = field(default=None, init=False, repr=False)
 
     @classmethod
     def from_run_state(cls, state: RunState) -> "TreeProjection":
@@ -405,21 +409,57 @@ class TreeProjection:
                 continue
             ordered_plays.append((runtime_play, None))
 
-        any_running = False
+        # First pass: find the latest play with running items.
+        fresh_found: str | None = None
         for runtime, _ in ordered_plays:
             if runtime is not None:
                 items = self._play_running_and_pending(runtime, include_cross_play=False)
                 if any(k == "running" for k, _, _, _ in items):
-                    any_running = True
+                    fresh_found = runtime.play_id  # don't break — find latest
+
+        if fresh_found is not None:
+            self._last_running_play_id = fresh_found
+            active_play_id: str | None = fresh_found
+        elif self._last_running_play_id is not None:
+            active_play_id = self._last_running_play_id  # sticky from previous frame
+        else:
+            # Secondary fallback: first gap frame, no running items anywhere.
+            # Pick the last runtime play that has any tasks at all — this
+            # initialises the sticky pointer so the tree doesn't go blank.
+            for runtime, _ in reversed(ordered_plays):
+                if runtime is not None and runtime.tasks:
+                    self._last_running_play_id = runtime.play_id
+                    active_play_id = runtime.play_id
                     break
+            else:
+                active_play_id = None
 
         for runtime, play_def in ordered_plays:
             if runtime is not None:
-                if any_running:
-                    items = self._play_running_and_pending(runtime, include_cross_play=False)
-                    if not any(k == "running" for k, _, _, _ in items):
-                        continue
+                if active_play_id is not None:
+                    if runtime.play_id != active_play_id:
+                        items = self._play_running_and_pending(
+                            runtime, include_cross_play=False
+                        )
+                        if not any(k == "running" for k, _, _, _ in items):
+                            continue
+                # When runtime IS the active play, emit even with no
+                # running/pending items (gap).  Fall through to
+                # _emit_runtime_play first; if it produces nothing,
+                # emit a bare play header as the sticky anchor.
+                idx_before = len(lines)
                 self._emit_runtime_play(lines, runtime, now)
+                if len(lines) == idx_before:
+                    lines.append(
+                        TreeLine(
+                            depth=1,
+                            kind="play",
+                            label=f"play: {runtime.name}",
+                            glyph=None,
+                            status=runtime.status,
+                            elapsed_s=None,
+                        )
+                    )
             elif play_def is not None:
                 self._emit_pending_play(lines, play_def)
         return lines
