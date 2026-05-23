@@ -441,8 +441,8 @@ class TreeProjection:
                         items = self._play_running_and_pending(
                             runtime, include_cross_play=False
                         )
-                        if not any(k == "running" for k, _, _, _ in items):
-                            continue
+                        if not any(k == "running" for k, _, _, _ in items) and runtime.tasks:
+                            continue  # completed play (had tasks, now all done)
                 # When runtime IS the active play, emit even with no
                 # running/pending items (gap).  Fall through to
                 # _emit_runtime_play first; if it produces nothing,
