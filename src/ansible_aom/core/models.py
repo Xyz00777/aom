@@ -472,6 +472,26 @@ class RunState:
                         continue
                     if all(hs.status != Status.RUNNING for hs in other_task.hosts.values()):
                         other_task.status = Status.COMPLETED
+                    elif p.play_id == play.play_id:
+                        # Not all hosts are terminal — under linear
+                        # strategy, within the same play, the previous
+                        # task MUST be complete on every host when a
+                        # new task starts. Any host still RUNNING has
+                        # a missing terminal event (e.g. meta:
+                        # reset_connection, silent skips).
+                        # Force-transition them to OK — the playbook
+                        # already moved past this task.
+                        for hostname in list(other_task.hosts):
+                            hs = other_task.hosts[hostname]
+                            if hs.status == Status.RUNNING:
+                                other_task.hosts[hostname] = HostRunState(
+                                    hostname=hostname,
+                                    status=Status.OK,
+                                    changed=False,
+                                    start_time=hs.start_time,
+                                    end_time=ts,
+                                )
+                        other_task.status = Status.COMPLETED
 
     def _resolve_play_hosts(self, play: "PlayRunState") -> list[str]:
         """Look up preflight resolved_hosts for a runtime play.
@@ -524,6 +544,13 @@ class RunState:
             )
             self.plays[play_id].detected_strategy = "free"
         elif self.plays[play_id].detected_strategy is None:
+            self.plays[play_id].detected_strategy = "free"
+        elif self.plays[play_id].detected_strategy == "linear":
+            # A v2_runner_on_start event means the playbook is NOT
+            # running with lockstep enabled (the JSONL callback
+            # guards runner_on_start behind `if self._is_lockstep:
+            # return`). Flip to free — the earlier linear detection
+            # by task_start was premature.
             self.plays[play_id].detected_strategy = "free"
 
         play = self.plays[play_id]

@@ -392,8 +392,12 @@ class TestRunnerOnStartStrategy:
         play_state = run_state.plays["play-uuid-1"]
         assert play_state.detected_strategy == "free"
 
-    def test_runner_start_after_task_start_keeps_linear(self) -> None:
-        """TC-203 edge case: runner_on_start after task_start keeps linear strategy."""
+    def test_runner_start_after_task_start_flips_to_free(self) -> None:
+        """TC-203: runner_on_start after task_start proves the playbook is
+        NOT running with lockstep enabled (the JSONL callback guards
+        runner_on_start behind `if self._is_lockstep: return`). The
+        earlier linear detection by task_start was premature — the
+        strategy must flip to free."""
         run_state = RunState(playbook="test.yml")
 
         run_state.handle_event(
@@ -413,7 +417,7 @@ class TestRunnerOnStartStrategy:
         )
         assert run_state.plays["play-uuid-1"].detected_strategy == "linear"
 
-        # Now runner_on_start arrives - strategy should remain linear
+        # runner_on_start arrives — proves strategy is actually free
         run_state.handle_event(
             {
                 "_event": "v2_runner_on_start",
@@ -424,7 +428,7 @@ class TestRunnerOnStartStrategy:
             }
         )
 
-        assert run_state.plays["play-uuid-1"].detected_strategy == "linear"
+        assert run_state.plays["play-uuid-1"].detected_strategy == "free"
 
 
 # ==============================================================================

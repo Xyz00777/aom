@@ -1432,3 +1432,35 @@ f932bee fix(tree): scope hostname fallback to play targets, fix elapsed time
   finishes but `runtime.hosts` is empty, the fallback shows spinners
   instead of the final status. Root cause: ansible doesn't emit
   `v2_runner_on_ok` for implicit tasks like `meta: flush_handlers`.
+
+## 2026-05-23 — Linear Force-Completion Fix
+
+### What Changed
+- Added a third completion branch in `_handle_v2_playbook_on_task_start` for
+  tasks that still have RUNNING hosts when a new task starts in the same play
+  under linear strategy.
+- Strategy detection corrected: `v2_runner_on_start` now flips strategy from
+  `"linear"` to `"free"` because the JSONL callback only emits that event
+  when NOT in lockstep mode (`if self._is_lockstep: return`).
+
+### Key Design Decisions
+1. **Same-play only**: Force-completion is scoped to `p.play_id == play.play_id`.
+   Cross-play completion was wrong — ansible can start play 2 while play 1 is
+   still running.
+2. **Preserve real terminal events**: Only `Status.RUNNING` hosts get force-
+   transitioned to `Status.OK`. Hosts that received `v2_runner_on_failed` etc.
+   keep their actual status.
+3. **Strategy flip on runner_on_start**: The earlier `task_start`→linear detection
+   is premature. If `runner_on_start` ever fires, the playbook is NOT in lockstep
+   mode. The code now flips `detected_strategy` to `"free"` in this case.
+
+### Files Modified
+- `src/ansible_aom/core/models.py`: +2 changes
+  1. New `elif p.play_id == play.play_id:` branch in linear completion loop
+  2. Strategy flip in `_handle_v2_runner_on_start`
+- `tests/unit/test_models.py`: +4 test methods in new `TestLinearForceCompletion`
+- `tests/unit/test_event_processing.py`: Updated TC-203 test assertion
+
+### Test Results
+- 2255 tests pass, 1 pre-existing failure (test_render_includes_stderr_tail_on_failure)
+- ruff clean on all modified files

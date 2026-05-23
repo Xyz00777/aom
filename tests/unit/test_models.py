@@ -1026,3 +1026,343 @@ class TestMemoryBounds:
         assert len(play.tasks) == 2
         assert isinstance(play.tasks[0], RoleGroupDefinition)
         assert isinstance(play.tasks[1], TaskDefinition)
+
+
+class TestLinearForceCompletion:
+    """Tests for force-completing stuck RUNNING tasks under linear strategy.
+
+    Under linear strategy, when a new task starts the previous task is
+    guaranteed complete on ALL hosts by ansible's sequential execution.
+    Some hosts never receive terminal events (meta: reset_connection,
+    silent skips from when: false), so remaining RUNNING hosts must be
+    force-transitioned to OK.
+    """
+
+    def test_meta_task_force_completed_under_linear(self):
+        """TC-RESET-1: Hosts stuck RUNNING in a meta task get force-
+        transitioned to OK when the next task starts."""
+        state = RunState(playbook="test.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="1",
+                name="test",
+                hosts="all",
+                resolved_hosts=["ipa1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Reset connection",
+                        role="freeipa",
+                        tags=[],
+                        play_id="1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="Next task",
+                        role=None,
+                        tags=[],
+                        play_id="1",
+                        play_order=0,
+                        task_order=1,
+                    ),
+                ],
+            )
+        ]
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_start",
+                "_timestamp": "2026-05-23T10:00:00Z",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:01Z",
+                "play": {"id": "play-1", "name": "test"},
+            }
+        )
+
+        # Task 1: "Reset connection" — meta, no terminal events
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:02Z",
+                "task": {"id": "uuid-meta", "name": "Reset connection"},
+                "play": {"id": "play-1"},
+            }
+        )
+
+        play = state.plays["play-1"]
+        task1 = play.tasks["uuid-meta"]
+        assert task1.status == Status.RUNNING
+        assert "ipa1" in task1.hosts
+        assert task1.hosts["ipa1"].status == Status.RUNNING
+
+        # Task 2: "Next task" starts — should force-complete task 1
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:01:00Z",
+                "task": {"id": "uuid-next", "name": "Next task"},
+                "play": {"id": "play-1"},
+            }
+        )
+
+        assert task1.status == Status.COMPLETED
+        assert task1.hosts["ipa1"].status == Status.OK
+
+    def test_real_terminal_hosts_preserved(self):
+        """TC-RESET-2: Hosts that received real terminal events keep their
+        actual status; only genuinely stuck RUNNING hosts get force-
+        transitioned to OK."""
+        state = RunState(playbook="test.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="1",
+                name="test",
+                hosts="all",
+                resolved_hosts=["ipa1", "ipa2"],
+                tasks=[
+                    TaskDefinition(
+                        name="Slow task",
+                        role=None,
+                        tags=[],
+                        play_id="1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="Next task",
+                        role=None,
+                        tags=[],
+                        play_id="1",
+                        play_order=0,
+                        task_order=1,
+                    ),
+                ],
+            )
+        ]
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_start",
+                "_timestamp": "2026-05-23T10:00:00Z",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:01Z",
+                "play": {"id": "play-1", "name": "test"},
+            }
+        )
+
+        # Task 1 starts — hosts synthesized RUNNING
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:02Z",
+                "task": {"id": "uuid-task1", "name": "Slow task"},
+                "play": {"id": "play-1"},
+            }
+        )
+
+        # ipa1 gets a real terminal event (FAILED)
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_failed",
+                "_timestamp": "2026-05-23T10:00:03Z",
+                "task": {"id": "uuid-task1", "name": "Slow task"},
+                "hosts": {"ipa1": {"failed": True}},
+            }
+        )
+        # ipa2 stays RUNNING — no terminal event
+
+        task1 = state.plays["play-1"].tasks["uuid-task1"]
+        assert task1.hosts["ipa1"].status == Status.FAILED
+        assert task1.hosts["ipa2"].status == Status.RUNNING
+
+        # Task 2 starts → force-complete task 1
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:01:00Z",
+                "task": {"id": "uuid-task2", "name": "Next task"},
+                "play": {"id": "play-1"},
+            }
+        )
+
+        assert task1.status == Status.COMPLETED
+        assert task1.hosts["ipa1"].status == Status.FAILED
+        assert task1.hosts["ipa2"].status == Status.OK
+
+    def test_same_play_handler_task_force_completed(self):
+        """TC-RESET-3: Within the same play, a handler task with no
+        terminal events gets force-completed when the next task in the
+        same play starts. Under linear strategy, ansible runs handlers
+        sequentially within the play before moving to the next task."""
+        state = RunState(playbook="test.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="1",
+                name="test",
+                hosts="all",
+                resolved_hosts=["host1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Normal task",
+                        role=None,
+                        tags=[],
+                        play_id="1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="Handler: restart service",
+                        role=None,
+                        tags=["handlers"],
+                        play_id="1",
+                        play_order=0,
+                        task_order=1,
+                    ),
+                    TaskDefinition(
+                        name="Next after handler",
+                        role=None,
+                        tags=[],
+                        play_id="1",
+                        play_order=0,
+                        task_order=2,
+                    ),
+                ],
+            )
+        ]
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_start",
+                "_timestamp": "2026-05-23T10:00:00Z",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:01Z",
+                "play": {"id": "play-1", "name": "test"},
+            }
+        )
+
+        # Task 1: normal task — gets a real terminal event
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:02Z",
+                "task": {"id": "uuid-normal", "name": "Normal task"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-23T10:00:03Z",
+                "task": {"id": "uuid-normal", "name": "Normal task"},
+                "hosts": {"host1": {"ok": True, "changed": False}},
+            }
+        )
+
+        # Handler task: no terminal events (meta operation)
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_handler_task_start",
+                "_timestamp": "2026-05-23T10:00:04Z",
+                "task": {"id": "uuid-handler", "name": "Handler: restart service"},
+                "play": {"id": "play-1"},
+            }
+        )
+        handler = state.plays["play-1"].tasks["uuid-handler"]
+        assert handler.status == Status.RUNNING
+        assert handler.hosts["host1"].status == Status.RUNNING
+
+        # Next task starts in same play — should force-complete the handler
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:05Z",
+                "task": {"id": "uuid-next", "name": "Next after handler"},
+                "play": {"id": "play-1"},
+            }
+        )
+
+        assert handler.status == Status.COMPLETED
+        assert handler.hosts["host1"].status == Status.OK
+
+    def test_free_strategy_not_affected(self):
+        """TC-RESET-4: Under free strategy, the force-completion path
+        does NOT run — tasks with stuck RUNNING hosts remain RUNNING."""
+        state = RunState(playbook="test.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="1",
+                name="test",
+                hosts="all",
+                resolved_hosts=["host1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Task 1",
+                        role=None,
+                        tags=[],
+                        play_id="1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="Task 2",
+                        role=None,
+                        tags=[],
+                        play_id="1",
+                        play_order=0,
+                        task_order=1,
+                    ),
+                ],
+            )
+        ]
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_start",
+                "_timestamp": "2026-05-23T10:00:00Z",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:01Z",
+                "play": {"id": "play-1", "name": "test"},
+            }
+        )
+
+        # Force the play to free strategy before any task starts
+        state.plays["play-1"].detected_strategy = "free"
+
+        # Task 1 — hosts synthesized RUNNING (no terminal events)
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:02Z",
+                "task": {"id": "uuid-t1", "name": "Task 1"},
+                "play": {"id": "play-1"},
+            }
+        )
+        task1 = state.plays["play-1"].tasks["uuid-t1"]
+        assert task1.status == Status.RUNNING
+        assert task1.hosts["host1"].status == Status.RUNNING
+
+        # Task 2 starts — should NOT force-complete task 1 (free strategy)
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:03Z",
+                "task": {"id": "uuid-t2", "name": "Task 2"},
+                "play": {"id": "play-1"},
+            }
+        )
+
+        # Under free strategy, task 1 stays RUNNING
+        assert task1.status == Status.RUNNING
+        assert task1.hosts["host1"].status == Status.RUNNING
