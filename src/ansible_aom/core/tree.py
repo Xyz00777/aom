@@ -408,7 +408,7 @@ class TreeProjection:
         any_running = False
         for runtime, _ in ordered_plays:
             if runtime is not None:
-                items = self._play_running_and_pending(runtime)
+                items = self._play_running_and_pending(runtime, include_cross_play=False)
                 if any(k == "running" for k, _, _, _ in items):
                     any_running = True
                     break
@@ -416,7 +416,7 @@ class TreeProjection:
         for runtime, play_def in ordered_plays:
             if runtime is not None:
                 if any_running:
-                    items = self._play_running_and_pending(runtime)
+                    items = self._play_running_and_pending(runtime, include_cross_play=False)
                     if not any(k == "running" for k, _, _, _ in items):
                         continue
                 self._emit_runtime_play(lines, runtime, now)
@@ -637,7 +637,7 @@ class TreeProjection:
                 )
 
     def _play_running_and_pending(
-        self, play: "PlayRunState"
+        self, play: "PlayRunState", include_cross_play: bool = True
     ) -> list[tuple[str, str, str | None, TaskRunState | None]]:
         """Enumerate (kind, name, role, runtime) for a play's running and
         pending tasks, in execution order.
@@ -657,14 +657,19 @@ class TreeProjection:
             stripped = strip_role_prefix(task.name)
             if stripped != task.name:
                 runtime_by_name[stripped] = task
-        for p in self._state.plays.values():
-            if p.play_id == play.play_id:
-                continue
-            for task in p.tasks.values():
-                runtime_by_name.setdefault(task.name, task)
-                stripped = strip_role_prefix(task.name)
-                if stripped != task.name:
-                    runtime_by_name.setdefault(stripped, task)
+        if include_cross_play:
+            for p in self._state.plays.values():
+                if p.play_id == play.play_id:
+                    continue
+                for task in p.tasks.values():
+                    if not any(
+                        hs.status == Status.RUNNING for hs in task.hosts.values()
+                    ):
+                        continue  # skip completed/stale cross-play tasks
+                    runtime_by_name.setdefault(task.name, task)
+                    stripped = strip_role_prefix(task.name)
+                    if stripped != task.name:
+                        runtime_by_name.setdefault(stripped, task)
 
         play_def = self._play_def_for(play)
 

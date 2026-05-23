@@ -904,3 +904,477 @@ class TestDynamicChildrenAsPendingInTree:
         assert len(task_lines) == 1, (
             f"Dynamic A should appear exactly once, got {len(task_lines)} lines: {task_lines}"
         )
+
+
+class TestCrossPlayLookupIsolation:
+    """TC-CROSS: Cross-play runtime_by_name lookup must not pollute the
+    ``any_running`` check in ``_tree_lines_unbounded``.
+
+    Bug 1: Completed plays borrow a RUNNING task with the same name from
+    a later play, appearing as ◐ instead of being skipped.
+
+    Bug 2: Completed handler tasks in a different play UUID are not found
+    in the current play's ``runtime_by_name``, showing □ pending. The fix
+    skips the completed play entirely when ``any_running`` is True.
+
+    The ``include_cross_play=False`` parameter scopes ``any_running``
+    checks to the current play's own tasks only, while rendering
+    (``_emit_runtime_play``) keeps the default ``include_cross_play=True``
+    for cross-play handler context.
+    """
+
+    def _multi_play_shared_task_state(self) -> RunState:
+        """Build a state with two plays sharing task name "Cleanup tasks".
+
+        Play 1 ("Deploy webservers"): "Cleanup tasks" completed.
+        Play 2 ("Deploy database"): "Cleanup tasks" is actively RUNNING
+        with host "db1" in RUNNING status.
+        """
+        from datetime import datetime, timezone
+
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy webservers",
+                hosts="webservers",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Install nginx",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="Cleanup tasks",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=1,
+                    ),
+                ],
+            ),
+            PlayDefinition(
+                id="p2",
+                name="Deploy database",
+                hosts="dbservers",
+                resolved_hosts=["db1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Install postgres",
+                        role=None,
+                        tags=[],
+                        play_id="p2",
+                        play_order=1,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="Cleanup tasks",
+                        role=None,
+                        tags=[],
+                        play_id="p2",
+                        play_order=1,
+                        task_order=1,
+                    ),
+                ],
+            ),
+        ]
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"}
+        )
+        # --- Play 1 events (all completed) ---
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:01Z",
+                "play": {"id": "play-1", "name": "Deploy webservers"},
+            }
+        )
+        # Task 1: Install nginx → OK
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-23T10:00:03Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-23T10:00:05Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "hosts": {"web1": {"ok": True, "changed": False}},
+            }
+        )
+        # Task 2: Cleanup tasks → OK
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:06Z",
+                "task": {"id": "t2", "name": "Cleanup tasks"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-23T10:00:07Z",
+                "task": {"id": "t2", "name": "Cleanup tasks"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-23T10:00:09Z",
+                "task": {"id": "t2", "name": "Cleanup tasks"},
+                "hosts": {"web1": {"ok": True, "changed": False}},
+            }
+        )
+        # --- Play 2 events (Cleanup tasks is RUNNING) ---
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:10Z",
+                "play": {"id": "play-2", "name": "Deploy database"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:11Z",
+                "task": {"id": "t3", "name": "Install postgres"},
+                "play": {"id": "play-2"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-23T10:00:12Z",
+                "task": {"id": "t3", "name": "Install postgres"},
+                "host": "db1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-23T10:00:14Z",
+                "task": {"id": "t3", "name": "Install postgres"},
+                "hosts": {"db1": {"ok": True, "changed": False}},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:15Z",
+                "task": {"id": "t4", "name": "Cleanup tasks"},
+                "play": {"id": "play-2"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-23T10:00:16Z",
+                "task": {"id": "t4", "name": "Cleanup tasks"},
+                "host": "db1",
+            }
+        )
+        return state
+
+    def test_completed_play_skipped_when_other_play_running(self) -> None:
+        """TC-CROSS-2: When play 2 has a RUNNING task, a previously completed
+        play 1 sharing the same task name must NOT appear in the tree
+        (no borrowed ◐ icon from play 2's running task)."""
+        state = self._multi_play_shared_task_state()
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=60)
+
+        # Play 2 is running; play 1 (completed) should be skipped.
+        play_lines = {ln.label: ln for ln in lines if ln.kind == "play"}
+        assert "play: Deploy database" in play_lines, (
+            "Running play 2 must appear in tree"
+        )
+        assert "play: Deploy webservers" not in play_lines, (
+            "Completed play 1 must be skipped when another play has running items"
+        )
+
+        # Ensure no task lines were emitted for the completed play 1.
+        play1_task_lines = [
+            ln for ln in lines if ln.kind == "task" and ln.label.startswith("Install nginx")
+        ]
+        assert len(play1_task_lines) == 0, (
+            "Completed play's tasks must not appear in tree"
+        )
+
+    def test_completed_play_no_stale_pending_handler_tasks(self) -> None:
+        """TC-CROSS-1: A completed play whose handler tasks ran under a
+        different play UUID must not show stale □ pending — the entire
+        play is skipped when ``any_running`` detects running items
+        from another play."""
+        from datetime import datetime, timezone
+
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy webservers",
+                hosts="webservers",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Install nginx",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="Restart nginx",
+                        role=None,
+                        tags=["handlers"],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=1,
+                    ),
+                ],
+            ),
+            PlayDefinition(
+                id="p2",
+                name="Deploy database",
+                hosts="dbservers",
+                resolved_hosts=["db1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Install postgres",
+                        role=None,
+                        tags=[],
+                        play_id="p2",
+                        play_order=1,
+                        task_order=0,
+                    ),
+                ],
+            ),
+        ]
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"}
+        )
+        # Play 1: "Install nginx" completes, then "Restart nginx" runs as
+        # a handler under a different play UUID.
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:01Z",
+                "play": {"id": "play-1", "name": "Deploy webservers"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-23T10:00:03Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-23T10:00:05Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "hosts": {"web1": {"ok": True, "changed": True}},
+            }
+        )
+
+        # Handler task "Restart nginx" runs under play-handler UUID (different
+        # from play-1). It's completed too.
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_handler_task_start",
+                "_timestamp": "2026-05-23T10:00:06Z",
+                "task": {"id": "t-handler", "name": "Restart nginx"},
+                "play": {"id": "play-handler", "name": "Deploy webservers"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-23T10:00:07Z",
+                "task": {"id": "t-handler", "name": "Restart nginx"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-23T10:00:09Z",
+                "task": {"id": "t-handler", "name": "Restart nginx"},
+                "hosts": {"web1": {"ok": True, "changed": True}},
+            }
+        )
+
+        # Play 2: has a RUNNING task.
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:10Z",
+                "play": {"id": "play-2", "name": "Deploy database"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:11Z",
+                "task": {"id": "t3", "name": "Install postgres"},
+                "play": {"id": "play-2"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-23T10:00:12Z",
+                "task": {"id": "t3", "name": "Install postgres"},
+                "host": "db1",
+            }
+        )
+        # Leave "Install postgres" RUNNING (no terminal event).
+
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=60)
+
+        # Only the running play 2 should appear.
+        play_lines = [ln.label for ln in lines if ln.kind == "play"]
+        assert "play: Deploy database" in play_lines, (
+            f"Running play must appear, got: {play_lines}"
+        )
+        assert "play: Deploy webservers" not in play_lines, (
+            f"Completed play must be skipped, got: {play_lines}"
+        )
+
+        # No □ pending for "Restart nginx" — play 1 is skipped entirely.
+        task_lines = [ln for ln in lines if ln.kind == "task"]
+        task_labels = [ln.label for ln in task_lines]
+        assert "Restart nginx" not in task_labels, (
+            f"Completed handler task must not show as □ pending, got tasks: {task_labels}"
+        )
+
+    def test_own_running_task_still_renders_with_cross_play(self) -> None:
+        """TC-CROSS-3: A play with its own RUNNING task renders correctly
+        using cross-play lookup (default ``include_cross_play=True``)."""
+        from datetime import datetime, timezone
+
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy webservers",
+                hosts="webservers",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Install nginx",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                ],
+            ),
+        ]
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"}
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:01Z",
+                "play": {"id": "play-1", "name": "Deploy webservers"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-23T10:00:03Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "host": "web1",
+            }
+        )
+
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+
+        task_lines = [ln for ln in lines if ln.kind == "task"]
+        assert len(task_lines) == 1, f"Expected one task line, got: {lines}"
+        assert task_lines[0].status == Status.RUNNING, (
+            f"Own running task should show RUNNING status, got {task_lines[0].status}"
+        )
+        assert "Install nginx" in task_lines[0].label, (
+            f"Own task name should appear, got {task_lines[0].label}"
+        )
+
+    def test_include_cross_play_false_returns_no_cross_play_items(self) -> None:
+        """TC-CROSS-4: ``_play_running_and_pending(play, include_cross_play=False)``
+        returns no items borrowed from other plays — only the current play's
+        own tasks are considered."""
+        state = self._multi_play_shared_task_state()
+        p = TreeProjection.from_run_state(state)
+
+        play1 = state.plays.get("play-1")
+        assert play1 is not None
+
+        # With cross-play: "Cleanup tasks" running in play 2 would be
+        # borrowed into play 1's runtime_by_name.
+        items_with = p._play_running_and_pending(play1, include_cross_play=True)
+        # With include_cross_play=False: only play 1's own tasks.
+        items_without = p._play_running_and_pending(play1, include_cross_play=False)
+
+        # Play 1's own tasks are all completed → no running/pending items.
+        running_without = [name for kind, name, *_ in items_without if kind == "running"]
+        assert len(running_without) == 0, (
+            f"No running items expected without cross-play, got: {running_without}"
+        )
+
+        # Play 1 has no own running tasks so items_without should be empty
+        # (all own tasks are completed → filtered).
+        # With cross-play, play 2's "Cleanup tasks" is RUNNING with a host
+        # → it may appear in items_with.
+        # (Whether it appears depends on whether play 2's task has hosts
+        # with RUNNING status; it does in the fixture.)
+        has_running_with = any(kind == "running" for kind, *_ in items_with)
+
+        # Verify isolation: items_without is strictly a subset.
+        names_without = {name for _, name, *_ in items_without}
+        names_with = {name for _, name, *_ in items_with}
+        assert names_without <= names_with, (
+            f"Items without cross-play should be subset of items with, "
+            f"without={names_without}, with={names_with}"
+        )
