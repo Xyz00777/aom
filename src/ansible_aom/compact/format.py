@@ -30,6 +30,7 @@ from ansible_aom.core.models import (
     RoleGroupDefinition,
     RunState,
     Status,
+    TaskDefinition,
 )
 from ansible_aom.core.tree import TreeProjection
 
@@ -648,13 +649,21 @@ def format_tree_block(
 
 
 def _count_tasks(play: PlayDefinition) -> int:
-    """Count leaf TaskDefinitions in a play, expanding any RoleGroupDefinition."""
+    """Count leaf TaskDefinitions in a play, expanding any RoleGroupDefinition.
+
+    Dynamic ``include_tasks`` children are grafted onto their parent
+    ``TaskDefinition`` at runtime via ``TaskDefinition.children``.  This
+    counter walks those children so the status-bar denominator reflects
+    the true total once dynamic tasks have expanded.
+    """
     total = 0
     for entry in play.tasks:
         if isinstance(entry, RoleGroupDefinition):
             total += len(entry.tasks)
         else:
             total += 1
+            if isinstance(entry, TaskDefinition) and entry.children:
+                total += len(entry.children)
     return total
 
 
@@ -663,8 +672,9 @@ def count_total_tasks(definitions: list[PlayDefinition]) -> int:
 
     Used for the status bar's `X/Y tasks` segment. Returns 0 for an empty
     list, which the renderer treats as "no preflight data — suppress the
-    segment". Dynamic ``include_tasks`` are not counted (they aren't
-    expanded by ``--list-tasks``); ``import_tasks`` are.
+    segment". Dynamic ``include_tasks`` children are counted when they
+    have been grafted onto their parent ``TaskDefinition`` via
+    ``TaskDefinition.children``; ``import_tasks`` are counted statically.
     """
     return sum(_count_tasks(play) for play in definitions)
 
@@ -672,17 +682,19 @@ def count_total_tasks(definitions: list[PlayDefinition]) -> int:
 def count_total_tasks_seen(definitions: list[PlayDefinition], state: RunState) -> int:
     """Running upper bound on task count for the status-bar denominator.
 
-    Preflight `--list-tasks` only sees static + `import_tasks`. Dynamic
-    `include_tasks` expand at runtime, so a playbook with 4 visible tasks
-    may actually announce 30 once `include_tasks` resolve. We take the
-    max of the preflight total and the runtime announced count so the
-    ratio `completed / total` never displays N > total.
+    Preflight ``--list-tasks`` only sees static + ``import_tasks``. Dynamic
+    ``include_tasks`` expand at runtime so a playbook with 4 visible tasks
+    may actually announce 30 once includes resolve. We take the maximum
+    of the preflight total (including grafted children), the runtime
+    announced count, and the include cache task count so the ratio
+    ``completed / total`` never displays N > total.
 
     Before any runtime event arrives, falls back to the preflight count
-    (avoids showing `0/0` during preflight).
+    (avoids showing ``0/0`` during preflight).
     """
     runtime = sum(len(play.tasks) for play in state.plays.values())
-    return max(count_total_tasks(definitions), runtime)
+    cached = sum(entry.task_count for entry in state._include_cache.values())
+    return max(count_total_tasks(definitions), runtime, cached)
 
 
 def count_completed_tasks(state: RunState) -> int:

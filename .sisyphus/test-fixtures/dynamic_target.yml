@@ -1,0 +1,10 @@
+---
+- name: Dynamic task A
+  debug:
+    msg: "Dynamic A"
+- name: Dynamic task B
+  debug:
+    msg: "Dynamic B"
+- name: Dynamic task C
+  debug:
+    msg: "Dynamic C"

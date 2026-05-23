@@ -1,0 +1,7 @@
+---
+- name: Playbook with dynamic include path
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Dynamic include
+      include_tasks: "{{ task_file }}"

@@ -230,3 +230,677 @@ class TestRuntimeRoleLabelTaskCountFromDefinitions:
             assert "(2 tasks)" in role_lines[0].label, (
                 f"if role line appears, it must show total task count, got: {role_lines[0].label}"
             )
+
+
+class TestDynamicChildrenTaskRole:
+    """TC-300: _task_role must index TaskDefinition.children (grafted
+    include_tasks children), not just the flat play_def.tasks list."""
+
+    def test_dynamic_child_under_role_returns_correct_role(self) -> None:
+        """Dynamic grafted child under role 'nginx' → _task_role("Dynamic task")
+        returns "nginx"."""
+        parent = TaskDefinition(
+            name="Include tasks file",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        parent.children.append(
+            TaskDefinition(
+                name="Dynamic task",
+                role="nginx",
+                is_dynamic=True,
+                tags=[],
+                play_id="1",
+                play_order=0,
+                task_order=-1,
+            )
+        )
+        defs = [
+            PlayDefinition(
+                id="1", name="Test", hosts="all", resolved_hosts=["web1"], tasks=[parent]
+            )
+        ]
+        state = RunState(playbook="test.yml", definitions=defs)
+        p = TreeProjection.from_run_state(state)
+        assert p._task_role("Dynamic task") == "nginx"
+
+    def test_dynamic_child_stripped_prefix_also_finds_role(self) -> None:
+        """Runtime task names with 'role : ' prefix should still match
+        the dynamic child index after stripping."""
+        parent = TaskDefinition(
+            name="Include tasks file",
+            role="nginx",
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        parent.children.append(
+            TaskDefinition(
+                name="nginx : Dynamic task",
+                role="nginx",
+                is_dynamic=True,
+                tags=[],
+                play_id="1",
+                play_order=0,
+                task_order=-1,
+            )
+        )
+        defs = [
+            PlayDefinition(
+                id="1", name="Test", hosts="all", resolved_hosts=["web1"], tasks=[parent]
+            )
+        ]
+        state = RunState(playbook="test.yml", definitions=defs)
+        p = TreeProjection.from_run_state(state)
+        assert p._task_role("nginx : Dynamic task") == "nginx"
+
+
+class TestDynamicChildrenRoleTotalTasks:
+    """TC-301: role_total_tasks must count dynamic children."""
+
+    def test_role_with_preflight_and_dynamic_children_count(self) -> None:
+        """Role with both preflight tasks and grafted dynamic children
+        must show the combined total."""
+        parent = TaskDefinition(
+            name="Include tasks file",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        parent.children.append(
+            TaskDefinition(
+                name="Dynamic task A",
+                role="nginx",
+                is_dynamic=True,
+                tags=[],
+                play_id="1",
+                play_order=0,
+                task_order=-1,
+            )
+        )
+        parent.children.append(
+            TaskDefinition(
+                name="Dynamic task B",
+                role="nginx",
+                is_dynamic=True,
+                tags=[],
+                play_id="1",
+                play_order=0,
+                task_order=-1,
+            )
+        )
+        # Also a preflight task with same role
+        preflight = TaskDefinition(
+            name="Install nginx",
+            role="nginx",
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=1,
+        )
+        defs = [
+            PlayDefinition(
+                id="1",
+                name="Test",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[parent, preflight],
+            )
+        ]
+        state = RunState(playbook="test.yml", definitions=defs)
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "Test"},
+            }
+        )
+        # Make one task RUNNING so the role tree line appears
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t-pre", "name": "Install nginx"},
+                "play": {"id": "play-1"},
+            }
+        )
+        from datetime import datetime, timezone
+
+        from ansible_aom.core.models import HostRunState
+
+        t = state.plays["play-1"].tasks["t-pre"]
+        t.hosts["web1"] = HostRunState(
+            hostname="web1",
+            status=Status.RUNNING,
+            start_time=datetime(2026, 5, 22, 10, 0, 2, tzinfo=timezone.utc),
+        )
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+        role_lines = [ln for ln in lines if ln.kind == "role" and "nginx" in ln.label]
+        assert len(role_lines) >= 1, f"expected nginx role, got {[ln.label for ln in lines]}"
+        assert "(3 tasks)" in role_lines[0].label, (
+            f"nginx role should show 3 tasks (1 preflight + 2 dynamic), got: {role_lines[0].label}"
+        )
+
+    def test_dynamic_child_task_appears_under_role_header(self) -> None:
+        """TC-302: Dynamic child renders under the correct role header
+        in tree output, not as a bare ungrouped task."""
+        parent = TaskDefinition(
+            name="Include tasks file",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        defs = [
+            PlayDefinition(
+                id="1",
+                name="Test",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[parent],
+            )
+        ]
+        state = RunState(playbook="test.yml", definitions=defs)
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "Test"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t-include", "name": "Include tasks file"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t-dyn", "name": "nginx : Dynamic task A"},
+                "play": {"id": "play-1"},
+            }
+        )
+        from datetime import datetime, timezone
+
+        from ansible_aom.core.models import HostRunState
+
+        t = state.plays["play-1"].tasks["t-dyn"]
+        t.hosts["web1"] = HostRunState(
+            hostname="web1",
+            status=Status.RUNNING,
+            start_time=datetime(2026, 5, 22, 10, 0, 3, tzinfo=timezone.utc),
+        )
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+        # The dynamic child should NOT appear as a bare ungrouped task
+        # (it has no runtime task state, so it's only reflected in the count).
+        role_lines = [ln for ln in lines if ln.kind == "role" and "nginx" in ln.label]
+        assert len(role_lines) >= 1, f"expected nginx role, got {[ln.label for ln in lines]}"
+        # At minimum the role header shows (1 task) — the dynamic child
+        assert "(1 task)" in role_lines[0].label, (
+            f"nginx role with one dynamic child should show (1 task), got: {role_lines[0].label}"
+        )
+
+
+class TestDynamicChildrenAsPendingInTree:
+    """TC-320: Dynamic children (grafted include_tasks) appear in tree
+    as □ pending before ansible announces them at runtime."""
+
+    def test_dynamic_children_show_pending_before_announcement(self) -> None:
+        """Grafted children not yet seen at runtime appear with Status.PENDING."""
+        from datetime import datetime, timezone
+
+        parent = TaskDefinition(
+            name="Include tasks file",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        parent.children.append(
+            TaskDefinition(
+                name="Dynamic A",
+                role=None,
+                is_dynamic=True,
+                tags=[],
+                play_id="1",
+                play_order=0,
+                task_order=-1,
+            )
+        )
+        parent.children.append(
+            TaskDefinition(
+                name="Dynamic B",
+                role=None,
+                is_dynamic=True,
+                tags=[],
+                play_id="1",
+                play_order=0,
+                task_order=-1,
+            )
+        )
+        defs = [
+            PlayDefinition(
+                id="1",
+                name="Test",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[parent],
+            )
+        ]
+        state = RunState(playbook="test.yml", definitions=defs)
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"}
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "Test"},
+            }
+        )
+        # Only the parent include_tasks is announced — children not yet.
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t-parent", "name": "Include tasks file"},
+                "play": {"id": "play-1"},
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+        pending_labels = [
+            ln.label for ln in lines if ln.kind == "task" and ln.status == Status.PENDING
+        ]
+        assert "Dynamic A" in pending_labels, (
+            f"Dynamic A should appear as □ pending, got pending: {pending_labels}"
+        )
+        assert "Dynamic B" in pending_labels, (
+            f"Dynamic B should appear as □ pending, got pending: {pending_labels}"
+        )
+
+    def test_running_dynamic_child_shows_running_status(self) -> None:
+        """TC-321: Dynamic child announced at runtime shows RUNNING status (◐)."""
+        from datetime import datetime, timezone
+
+        parent = TaskDefinition(
+            name="Include tasks file",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        parent.children.append(
+            TaskDefinition(
+                name="Dynamic A",
+                role=None,
+                is_dynamic=True,
+                tags=[],
+                play_id="1",
+                play_order=0,
+                task_order=-1,
+            )
+        )
+        defs = [
+            PlayDefinition(
+                id="1",
+                name="Test",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[parent],
+            )
+        ]
+        state = RunState(playbook="test.yml", definitions=defs)
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"}
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "Test"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t-parent", "name": "Include tasks file"},
+                "play": {"id": "play-1"},
+            }
+        )
+        # Announce the dynamic child.
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t-dyn", "name": "Dynamic A"},
+                "play": {"id": "play-1"},
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+        running_labels = [
+            ln.label.split("  ")[0]
+            for ln in lines
+            if ln.kind == "task" and ln.status == Status.RUNNING
+        ]
+        assert "Dynamic A" in running_labels, (
+            f"Dynamic A should show as RUNNING, got running tasks: {running_labels}"
+        )
+
+    def test_completed_dynamic_child_filtered_from_tree(self) -> None:
+        """TC-322: Dynamic child classified as 'completed' is excluded from tree lines."""
+        from datetime import datetime, timezone
+
+        parent = TaskDefinition(
+            name="Include tasks file",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        parent.children.append(
+            TaskDefinition(
+                name="Dynamic A",
+                role=None,
+                is_dynamic=True,
+                tags=[],
+                play_id="1",
+                play_order=0,
+                task_order=-1,
+            )
+        )
+        defs = [
+            PlayDefinition(
+                id="1",
+                name="Test",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[parent],
+            )
+        ]
+        state = RunState(playbook="test.yml", definitions=defs)
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"}
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "Test"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t-parent", "name": "Include tasks file"},
+                "play": {"id": "play-1"},
+            }
+        )
+        # Fire task_start + runner_on_start + runner_on_ok to complete the child.
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t-dyn", "name": "Dynamic A"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:04Z",
+                "task": {"id": "t-dyn", "name": "Dynamic A"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-22T10:00:05Z",
+                "task": {"id": "t-dyn", "name": "Dynamic A"},
+                "hosts": {"web1": {"ok": True, "changed": False}},
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+        all_task_labels = [ln.label for ln in lines if ln.kind == "task"]
+        # Completed dynamic child must not appear.
+        assert not any("Dynamic A" in lbl for lbl in all_task_labels), (
+            f"Completed dynamic child must be filtered, got: {all_task_labels}"
+        )
+
+    def test_dynamic_child_under_role_header(self) -> None:
+        """TC-323: Dynamic child with role appears under correct role header."""
+        from datetime import datetime, timezone
+
+        parent = TaskDefinition(
+            name="Include tasks file",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        parent.children.append(
+            TaskDefinition(
+                name="nginx : Dynamic A",
+                role="nginx",
+                is_dynamic=True,
+                tags=[],
+                play_id="1",
+                play_order=0,
+                task_order=-1,
+            )
+        )
+        defs = [
+            PlayDefinition(
+                id="1",
+                name="Test",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[parent],
+            )
+        ]
+        state = RunState(playbook="test.yml", definitions=defs)
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"}
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "Test"},
+            }
+        )
+        # Make parent running so tree is visible.
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t-parent", "name": "Include tasks file"},
+                "play": {"id": "play-1"},
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+        role_lines = [ln for ln in lines if ln.kind == "role" and "nginx" in ln.label]
+        assert len(role_lines) >= 1, (
+            f"Expected nginx role header, got {[ln.label for ln in lines]}"
+        )
+        # The pending dynamic child should appear under the nginx role header
+        # (depth 3, not depth 2).
+        pending_under_role = [
+            ln
+            for ln in lines
+            if ln.kind == "task" and ln.status == Status.PENDING and ln.depth == 3
+        ]
+        assert len(pending_under_role) >= 1, (
+            f"Dynamic child should appear at depth 3 under role header, got lines: {lines}"
+        )
+        assert any(
+            "Dynamic A" in ln.label for ln in pending_under_role
+        ), f"Dynamic A not found under role at depth 3: {[ln.label for ln in pending_under_role]}"
+
+    def test_host_leaves_for_running_dynamic_child(self) -> None:
+        """TC-324: Running dynamic child shows host leaves under it."""
+        from datetime import datetime, timezone
+
+        from ansible_aom.core.models import HostRunState
+
+        parent = TaskDefinition(
+            name="Include tasks file",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        parent.children.append(
+            TaskDefinition(
+                name="Dynamic A",
+                role=None,
+                is_dynamic=True,
+                tags=[],
+                play_id="1",
+                play_order=0,
+                task_order=-1,
+            )
+        )
+        defs = [
+            PlayDefinition(
+                id="1",
+                name="Test",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[parent],
+            )
+        ]
+        state = RunState(playbook="test.yml", definitions=defs)
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"}
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "Test"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t-parent", "name": "Include tasks file"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t-dyn", "name": "Dynamic A"},
+                "play": {"id": "play-1"},
+            }
+        )
+        # Give the child a running host.
+        t = state.plays["play-1"].tasks["t-dyn"]
+        t.hosts["web1"] = HostRunState(
+            hostname="web1",
+            status=Status.RUNNING,
+            start_time=datetime(2026, 5, 22, 10, 0, 3, tzinfo=timezone.utc),
+        )
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+        host_lines = [ln for ln in lines if ln.kind == "host"]
+        assert "web1" in [ln.label for ln in host_lines], (
+            f"Running dynamic child should have host leaf for web1, got hosts: {[ln.label for ln in host_lines]}"
+        )
+
+    def test_no_duplicate_for_runtime_announced_dynamic_child(self) -> None:
+        """When a dynamic child is announced at runtime AND grafted in
+        children, it must NOT appear twice in the tree."""
+        from datetime import datetime, timezone
+
+        parent = TaskDefinition(
+            name="Include tasks file",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        parent.children.append(
+            TaskDefinition(
+                name="Dynamic A",
+                role=None,
+                is_dynamic=True,
+                tags=[],
+                play_id="1",
+                play_order=0,
+                task_order=-1,
+            )
+        )
+        defs = [
+            PlayDefinition(
+                id="1",
+                name="Test",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[parent],
+            )
+        ]
+        state = RunState(playbook="test.yml", definitions=defs)
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"}
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "Test"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t-parent", "name": "Include tasks file"},
+                "play": {"id": "play-1"},
+            }
+        )
+        # Announce the dynamic child at runtime — name matches grafted child.
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t-dyn", "name": "Dynamic A"},
+                "play": {"id": "play-1"},
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+        task_lines = [ln for ln in lines if ln.kind == "task" and "Dynamic A" in ln.label]
+        assert len(task_lines) == 1, (
+            f"Dynamic A should appear exactly once, got {len(task_lines)} lines: {task_lines}"
+        )

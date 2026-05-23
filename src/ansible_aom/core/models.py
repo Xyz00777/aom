@@ -178,6 +178,46 @@ def count_leaf_tasks(plays: list["PlayDefinition"]) -> int:
 
 
 @dataclass
+class IncludeCacheEntry:
+    """Cached parsing result for an ``include_tasks`` file.
+
+    ``--list-tasks`` does not expand ``include_tasks`` (only
+    ``import_tasks``), so dynamic includes are discovered at runtime via
+    the ``task.path`` field in JSONL events. This cache avoids re-parsing
+    the same file each time it is included.
+    """
+
+    path: str
+    task_names: list[str]
+    role: str | None
+    parsed_at: datetime
+
+    @property
+    def task_count(self) -> int:
+        """Pre-computed count for O(1) access in counter hot paths."""
+        return len(self.task_names)
+
+
+@dataclass
+class RoleCacheEntry:
+    """Cached task list for a role discovered at runtime.
+
+    When a role is applied dynamically (e.g. via ``include_role``), its
+    tasks are not known from preflight ``--list-tasks``. This entry
+    records the tasks observed at runtime so they can be re-used if the
+    same role is included again.
+    """
+
+    role_name: str
+    task_names: list[str]
+
+    @property
+    def task_count(self) -> int:
+        """Pre-computed count for O(1) access in counter hot paths."""
+        return len(self.task_names)
+
+
+@dataclass
 class RunState:
     """Complete execution state (State class)."""
 
@@ -206,6 +246,10 @@ class RunState:
     _play_def_by_name: dict[str, PlayDefinition] | None = field(
         default=None, init=False, repr=False
     )
+    _include_cache: dict[str, "IncludeCacheEntry"] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    _role_cache: dict[str, "RoleCacheEntry"] = field(default_factory=dict, init=False, repr=False)
 
     def __setattr__(self, name: str, value: Any) -> None:
         super().__setattr__(name, value)

@@ -1340,3 +1340,95 @@ preflight (include_role tasks). `_task_role` extracts role from
 `"role : task"` prefix when the role name is in `_known_roles` (built
 from both preflight definitions and runtime task names). This makes
 dynamic roles like `podman` show correct "(N tasks)" counts.
+
+## 2026-05-23 — Tree rendering fix pass (branch: feat/nom-compact-renderer)
+
+Four tree rendering bugs found in interactive multi-play smoke testing.
+All four interact: a play's host leaves vanish when the next play starts,
+stale `□ pending` tasks from a completed play linger in the tree, the
+elapsed timer for fallback host leaves is stuck at `0s`, and hosts like
+`localhost` show up in playbooks they were never targeted by.
+
+### 1. Host leaves missing during execution (tree budget starvation)
+
+On a 24-row terminal with 17 hosts, the tree panel needed 20+ lines
+(one per host leaf + task header + role header) but the budget formula
+gave it only 17. Host leaves were truncated from the bottom.
+
+**Fix**: Raised `_compute_tree_budget` cap from 40 to 60
+(`src/ansible_aom/compact/format.py:320`). Formula is now
+`max(8, min(60, rows // 2 + active_hosts // 3))`. The 40 cap was
+arbitrary — 60 covers up to ~35 host leaves on a standard 24-row
+terminal without excessive budget waste.
+
+### 2. Stale `□ pending` tasks from completed plays
+
+When play 1 completed and play 2 started running, `_play_running_and_pending`
+in `_emit_runtime_play` only searched the *current* play's runtime tasks.
+If play 1 had handler tasks (like `meta: flush_handlers`) whose
+`runtime.tasks` lived under play 1's UUID, they showed as `□ pending`
+forever because the search never crossed play boundaries.
+
+**Fix**: Extended the running/pending scan to search across *all* plays.
+Also added cross-play completion marking: when a handler task in a
+different play UUID is found running, the linear-completion loop in
+`PlayRunState._mark_completed()` now iterates `self.plays.values()` not
+just the current play's tasks.
+
+Completed plays are skipped from tree rendering when another play has
+running items — a play with zero running items and another play actively
+running gets pruned. This uses running-item detection rather than
+terminal state: handler plays with no local tasks but running items in
+other plays stay visible.
+
+### 3. Elapsed time stuck at 0s for fallback host leaves
+
+When `runtime.hosts` was empty (first task in a new play, or a handler
+with no per-host events yet), the fallback path created host leaves with
+`Status.RUNNING` and `elapsed_s=0.0`. The elapsed counter never advanced
+from zero.
+
+**Fix**: Compute elapsed from the task's `runtime.start_time` instead of
+hardcoding 0. When `runtime.start_time` is None (pre-start) it still
+falls back to 0, which is correct — the task hasn't started yet.
+
+### 4. All hosts appearing in every play (hostname fallback scope)
+
+The fallback function `_all_known_hostnames` collected hostnames from
+every task in every play. On a multi-play playbook where play 1 targets
+`[web1, web2, web3]` and play 2 targets `[db1]`, play 2 would show
+leaves for `web1`, `web2`, and `web3` (and `localhost` from test
+playbooks) because the fallback had no play scoping.
+
+**Fix**: Replaced `_all_known_hostnames` with `_play_target_hostnames`
+that takes a `PlayDefinition` parameter and uses `play_def.resolved_hosts`
+from preflight when available. When preflight data is absent, it falls
+back to hostnames from the play's own runtime tasks only. The call site
+in `_emit_runtime_play` already has both `play` (PlayRunState) and
+`play_def` (PlayDefinition) in scope, so no plumbing changes needed.
+
+### Test impact
+
+Suite: 2189 passed, 1 known-failure, 1 deselected. The known failure
+(`test_render_includes_stderr_tail_on_failure`) is a pre-existing
+integration test that depends on ansible-core being installed.
+
+### Commits (unpushed — git.eisen5.eu:2222 unreachable)
+
+```
+9d9e2e7 feat(tree): show host leaves during execution, higher budget cap
+a2c79e2 fix(tree): cross-play runtime_by_name + completed-play skip
+c722bcd fix(tree): cross-play linear completion, remove runtime.tasks guard
+00db4bb fix(core): skip completed plays, use _all_known_hostnames fallback
+63051d5 fix(tree): filter stale task items (□ pending) from completed plays
+f932bee fix(tree): scope hostname fallback to play targets, fix elapsed time
+72eba82 fix(core): scope hostname fallback to play targets, fix elapsed time
+```
+
+### Still open
+
+- Push blocked: remote `git.eisen5.eu:2222` connection refused
+- Fallback host leaves still default to `Status.RUNNING` — when a task
+  finishes but `runtime.hosts` is empty, the fallback shows spinners
+  instead of the final status. Root cause: ansible doesn't emit
+  `v2_runner_on_ok` for implicit tasks like `meta: flush_handlers`.

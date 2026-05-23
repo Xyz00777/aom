@@ -97,3 +97,32 @@ Tree host leaves under a running task only showed hosts with `Status.RUNNING`. T
 Under linear strategy, `task.status` only transitioned to COMPLETED at `v2_playbook_on_stats`. Previous tasks showed as "running" long after they finished.
 
 **Fix**: In `_handle_v2_playbook_on_task_start`, when a new task starts under linear strategy, mark all other RUNNING tasks in the same play as COMPLETED (either all hosts terminal, or empty hosts meaning no runner events arrived). The `_classify` method respects `Status.COMPLETED` as an early exit returning "completed" so the tree prunes them immediately.
+
+### Hostname fallback showed all hosts from all plays (resolved 2026-05)
+
+The tree fallback `_all_known_hostnames` collected hostnames from every
+task across every play when `runtime.hosts` was empty. On multi-play
+playbooks, play 2 would show host leaves from play 1 (plus `localhost`
+from test playbooks).
+
+**Fix**: Replaced with `_play_target_hostnames(play, play_def)` that uses
+`play_def.resolved_hosts` (preflight targets) when available, falling
+back to the play's own runtime task hostnames. Call site already had both
+`play` (PlayRunState) and `play_def` (PlayDefinition) in scope.
+
+### Elapsed time stuck at 0s for fallback host leaves (resolved 2026-05)
+
+Fallback host leaves (when `runtime.hosts` is empty) hardcoded
+`elapsed_s=0.0` with `Status.RUNNING`. The elapsed counter never
+advanced from zero, even for tasks that had been running for minutes.
+
+**Fix**: Compute elapsed from `runtime.start_time` instead of hardcoding
+0. When `start_time` is None (task hasn't started yet), 0 is correct.
+
+### Dynamic children not shown as pending in tree (resolved 2026-05-23)
+
+Grafted `include_tasks` children (in `TaskDefinition.children`) appeared only in role task counts, not as visual □ pending entries in the tree. Users couldn't see what dynamic tasks were coming.
+
+**Fix**: Added a new loop in `_play_running_and_pending` after the runtime-only tasks loop. Iterates `play_def.tasks` for entries with `.children`, emitting each child as either "running" (if announced at runtime with a matching `TaskRunState`) or "pending" (if not yet seen). Completed children are filtered. Duplicates prevented via `emitted_names` — the runtime-only loop now also adds to `emitted_names` so dynamic children already picked up there don't re-appear.
+
+**Tests added**: TC-320 (pending before announcement), TC-321 (running status), TC-322 (completed filtered), TC-323 (under role header), TC-324 (host leaves), + duplicate-prevention test.
