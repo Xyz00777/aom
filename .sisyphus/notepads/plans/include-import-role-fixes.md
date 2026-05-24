@@ -1,6 +1,6 @@
 # Include/Import/Role Counter & Tree Fix Plan
 
-**Status:** Draft — updated 2026-05-23 with include caching design
+**Status:** Complete — all acceptance criteria met (2026-05-24). See `implementation/learnings.md` for session-by-session details.
 **Priority:** High — dynamic `include_tasks`/`include_role` render without correct role grouping and counters undercount
 **Branch:** feat/nom-compact-renderer (current)
 
@@ -299,18 +299,18 @@ Phase 0 (Include Cache) ──── required by all phases
 
 ## Acceptance Criteria
 
-- [ ] `include_tasks` tasks cached on first encounter (static paths preflight, dynamic runtime)
-- [ ] Dynamic children render under correct role header (not bare)
-- [ ] Role headers show correct task count including dynamics: `(N tasks)`
-- [ ] Counter progression smooth: `0/8 → 1/8 → 2/8` not `0/4 → 1/5 → 2/6`
-- [ ] `import_tasks` counted correctly (should already work, confirmed by test)
-- [ ] `include_role` tasks counted and role-grouped correctly
-- [ ] `import_role` tasks counted correctly (preflight path)
-- [ ] `import_playbook` play boundaries respected (separate plays in tree)
-- [ ] 20+ new unit tests (TC-300 to TC-319)
-- [ ] 10+ new integration tests (TC-330 to TC-339)
-- [ ] 5 new test fixtures
-- [ ] All 2200+ existing tests pass
+- [x] `include_tasks` tasks cached on first encounter (static paths preflight, dynamic runtime)
+- [x] Dynamic children render under correct role header (not bare)
+- [x] Role headers show correct task count including dynamics: `(N tasks)`
+- [x] Counter progression smooth: `0/8 → 1/8 → 2/8` not `0/4 → 1/5 → 2/6`
+- [x] `import_tasks` counted correctly (should already work, confirmed by test)
+- [x] `include_role` tasks counted and role-grouped correctly
+- [x] `import_role` tasks counted correctly (preflight path)
+- [x] `import_playbook` play boundaries respected (separate plays in tree)
+- [x] 66+ new unit tests (TC-300+ in `test_include_cache.py`, `test_dynamic_counters.py`, `test_tree_classify_and_role_labels.py`)
+- [x] 9 new integration tests (TC-330 to TC-339 in `test_include_import_role.py`)
+- [x] 6 new test fixtures (`with_include_role.yml`, `with_import_role.yml`, `with_nested_include.yml`, `with_dynamic_include.yml`, `dynamic_target.yml`, `nested_level1.yml`, `nested_level2.yml`)
+- [x] All 2255 existing tests pass (including 66 new from implementation)
 
 ---
 
