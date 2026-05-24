@@ -1,3 +1,5 @@
+# pyright: reportMissingImports=false
+
 """Record → replay determinism.
 
 For a session recorded from a live run, replaying via
@@ -22,6 +24,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -29,9 +32,12 @@ import pytest
 
 from ansible_aom.ansible.preflight import PreParseResult
 from ansible_aom.ansible.runner import run_playbook
+from ansible_aom.core.models import RunState
+from ansible_aom.core.tree import TreeProjection
 from ansible_aom.compact.renderer import CompactRenderer
 from ansible_aom.drivers.replay import replay_session
 from ansible_aom.formats.json import JsonRenderer
+from tests.fixtures.sessions.conftest import load_session_dict
 from tests._utils import normalize_json_summary, normalize_render_output
 
 
@@ -188,6 +194,25 @@ EVENT_STREAMS: tuple[tuple[str, list[dict], int], ...] = (
 EVENT_IDS = [s[0] for s in EVENT_STREAMS]
 
 
+def _event_timestamp(event: dict) -> datetime:
+    return datetime.fromisoformat(event["_timestamp"].replace("Z", "+00:00"))
+
+
+def _tree_frame_signatures(
+    session: dict,
+) -> list[tuple[tuple[str, int, str], ...]]:
+    state = RunState(playbook=session["playbook"])
+    frames: list[tuple[tuple[str, int, str], ...]] = []
+
+    for event in session["events"]:
+        state.handle_event(event)
+        projection = TreeProjection.from_run_state(state)
+        lines = projection.tree_lines(budget=999, now=_event_timestamp(event))
+        frames.append(tuple((line.kind, line.depth, line.label) for line in lines))
+
+    return frames
+
+
 def _fake_ansible_command(events: list[dict], exit_code: int = 0) -> tuple[str, list[str]]:
     """Build a (cmd, args) pair that emits ``events`` as JSONL then exits."""
     payload = json.dumps(events)
@@ -320,3 +345,19 @@ def test_json_record_then_replay_matches(
     assert live_norm == replay_norm, (
         f"JSON live vs replay mismatch for {name}:\n  live:   {live_norm}\n  replay: {replay_norm}"
     )
+
+
+def test_tree_frame_signatures_are_deterministic_and_stable() -> None:
+    """Recorded replay frames should be reproducible and keep row order stable."""
+    session = load_session_dict("019e4600-0000-7000-8000-000000000006")
+
+    first = _tree_frame_signatures(session)
+    second = _tree_frame_signatures(session)
+
+    assert first == second
+    assert len(first) == len(session["events"])
+
+    non_empty_frames = [frame for frame in first if frame]
+    for prev, curr in zip(non_empty_frames, non_empty_frames[1:]):
+        shared = [line for line in prev if line in curr]
+        assert shared == [line for line in curr if line in prev]
