@@ -15,6 +15,7 @@ from ansible_aom.core.models import (
     TaskDefinition,
 )
 from ansible_aom.core.tree import HostRow, TreeLine, TreeProjection
+from typing import cast
 
 
 def _state_with_running_task(
@@ -469,13 +470,241 @@ class TestTreeLinesRolesAndFanOut:
         current_task: str | None = None
         for ln in lines:
             if ln.kind == "task":
-                current_task = ln.label.split("  ")[0]
-                host_under_task[current_task] = []
+                task_label = cast(str, ln.label.split("  ")[0])
+                current_task = task_label
+                host_under_task[task_label] = []
             elif ln.kind == "host" and current_task is not None:
                 host_under_task[current_task].append(ln.label)
 
         assert host_under_task["Install nginx"] == ["web1"]
         assert host_under_task["Configure firewall"] == ["web2"]
+
+
+class TestTreeLinesPlayIdentity:
+    def _duplicate_name_state(self) -> RunState:
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy",
+                hosts="all",
+                resolved_hosts=[],
+                tasks=[
+                    TaskDefinition(
+                        name="Install nginx",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    )
+                ],
+            ),
+            PlayDefinition(
+                id="p2",
+                name="Deploy",
+                hosts="all",
+                resolved_hosts=[],
+                tasks=[
+                    TaskDefinition(
+                        name="Configure firewall",
+                        role=None,
+                        tags=[],
+                        play_id="p2",
+                        play_order=1,
+                        task_order=0,
+                    )
+                ],
+            ),
+        ]
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:03Z",
+                "play": {"id": "p2", "name": "Deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:04Z",
+                "task": {"id": "t2", "name": "Configure firewall"},
+                "host": "db1",
+            }
+        )
+        return state
+
+    def test_duplicate_play_names_keep_both_executions_visible(self):
+        state = self._duplicate_name_state()
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=20)
+
+        # This is an identity bug, not a cosmetic one: same display name
+        # is intentional here, and the projection must still preserve both
+        # play executions instead of joining them by name and dropping the
+        # second play's surface.
+        play_labels = [ln.label for ln in lines if ln.kind == "play"]
+        task_labels = [ln.label.split("  ")[0] for ln in lines if ln.kind == "task"]
+
+        assert play_labels == ["play: Deploy", "play: Deploy"]
+        assert task_labels == ["Install nginx", "Configure firewall"]
+
+
+class TestTreeLinesTaskIdentity:
+    def _same_name_concurrent_tasks_state(self) -> RunState:
+        state = RunState(playbook="site.yml")
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:03Z",
+                "task": {"id": "t2", "name": "Install nginx"},
+                "host": "web2",
+            }
+        )
+        return state
+
+    def test_same_name_concurrent_tasks_stay_separate(self):
+        state = self._same_name_concurrent_tasks_state()
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=20)
+
+        # This is a task-execution identity bug, not a rendering cosmetic
+        # issue: two live executions can share the same display name, and
+        # the projection must still preserve them as distinct task rows.
+        task_groups: list[tuple[str, list[str]]] = []
+        current_hosts: list[str] | None = None
+        for ln in lines:
+            if ln.kind == "task":
+                current_hosts = []
+                task_groups.append((ln.label.split("  ")[0], current_hosts))
+            elif ln.kind == "host" and current_hosts is not None:
+                current_hosts.append(ln.label)
+
+        assert [task for task, _ in task_groups] == ["Install nginx", "Install nginx"]
+        assert [hosts for _, hosts in task_groups] == [["web1"], ["web2"]]
+
+
+class TestTreeLinesPreflightTaskIdentity:
+    def _same_name_preflight_tasks_state(self) -> RunState:
+        state = RunState(playbook="site.yml")
+        # Same display name on purpose: this is a task-identity regression,
+        # not a renderer cosmetic issue. Preflight definitions and runtime
+        # events must still project as two distinct executions.
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy",
+                hosts="all",
+                resolved_hosts=[],
+                tasks=[
+                    TaskDefinition(
+                        name="Install nginx",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                        uuid="task-def-1",
+                        path="site.yml:10",
+                    ),
+                    TaskDefinition(
+                        name="Install nginx",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=1,
+                        uuid="task-def-2",
+                        path="site.yml:20",
+                    ),
+                ],
+            )
+        ]
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:03Z",
+                "task": {"id": "t2", "name": "Install nginx"},
+                "host": "web2",
+            }
+        )
+        return state
+
+    def test_same_name_preflight_tasks_keep_both_executions_visible(self):
+        state = self._same_name_preflight_tasks_state()
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=20)
+
+        # This is a task-execution identity bug, not a renderer cosmetic
+        # issue: the two preflight task definitions intentionally share a
+        # display name, but the projection must still keep the two runtime
+        # executions separate by task id/host activity.
+        task_labels = [ln.label.split("  ")[0] for ln in lines if ln.kind == "task"]
+        host_groups: list[list[str]] = []
+        current_hosts: list[str] | None = None
+        for ln in lines:
+            if ln.kind == "task":
+                current_hosts = []
+                host_groups.append(current_hosts)
+            elif ln.kind == "host" and current_hosts is not None:
+                current_hosts.append(ln.label)
+
+        assert task_labels == ["Install nginx", "Install nginx"]
+        assert host_groups == [["web1"], ["web2"]]
 
 
 class TestTreeLinesPruning:

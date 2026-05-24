@@ -14,6 +14,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+import re
 from typing import Literal
 
 from ansible_aom.core.models import (
@@ -30,7 +31,7 @@ from ansible_aom.core.models import (
 
 TreeKind = Literal["playbook", "play", "role", "task", "host"]
 
-_TEMPLATE_RE = __import__("re").compile(r"\{\{.*?\}\}")
+_TEMPLATE_RE = re.compile(r"\{\{.*?\}\}")
 
 
 def _template_skeleton(name: str) -> str:
@@ -43,7 +44,7 @@ def _template_skeleton(name: str) -> str:
     that are guaranteed identical between preflight and runtime.
     Multiple whitespace runs are collapsed so that ``"user  exists"``
     (from stripping ``{{ username }}``) becomes ``"user exists"``."""
-    return __import__("re").sub(r"\s+", " ", _TEMPLATE_RE.sub("", name)).strip()
+    return _TEMPLATE_RE.sub("", name).strip()
 
 
 def _is_template_match(preflight_name: str, runtime_name: str) -> bool:
@@ -393,19 +394,35 @@ class TreeProjection:
         # plays render their entire task list as pending. Any runtime
         # play whose name isn't in preflight (defensive: unusual but
         # possible) gets appended at the end.
-        runtime_by_name: dict[str, PlayRunState] = {}
+        runtime_by_id: dict[str, PlayRunState] = {}
+        runtime_by_name: dict[str, list[PlayRunState]] = defaultdict(list)
         for runtime_play in self._state.plays.values():
-            runtime_by_name.setdefault(runtime_play.name, runtime_play)
-        seen_runtime_names: set[str] = set()
+            if runtime_play.play_id:
+                runtime_by_id.setdefault(runtime_play.play_id, runtime_play)
+            runtime_by_name[runtime_play.name].append(runtime_play)
+        seen_runtime_ids: set[str] = set()
+        seen_runtime_objects: set[int] = set()
 
         ordered_plays: list[tuple[PlayRunState | None, "PlayDefinition | None"]] = []
-        for play_def in self._state.definitions:
-            runtime = runtime_by_name.get(play_def.name)
+        for preflight_play_def in self._state.definitions:
+            runtime = None
+            if preflight_play_def.id:
+                runtime = runtime_by_id.get(preflight_play_def.id)
+                if runtime is not None:
+                    seen_runtime_ids.add(preflight_play_def.id)
+            if runtime is None:
+                for candidate in runtime_by_name.get(preflight_play_def.name, []):
+                    if id(candidate) in seen_runtime_objects:
+                        continue
+                    runtime = candidate
+                    break
             if runtime is not None:
-                seen_runtime_names.add(play_def.name)
-            ordered_plays.append((runtime, play_def))
+                seen_runtime_objects.add(id(runtime))
+            ordered_plays.append((runtime, preflight_play_def))
         for runtime_play in self._state.plays.values():
-            if runtime_play.name in seen_runtime_names:
+            if runtime_play.play_id and runtime_play.play_id in seen_runtime_ids:
+                continue
+            if id(runtime_play) in seen_runtime_objects:
                 continue
             ordered_plays.append((runtime_play, None))
 
@@ -691,12 +708,12 @@ class TreeProjection:
         with any runtime-only tasks (dynamic ``include_tasks``) appended
         in runtime-arrival order.
         """
-        runtime_by_name: dict[str, TaskRunState] = {}
+        runtime_by_name: dict[str, list[TaskRunState]] = defaultdict(list)
         for task in play.tasks.values():
-            runtime_by_name[task.name] = task
+            runtime_by_name[task.name].append(task)
             stripped = strip_role_prefix(task.name)
             if stripped != task.name:
-                runtime_by_name[stripped] = task
+                runtime_by_name[stripped].append(task)
         if include_cross_play:
             for p in self._state.plays.values():
                 if p.play_id == play.play_id:
@@ -706,15 +723,19 @@ class TreeProjection:
                         hs.status == Status.RUNNING for hs in task.hosts.values()
                     ):
                         continue  # skip completed/stale cross-play tasks
-                    runtime_by_name.setdefault(task.name, task)
+                    runtime_by_name[task.name].append(task)
                     stripped = strip_role_prefix(task.name)
                     if stripped != task.name:
-                        runtime_by_name.setdefault(stripped, task)
+                        runtime_by_name[stripped].append(task)
 
         play_def = self._play_def_for(play)
 
         items: list[tuple[str, str, str | None, TaskRunState | None]] = []
         emitted_names: set[str] = set()
+        emitted_task_ids: set[str] = set()
+
+        def _task_identity(task: TaskRunState) -> str:
+            return task.task_id or task.name
 
         def _classify(runtime: TaskRunState | None) -> str:
             """Return ``"running"`` / ``"pending"`` / ``"completed"``.
@@ -739,8 +760,20 @@ class TreeProjection:
                 return "running"
             return "completed"
 
+        def _pick_runtime(
+            task_name: str,
+            matched_runtime_task_ids: set[str],
+        ) -> TaskRunState | None:
+            for candidate in runtime_by_name.get(task_name, []):
+                candidate_id = _task_identity(candidate)
+                if candidate_id in matched_runtime_task_ids:
+                    continue
+                matched_runtime_task_ids.add(candidate_id)
+                return candidate
+            return None
+
         if play_def is not None:
-            matched_runtime_tasks: set[str] = set()
+            matched_runtime_task_ids: set[str] = set()
             for entry in play_def.tasks:
                 if isinstance(entry, RoleGroupDefinition):
                     role: str | None = entry.role
@@ -749,36 +782,27 @@ class TreeProjection:
                     role = entry.role
                     task_defs = [entry]
                 for tdef in task_defs:
-                    runtime = runtime_by_name.get(tdef.name)
+                    runtime = _pick_runtime(tdef.name, matched_runtime_task_ids)
                     if runtime is None and "{{" in tdef.name:
                         # Preflight name has unresolved Jinja2 template —
                         # try to find a runtime task whose resolved name
                         # matches the template skeleton.
-                        for rt_name, rt in runtime_by_name.items():
-                            if rt_name in matched_runtime_tasks:
+                        for rt_name in runtime_by_name:
+                            stripped_rt = strip_role_prefix(rt_name)
+                            if not _is_template_match(tdef.name, rt_name) and not _is_template_match(
+                                tdef.name, stripped_rt
+                            ):
                                 continue
-                            if _is_template_match(tdef.name, rt_name):
-                                runtime = rt
-                                matched_runtime_tasks.add(rt_name)
+                            runtime = _pick_runtime(rt_name, matched_runtime_task_ids)
+                            if runtime is not None:
                                 break
-                        if runtime is not None:
-                            # Also try with role prefix stripped
-                            for rt_name, rt in runtime_by_name.items():
-                                if rt_name in matched_runtime_tasks:
-                                    continue
-                                stripped_rt = strip_role_prefix(rt_name)
-                                if stripped_rt != rt_name and _is_template_match(
-                                    tdef.name, stripped_rt
-                                ):
-                                    runtime = rt
-                                    matched_runtime_tasks.add(rt_name)
-                                    break
                     kind = _classify(runtime)
                     emitted_names.add(tdef.name)
                     if runtime is not None:
                         # Emit under the runtime (resolved) name so host
                         # leaves and status are correct.
                         emitted_names.add(runtime.name)
+                        emitted_task_ids.add(_task_identity(runtime))
                         stripped = strip_role_prefix(runtime.name)
                         if stripped != runtime.name:
                             emitted_names.add(stripped)
@@ -788,13 +812,15 @@ class TreeProjection:
 
         # Runtime-only tasks (dynamic include_tasks, or no preflight at all).
         for task in play.tasks.values():
-            if task.name in emitted_names or strip_role_prefix(task.name) in emitted_names:
+            task_identity = _task_identity(task)
+            if task_identity in emitted_task_ids:
                 continue
             kind = _classify(task)
             if kind == "completed":
                 continue
             items.append((kind, task.name, self._task_role(task.name), task))
             emitted_names.add(task.name)
+            emitted_task_ids.add(task_identity)
             stripped = strip_role_prefix(task.name)
             if stripped != task.name:
                 emitted_names.add(stripped)
@@ -811,12 +837,17 @@ class TreeProjection:
                             or strip_role_prefix(child.name) in emitted_names
                         ):
                             continue
-                        runtime = runtime_by_name.get(child.name)
+                        runtime = _pick_runtime(child.name, emitted_task_ids)
                         if runtime is None and "{{" in child.name:
                             # Try template match for dynamic child names with Jinja2
-                            for rt_name, rt in runtime_by_name.items():
-                                if _is_template_match(child.name, rt_name):
-                                    runtime = rt
+                            for rt_name in runtime_by_name:
+                                stripped_rt = strip_role_prefix(rt_name)
+                                if not _is_template_match(child.name, rt_name) and not _is_template_match(
+                                    child.name, stripped_rt
+                                ):
+                                    continue
+                                runtime = _pick_runtime(rt_name, emitted_task_ids)
+                                if runtime is not None:
                                     break
                         kind = _classify(runtime)
                         if kind == "completed":
@@ -830,20 +861,27 @@ class TreeProjection:
                             child_role = role
                         items.append((kind, child.name, child_role, runtime))
                         emitted_names.add(child.name)
+                        if runtime is not None:
+                            emitted_task_ids.add(_task_identity(runtime))
 
         return items
 
     def _play_def_for(self, play: "PlayRunState") -> "PlayDefinition | None":
         """Return the matching preflight PlayDefinition, or None.
 
-        Preflight defs key by play number; runtime plays key by UUID, so
-        the only viable join is by name. ``RunState`` already maintains
-        ``_play_def_by_name`` for the runner — reuse it here.
+        Prefer stable play execution identity (play_id) when available.
+        Fall back to display-name matching only for legacy/partial event
+        streams that lack a stable id.
         """
-        index = self._state._play_def_by_name
-        if index is None:
+        by_id = self._state._play_def_by_id
+        if by_id is not None and play.play_id:
+            match = by_id.get(play.play_id)
+            if match is not None:
+                return match
+        by_name = self._state._play_def_by_name
+        if by_name is None:
             return None
-        return index.get(play.name)
+        return by_name.get(play.name)
 
     def _task_role(self, task_name: str) -> str | None:
         """Return the role name a task belongs to, or None.

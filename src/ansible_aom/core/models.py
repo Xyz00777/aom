@@ -243,6 +243,9 @@ class RunState:
     _task_def_index: dict[str, "TaskDefinition"] | None = field(
         default=None, init=False, repr=False
     )
+    _play_def_by_id: dict[str, PlayDefinition] | None = field(
+        default=None, init=False, repr=False
+    )
     _play_def_by_name: dict[str, PlayDefinition] | None = field(
         default=None, init=False, repr=False
     )
@@ -259,7 +262,7 @@ class RunState:
             self._rebuild_definition_indexes()
 
     def _rebuild_definition_indexes(self) -> None:
-        """(Re)populate ``_task_def_index`` and ``_play_def_by_name``.
+        """(Re)populate the definition lookup indexes.
 
         Called whenever ``definitions`` is reassigned. Empty definitions
         produce empty dicts (not ``None``) so the lookup paths never need
@@ -272,10 +275,14 @@ class RunState:
             task_index.setdefault(leaf.name, leaf)
         super().__setattr__("_task_def_index", task_index)
 
-        play_index: dict[str, PlayDefinition] = {}
+        play_index_by_id: dict[str, PlayDefinition] = {}
+        play_index_by_name: dict[str, PlayDefinition] = {}
         for play_def in self.definitions:
-            play_index.setdefault(play_def.name.strip(), play_def)
-        super().__setattr__("_play_def_by_name", play_index)
+            if play_def.id:
+                play_index_by_id.setdefault(play_def.id, play_def)
+            play_index_by_name.setdefault(play_def.name.strip(), play_def)
+        super().__setattr__("_play_def_by_id", play_index_by_id)
+        super().__setattr__("_play_def_by_name", play_index_by_name)
 
     def handle_event(self, event: dict[str, Any]) -> None:
         """Process a JSONL event and update state."""
