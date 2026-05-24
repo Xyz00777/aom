@@ -21,11 +21,10 @@ from ansible_aom.core.models import (
     HostRunState,
     PlayDefinition,
     PlayRunState,
-    RoleGroupDefinition,
     RunState,
     Status,
-    TaskDefinition,
     TaskRunState,
+    iter_preflight_task_defs,
     strip_role_prefix,
 )
 
@@ -140,6 +139,21 @@ def _effective_status(hs: HostRunState) -> Status:
     return Status.CHANGED if hs.status == Status.OK and hs.changed else hs.status
 
 
+def _runtime_role_from_task_name(task_name: str) -> str | None:
+    """Infer an include_role-style runtime role from a task name.
+
+    Accepts simple ``role : task`` prefixes where the role token has no
+    whitespace. This intentionally rejects literal task names like
+    ``Install foo : bar``.
+    """
+    if " : " not in task_name:
+        return None
+    prefix = task_name.split(" : ", 1)[0].strip()
+    if not prefix or any(ch.isspace() for ch in prefix):
+        return None
+    return prefix
+
+
 @dataclass
 class TreeProjection:
     """Pure projection of RunState. Build via `from_run_state`."""
@@ -147,6 +161,7 @@ class TreeProjection:
     _state: RunState
     _role_index: dict[str, str] | None = field(default=None, init=False, repr=False)
     _known_roles: set[str] | None = field(default=None, init=False, repr=False)
+    _runtime_role_counts: dict[str, int] | None = field(default=None, init=False, repr=False)
     # Sticky fallback: the play_id of the most recent play with running
     # tasks. Persists between render calls so the tree stays stable during
     # transient gaps (e.g. between linear-strategy tasks).
@@ -493,29 +508,15 @@ class TreeProjection:
                 elapsed_s=None,
             )
         )
+        role_counts: dict[str | None, int] = {}
+        for entry, role in iter_preflight_task_defs(play_def.tasks):
+            role_counts[role] = role_counts.get(role, 0) + 1
         current_role: str | None = None
-        for entry in play_def.tasks:
-            if isinstance(entry, RoleGroupDefinition):
-                role: str | None = entry.role
-                task_defs = entry.tasks
-            else:
-                role = entry.role
-                task_defs = [entry]
+        for tdef, role in iter_preflight_task_defs(play_def.tasks):
             if role != current_role:
                 current_role = role
                 if role is not None:
-                    # For bare TaskDefinition entries with a role, count
-                    # all same-role entries across the play (not just the
-                    # current entry, which would always be 1).
-                    n = (
-                        len(task_defs)
-                        if isinstance(entry, RoleGroupDefinition)
-                        else sum(
-                            1
-                            for e in play_def.tasks
-                            if not isinstance(e, RoleGroupDefinition) and e.role == role
-                        )
-                    )
+                    n = role_counts.get(role, 0)
                     task_count = f" ({n} task{'s' if n != 1 else ''})" if n > 0 else ""
                     lines.append(
                         TreeLine(
@@ -529,17 +530,17 @@ class TreeProjection:
                         )
                     )
             task_depth = 3 if role is not None else 2
-            for tdef in task_defs:
-                lines.append(
-                    TreeLine(
-                        depth=task_depth,
-                        kind="task",
-                        label=tdef.name,
-                        glyph=None,
-                        status=Status.PENDING,
-                        elapsed_s=None,
-                    )
+
+            lines.append(
+                TreeLine(
+                    depth=task_depth,
+                    kind="task",
+                    label=tdef.name,
+                    glyph=None,
+                    status=Status.PENDING,
+                    elapsed_s=None,
                 )
+            )
 
     def _emit_runtime_play(self, lines: list[TreeLine], play: PlayRunState, now: datetime) -> None:
         """Render a play that's already in flight (or was)."""
@@ -573,29 +574,16 @@ class TreeProjection:
         role_total_tasks: dict[str | None, int] = {}
         play_def = self._play_def_for(play)
         if play_def is not None:
-            for entry in play_def.tasks:
-                if isinstance(entry, RoleGroupDefinition):
-                    n = len(entry.tasks)
-                    role_total_tasks[entry.role] = role_total_tasks.get(entry.role, 0) + n
-                elif entry.role is not None:
-                    role_total_tasks[entry.role] = role_total_tasks.get(entry.role, 0) + 1
-                else:
-                    role_total_tasks[None] = role_total_tasks.get(None, 0) + 1
+            for entry, role in iter_preflight_task_defs(play_def.tasks):
+                role_total_tasks[role] = role_total_tasks.get(role, 0) + 1
         # Also count runtime tasks per role that weren't in preflight.
         # include_role tasks appear at runtime but --list-tasks doesn't
         # expand them, so they're missing from play_def.
         emitted_preflight_names: set[str] = set()
         if play_def is not None:
-            for entry in play_def.tasks:
-                if isinstance(entry, RoleGroupDefinition):
-                    for td in entry.tasks:
-                        emitted_preflight_names.add(td.name)
-                else:
-                    emitted_preflight_names.add(entry.name)
-            for entry in play_def.tasks:
-                if isinstance(entry, TaskDefinition) and entry.children:
-                    for child in entry.children:
-                        emitted_preflight_names.add(child.name)
+            for entry, _ in iter_preflight_task_defs(play_def.tasks):
+                emitted_preflight_names.add(entry.name)
+
         for task in play.tasks.values():
             stripped = strip_role_prefix(task.name)
             if task.name in emitted_preflight_names or stripped in emitted_preflight_names:
@@ -611,38 +599,33 @@ class TreeProjection:
                     break
             if is_template_matched:
                 continue
-            task_role = self._task_role(task.name)
+            task_role = _runtime_role_from_task_name(task.name)
             if task_role is not None:
                 role_total_tasks[task_role] = role_total_tasks.get(task_role, 0) + 1
-        # Also count dynamic children (grafted include_tasks) so that
-        # role_total_tasks includes tasks expanded at runtime.
-        if play_def is not None:
-            for entry in play_def.tasks:
-                if isinstance(entry, TaskDefinition) and entry.children:
-                    for child in entry.children:
-                        role = child.role
-                        if role is None and " : " in child.name:
-                            role = child.name.split(" : ", 1)[0].strip()
-                        if role is not None:
-                            role_total_tasks[role] = role_total_tasks.get(role, 0) + 1
-                        else:
-                            role_total_tasks[None] = role_total_tasks.get(None, 0) + 1
         for item_kind, name, role, runtime in play_items:
-            if role != current_role:
-                current_role = role
-                role_open = role is not None
+            effective_role = role if role is not None else (_runtime_role_from_task_name(runtime.name) if runtime is not None else None)
+
+            if effective_role != current_role:
+                current_role = effective_role
+                role_open = effective_role is not None
                 if role_open:
-                    n = role_total_tasks.get(role, 0)
+                    n = role_total_tasks.get(effective_role, 0)
+                    if n == 0:
+                        n = sum(
+                            1
+                            for task in play.tasks.values()
+                            if _runtime_role_from_task_name(task.name) == effective_role
+                        )
                     task_count = f" ({n} task{'s' if n != 1 else ''})" if n > 0 else ""
                     lines.append(
                         TreeLine(
                             depth=2,
                             kind="role",
-                            label=f"role: {role}{task_count}",
+                            label=f"role: {effective_role}{task_count}",
                             glyph=None,
                             status=None,
                             elapsed_s=None,
-                            identity=role,
+                            identity=effective_role,
                         )
                     )
             task_depth = 3 if role_open else 2
@@ -774,41 +757,34 @@ class TreeProjection:
 
         if play_def is not None:
             matched_runtime_task_ids: set[str] = set()
-            for entry in play_def.tasks:
-                if isinstance(entry, RoleGroupDefinition):
-                    role: str | None = entry.role
-                    task_defs = entry.tasks
-                else:
-                    role = entry.role
-                    task_defs = [entry]
-                for tdef in task_defs:
-                    runtime = _pick_runtime(tdef.name, matched_runtime_task_ids)
-                    if runtime is None and "{{" in tdef.name:
-                        # Preflight name has unresolved Jinja2 template —
-                        # try to find a runtime task whose resolved name
-                        # matches the template skeleton.
-                        for rt_name in runtime_by_name:
-                            stripped_rt = strip_role_prefix(rt_name)
-                            if not _is_template_match(tdef.name, rt_name) and not _is_template_match(
-                                tdef.name, stripped_rt
-                            ):
-                                continue
-                            runtime = _pick_runtime(rt_name, matched_runtime_task_ids)
-                            if runtime is not None:
-                                break
-                    kind = _classify(runtime)
-                    emitted_names.add(tdef.name)
-                    if runtime is not None:
-                        # Emit under the runtime (resolved) name so host
-                        # leaves and status are correct.
-                        emitted_names.add(runtime.name)
-                        emitted_task_ids.add(_task_identity(runtime))
-                        stripped = strip_role_prefix(runtime.name)
-                        if stripped != runtime.name:
-                            emitted_names.add(stripped)
-                    if kind == "completed":
-                        continue
-                    items.append((kind, tdef.name, role, runtime))
+            for tdef, role in iter_preflight_task_defs(play_def.tasks):
+                runtime = _pick_runtime(tdef.name, matched_runtime_task_ids)
+                if runtime is None and "{{" in tdef.name:
+                    # Preflight name has unresolved Jinja2 template —
+                    # try to find a runtime task whose resolved name
+                    # matches the template skeleton.
+                    for rt_name in runtime_by_name:
+                        stripped_rt = strip_role_prefix(rt_name)
+                        if not _is_template_match(tdef.name, rt_name) and not _is_template_match(
+                            tdef.name, stripped_rt
+                        ):
+                            continue
+                        runtime = _pick_runtime(rt_name, matched_runtime_task_ids)
+                        if runtime is not None:
+                            break
+                kind = _classify(runtime)
+                emitted_names.add(tdef.name)
+                if runtime is not None:
+                    # Emit under the runtime (resolved) name so host
+                    # leaves and status are correct.
+                    emitted_names.add(runtime.name)
+                    emitted_task_ids.add(_task_identity(runtime))
+                    stripped = strip_role_prefix(runtime.name)
+                    if stripped != runtime.name:
+                        emitted_names.add(stripped)
+                if kind == "completed":
+                    continue
+                items.append((kind, tdef.name, role, runtime))
 
         # Runtime-only tasks (dynamic include_tasks, or no preflight at all).
         for task in play.tasks.values():
@@ -818,51 +794,12 @@ class TreeProjection:
             kind = _classify(task)
             if kind == "completed":
                 continue
-            items.append((kind, task.name, self._task_role(task.name), task))
+            items.append((kind, task.name, _runtime_role_from_task_name(task.name), task))
             emitted_names.add(task.name)
             emitted_task_ids.add(task_identity)
             stripped = strip_role_prefix(task.name)
             if stripped != task.name:
                 emitted_names.add(stripped)
-
-        # Emit dynamic children (grafted include_tasks) — □ pending if not yet
-        # seen at runtime, classified by status if already announced.
-        if play_def is not None:
-            for entry in play_def.tasks:
-                if isinstance(entry, TaskDefinition) and entry.children:
-                    role = self._task_role(entry.children[0].name) if entry.children else None
-                    for child in entry.children:
-                        if (
-                            child.name in emitted_names
-                            or strip_role_prefix(child.name) in emitted_names
-                        ):
-                            continue
-                        runtime = _pick_runtime(child.name, emitted_task_ids)
-                        if runtime is None and "{{" in child.name:
-                            # Try template match for dynamic child names with Jinja2
-                            for rt_name in runtime_by_name:
-                                stripped_rt = strip_role_prefix(rt_name)
-                                if not _is_template_match(child.name, rt_name) and not _is_template_match(
-                                    child.name, stripped_rt
-                                ):
-                                    continue
-                                runtime = _pick_runtime(rt_name, emitted_task_ids)
-                                if runtime is not None:
-                                    break
-                        kind = _classify(runtime)
-                        if kind == "completed":
-                            continue
-                        # Use the child's role (set during grafting) or fall back
-                        # to role prefix in name, then to parent-derived role.
-                        child_role = child.role
-                        if child_role is None and role is None and " : " in child.name:
-                            child_role = child.name.split(" : ", 1)[0].strip()
-                        if child_role is None:
-                            child_role = role
-                        items.append((kind, child.name, child_role, runtime))
-                        emitted_names.add(child.name)
-                        if runtime is not None:
-                            emitted_task_ids.add(_task_identity(runtime))
 
         return items
 
@@ -900,40 +837,20 @@ class TreeProjection:
             idx: dict[str, str] = {}
             known_roles: set[str] = set()
             for play_def in self._state.definitions:
-                for entry in play_def.tasks:
-                    if isinstance(entry, RoleGroupDefinition):
-                        for task_def in entry.tasks:
-                            idx.setdefault(task_def.name, entry.role)
-                        known_roles.add(entry.role)
-                    elif entry.role is not None:
-                        idx.setdefault(entry.name, entry.role)
-                        known_roles.add(entry.role)
-            # Also collect roles from runtime task names (include_role /
-            # dynamic tasks not in preflight). These have "role : task" prefix.
+                for task_def, role in iter_preflight_task_defs(play_def.tasks):
+                    if role is not None:
+                        idx.setdefault(task_def.name, role)
+                        known_roles.add(role)
+            runtime_role_counts: dict[str, int] = defaultdict(int)
             for play in self._state.plays.values():
                 for task in play.tasks.values():
                     if " : " in task.name:
                         runtime_role = task.name.split(" : ", 1)[0].strip()
                         if runtime_role:
-                            known_roles.add(runtime_role)
-            # Index dynamic children (grafted include_tasks). These
-            # live on TaskDefinition.children, not the flat play_def.tasks
-            # list, so the loop above misses them. Dynamic children inherit
-            # the parent role (often None for include_tasks), so fall back
-            # to extracting the role prefix from their name.
-            for play_def in self._state.definitions:
-                for entry in play_def.tasks:
-                    if isinstance(entry, TaskDefinition) and entry.children:
-                        for child in entry.children:
-                            role = child.role
-                            if role is None and " : " in child.name:
-                                role = child.name.split(" : ", 1)[0].strip()
-                            if role is not None:
-                                idx.setdefault(child.name, role)
-                            if role:
-                                known_roles.add(role)
+                            runtime_role_counts[runtime_role] += 1
             self._role_index = idx
             self._known_roles = known_roles
+            self._runtime_role_counts = runtime_role_counts
         result = self._role_index.get(task_name)
         if result is None:
             result = self._role_index.get(strip_role_prefix(task_name))
@@ -946,13 +863,17 @@ class TreeProjection:
         if result is None and " : " in task_name:
             # Runtime "role : task" prefix with no preflight entry —
             # extract role name directly from the prefix (include_role).
-            # Only accept if the role was seen elsewhere in the play (avoids
-            # false positives from task names that happen to contain " : ").
+            # Only accept if the role was seen in preflight or repeated
+            # across runtime tasks (avoids false positives from task names
+            # that happen to contain " : ").
             role_from_prefix = task_name.split(" : ", 1)[0].strip()
+            if not role_from_prefix or any(ch.isspace() for ch in role_from_prefix):
+                return result
+            if self._known_roles is not None and role_from_prefix in self._known_roles:
+                return role_from_prefix
             if (
-                role_from_prefix
-                and self._known_roles is not None
-                and role_from_prefix in self._known_roles
+                self._runtime_role_counts is not None
+                and self._runtime_role_counts.get(role_from_prefix, 0) > 1
             ):
                 return role_from_prefix
         return result

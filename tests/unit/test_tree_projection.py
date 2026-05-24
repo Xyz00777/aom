@@ -1,3 +1,5 @@
+# pyright: reportMissingImports=false
+
 """Pure-data tests for core/tree.TreeProjection.
 
 The projection is a deterministic function of RunState; tests build a
@@ -13,6 +15,7 @@ from ansible_aom.core.models import (
     RunState,
     Status,
     TaskDefinition,
+    count_leaf_tasks,
 )
 from ansible_aom.core.tree import HostRow, TreeLine, TreeProjection
 from typing import cast
@@ -566,6 +569,163 @@ class TestTreeLinesPlayIdentity:
 
         assert play_labels == ["play: Deploy", "play: Deploy"]
         assert task_labels == ["Install nginx", "Configure firewall"]
+
+
+class TestTreeLinesGroupedRoleNestedChildren:
+    def _nested_grouped_role_state(self) -> RunState:
+        state = RunState(playbook="site.yml")
+
+        polling_child = TaskDefinition(
+            name="theforeman.operations.installer : Poll async status",
+            role="theforeman.operations.installer",
+            tags=[],
+            play_id="p2",
+            play_order=1,
+            task_order=-1,
+            is_dynamic=True,
+        )
+        install_parent = TaskDefinition(
+            name="theforeman.operations.installer : Install installer",
+            role="theforeman.operations.installer",
+            tags=[],
+            play_id="p2",
+            play_order=1,
+            task_order=0,
+            children=[polling_child],
+        )
+        configure_task = TaskDefinition(
+            name="theforeman.operations.installer : Configure installer",
+            role="theforeman.operations.installer",
+            tags=[],
+            play_id="p2",
+            play_order=1,
+            task_order=1,
+        )
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Bootstrap",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Prepare hosts",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    )
+                ],
+            ),
+            PlayDefinition(
+                id="p2",
+                name="Deploy Foreman",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[
+                    RoleGroupDefinition(
+                        role="theforeman.operations.installer",
+                        tasks=[install_parent, configure_task],
+                    )
+                ],
+            ),
+        ]
+
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-24T10:00:00Z"}
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-24T10:00:01Z",
+                "play": {"id": "p1", "name": "Bootstrap"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-24T10:00:02Z",
+                "task": {"id": "t1", "name": "Prepare hosts"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-24T10:00:03Z",
+                "task": {"id": "t1", "name": "Prepare hosts"},
+                "hosts": {"web1": {"ok": True, "changed": False}},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-24T10:00:04Z",
+                "play": {"id": "p2", "name": "Deploy Foreman"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-24T10:00:05Z",
+                "task": {"id": "t2", "name": "theforeman.operations.installer : Install installer"},
+                "play": {"id": "p2"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-24T10:00:06Z",
+                "task": {"id": "t2", "name": "theforeman.operations.installer : Install installer"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-24T10:00:07Z",
+                "task": {"id": "t2a", "name": "theforeman.operations.installer : Poll async status"},
+                "play": {"id": "p2"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-24T10:00:08Z",
+                "task": {"id": "t2a", "name": "theforeman.operations.installer : Poll async status"},
+                "host": "web1",
+            }
+        )
+        return state
+
+    def test_grouped_role_children_are_indexed_emitted_and_keep_previous_play_hidden(self):
+        state = self._nested_grouped_role_state()
+
+        assert state._task_def_index is not None
+        assert "theforeman.operations.installer : Poll async status" in state._task_def_index
+        assert count_leaf_tasks(state.definitions) == 4
+
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=30)
+
+        play_labels = [ln.label for ln in lines if ln.kind == "play"]
+        assert play_labels == ["play: Deploy Foreman"]
+
+        role_line = next(ln for ln in lines if ln.kind == "role")
+        assert "(3 tasks)" in role_line.label
+
+        task_lines = [ln for ln in lines if ln.kind == "task"]
+        task_labels = [ln.label.split("  ")[0] for ln in task_lines]
+        assert task_labels[:3] == [
+            "theforeman.operations.installer : Install installer",
+            "theforeman.operations.installer : Poll async status",
+            "theforeman.operations.installer : Configure installer",
+        ]
+
+        poll_line = next(ln for ln in task_lines if "Poll async status" in ln.label)
+        assert poll_line.depth > role_line.depth
+        assert poll_line.status == Status.RUNNING
 
 
 class TestTreeLinesTaskIdentity:

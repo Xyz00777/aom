@@ -12,6 +12,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from collections.abc import Iterator, Sequence
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -89,6 +90,32 @@ class RoleGroupDefinition:
         return f"Role: {self.role} ({len(self.tasks)} tasks)"
 
 
+def _iter_task_def_tree(task_def: TaskDefinition) -> Iterator[TaskDefinition]:
+    """Yield a TaskDefinition and all nested TaskDefinition.children in order."""
+    yield task_def
+    for child in task_def.children:
+        yield from _iter_task_def_tree(child)
+
+
+def iter_preflight_task_defs(
+    entries: Sequence[TaskDefinition | RoleGroupDefinition], inherited_role: str | None = None
+) -> Iterator[tuple[TaskDefinition, str | None]]:
+    """Yield preflight task definitions in display order with effective role context.
+
+    Walks ``RoleGroupDefinition.tasks`` and nested ``TaskDefinition.children`` recursively,
+    preserving the pre-order tree traversal used by indexing and rendering.
+    """
+    for entry in entries:
+        if isinstance(entry, RoleGroupDefinition):
+            yield from iter_preflight_task_defs(entry.tasks, inherited_role=entry.role)
+            continue
+
+        role = entry.role if entry.role is not None else inherited_role
+        yield entry, role
+        if entry.children:
+            yield from iter_preflight_task_defs(entry.children, inherited_role=role)
+
+
 @dataclass
 class PlayDefinition:
     """Static play info from --list-tasks and --list-hosts (Definition class)."""
@@ -151,17 +178,18 @@ def _parse_timestamp(event: dict[str, Any]) -> datetime:
 def _iter_leaf_task_defs(plays: list["PlayDefinition"]) -> "list[TaskDefinition]":
     """Flatten preflight definitions into the leaf TaskDefinitions visible by name.
 
-    ``RoleGroupDefinition`` is unwrapped so its inner tasks are reachable; the
-    grafting logic needs to look up an event task name against every static
-    leaf, regardless of whether role grouping wrapped it for display.
+    ``RoleGroupDefinition`` is unwrapped so its inner tasks are reachable; nested
+    ``TaskDefinition.children`` are also traversed so recursive include/import
+    expansions are visible to the grafting logic.
     """
     leaves: list[TaskDefinition] = []
     for play in plays:
         for entry in play.tasks:
             if isinstance(entry, RoleGroupDefinition):
-                leaves.extend(entry.tasks)
+                for task_def in entry.tasks:
+                    leaves.extend(_iter_task_def_tree(task_def))
             else:
-                leaves.append(entry)
+                leaves.extend(_iter_task_def_tree(entry))
     return leaves
 
 
