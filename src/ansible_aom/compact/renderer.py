@@ -274,9 +274,15 @@ class CompactRenderer:
         # Update RunState with the event
         self._state.handle_event(event)
 
-        # HS-3: any event arrival mutates state — invalidate the cached
-        # projection so the next render rebuilds from the updated tree.
-        self._projection = None
+        event_type = event.get("_event", "")
+        if event_type in (
+            "v2_playbook_on_task_start",
+            "v2_playbook_on_handler_task_start",
+            "v2_runner_on_start",
+        ):
+            # Task/host start events can add new tree nodes or role/name
+            # mappings, so rebuild the cached projection for the next frame.
+            self._projection = None
 
         # HS-2: bump the incremental counters using the freshly-mutated
         # state. Done after ``handle_event`` so the task's hosts dict
