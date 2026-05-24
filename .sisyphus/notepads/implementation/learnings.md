@@ -218,6 +218,16 @@ RichLog's `write()` method accepts `scroll_end` parameter - pass `scroll_end=sel
 - **TC-145** (Terminal pass-through): 11 tests — getpass masking, prompt display, special chars, cursor positioning, non-TTY fallback
 - **TC-146** (TUI modal): 6 tests — suspend() context, prompt suffix, return values, error handling, synchronous nature
 - **TC-147** (Password masking): 5 tests — getpass masking in both modes, Renderer Protocol interface
+
+## 2026-05-24 Tree replay determinism harness
+
+- Added a pure frame-capture helper in `tests/integration/test_replay_determinism.py` that
+  drives `RunState.handle_event()` + `TreeProjection.from_run_state()` + `tree_lines(now=...)`
+  for every JSONL event.
+- Deterministic timestamps came straight from each event's `_timestamp`, so the captured frame
+  signatures stay stable across repeated runs.
+- A shared-prefix assertion across successive frames is a lightweight guard against row churn /
+  reordering without needing full snapshot fixtures.
 - **TC-148** (Timeout default): 9 tests — DEFAULT_PASSWORD_TIMEOUT=60, type checks, timeout constant availability
 
 ## 2026-05-08 nom-style Display Backend Swap (branch: feat/nom-compact-renderer)
@@ -258,6 +268,15 @@ RichLog's `write()` method accepts `scroll_end` parameter - pass `scroll_end=sel
   `live.refresh_per_second`) to assert observable behaviour: non-TTY
   produces no ANSI, `stop()` emits the show-cursor sequence, throttle
   coalesces frames within 250 ms.
+
+## 2026-05-24 Projection lifecycle note
+
+- `CompactRenderer` should keep the cached `TreeProjection` alive across
+  non-structural result events (`runner_on_ok` / failed / skipped /
+  unreachable) so sticky tree state stays anchored between frames.
+- Projection invalidation is still needed for task/host start events
+  (`task_start`, handler task start, `runner_on_start`) because those can
+  introduce new tree nodes and new role-name memo entries.
 - Added one PQ6 test asserting non-TTY `handle_completion` prints the
   final summary as plain text.
 
@@ -289,6 +308,13 @@ RichLog's `write()` method accepts `scroll_end` parameter - pass `scroll_end=sel
 - New `tests/integration/test_runner.py` — 4 tests covering happy path,
   event forwarding, non-zero exit → state="failed", missing executable →
   exit 127 + state="crashed". Tests substitute a fake "ansible-playbook"
+
+## 2026-05-24 Tree play identity caveat
+
+- Tree projection now prefers `play_id` for joining runtime plays to
+  preflight play definitions, with display-name matching only as a
+  fallback for legacy/partial streams. This prevents duplicate visible
+  play names from collapsing into one projection row.
   built from `python -c "..."` that emits canned JSONL — exercises the
   real spawn/expect loop without needing Ansible to be installed.
 - Updated TC-027 in `tests/unit/test_cli.py` — used to patch
@@ -1464,3 +1490,183 @@ f932bee fix(tree): scope hostname fallback to play targets, fix elapsed time
 ### Test Results
 - 2255 tests pass, 1 pre-existing failure (test_render_includes_stderr_tail_on_failure)
 - ruff clean on all modified files
+
+## 2026-05-24 — Cross-Play Leakage, Tree Flicker, Stuck Meta Tasks, Upcoming Plays
+
+Five tree rendering bugs fixed in interactive multi-play smoke testing.
+These followed on from the May 23 fixes — all four interact and required
+careful ordering to avoid regressing each other.
+
+### 1. Cross-play task leakage (◐ zombies)
+
+**Bug**: Completed plays showed `◐` (running) tasks borrowed from later
+plays via `_play_running_and_pending` when the cross-play scan found
+running items in a *different* play. A completed play's tree showed
+`◐` tasks from the currently-running play.
+
+**Root cause**: The cross-play scan in `_play_running_and_pending`
+searched `runtime_by_name` across *all* plays. It didn't filter out
+completed plays' own tasks — it found running tasks in other plays and
+reported them as belonging to the completed play.
+
+**Fix** (`dab145a`): In `_play_running_and_pending`, completed plays now
+only emit their own completed tasks. Running tasks from other plays
+are not attributed to a completed play's tree. This uses a new
+`include_cross_play=False` parameter that only completed plays use;
+active plays still use `True` to show borrowed tasks.
+
+**Key design decision**: The cross-play scan is still needed for active
+plays to show pending/running state from handler tasks in other plays.
+The fix scopes it to only run for non-completed plays.
+
+### 2. Tree flicker between completed and current plays
+
+**Bug**: When one play ended and the next started, the tree panel
+flickered between showing the completed play and the current play on
+alternate frames. This was especially visible during the gap between
+play completion events — `v2_playbook_on_play_start` for play 2 hadn't
+arrived yet, but play 1 was already marked complete.
+
+**Root cause**: The tree play selection logic alternated between
+"the last play with running items" and "the last play in the list"
+when no play had explicitly running items. The decision bounced
+between plays on each render frame.
+
+**Fix** (`f179469`): Introduced `_last_running_play_id` — a sticky
+fallback that remembers the most recently active play. The selection
+tiers are now:
+1. Fresh running play (active play with `any_running == True`)
+2. Previous frame's sticky play (`_last_running_play_id`)
+3. Last play with tasks (cold-start fallback)
+
+This prevents oscillation because tier 2 persists the choice across
+frames until a new play actually starts running.
+
+**Tests**: 4 new test methods in `TestStickyFallback`:
+- `test_sticky_fallback_fresh_running_play` — active play wins
+- `test_sticky_fallback_remembers_previous` — sticky persists
+- `test_sticky_fallback_no_previous` — cold-start fallback
+- `test_sticky_fallback_transitions_to_new` — new play overrides sticky
+
+### 3. Stuck meta tasks under linear strategy (◐ 949s)
+
+**Bug**: Under linear strategy, `meta: reset_connection` tasks showed
+`◐` forever with elapsed time like `0:15:49` (949 seconds = 15 min).
+The task completed almost instantly but never got force-completed
+because it had zero hosts (meta tasks don't run on hosts).
+
+**Root cause**: The linear completion branch in `_handle_v2_playbook_on_task_start`
+had two guard conditions: (a) all hosts terminal OR (b) empty hosts.
+But the empty-hosts branch only ran when `p.play_id == play.play_id` —
+and the outer loop iterated `self.plays.values()` which included
+*other* plays. When meta tasks belonged to play 1 but the outer loop
+was checking play 2, the force-completion was skipped.
+
+**Fix** (`d981444`): Added a third completion branch in the linear
+strategy force-completion loop:
+```python
+elif p.play_id == play.play_id:
+    # Same play — force-complete RUNNING hosts on this new task start
+    for host_state in p.hosts.values():
+        if host_state.status == Status.RUNNING:
+            host_state.status = Status.OK
+```
+This scopes force-completion to the same play, preventing cross-play
+host stealing. Hosts with real terminal events (`FAILED`, `UNREACHABLE`)
+keep their actual status — only `RUNNING` gets force-transitioned.
+
+### 4. Upcoming plays invisible
+
+**Bug**: Plays that hadn't started yet (zero `runtime.tasks`) were
+silently omitted from the tree. On a 3-play playbook, the tree only
+showed play 1 until play 2 started.
+
+**Root cause**: The sticky fallback (`_last_running_play_id`) and the
+skip-completed-plays logic had a joint guard: `and runtime.tasks`.
+When a play had no runtime tasks yet (upcoming play), this guard
+treated it like a completed play and skipped it.
+
+**Fix** (`cd68065`): Changed the skip guard from `runtime.tasks` (empty
+for upcoming plays too) to `is not None` — upcoming plays have no
+runtime tasks yet but should still appear. Only completed plays with
+zero running items and nonzero runtime tasks get skipped. The guard
+now reads: skip if play is not active AND has runtime tasks AND no
+running items in any play.
+
+**Key insight**: The original `runtime.tasks` check was meant to skip
+completed plays that had no tasks (like handler-only plays). But it
+was accidentally too broad — it also skipped upcoming plays.
+
+### 5. Strategy detection corrected
+
+**Bug**: The strategy detection in `_handle_v2_playbook_on_task_start`
+could never detect "free" strategy. The JSONL callback only emits
+`v2_runner_on_start` when `self._is_lockstep` is False (i.e., when
+NOT in linear mode). So whenever this event fires, the strategy is
+NOT linear.
+
+**Fix** (`d981444`): In `_handle_v2_runner_on_start`, added:
+```python
+if self.detected_strategy == "linear":
+    self.detected_strategy = "free"
+```
+This flips the detected strategy from the default ("linear") to
+"free" on the first runner_on_start event.
+
+### Test Impact
+
+- Suite: 2255 passed, 1 known-failure (test_render_includes_stderr_tail_on_failure)
+- +52 new tests across all include/import/role features (incremental since May 23)
+
+### Commits (still unpushed — git.eisen5.eu:2222 unreachable)
+
+```
+dab145a fix(tree): prevent cross-play task leakage in tree rendering
+f179469 fix(tree): implement sticky fallback to prevent tree flicker
+d981444 fix(core): force-complete stuck hosts under linear strategy
+cd68065 fix(tree): don't skip upcoming plays in sticky fallback
+```
+
+### Still open
+
+- Push blocked: remote `git.eisen5.eu:2222` connection refused
+  (11 commits unpushed total — 7 from May 23 + 4 from May 24)
+- Fallback host leaves still default to `Status.RUNNING` — when a task
+  finishes but `runtime.hosts` is empty, the fallback shows spinners
+  instead of the final status. Root cause: ansible doesn't emit
+  `v2_runner_on_ok` for implicit tasks like `meta: flush_handlers`.
+  Partially mitigated: the sticky fallback keeps the last active play
+  visible instead of bouncing to the completed play, so this issue
+  only manifests during brief transition windows.
+
+## 2026-05-24 Tree projection same-name task identity
+
+- `_play_running_and_pending()` now builds per-name runtime candidate lists and
+  consumes unmatched runtime task executions by `task_id` / stable runtime
+  identity instead of reusing the first matching display name.
+- Same-name preflight task definitions now project as distinct visible rows in
+  execution order when their runtime events arrive with different ids.
+- Dynamic child matching uses the same unmatched-candidate selection so a
+  runtime task is not reused for a later child line after it has already been
+  projected once.
+
+## 2026-05-24 Tree projection typecheck cleanup
+
+- The `ordered_plays` loop in `tree.py` needed a variable rename to avoid
+  reusing `play_def` with a broader `PlayDefinition | None` type in the same
+  scope.
+- `mypy src/ansible_aom/core/tree.py` still reports a pre-existing
+  `no-any-return` issue in `src/ansible_aom/core/models.py`, but the local
+  tree-module type error from the identity change is gone.
+
+
+## 2026-05-24 Tree Flicker Regression Harness Search
+
+### Existing reusable patterns
+- `tests/compact/test_tree_projection_lifecycle.py` already proves projection instance continuity across frames with `MagicMock`, `_renderer()`, `_seed_sticky_gap_state()`, and `tree_lines(20)` assertions.
+- `tests/unit/test_tree_projection.py` has pure-data `TreeProjection.from_run_state(...)` coverage plus deterministic repeated-call checks (`bounded == again`) that can be reused for replayed frame assertions.
+- `tests/compact/test_golden_frames.py` and `tests/integration/test_replay_determinism.py` already provide replay / golden scaffolding that can be extended to capture per-frame output, not just final-state output.
+
+### Blind spots
+- Current coverage mostly checks final frames or two-frame sticky cases; no existing test asserts row identity churn across a longer replay sequence.
+- No fixture today captures a hostile frame sequence specifically for tree flicker; likely need a new replay JSONL fixture plus per-event frame snapshots.

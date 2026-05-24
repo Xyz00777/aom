@@ -126,3 +126,64 @@ Grafted `include_tasks` children (in `TaskDefinition.children`) appeared only in
 **Fix**: Added a new loop in `_play_running_and_pending` after the runtime-only tasks loop. Iterates `play_def.tasks` for entries with `.children`, emitting each child as either "running" (if announced at runtime with a matching `TaskRunState`) or "pending" (if not yet seen). Completed children are filtered. Duplicates prevented via `emitted_names` — the runtime-only loop now also adds to `emitted_names` so dynamic children already picked up there don't re-appear.
 
 **Tests added**: TC-320 (pending before announcement), TC-321 (running status), TC-322 (completed filtered), TC-323 (under role header), TC-324 (host leaves), + duplicate-prevention test.
+
+## Cross-Play Task Leakage (resolved 2026-05-24)
+
+Completed plays showed `◐` running tasks from *later* plays because
+`_play_running_and_pending` searched `runtime_by_name` across all plays
+without filtering by play ownership.
+
+**Fix** (`dab145a`): Added `include_cross_play=False` parameter. Completed
+plays use `False` — they only emit their own tasks. Active plays still
+use `True` to show handler tasks from other plays.
+
+**Key files**: `tree.py:_play_running_and_pending` — new `include_cross_play` parameter
+
+## Tree Flicker Between Plays (resolved 2026-05-24)
+
+Between play transitions, the tree alternated between completed and
+current play on alternate frames because the play selection lacked
+temporal persistence.
+
+**Fix** (`f179469`): Introduced `_last_running_play_id` — a sticky
+fallback that persists the most recently running play across frames.
+Selection tiers: (1) fresh running play, (2) previous frame's sticky,
+(3) cold-start fallback.
+
+**Key files**: `tree.py:_select_play_for_tree` — `_last_running_play_id` logic
+
+## Stuck Meta Tasks Under Linear Strategy (resolved 2026-05-24)
+
+`meta: reset_connection` showed `◐` forever (elapsed time >15 minutes)
+because the linear force-completion loop had scope guards that skipped
+meta tasks with zero hosts.
+
+**Fix** (`d981444`): Added third completion branch scoped to same play:
+`elif p.play_id == play.play_id:` force-transitions RUNNING hosts to
+OK. Only RUNNING is force-completed — real terminal events preserved.
+
+**Key files**: `models.py:_handle_v2_playbook_on_task_start` — new
+force-completion branch
+
+## Upcoming Plays Invisible (resolved 2026-05-24)
+
+Plays with zero `runtime.tasks` (not yet started) were silently omitted
+from the tree because the skip guard `and runtime.tasks` treated them
+the same as completed plays.
+
+**Fix** (`cd68065`): Changed guard to `runtime.tasks is not None` instead
+of truthiness. Upcoming plays have empty dicts (truthy `is not None`)
+while completed+empty plays still get skipped.
+
+**Key files**: `tree.py:_select_play_for_tree` — skip guard logic
+
+## Strategy Detection Corrected (resolved 2026-05-24)
+
+Strategy detection never flipped to "free" because `v2_runner_on_start`
+only fires outside lockstep mode — but no code handled this signal.
+
+**Fix**: In `_handle_v2_runner_on_start`, flip `detected_strategy`
+from "linear" to "free" on first occurrence. This is correct because
+the JSONL callback guards `runner_on_start` behind `if self._is_lockstep: return`.
+
+**Key files**: `models.py:_handle_v2_runner_on_start` — strategy flip logic
