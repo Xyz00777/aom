@@ -449,6 +449,17 @@ The `⚠ 1 │ ✱ 1` confirms the warning + deprecation that ansible-core
   logs + final-summary persistence are in. Should look like nom: logs
   scrolling, panel anchored, summary survives at the cursor on exit.
 
+## 2026-05-24 Recursive grouped-role traversal
+
+- `RoleGroupDefinition.tasks` and nested `TaskDefinition.children` now
+  share one recursive preflight walk in `core/models.py` + `core/tree.py`,
+  so `_task_def_index`, role labels, and tree emission stay in the same
+  order for grouped roles with include_role/import_role descendants.
+- The sticky play fallback only stops lingering once the active play's
+  nested running task is visible to the tree; recursive traversal makes
+  that nested async-status row count as the active play instead of a stale
+  previous play.
+
 ## 2026-05-10 Pre-flight `--list-tasks` / `--list-hosts` (same branch)
 
 The major slice that was open after the TTY UX work — runner now does
@@ -1670,3 +1681,18 @@ cd68065 fix(tree): don't skip upcoming plays in sticky fallback
 ### Blind spots
 - Current coverage mostly checks final frames or two-frame sticky cases; no existing test asserts row identity churn across a longer replay sequence.
 - No fixture today captures a hostile frame sequence specifically for tree flicker; likely need a new replay JSONL fixture plus per-event frame snapshots.
+
+## 2026-05-24 Shared recursive preflight traversal
+
+- Added a shared `iter_preflight_task_defs()` helper in `core/models.py` and
+  pointed `core/tree.py` at it so grouped roles and nested children are walked
+  in one pre-order path for role indexing, task counting, and tree emission.
+- `count_leaf_tasks()` still uses the dedicated leaf-tree walk; the shared
+  iterator is for the projection/indexing path, not for counting duplicates.
+
+## 2026-05-24 Runtime role prefix guard
+
+- Runtime tree emission now treats ``role : task`` prefixes as roles only
+  when the prefix has no whitespace, so literal task names like ``Install
+  foo : bar`` stay ungrouped while include_role-style ``podman : ...`` and
+  ``nginx : ...`` tasks still group and count correctly.

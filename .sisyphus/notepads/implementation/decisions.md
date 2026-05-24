@@ -44,3 +44,19 @@ The JSONL callback from `ansible.posix` only emits `v2_runner_on_start`
 when NOT in lockstep mode (`if self._is_lockstep: return`). Therefore
 receiving this event is definitive proof of "free" strategy. Flip
 `detected_strategy` from "linear" to "free" unconditionally.
+
+### Tree traversal: recurse through grouped roles and children
+Tree projection and preflight indexing must walk `RoleGroupDefinition.tasks`
+and nested `TaskDefinition.children` recursively, in pre-order, so grouped
+roles and their dynamic descendants keep one stable execution order across
+indexing, role counting, and rendering.
+
+### Shared traversal helper
+Keep the recursive walk centralized in `core.models.iter_preflight_task_defs()`
+and reuse it from `core.tree` rather than duplicating recursion branches in
+multiple modules.
+
+### Runtime role prefixes: no-space only
+Treat colon-prefixed runtime role names as roles only when the prefix token
+contains no whitespace. This preserves include_role-style labels while
+rejecting literal task names that merely contain ``" : "``.
