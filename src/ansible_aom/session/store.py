@@ -459,18 +459,18 @@ def cleanup_old_sessions(
                 start_time_str = meta.get("start_time", "")
                 if start_time_str:
                     start_time = datetime.fromisoformat(start_time_str.replace("Z", "+00:00"))
-                    sessions.append((session_path, start_time, meta))
+                    sessions.append((session_path, start_time, session_path.name, meta))
                     continue
-            except json.JSONDecodeError, ValueError:
+            except (json.JSONDecodeError, ValueError):
                 pass
-        sessions.append((session_path, fallback_time, {}))
+        sessions.append((session_path, fallback_time, session_path.name, {}))
 
-    sessions.sort(key=lambda x: x[1], reverse=True)
+    sessions.sort(key=lambda x: (x[1], x[2]), reverse=True)
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=keep_days)
 
     to_delete = []
-    for i, (session_path, start_time, meta) in enumerate(sessions):
+    for i, (session_path, start_time, _, _meta) in enumerate(sessions):
         if i >= keep_count or start_time < cutoff:
             to_delete.append(session_path)
 

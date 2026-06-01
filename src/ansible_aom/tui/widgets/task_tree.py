@@ -8,13 +8,12 @@ from typing import TYPE_CHECKING
 
 from rich.text import Text
 from textual.widgets import Tree
+from textual.widgets.tree import TreeNode
 
 from ansible_aom.core.icons import STATUS_COLORS, STATUS_ICONS
 
 if TYPE_CHECKING:
     from ansible_aom.core.models import RunState
-
-
 # Tree node icons
 TREE_COLLAPSED_ICON = "▶"  # Right triangle for collapsed node (U+25B6)
 TREE_EXPANDED_ICON = "▼"  # Down triangle for expanded node (U+25BC)
@@ -177,8 +176,8 @@ class TaskTree(Tree[str]):
         path) or future graft logic can pick them up.
         """
         # Index existing task nodes by their data key for O(1) lookup.
-        task_index: dict[str, object] = {}
-        host_index: dict[tuple[str, str], object] = {}
+        task_index: dict[str, TreeNode[str]] = {}
+        host_index: dict[tuple[str, str], TreeNode[str]] = {}
         for play_node in self.root.children:
             for child in play_node.children:
                 # child may be a role node or a task node; walk one
@@ -205,7 +204,12 @@ class TaskTree(Tree[str]):
                         h_color = STATUS_COLORS.get(host_state.status, "white")
                         host_node.set_label(Text(f"{h_icon} {hostname}", style=h_color))
 
-    def _index_task_node(self, task_node, task_index: dict, host_index: dict) -> None:
+    def _index_task_node(
+        self,
+        task_node: TreeNode[str],
+        task_index: dict[str, TreeNode[str]],
+        host_index: dict[tuple[str, str], TreeNode[str]],
+    ) -> None:
         """Populate the task/host lookup tables for ``apply_state_icons``."""
         data = task_node.data or ""
         if not isinstance(data, str) or not data.startswith("task:"):

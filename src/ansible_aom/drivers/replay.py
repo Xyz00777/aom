@@ -192,7 +192,7 @@ def _build_parser() -> argparse.ArgumentParser:
     session_action = parser.add_argument(
         "session_id", help="Session ID (UUIDv7 directory name) to replay"
     )
-    session_action.completer = session_id_completer
+    setattr(session_action, "completer", session_id_completer)
     parser.add_argument(
         "--state-dir",
         type=Path,

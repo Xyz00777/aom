@@ -554,7 +554,7 @@ class InspectApp(App):
         node = self.focused
         while node is not None:
             ident = getattr(node, "id", None)
-            if ident in self._PANE_ORDER:
+            if isinstance(ident, str) and ident in self._PANE_ORDER:
                 return ident
             parent = getattr(node, "parent", None)
             # Some widget hierarchies expose ``.parent`` as a property;
