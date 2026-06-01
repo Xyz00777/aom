@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -32,8 +31,7 @@ import pytest
 
 from ansible_aom.ansible.preflight import PreParseResult
 from ansible_aom.ansible.runner import run_playbook
-from ansible_aom.core.models import RunState
-from ansible_aom.core.tree import TreeProjection
+from ansible_aom.core.replay import iter_tree_frames
 from ansible_aom.compact.renderer import CompactRenderer
 from ansible_aom.drivers.replay import replay_session
 from ansible_aom.formats.json import JsonRenderer
@@ -182,6 +180,80 @@ def _events_with_failure() -> list[dict]:
     ]
 
 
+def _events_same_name_concurrent_tasks_repro() -> list[dict]:
+    return [
+        {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-08T10:00:00Z"},
+        {
+            "_event": "v2_playbook_on_play_start",
+            "_timestamp": "2026-05-08T10:00:01Z",
+            "play": {"id": "p1", "name": "Deploy"},
+        },
+        {
+            "_event": "v2_runner_on_start",
+            "_timestamp": "2026-05-08T10:00:02Z",
+            "play": {"id": "p1"},
+            "task": {"id": "t1", "name": "Install nginx"},
+            "host": "web1",
+        },
+        {
+            "_event": "v2_runner_on_start",
+            "_timestamp": "2026-05-08T10:00:03Z",
+            "play": {"id": "p1"},
+            "task": {"id": "t2", "name": "Install nginx"},
+            "host": "web2",
+        },
+        {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "2026-05-08T10:00:04Z",
+            "play": {"id": "p1"},
+            "task": {"id": "t1", "name": "Install nginx"},
+            "hosts": {"web1": {"ok": True, "changed": False}},
+        },
+    ]
+
+
+def _events_serial_run_once_repro() -> list[dict]:
+    return [
+        {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-25T10:00:00Z"},
+        {
+            "_event": "v2_playbook_on_play_start",
+            "_timestamp": "2026-05-25T10:00:01Z",
+            "play": {
+                "id": "p1",
+                "name": "Deploy",
+                "duration": {"start": "2026-05-25T10:00:01Z"},
+            },
+        },
+        {
+            "_event": "v2_runner_on_start",
+            "_timestamp": "2026-05-25T10:00:02Z",
+            "task": {"id": "t1", "name": "Run once", "path": "site.yml:3"},
+            "host": "web1",
+        },
+        {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "2026-05-25T10:00:03Z",
+            "task": {"id": "t1", "name": "Run once", "path": "site.yml:3"},
+            "hosts": {"web1": {"ok": True, "changed": False}},
+        },
+        {
+            "_event": "v2_playbook_on_play_start",
+            "_timestamp": "2026-05-25T10:00:04Z",
+            "play": {
+                "id": "p1",
+                "name": "Deploy",
+                "duration": {"start": "2026-05-25T10:00:04Z"},
+            },
+        },
+        {
+            "_event": "v2_runner_on_start",
+            "_timestamp": "2026-05-25T10:00:05Z",
+            "task": {"id": "t1", "name": "Run once", "path": "site.yml:3"},
+            "host": "web2",
+        },
+    ]
+
+
 EVENT_STREAMS: tuple[tuple[str, list[dict], int], ...] = (
     ("single_ok", _events_single_ok(), 0),
     ("multi_host_mixed", _events_multi_host_mixed(), 0),
@@ -192,22 +264,12 @@ EVENT_STREAMS: tuple[tuple[str, list[dict], int], ...] = (
 # default repr (a JSON-stringified events list) doesn't dominate test
 # names.
 EVENT_IDS = [s[0] for s in EVENT_STREAMS]
-
-
-def _event_timestamp(event: dict) -> datetime:
-    return datetime.fromisoformat(event["_timestamp"].replace("Z", "+00:00"))
-
-
 def _tree_frame_signatures(
     session: dict,
 ) -> list[tuple[tuple[str, int, str], ...]]:
-    state = RunState(playbook=session["playbook"])
     frames: list[tuple[tuple[str, int, str], ...]] = []
 
-    for event in session["events"]:
-        state.handle_event(event)
-        projection = TreeProjection.from_run_state(state)
-        lines = projection.tree_lines(budget=999, now=_event_timestamp(event))
+    for lines in iter_tree_frames(session["playbook"], session["events"]):
         frames.append(tuple((line.kind, line.depth, line.label) for line in lines))
 
     return frames
@@ -361,3 +423,47 @@ def test_tree_frame_signatures_are_deterministic_and_stable() -> None:
     for prev, curr in zip(non_empty_frames, non_empty_frames[1:]):
         shared = [line for line in prev if line in curr]
         assert shared == [line for line in curr if line in prev]
+
+
+def test_tree_replay_keeps_same_name_task_rows_separate_across_frames() -> None:
+    """Identical task labels must not collapse or swap while the replay advances."""
+
+    frames = list(iter_tree_frames("site.yml", _events_same_name_concurrent_tasks_repro()))
+
+    def task_groups(frame: list) -> list[tuple[str, list[str]]]:
+        groups: list[tuple[str, list[str]]] = []
+        current_hosts: list[str] | None = None
+        for line in frame:
+            if line.kind == "task":
+                current_hosts = []
+                groups.append((line.label.split("  ")[0], current_hosts))
+            elif line.kind == "host" and current_hosts is not None:
+                current_hosts.append(line.label)
+        return groups
+
+    assert task_groups(frames[2]) == [("Install nginx", ["web1"])]
+    assert task_groups(frames[3]) == [
+        ("Install nginx", ["web1"]),
+        ("Install nginx", ["web2"]),
+    ]
+    assert task_groups(frames[4]) == [("Install nginx", ["web2"])]
+
+
+def test_tree_replay_keeps_run_once_rows_separate_across_serial_windows() -> None:
+    """Serial play windows must not reuse the prior run_once task row."""
+
+    frames = list(iter_tree_frames("site.yml", _events_serial_run_once_repro()))
+
+    def task_groups(frame: list) -> list[tuple[str, list[str]]]:
+        groups: list[tuple[str, list[str]]] = []
+        current_hosts: list[str] | None = None
+        for line in frame:
+            if line.kind == "task":
+                current_hosts = []
+                groups.append((line.label.split("  ")[0], current_hosts))
+            elif line.kind == "host" and current_hosts is not None:
+                current_hosts.append(line.label)
+        return groups
+
+    assert task_groups(frames[2]) == [("Run once", ["web1"])]
+    assert task_groups(frames[5]) == [("Run once", ["web2"])]

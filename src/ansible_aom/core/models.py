@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from collections.abc import Iterator, Sequence
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +149,7 @@ class TaskRunState:
     hosts: dict[str, HostRunState] = field(default_factory=dict)
     start_time: datetime | None = None
     end_time: datetime | None = None
+    path: str | None = None
 
 
 @dataclass
@@ -160,6 +161,8 @@ class PlayRunState:
     status: Status = Status.PENDING
     tasks: dict[str, TaskRunState] = field(default_factory=dict)
     detected_strategy: str | None = None
+    window_start: str | None = None
+    window_ordinal: int = 0
 
 
 def _parse_timestamp(event: dict[str, Any]) -> datetime:
@@ -173,6 +176,15 @@ def _parse_timestamp(event: dict[str, Any]) -> datetime:
         return datetime.fromisoformat(ts_str)
     except ValueError, TypeError:
         return datetime.now(timezone.utc)
+
+
+def _parse_play_window_start(play_data: dict[str, Any]) -> str | None:
+    """Extract the window discriminator from ``play.duration.start`` if present."""
+    duration = play_data.get("duration")
+    if not isinstance(duration, dict):
+        return None
+    window_start = duration.get("start")
+    return window_start if isinstance(window_start, str) else None
 
 
 def _iter_leaf_task_defs(plays: list["PlayDefinition"]) -> "list[TaskDefinition]":
@@ -271,9 +283,10 @@ class RunState:
     _task_def_index: dict[str, "TaskDefinition"] | None = field(
         default=None, init=False, repr=False
     )
-    _play_def_by_id: dict[str, PlayDefinition] | None = field(
+    _task_def_by_path: dict[str, "TaskDefinition"] | None = field(
         default=None, init=False, repr=False
     )
+    _play_def_by_id: dict[str, PlayDefinition] | None = field(default=None, init=False, repr=False)
     _play_def_by_name: dict[str, PlayDefinition] | None = field(
         default=None, init=False, repr=False
     )
@@ -281,6 +294,8 @@ class RunState:
         default_factory=dict, init=False, repr=False
     )
     _role_cache: dict[str, "RoleCacheEntry"] = field(default_factory=dict, init=False, repr=False)
+    _play_window_counts: dict[str, int] = field(default_factory=dict, init=False, repr=False)
+    _tree_revision: int = field(default=0, init=False, repr=False)
 
     def __setattr__(self, name: str, value: Any) -> None:
         super().__setattr__(name, value)
@@ -288,6 +303,15 @@ class RunState:
         # Cheap: O(P_def + T_def), happens once per run after preflight.
         if name == "definitions":
             self._rebuild_definition_indexes()
+            self._bump_tree_revision()
+
+    def _bump_tree_revision(self) -> None:
+        """Advance the private tree-shape revision counter.
+
+        TreeProjection instances use this to refresh any caches derived
+        from ``definitions`` without being recreated on every event.
+        """
+        super().__setattr__("_tree_revision", getattr(self, "_tree_revision", 0) + 1)
 
     def _rebuild_definition_indexes(self) -> None:
         """(Re)populate the definition lookup indexes.
@@ -297,11 +321,15 @@ class RunState:
         a None-check.
         """
         task_index: dict[str, TaskDefinition] = {}
+        task_index_by_path: dict[str, TaskDefinition] = {}
         for leaf in _iter_leaf_task_defs(self.definitions):
             # First-write wins — matches the prior linear scan's behaviour
             # of returning the first match for duplicate names.
             task_index.setdefault(leaf.name, leaf)
+            if leaf.path is not None:
+                task_index_by_path.setdefault(leaf.path, leaf)
         super().__setattr__("_task_def_index", task_index)
+        super().__setattr__("_task_def_by_path", task_index_by_path)
 
         play_index_by_id: dict[str, PlayDefinition] = {}
         play_index_by_name: dict[str, PlayDefinition] = {}
@@ -348,21 +376,23 @@ class RunState:
         play_data = event.get("play", {})
         play_id = play_data.get("id", "")
         play_name = play_data.get("name", "").strip()
+        play_window_start = _parse_play_window_start(play_data)
+        play_window_ordinal = self._play_window_counts.get(play_id, 0)
 
         self._current_play_id = play_id
+        self._play_window_counts[play_id] = play_window_ordinal + 1
 
         if self.start_time is None:
             self.start_time = ts
             self.status = Status.RUNNING
 
-        if play_id in self.plays:
-            self.plays[play_id].name = play_name
-        else:
-            self.plays[play_id] = PlayRunState(
-                play_id=play_id,
-                name=play_name,
-                status=Status.RUNNING,
-            )
+        self.plays[play_id] = PlayRunState(
+            play_id=play_id,
+            name=play_name,
+            status=Status.RUNNING,
+            window_start=play_window_start,
+            window_ordinal=play_window_ordinal,
+        )
 
     def _resolve_play_id(self, event: dict[str, Any]) -> str:
         """Resolve play_id from event or _current_play_id.
@@ -373,17 +403,20 @@ class RunState:
         """
         play_data = event.get("play")
         if play_data and isinstance(play_data, dict):
-            return play_data.get("id", "")
+            return cast(str, play_data.get("id", ""))
         return self._current_play_id or ""
 
-    def _graft_or_match_task(self, task_id: str, task_name: str) -> None:
+    def _graft_or_match_task(
+        self, task_id: str, task_name: str, task_path: str | None = None
+    ) -> None:
         """Update the dynamic-expansion cursor for an arriving task.
 
-        Matches the task name against preflight TaskDefinitions. A hit
-        updates the parent cursor — the next unknown task gets grafted as
-        its child. A miss creates a dynamic TaskDefinition under the current
-        parent (the most recently matched preflight task) and marks the
-        UUID so re-arriving events don't duplicate the graft.
+        Matches the runtime task path against preflight TaskDefinitions
+        first, then falls back to the task name. A hit updates the parent
+        cursor — the next unknown task gets grafted as its child. A miss
+        creates a dynamic TaskDefinition under the current parent (the most
+        recently matched preflight task) and marks the UUID so re-arriving
+        events don't duplicate the graft.
 
         Called from both ``v2_playbook_on_task_start`` (linear strategy)
         and ``v2_runner_on_start`` (free strategy) so dynamic include_tasks
@@ -392,9 +425,16 @@ class RunState:
         if not self.definitions or not task_name or task_id in self._grafted_uuids:
             return
 
-        # HS-5: name → leaf lookup via the precomputed index (built when
-        # ``definitions`` was assigned). Falls back to scanning only if the
-        # index is somehow stale, which __setattr__ rules out.
+        # HS-5: path/name → leaf lookup via the precomputed indexes (built
+        # when ``definitions`` was assigned). Falls back to scanning only if
+        # the indexes are somehow stale, which __setattr__ rules out.
+        path_index = self._task_def_by_path
+        if task_path and path_index is not None:
+            leaf = path_index.get(task_path)
+            if leaf is not None:
+                self._last_matched_task_def = leaf
+                return
+
         index = self._task_def_index
         if index is not None:
             leaf = index.get(task_name)
@@ -440,10 +480,12 @@ class RunState:
                 play_order=parent.play_order,
                 task_order=-1,
                 is_dynamic=True,
+                path=task_path,
             )
         )
         if task_id:
             self._grafted_uuids.add(task_id)
+        self._bump_tree_revision()
 
     def _handle_v2_playbook_on_task_start(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_playbook_on_task_start event."""
@@ -451,8 +493,9 @@ class RunState:
         play_id = self._resolve_play_id(event)
         task_id = task_data.get("id", "")
         task_name = task_data.get("name", "")
+        task_path = task_data.get("path")
 
-        self._graft_or_match_task(task_id, task_name)
+        self._graft_or_match_task(task_id, task_name, task_path)
 
         if play_id not in self.plays:
             self.plays[play_id] = PlayRunState(
@@ -472,10 +515,13 @@ class RunState:
                 name=task_name,
                 status=Status.RUNNING,
                 start_time=ts,
+                path=task_path,
             )
         else:
             play.tasks[task_id].status = Status.RUNNING
             play.tasks[task_id].start_time = ts
+            if task_path is not None:
+                play.tasks[task_id].path = task_path
 
         # Under linear strategy `ansible.posix.jsonl` does not emit
         # v2_runner_on_start (guarded by `if self._is_lockstep: return`),
@@ -567,9 +613,10 @@ class RunState:
         hostname = event.get("host", "")
         task_id = task_data.get("id", "")
         task_name = task_data.get("name", "")
+        task_path = task_data.get("path")
         play_id = self._resolve_play_id(event)
 
-        self._graft_or_match_task(task_id, task_name)
+        self._graft_or_match_task(task_id, task_name, task_path)
 
         if play_id not in self.plays:
             self.plays[play_id] = PlayRunState(
@@ -596,10 +643,13 @@ class RunState:
                 name=task_name,
                 status=Status.RUNNING,
                 start_time=ts,
+                path=task_path,
             )
         else:
             play.tasks[task_id].status = Status.RUNNING
             play.tasks[task_id].start_time = ts
+            if task_path is not None:
+                play.tasks[task_id].path = task_path
 
         # Record the host as RUNNING so the renderer can show which hosts
         # are currently executing a task (especially under strategy: free,

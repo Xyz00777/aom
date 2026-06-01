@@ -7,6 +7,8 @@
    (not shrinking as tasks complete).
 """
 
+# pyright: reportMissingImports=false
+
 from __future__ import annotations
 
 from ansible_aom.core.models import (
@@ -918,9 +920,9 @@ class TestCrossPlayLookupIsolation:
     skips the completed play entirely when ``any_running`` is True.
 
     The ``include_cross_play=False`` parameter scopes ``any_running``
-    checks to the current play's own tasks only, while rendering
-    (``_emit_runtime_play``) keeps the default ``include_cross_play=True``
-    for cross-play handler context.
+    checks to the current play's own tasks only. Rendering stays on the
+    current play's own runtime rows; generic cross-play borrowing is
+    disabled until explicit ownership is modeled.
     """
 
     def _multi_play_shared_task_state(self) -> RunState:
@@ -1089,6 +1091,104 @@ class TestCrossPlayLookupIsolation:
                 "_event": "v2_runner_on_start",
                 "_timestamp": "2026-05-23T10:00:16Z",
                 "task": {"id": "t4", "name": "Cleanup tasks"},
+                "host": "db1",
+            }
+        )
+        return state
+
+    def _active_play_shared_task_state(self) -> RunState:
+        """Build a state where play 1 stays active and play 2 shares a task
+        name that must not be borrowed across play boundaries.
+        """
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy webservers",
+                hosts="webservers",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Install nginx",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="Cleanup tasks",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=1,
+                    ),
+                ],
+            ),
+            PlayDefinition(
+                id="p2",
+                name="Deploy database",
+                hosts="dbservers",
+                resolved_hosts=["db1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Cleanup tasks",
+                        role=None,
+                        tags=[],
+                        play_id="p2",
+                        play_order=1,
+                        task_order=0,
+                    ),
+                ],
+            ),
+        ]
+        state.handle_event(
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"}
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:01Z",
+                "play": {"id": "play-1", "name": "Deploy webservers"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-23T10:00:03Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:10Z",
+                "play": {"id": "play-2", "name": "Deploy database"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:11Z",
+                "task": {"id": "t2", "name": "Cleanup tasks"},
+                "play": {"id": "play-2"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-23T10:00:12Z",
+                "task": {"id": "t2", "name": "Cleanup tasks"},
                 "host": "db1",
             }
         )
@@ -1341,42 +1441,29 @@ class TestCrossPlayLookupIsolation:
             f"Own task name should appear, got {task_lines[0].label}"
         )
 
-    def test_include_cross_play_false_returns_no_cross_play_items(self) -> None:
-        """TC-CROSS-4: ``_play_running_and_pending(play, include_cross_play=False)``
-        returns no items borrowed from other plays — only the current play's
-        own tasks are considered."""
-        state = self._multi_play_shared_task_state()
+    def test_include_cross_play_true_does_not_borrow_same_name_rows(self) -> None:
+        """TC-CROSS-4: ``_play_running_and_pending(play, include_cross_play=True)``
+        must keep a play's own RUNNING task visible while leaving same-name
+        tasks from other plays as pending rather than borrowing them.
+        """
+        state = self._active_play_shared_task_state()
         p = TreeProjection.from_run_state(state)
 
         play1 = state.plays.get("play-1")
         assert play1 is not None
 
-        # With cross-play: "Cleanup tasks" running in play 2 would be
-        # borrowed into play 1's runtime_by_name.
         items_with = p._play_running_and_pending(play1, include_cross_play=True)
-        # With include_cross_play=False: only play 1's own tasks.
         items_without = p._play_running_and_pending(play1, include_cross_play=False)
 
-        # Play 1's own tasks are all completed → no running/pending items.
-        running_without = [name for kind, name, *_ in items_without if kind == "running"]
-        assert len(running_without) == 0, (
-            f"No running items expected without cross-play, got: {running_without}"
-        )
+        simplified_without = [(kind, name) for kind, name, *_ in items_without]
+        simplified_with = [(kind, name) for kind, name, *_ in items_with]
 
-        # Play 1 has no own running tasks so items_without should be empty
-        # (all own tasks are completed → filtered).
-        # With cross-play, play 2's "Cleanup tasks" is RUNNING with a host
-        # → it may appear in items_with.
-        # (Whether it appears depends on whether play 2's task has hosts
-        # with RUNNING status; it does in the fixture.)
-        has_running_with = any(kind == "running" for kind, *_ in items_with)
-
-        # Verify isolation: items_without is strictly a subset.
-        names_without = {name for _, name, *_ in items_without}
-        names_with = {name for _, name, *_ in items_with}
-        assert names_without <= names_with, (
-            f"Items without cross-play should be subset of items with, "
-            f"without={names_without}, with={names_with}"
+        assert simplified_without == [
+            ("running", "Install nginx"),
+            ("pending", "Cleanup tasks"),
+        ], f"unexpected own-play projection without cross-play: {simplified_without}"
+        assert simplified_with == simplified_without, (
+            f"include_cross_play=True must not borrow foreign rows, got: {simplified_with}"
         )
 
 
@@ -1391,12 +1478,13 @@ class TestStickyFallbackTreeRender:
     """
 
     @staticmethod
-    def _two_play_state_play2_gap() -> RunState:
-        """Play 1 completed, Play 2 in gap (tasks exist, all hosts terminal).
+    def _two_play_state_play2_gap(play2_complete: bool = True) -> RunState:
+        """Play 1 completed, Play 2 either running or complete.
 
         Simulates the moment after one linear-strategy task finishes and
         before the next task starts. Both plays have a runtime counterpart
-        (play_start fired), but no hosts are RUNNING anywhere.
+        (play_start fired), but no hosts are RUNNING anywhere once
+        ``play2_complete`` is true.
         """
         from datetime import datetime, timezone
 
@@ -1494,14 +1582,15 @@ class TestStickyFallbackTreeRender:
                 "host": "db1",
             }
         )
-        state.handle_event(
-            {
-                "_event": "v2_runner_on_ok",
-                "_timestamp": "2026-05-23T10:00:10Z",
-                "task": {"id": "t2", "name": "Task 2A"},
-                "hosts": {"db1": {"ok": True, "changed": False}},
-            }
-        )
+        if play2_complete:
+            state.handle_event(
+                {
+                    "_event": "v2_runner_on_ok",
+                    "_timestamp": "2026-05-23T10:00:10Z",
+                    "task": {"id": "t2", "name": "Task 2A"},
+                    "hosts": {"db1": {"ok": True, "changed": False}},
+                }
+            )
         return state
 
     def test_sticky_1_gap_between_tasks_renders_most_recent_play(self):
@@ -1517,30 +1606,19 @@ class TestStickyFallbackTreeRender:
         state = self._two_play_state_play2_gap()
         p = TreeProjection.from_run_state(state)
 
-        # First render: Play 2 was the last running play (via the scan),
-        # so it should be the sticky winner.
+        # First render: the run is fully complete, so no play row should linger.
         lines1 = p.tree_lines(budget=60)
         play_lines1 = {ln.label for ln in lines1 if ln.kind == "play"}
-        assert "play: Play Two" in play_lines1, (
-            f"Play 2 must render as sticky fallback, got: {play_lines1}"
-        )
-        assert "play: Play One" not in play_lines1, (
-            f"Completed Play 1 must be filtered, got: {play_lines1}"
-        )
-        # Verify sticky state persisted
+        assert play_lines1 == set(), f"completed plays must vanish, got: {play_lines1}"
+        # Verify sticky state persisted internally, but is no longer rendered.
         assert p._last_running_play_id == "play-2", (
             f"Sticky fallback should point to play-2, got {p._last_running_play_id}"
         )
 
-        # Second render (simulating next frame): the gap persists.
+        # Second render (simulating next frame): the completed play must stay gone.
         lines2 = p.tree_lines(budget=60)
         play_lines2 = {ln.label for ln in lines2 if ln.kind == "play"}
-        assert "play: Play Two" in play_lines2, (
-            "Second frame: Play 2 must still render via sticky fallback"
-        )
-        assert "play: Play One" not in play_lines2, (
-            "Second frame: completed Play 1 must stay filtered"
-        )
+        assert play_lines2 == set(), f"second frame must also stay clear, got: {play_lines2}"
 
     def test_sticky_2_two_plays_both_running(self):
         """TC-STICKY-2: Two plays both running — both render in the tree.
@@ -1646,15 +1724,14 @@ class TestStickyFallbackTreeRender:
         )
 
     def test_sticky_3_no_plays_running_yet_renders_all_upcoming(self):
-        """TC-STICKY-3: No plays running yet — all plays render (no filter).
+        """TC-STICKY-3: No plays running yet — only upcoming plays render.
 
-        When no play has running items AND the sticky pointer is unset
-        (pre-first task), the tree must render all plays: runtime plays
-        with tasks and upcoming definition-only plays.
+        When no play has running items, a fully completed runtime play
+        must not linger as a sticky anchor. The tree should show only
+        upcoming definition-only plays.
 
-        The gap test fixture fires events so tree is visible but no
-        host is RUNNING anywhere. Both the started play and the upcoming
-        play must appear.
+        The gap test fixture fires events so the tree is visible but no
+        host is RUNNING anywhere. Only the upcoming play must appear.
         """
         state = RunState(playbook="site.yml")
         state.definitions = [
@@ -1729,29 +1806,26 @@ class TestStickyFallbackTreeRender:
         )
 
         # Fresh projection: no _last_running_play_id, no running items.
-        # secondary fallback should kick in and set active_play_id to
-        # play-1 (last with tasks). But that's a single-play sticky —
-        # we still want upcoming plays.
+        # The completed play should stay filtered even on the first frame.
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=60)
         play_labels = {ln.label for ln in lines if ln.kind == "play"}
-        assert "play: Setup" in play_labels, "Started play should render"
+        assert "play: Setup" not in play_labels, "Completed play must stay filtered"
         assert "play: Deploy" in play_labels, "Upcoming play should render"
         assert p._last_running_play_id == "play-1", (
-            "Secondary fallback should set sticky to play-1"
+            "Sticky fallback may still remember the last active play internally"
         )
 
     def test_sticky_4_play_transitions_from_running_to_gap(self):
-        """TC-STICKY-4: Play transitions from running to gap — tree
-        stays showing the play's last state, does NOT toggle to
-        showing completed plays.
+        """TC-STICKY-4: Play transitions from running to complete — tree
+        shows the play while it is still active, then drops it once all
+        tasks are done.
 
         This simulates two frames:
         Frame 1: Play 2 has a RUNNING task → sticky set to play-2.
-        Frame 2: Play 2's task completes (gap) → sticky persists,
-        tree still shows Play 2, not completed Play 1.
+        Frame 2: Play 2's task completes → the completed play disappears.
         """
-        from datetime import datetime, timezone
+        from datetime import datetime, timedelta, timezone
 
         state = RunState(playbook="site.yml")
         state.definitions = [
@@ -1848,15 +1922,17 @@ class TestStickyFallbackTreeRender:
             }
         )
 
+        frame_now = datetime(2026, 5, 23, 10, 0, 8, tzinfo=timezone.utc)
+
         # Frame 1: Play 2 running → sticky set to play-2
         p = TreeProjection.from_run_state(state)
-        lines1 = p.tree_lines(budget=60)
+        lines1 = p.tree_lines(budget=60, now=frame_now)
         play_labels1 = {ln.label for ln in lines1 if ln.kind == "play"}
         assert "play: Start services" in play_labels1
         assert "play: Install deps" not in play_labels1
         assert p._last_running_play_id == "play-2"
 
-        # Frame 2: Complete Play 2's task → gap state
+        # Frame 2: Complete Play 2's task, then advance past the lease TTL.
         state.handle_event(
             {
                 "_event": "v2_runner_on_ok",
@@ -1866,11 +1942,11 @@ class TestStickyFallbackTreeRender:
             }
         )
         # Same projection object (sticky state persists)
-        lines2 = p.tree_lines(budget=60)
+        lines2 = p.tree_lines(budget=60, now=frame_now + timedelta(seconds=5))
         play_labels2 = {ln.label for ln in lines2 if ln.kind == "play"}
-        assert "play: Start services" in play_labels2, (
-            "Sticky fallback must keep showing Play 2 during gap"
+        assert "play: Start services" not in play_labels2, (
+            "Completed Play 2 must disappear once it has no running/pending surface"
         )
         assert "play: Install deps" not in play_labels2, (
-            "Completed Play 1 must stay filtered even during gap"
+            "Completed Play 1 must stay filtered"
         )

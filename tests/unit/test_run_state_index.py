@@ -1,3 +1,5 @@
+# pyright: reportMissingImports=false
+
 """TC-PERF-010..012 — name indexes on RunState for O(1) lookups.
 
 ``_graft_or_match_task`` currently does an O(T_def) linear scan via
@@ -19,7 +21,9 @@ from ansible_aom.core.models import (
 )
 
 
-def _make_task(name: str, play_id: str = "p1", order: int = 0) -> TaskDefinition:
+def _make_task(
+    name: str, play_id: str = "p1", order: int = 0, path: str | None = None
+) -> TaskDefinition:
     return TaskDefinition(
         name=name,
         role=None,
@@ -27,6 +31,7 @@ def _make_task(name: str, play_id: str = "p1", order: int = 0) -> TaskDefinition
         play_id=play_id,
         play_order=0,
         task_order=order,
+        path=path,
     )
 
 
@@ -75,6 +80,121 @@ class TestTaskDefIndex:
         state._graft_or_match_task("uuid-known", "t500")
         assert state._last_matched_task_def is not None
         assert state._last_matched_task_def.name == "t500"
+
+    def test_perf_012_path_index_disambiguates_async_launcher_and_status(self) -> None:
+        """Async launcher + async-status rows with the same display name stay separate.
+
+        The launcher at ``deploy_vms.yml:10`` and the later async-status
+        poller at ``deploy_vms.yml:61`` intentionally share a display name
+        here so the path index has to choose the later branch. Without the
+        path-aware lookup, the unknown child grafts under the launcher
+        because the name index always returns the first match.
+        """
+        state = RunState(playbook="x.yml")
+        launcher = _make_task(
+            "Async job",
+            order=0,
+            path="server-setup/playbooks/proxmox/deploy_vms.yml:10",
+        )
+        poller = _make_task(
+            "Async job",
+            order=1,
+            path="server-setup/playbooks/proxmox/deploy_vms.yml:61",
+        )
+        state.definitions = [_make_play("p1", "Play 1", [launcher, poller])]
+
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_start",
+                "_timestamp": "2026-05-24T10:00:00Z",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-24T10:00:01Z",
+                "play": {"id": "p1", "name": "Play 1"},
+            }
+        )
+
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-24T10:00:02Z",
+                "task": {
+                    "id": "launch-1",
+                    "name": "Async job",
+                    "path": "server-setup/playbooks/proxmox/deploy_vms.yml:10",
+                },
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-24T10:00:03Z",
+                "task": {
+                    "id": "launch-1",
+                    "name": "Async job",
+                    "path": "server-setup/playbooks/proxmox/deploy_vms.yml:10",
+                },
+                "hosts": {
+                    "web1": {
+                        "ok": True,
+                        "changed": True,
+                        "action": "ansible.builtin.command",
+                        "ansible_job_id": "j1",
+                        "started": True,
+                        "finished": False,
+                    }
+                },
+            }
+        )
+
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-24T10:00:10Z",
+                "task": {
+                    "id": "poll-1",
+                    "name": "Async job",
+                    "path": "server-setup/playbooks/proxmox/deploy_vms.yml:61",
+                },
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-24T10:00:11Z",
+                "task": {
+                    "id": "poll-1",
+                    "name": "Async job",
+                    "path": "server-setup/playbooks/proxmox/deploy_vms.yml:61",
+                },
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-24T10:00:12Z",
+                "task": {
+                    "id": "child-1",
+                    "name": "Unknown child",
+                    "path": "server-setup/playbooks/proxmox/deploy_vms.yml:99",
+                },
+                "play": {"id": "p1"},
+            }
+        )
+
+        assert state._task_def_by_path is not None
+        assert state._task_def_by_path[launcher.path] is launcher
+        assert state._task_def_by_path[poller.path] is poller
+        assert launcher.children == []
+        assert [child.name for child in poller.children] == ["Unknown child"]
+        assert poller.children[0].path == "server-setup/playbooks/proxmox/deploy_vms.yml:99"
+        assert state._last_matched_task_def is poller
 
 
 class TestPlayDefIndex:

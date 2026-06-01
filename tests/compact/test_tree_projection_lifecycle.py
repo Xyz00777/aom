@@ -1,9 +1,11 @@
+# pyright: reportMissingImports=false
+
 """TC-PERF-020..021 — persistent TreeProjection on CompactRenderer.
 
 ``TreeProjection.from_run_state`` was called per render, which threw
-away the per-instance ``_role_index`` memo on every cycle. Caching the
-projection on the renderer and invalidating it only when state-shape
-mutating events arrive keeps the memo alive across renders.
+away the per-instance ``_role_index`` memo on every cycle. The durable
+projection now stays alive on the renderer and refreshes its own
+revision-aware caches when state-shape mutating events arrive.
 """
 
 from __future__ import annotations
@@ -22,12 +24,14 @@ from ansible_aom.core.models import (
 from ansible_aom.core.tree import TreeProjection
 
 
-def _task_start(uuid: str = "u1", ts: str = "2026-05-11T10:00:00Z") -> dict:
+def _task_start(
+    uuid: str = "u1", ts: str = "2026-05-11T10:00:00Z", name: str = "T", play_id: str = "p1"
+) -> dict:
     return {
         "_event": "v2_playbook_on_task_start",
         "_timestamp": ts,
-        "task": {"id": uuid, "name": "T"},
-        "play": {"id": "p1"},
+        "task": {"id": uuid, "name": name},
+        "play": {"id": play_id},
     }
 
 
@@ -108,27 +112,53 @@ def _renderer() -> CompactRenderer:
 
 
 class TestProjectionLifecycle:
-    def test_perf_020_event_invalidates_projection(self) -> None:
-        """A state-shape change invalidates the cached projection.
+    def test_perf_020_event_keeps_projection_alive_and_refreshes_cache(self) -> None:
+        """A state-shape change must refresh, not replace, the cached projection.
 
-        The cache is forced to None on every ``update_state``; the next
-        eligible render rebuilds it. The HS-1/HS-8 compute-throttle can
-        skip that render if it lands inside the throttle window — what
-        matters for HS-3 is that the stale instance is gone.
+        The renderer should keep one durable ``TreeProjection`` instance
+        alive so row continuity survives successive events. When
+        ``RunState`` grafts a dynamic child, the projection must refresh
+        its cached role map in place rather than being discarded.
         """
         r = _renderer()
-        # Force a render so the projection cache populates.
-        r._render_status_panel()
+        r._definitions = [
+            PlayDefinition(
+                id="p1",
+                name="deploy",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Install nginx",
+                        role="webserver",
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    )
+                ],
+            )
+        ]
+        assert r._state is not None
+        r._state.definitions = list(r._definitions)
+
+        # Force a render so the projection cache populates, then seed a
+        # known parent task so the next unknown task grafts as its child.
+        r._last_panel_compute_time = 0.0
+        r.update_state(_task_start(uuid="u1", name="Install nginx"))
         first = r._projection
         assert isinstance(first, TreeProjection)
+        assert first._task_role("Install nginx") == "webserver"
 
-        r.update_state(_task_start("u1"))
+        # The unknown task is grafted dynamically under the matched
+        # parent. The same projection instance must survive, and its
+        # role cache must refresh to recognise the new child.
+        r._last_panel_compute_time = 0.0
+        r.update_state(_task_start(uuid="u2", name="Poll async status"))
 
-        # The projection cache must have been invalidated by the event
-        # (cleared to None or rebuilt to a fresh instance) — never
-        # silently kept as the pre-event object.
         post_event = r._projection
-        assert post_event is not first
+        assert post_event is first
+        assert post_event._task_role("Poll async status") == "webserver"
 
     def test_perf_021_consecutive_ticks_reuse_projection(self) -> None:
         """Two ticks with no intervening state mutation reuse the same instance."""
@@ -149,12 +179,12 @@ class TestProjectionLifecycle:
         assert second is first
 
     def test_perf_022_update_state_keeps_sticky_active_play_on_gap_frame(self) -> None:
-        """A non-structural update must not drop the sticky active-play anchor.
+        """A non-structural update must keep the active play visible only
+        while it still has running/pending surface.
 
-        The regression is that ``update_state()`` clears ``_projection`` on every
-        event. That throws away ``TreeProjection._last_running_play_id`` and lets
-        the next frame reselect the wrong play (``later``) even though no row
-        reassignment is semantically justified.
+        The active task now completes, leaving a quiet frame. The renderer must
+        keep the same projection instance alive, but the completed play itself
+        must stop rendering as the sticky fallback row.
         """
         r = _renderer()
         _seed_sticky_gap_state(r)
@@ -164,10 +194,15 @@ class TestProjectionLifecycle:
         r._last_panel_compute_time = 0.0
         r._render_status_panel()
         assert isinstance(r._projection, TreeProjection)
+        active_rows = [
+            ln.label
+            for ln in r._projection.tree_lines(20)
+            if ln.kind == "play" and ln.depth == 1
+        ]
+        assert active_rows == ["play: active"]
 
-        # The active task now completes, leaving a gap frame. The renderer must
-        # keep the same projection instance alive so the sticky fallback keeps
-        # the tree anchored on ``active`` instead of bouncing to ``later``.
+        # The active task now completes, leaving a quiet frame. The completed
+        # play must vanish instead of lingering as the sticky fallback row.
         r._last_panel_compute_time = 0.0
         r.update_state(_runner_ok())
 
@@ -176,4 +211,4 @@ class TestProjectionLifecycle:
             for ln in r._projection.tree_lines(20)
             if ln.kind == "play" and ln.depth == 1
         ]
-        assert play_rows == ["play: active"]
+        assert play_rows == []

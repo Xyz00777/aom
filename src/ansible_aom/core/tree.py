@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import re
 from typing import Literal
 
@@ -21,8 +21,10 @@ from ansible_aom.core.models import (
     HostRunState,
     PlayDefinition,
     PlayRunState,
+    RoleGroupDefinition,
     RunState,
     Status,
+    TaskDefinition,
     TaskRunState,
     iter_preflight_task_defs,
     strip_role_prefix,
@@ -31,6 +33,8 @@ from ansible_aom.core.models import (
 TreeKind = Literal["playbook", "play", "role", "task", "host"]
 
 _TEMPLATE_RE = re.compile(r"\{\{.*?\}\}")
+_ROW_LEASE_TTL = timedelta(seconds=4)
+_ROW_LEASE_LIMIT = 128
 
 
 def _template_skeleton(name: str) -> str:
@@ -128,6 +132,19 @@ class HostRow:
     current_elapsed_s: float | None
 
 
+@dataclass
+class _RowLease:
+    """Internal continuity record for a visible row.
+
+    Leases are intentionally short-lived: they keep the projection's
+    sticky selection and row continuity metadata alive across quiet gaps,
+    but expire on their own so completed rows do not accumulate forever.
+    """
+
+    last_seen_at: datetime
+    expires_at: datetime
+
+
 def _effective_status(hs: HostRunState) -> Status:
     """Promote OK+changed → CHANGED for count-classification purposes.
 
@@ -154,6 +171,15 @@ def _runtime_role_from_task_name(task_name: str) -> str | None:
     return prefix
 
 
+def _is_meta_task(task_name: str) -> bool:
+    """Return True for explicit ``meta: ...`` tasks.
+
+    This is a narrow projection-only heuristic: only meta tasks skip
+    synthetic host-leaf fallback when their runtime host map is empty.
+    """
+    return strip_role_prefix(task_name).startswith("meta:")
+
+
 @dataclass
 class TreeProjection:
     """Pure projection of RunState. Build via `from_run_state`."""
@@ -162,10 +188,16 @@ class TreeProjection:
     _role_index: dict[str, str] | None = field(default=None, init=False, repr=False)
     _known_roles: set[str] | None = field(default=None, init=False, repr=False)
     _runtime_role_counts: dict[str, int] | None = field(default=None, init=False, repr=False)
+    _known_tree_revision: int | None = field(default=None, init=False, repr=False)
+    _row_leases: dict[tuple[str, str], _RowLease] = field(
+        default_factory=dict, init=False, repr=False
+    )
     # Sticky fallback: the play_id of the most recent play with running
     # tasks. Persists between render calls so the tree stays stable during
     # transient gaps (e.g. between linear-strategy tasks).
     _last_running_play_id: str | None = field(default=None, init=False, repr=False)
+    # Internal lease/sticky discriminator for serial/run_once windowed plays.
+    _last_running_play_runtime_id: str | None = field(default=None, init=False, repr=False)
 
     @classmethod
     def from_run_state(cls, state: RunState) -> "TreeProjection":
@@ -212,6 +244,129 @@ class TreeProjection:
                 seen.update(task.hosts.keys())
         return len(seen) > 1
 
+    def _refresh_tree_cache(self) -> None:
+        """Refresh caches that depend on mutable ``RunState`` shape.
+
+        ``RunState`` mutates in place, so durable projections need a
+        lightweight change detector instead of being recreated on every
+        event. ``_tree_revision`` advances when definitions change or a
+        dynamic task is grafted.
+        """
+        revision = getattr(self._state, "_tree_revision", 0)
+        if self._known_tree_revision == revision:
+            return
+        self._known_tree_revision = revision
+        self._role_index = None
+        self._known_roles = None
+        self._runtime_role_counts = None
+
+    @staticmethod
+    def _task_definition_identity(task_def: "TaskDefinition") -> str:
+        if task_def.uuid:
+            return task_def.uuid
+        if task_def.path:
+            return task_def.path
+        return f"{task_def.play_id}:{task_def.task_order}:{task_def.name}"
+
+    @staticmethod
+    def _task_runtime_identity(play: PlayRunState, task: TaskRunState) -> str:
+        play_identity = TreeProjection._play_runtime_identity(play)
+        task_identity = task.task_id or task.name
+        return f"{play_identity}:{task_identity}"
+
+    @staticmethod
+    def _play_runtime_identity(play: PlayRunState) -> str:
+        base = play.play_id or play.name
+        window = play.window_start if play.window_start is not None else f"#{play.window_ordinal}"
+        return f"{base}:{window}" if window else base
+
+    @staticmethod
+    def _play_sticky_identity(play: PlayRunState) -> str:
+        return play.play_id or play.name
+
+    def _remember_running_play(self, play: PlayRunState) -> None:
+        self._last_running_play_id = self._play_sticky_identity(play)
+        self._last_running_play_runtime_id = self._play_runtime_identity(play)
+
+    def _touch_row_lease(self, kind: str, identity: str, now: datetime) -> None:
+        if not identity:
+            return
+        lease = self._row_leases.get((kind, identity))
+        expires_at = now + _ROW_LEASE_TTL
+        if lease is None:
+            self._row_leases[(kind, identity)] = _RowLease(last_seen_at=now, expires_at=expires_at)
+        else:
+            lease.last_seen_at = now
+            lease.expires_at = expires_at
+
+    def _touch_play_leases(
+        self, runtime: PlayRunState | None, play_def: "PlayDefinition | None", now: datetime
+    ) -> None:
+        if runtime is not None:
+            self._touch_row_lease("play", self._play_runtime_identity(runtime), now)
+        elif play_def is not None and play_def.id:
+            self._touch_row_lease("play", play_def.id, now)
+
+    def _touch_task_lease(
+        self,
+        play: PlayRunState | None,
+        runtime: TaskRunState | None,
+        task_def: "TaskDefinition | None",
+        now: datetime,
+    ) -> None:
+        if runtime is not None:
+            if play is not None:
+                self._touch_row_lease("task", self._task_runtime_identity(play, runtime), now)
+            else:
+                self._touch_row_lease("task", runtime.task_id or runtime.name, now)
+            return
+        if task_def is not None:
+            self._touch_row_lease("task", self._task_definition_identity(task_def), now)
+
+    def _touch_host_lease(self, hostname: str, now: datetime) -> None:
+        self._touch_row_lease("host", hostname, now)
+
+    def _touch_role_lease(self, role: str | None, now: datetime) -> None:
+        if role is not None:
+            self._touch_row_lease("role", role, now)
+
+    def _prune_row_leases(self, now: datetime) -> None:
+        expired = [key for key, lease in self._row_leases.items() if lease.expires_at <= now]
+        for key in expired:
+            del self._row_leases[key]
+
+        if len(self._row_leases) <= _ROW_LEASE_LIMIT:
+            return
+
+        overflow = len(self._row_leases) - _ROW_LEASE_LIMIT
+        for key, _ in sorted(
+            self._row_leases.items(),
+            key=lambda item: (item[1].last_seen_at, item[1].expires_at, item[0]),
+        )[:overflow]:
+            del self._row_leases[key]
+
+    def _leased_play_id(
+        self,
+        ordered_plays: list[tuple[PlayRunState | None, "PlayDefinition | None"]],
+        now: datetime,
+    ) -> str | None:
+        best: tuple[datetime, int, str] | None = None
+        for index, (runtime, _play_def) in enumerate(ordered_plays):
+            if runtime is None or not runtime.tasks:
+                continue
+            play_id = self._play_runtime_identity(runtime)
+            lease = self._row_leases.get(("play", play_id))
+            if lease is None or lease.expires_at <= now:
+                continue
+            candidate = (lease.last_seen_at, index, play_id)
+            if best is None or candidate > best:
+                best = candidate
+        return best[2] if best is not None else None
+
+    def _play_lease_alive(self, play_id: str, now: datetime) -> bool:
+        lease = self._row_leases.get(("play", play_id))
+        return lease is not None and lease.expires_at > now
+
     # --- Projections (filled in later tasks) ------------------------------
 
     # Priority order for worst-status selection (highest precedence first).
@@ -230,6 +385,9 @@ class TreeProjection:
     def host_rows(self, now: datetime | None = None) -> list[HostRow]:
         if now is None:
             now = datetime.now(timezone.utc)
+
+        self._refresh_tree_cache()
+        self._prune_row_leases(now)
 
         # Per-host accumulators.
         counts: dict[str, dict[Status, int]] = {}
@@ -282,6 +440,7 @@ class TreeProjection:
                     current_elapsed_s=cur[1] if cur else None,
                 )
             )
+            self._touch_host_lease(hostname, now)
         return rows
 
     @classmethod
@@ -310,18 +469,24 @@ class TreeProjection:
         if now is None:
             now = datetime.now(timezone.utc)
 
+        self._refresh_tree_cache()
+        self._prune_row_leases(now)
+
         lines = self._tree_lines_unbounded(now)
         if len(lines) <= budget:
+            self._prune_row_leases(now)
             return lines
 
         # --- Stage (a): truncate from the end --------------------------------
         lines = lines[:budget]
         if len(lines) <= budget:
+            self._prune_row_leases(now)
             return lines
 
         # --- Stage (b): drop host leaves --------------------------------------
         lines = [ln for ln in lines if ln.kind != "host"]
         if len(lines) <= budget:
+            self._prune_row_leases(now)
             return lines
 
         # --- Stage (c): collapse roles to summary lines -----------------------
@@ -375,6 +540,8 @@ class TreeProjection:
         if len(collapsed) > budget:
             collapsed = collapsed[:budget]
 
+        self._prune_row_leases(now)
+
         return collapsed
 
     def _tree_lines_unbounded(self, now: datetime) -> list[TreeLine]:
@@ -402,6 +569,7 @@ class TreeProjection:
                 elapsed_s=None,
             )
         ]
+        self._touch_row_lease("playbook", self._state.playbook, now)
 
         # Iterate preflight plays in declared order so upcoming plays
         # land in the visual position the user will encounter them.
@@ -442,61 +610,64 @@ class TreeProjection:
             ordered_plays.append((runtime_play, None))
 
         # First pass: find the latest play with running items.
-        fresh_found: str | None = None
+        fresh_found: PlayRunState | None = None
         for runtime, _ in ordered_plays:
             if runtime is not None:
                 items = self._play_running_and_pending(runtime, include_cross_play=False)
                 if any(k == "running" for k, _, _, _ in items):
-                    fresh_found = runtime.play_id  # don't break — find latest
+                    fresh_found = runtime  # don't break — find latest
 
         if fresh_found is not None:
-            self._last_running_play_id = fresh_found
-            active_play_id: str | None = fresh_found
-        elif self._last_running_play_id is not None:
-            active_play_id = self._last_running_play_id  # sticky from previous frame
+            self._remember_running_play(fresh_found)
+            active_play_id: str | None = self._last_running_play_runtime_id
+        elif self._last_running_play_runtime_id is not None and self._play_lease_alive(
+            self._last_running_play_runtime_id, now
+        ):
+            active_play_id = self._last_running_play_runtime_id  # sticky from previous frame
         else:
-            # Secondary fallback: first gap frame, no running items anywhere.
-            # Pick the last runtime play that has any tasks at all — this
-            # initialises the sticky pointer so the tree doesn't go blank.
-            for runtime, _ in reversed(ordered_plays):
-                if runtime is not None and runtime.tasks:
-                    self._last_running_play_id = runtime.play_id
-                    active_play_id = runtime.play_id
-                    break
+            leased_play_id = self._leased_play_id(ordered_plays, now)
+            if leased_play_id is not None:
+                self._last_running_play_runtime_id = leased_play_id
+                for runtime, _ in ordered_plays:
+                    if runtime is not None and self._play_runtime_identity(runtime) == leased_play_id:
+                        self._remember_running_play(runtime)
+                        break
+                active_play_id = leased_play_id
             else:
-                active_play_id = None
+                if self._last_running_play_runtime_id is None:
+                    # Cold start: no running items anywhere and no sticky
+                    # anchor yet. Pick the last runtime play with tasks so
+                    # the tree doesn't go blank on the very first gap frame.
+                    for runtime, _ in reversed(ordered_plays):
+                        if runtime is not None and runtime.tasks:
+                            self._remember_running_play(runtime)
+                            active_play_id = self._last_running_play_runtime_id
+                            break
+                    else:
+                        active_play_id = None
+                else:
+                    # The lease expired and no fresh running play replaced
+                    # it. Keep the most recent active play pinned so quiet
+                    # gaps do not widen back out to every completed play;
+                    # row leases still age out independently.
+                    active_play_id = self._last_running_play_runtime_id
 
         for runtime, play_def in ordered_plays:
             if runtime is not None:
                 if active_play_id is not None:
-                    if runtime.play_id != active_play_id:
-                        items = self._play_running_and_pending(
-                            runtime, include_cross_play=False
-                        )
+                    if self._play_runtime_identity(runtime) != active_play_id:
+                        items = self._play_running_and_pending(runtime, include_cross_play=False)
                         if not any(k == "running" for k, _, _, _ in items) and runtime.tasks:
                             continue  # completed play (had tasks, now all done)
-                # When runtime IS the active play, emit even with no
-                # running/pending items (gap).  Fall through to
-                # _emit_runtime_play first; if it produces nothing,
-                # emit a bare play header as the sticky anchor.
                 idx_before = len(lines)
                 self._emit_runtime_play(lines, runtime, now)
-                if len(lines) == idx_before:
-                    lines.append(
-                        TreeLine(
-                            depth=1,
-                            kind="play",
-                            label=f"play: {runtime.name}",
-                            glyph=None,
-                            status=runtime.status,
-                            elapsed_s=None,
-                        )
-                    )
             elif play_def is not None:
-                self._emit_pending_play(lines, play_def)
+                self._emit_pending_play(lines, play_def, now)
         return lines
 
-    def _emit_pending_play(self, lines: list[TreeLine], play_def: "PlayDefinition") -> None:
+    def _emit_pending_play(
+        self, lines: list[TreeLine], play_def: "PlayDefinition", now: datetime
+    ) -> None:
         """Render an upcoming-only play: header + every preflight task as pending."""
         lines.append(
             TreeLine(
@@ -508,6 +679,7 @@ class TreeProjection:
                 elapsed_s=None,
             )
         )
+        self._touch_row_lease("play", play_def.id or play_def.name, now)
         role_counts: dict[str | None, int] = {}
         for entry, role in iter_preflight_task_defs(play_def.tasks):
             role_counts[role] = role_counts.get(role, 0) + 1
@@ -529,6 +701,7 @@ class TreeProjection:
                             identity=role,
                         )
                     )
+                    self._touch_role_lease(role, now)
             task_depth = 3 if role is not None else 2
 
             lines.append(
@@ -541,6 +714,7 @@ class TreeProjection:
                     elapsed_s=None,
                 )
             )
+            self._touch_task_lease(None, None, tdef, now)
 
     def _emit_runtime_play(self, lines: list[TreeLine], play: PlayRunState, now: datetime) -> None:
         """Render a play that's already in flight (or was)."""
@@ -573,6 +747,7 @@ class TreeProjection:
         # which drops completed tasks and would undercount).
         role_total_tasks: dict[str | None, int] = {}
         play_def = self._play_def_for(play)
+        self._touch_play_leases(play, play_def, now)
         if play_def is not None:
             for entry, role in iter_preflight_task_defs(play_def.tasks):
                 role_total_tasks[role] = role_total_tasks.get(role, 0) + 1
@@ -603,7 +778,11 @@ class TreeProjection:
             if task_role is not None:
                 role_total_tasks[task_role] = role_total_tasks.get(task_role, 0) + 1
         for item_kind, name, role, runtime in play_items:
-            effective_role = role if role is not None else (_runtime_role_from_task_name(runtime.name) if runtime is not None else None)
+            effective_role = (
+                role
+                if role is not None
+                else (_runtime_role_from_task_name(runtime.name) if runtime is not None else None)
+            )
 
             if effective_role != current_role:
                 current_role = effective_role
@@ -628,11 +807,17 @@ class TreeProjection:
                             identity=effective_role,
                         )
                     )
+                    self._touch_role_lease(effective_role, now)
             task_depth = 3 if role_open else 2
 
             if item_kind == "running" and runtime is not None:
                 lines.append(self._task_line(runtime, depth=task_depth))
-                if runtime.hosts:
+                self._touch_task_lease(play, runtime, None, now)
+                if _is_meta_task(runtime.name):
+                    # Meta tasks are projection-only control flow. Keep the
+                    # task row visible, but never project host leaves.
+                    pass
+                elif runtime.hosts:
                     for hostname, hs in runtime.hosts.items():
                         elapsed = (
                             (now - hs.start_time).total_seconds()
@@ -649,7 +834,8 @@ class TreeProjection:
                                 elapsed_s=elapsed,
                             )
                         )
-                else:
+                        self._touch_host_lease(hostname, now)
+                elif not _is_meta_task(runtime.name):
                     elapsed = (
                         (now - runtime.start_time).total_seconds() if runtime.start_time else 0.0
                     )
@@ -664,6 +850,7 @@ class TreeProjection:
                                 elapsed_s=elapsed,
                             )
                         )
+                        self._touch_host_lease(hostname, now)
             else:  # pending
                 lines.append(
                     TreeLine(
@@ -675,6 +862,7 @@ class TreeProjection:
                         elapsed_s=None,
                     )
                 )
+                self._touch_row_lease("task", name, now)
 
     def _play_running_and_pending(
         self, play: "PlayRunState", include_cross_play: bool = True
@@ -692,24 +880,18 @@ class TreeProjection:
         in runtime-arrival order.
         """
         runtime_by_name: dict[str, list[TaskRunState]] = defaultdict(list)
+        runtime_by_path: dict[str, list[TaskRunState]] = defaultdict(list)
         for task in play.tasks.values():
             runtime_by_name[task.name].append(task)
+            if task.path is not None:
+                runtime_by_path[task.path].append(task)
             stripped = strip_role_prefix(task.name)
             if stripped != task.name:
                 runtime_by_name[stripped].append(task)
-        if include_cross_play:
-            for p in self._state.plays.values():
-                if p.play_id == play.play_id:
-                    continue
-                for task in p.tasks.values():
-                    if not any(
-                        hs.status == Status.RUNNING for hs in task.hosts.values()
-                    ):
-                        continue  # skip completed/stale cross-play tasks
-                    runtime_by_name[task.name].append(task)
-                    stripped = strip_role_prefix(task.name)
-                    if stripped != task.name:
-                        runtime_by_name[stripped].append(task)
+
+        # Generic cross-play borrowing is intentionally disabled here.
+        # Rows are built only from the current play's runtime tasks; any
+        # explicit ownership model needs to be represented upstream.
 
         play_def = self._play_def_for(play)
 
@@ -746,34 +928,104 @@ class TreeProjection:
         def _pick_runtime(
             task_name: str,
             matched_runtime_task_ids: set[str],
+            preferred_hosts: set[str] | None = None,
+            task_path: str | None = None,
         ) -> TaskRunState | None:
-            for candidate in runtime_by_name.get(task_name, []):
-                candidate_id = _task_identity(candidate)
-                if candidate_id in matched_runtime_task_ids:
-                    continue
-                matched_runtime_task_ids.add(candidate_id)
-                return candidate
-            return None
+            def _pick_best(candidates: list[TaskRunState]) -> TaskRunState | None:
+                best: TaskRunState | None = None
+                best_score = -1
 
-        if play_def is not None:
-            matched_runtime_task_ids: set[str] = set()
-            for tdef, role in iter_preflight_task_defs(play_def.tasks):
-                runtime = _pick_runtime(tdef.name, matched_runtime_task_ids)
-                if runtime is None and "{{" in tdef.name:
-                    # Preflight name has unresolved Jinja2 template —
-                    # try to find a runtime task whose resolved name
-                    # matches the template skeleton.
-                    for rt_name in runtime_by_name:
-                        stripped_rt = strip_role_prefix(rt_name)
-                        if not _is_template_match(tdef.name, rt_name) and not _is_template_match(
-                            tdef.name, stripped_rt
-                        ):
+                for candidate in candidates:
+                    candidate_id = _task_identity(candidate)
+                    if candidate_id in matched_runtime_task_ids:
+                        continue
+
+                    score = 0
+                    if preferred_hosts:
+                        score = len(preferred_hosts.intersection(candidate.hosts))
+
+                    # Prefer the candidate that best matches the current
+                    # branch's hosts; when scores tie, keep the earlier
+                    # runtime arrival order.
+                    if best is None or score > best_score:
+                        best = candidate
+                        best_score = score
+
+                if best is not None:
+                    matched_runtime_task_ids.add(_task_identity(best))
+                return best
+
+            # Exact task paths outrank name/host heuristics so same-named
+            # delegated and non-delegated rows stay distinct.
+            if task_path is not None:
+                best = _pick_best(runtime_by_path.get(task_path, []))
+                if best is not None:
+                    return best
+
+            candidates: list[TaskRunState] = []
+            seen_candidate_ids: set[str] = set()
+
+            def _append_candidates(candidate_name: str) -> None:
+                for candidate in runtime_by_name.get(candidate_name, []):
+                    candidate_id = _task_identity(candidate)
+                    if candidate_id in seen_candidate_ids:
+                        continue
+                    seen_candidate_ids.add(candidate_id)
+                    candidates.append(candidate)
+
+            _append_candidates(task_name)
+            if "{{" in task_name:
+                for candidate_name, candidate_tasks in runtime_by_name.items():
+                    stripped_candidate_name = strip_role_prefix(candidate_name)
+                    if not _is_template_match(task_name, candidate_name) and not _is_template_match(
+                        task_name, stripped_candidate_name
+                    ):
+                        continue
+                    for candidate in candidate_tasks:
+                        candidate_id = _task_identity(candidate)
+                        if candidate_id in seen_candidate_ids:
                             continue
-                        runtime = _pick_runtime(rt_name, matched_runtime_task_ids)
+                        seen_candidate_ids.add(candidate_id)
+                        candidates.append(candidate)
+
+            return _pick_best(candidates)
+
+        def _emit_preflight_entries(
+            entries: Iterable[TaskDefinition | RoleGroupDefinition],
+            inherited_role: str | None,
+            preferred_hosts: set[str] | None,
+            matched_runtime_task_ids: set[str],
+        ) -> None:
+            for entry in entries:
+                if isinstance(entry, RoleGroupDefinition):
+                    _emit_preflight_entries(
+                        entry.tasks, entry.role, preferred_hosts, matched_runtime_task_ids
+                    )
+                    continue
+
+                role = entry.role if entry.role is not None else inherited_role
+                runtime = _pick_runtime(
+                    entry.name, matched_runtime_task_ids, preferred_hosts, entry.path
+                )
+                if runtime is None and "{{" in entry.name:
+                    # Preflight name has unresolved Jinja2 template — try
+                    # to find a runtime task whose resolved name matches
+                    # the template skeleton.
+                    for candidate_name in runtime_by_name:
+                        stripped_candidate_name = strip_role_prefix(candidate_name)
+                        if not _is_template_match(
+                            entry.name, candidate_name
+                        ) and not _is_template_match(entry.name, stripped_candidate_name):
+                            continue
+                        runtime = _pick_runtime(
+                            candidate_name, matched_runtime_task_ids, preferred_hosts
+                        )
                         if runtime is not None:
                             break
+
                 kind = _classify(runtime)
-                emitted_names.add(tdef.name)
+                emitted_names.add(entry.name)
+                next_preferred_hosts = preferred_hosts
                 if runtime is not None:
                     # Emit under the runtime (resolved) name so host
                     # leaves and status are correct.
@@ -782,9 +1034,19 @@ class TreeProjection:
                     stripped = strip_role_prefix(runtime.name)
                     if stripped != runtime.name:
                         emitted_names.add(stripped)
-                if kind == "completed":
-                    continue
-                items.append((kind, tdef.name, role, runtime))
+                    if runtime.hosts:
+                        next_preferred_hosts = set(runtime.hosts)
+                if kind != "completed":
+                    items.append((kind, entry.name, role, runtime))
+
+                if entry.children:
+                    _emit_preflight_entries(
+                        entry.children, role, next_preferred_hosts, matched_runtime_task_ids
+                    )
+
+        if play_def is not None:
+            matched_runtime_task_ids: set[str] = set()
+            _emit_preflight_entries(play_def.tasks, None, None, matched_runtime_task_ids)
 
         # Runtime-only tasks (dynamic include_tasks, or no preflight at all).
         for task in play.tasks.values():
@@ -833,6 +1095,7 @@ class TreeProjection:
         also tried so that lookups succeed against the preflight index
         which stores bare task names.
         """
+        self._refresh_tree_cache()
         if self._role_index is None:
             idx: dict[str, str] = {}
             known_roles: set[str] = set()

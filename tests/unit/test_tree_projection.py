@@ -9,6 +9,8 @@ then assert on the projection.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from ansible_aom.core.models import (
     PlayDefinition,
     RoleGroupDefinition,
@@ -520,9 +522,7 @@ class TestTreeLinesPlayIdentity:
                 ],
             ),
         ]
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -569,6 +569,98 @@ class TestTreeLinesPlayIdentity:
 
         assert play_labels == ["play: Deploy", "play: Deploy"]
         assert task_labels == ["Install nginx", "Configure firewall"]
+
+
+class TestTreeLinesSerialWindowIdentity:
+    def _serial_window_state(self) -> RunState:
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy",
+                hosts="all",
+                resolved_hosts=["web1", "web2"],
+                tasks=[
+                    TaskDefinition(
+                        name="Run once",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                        path="site.yml:3",
+                    )
+                ],
+            )
+        ]
+
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-25T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-25T10:00:01Z",
+                "play": {
+                    "id": "p1",
+                    "name": "Deploy",
+                    "duration": {"start": "2026-05-25T10:00:01Z"},
+                },
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-25T10:00:03Z",
+                "task": {"id": "t1", "name": "Run once", "path": "site.yml:3"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-25T10:00:04Z",
+                "task": {"id": "t1", "name": "Run once", "path": "site.yml:3"},
+                "hosts": {"web1": {"ok": True, "changed": False}},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-25T10:00:05Z",
+                "play": {
+                    "id": "p1",
+                    "name": "Deploy",
+                    "duration": {"start": "2026-05-25T10:00:05Z"},
+                },
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-25T10:00:06Z",
+                "task": {"id": "t1", "name": "Run once", "path": "site.yml:3"},
+                "host": "web2",
+            }
+        )
+        return state
+
+    def test_run_once_tasks_refresh_between_serial_windows(self):
+        state = self._serial_window_state()
+
+        assert state.plays["p1"].window_start == "2026-05-25T10:00:05Z"
+
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=20)
+
+        task_groups: list[tuple[str, list[str]]] = []
+        current_hosts: list[str] | None = None
+        for ln in lines:
+            if ln.kind == "task":
+                current_hosts = []
+                task_groups.append((ln.label.split("  ")[0], current_hosts))
+            elif ln.kind == "host" and current_hosts is not None:
+                current_hosts.append(ln.label)
+
+        assert task_groups == [("Run once", ["web2"])]
 
 
 class TestTreeLinesGroupedRoleNestedChildren:
@@ -632,9 +724,7 @@ class TestTreeLinesGroupedRoleNestedChildren:
             ),
         ]
 
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-24T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-24T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -685,7 +775,10 @@ class TestTreeLinesGroupedRoleNestedChildren:
             {
                 "_event": "v2_playbook_on_task_start",
                 "_timestamp": "2026-05-24T10:00:07Z",
-                "task": {"id": "t2a", "name": "theforeman.operations.installer : Poll async status"},
+                "task": {
+                    "id": "t2a",
+                    "name": "theforeman.operations.installer : Poll async status",
+                },
                 "play": {"id": "p2"},
             }
         )
@@ -693,7 +786,10 @@ class TestTreeLinesGroupedRoleNestedChildren:
             {
                 "_event": "v2_runner_on_start",
                 "_timestamp": "2026-05-24T10:00:08Z",
-                "task": {"id": "t2a", "name": "theforeman.operations.installer : Poll async status"},
+                "task": {
+                    "id": "t2a",
+                    "name": "theforeman.operations.installer : Poll async status",
+                },
                 "host": "web1",
             }
         )
@@ -728,12 +824,189 @@ class TestTreeLinesGroupedRoleNestedChildren:
         assert poll_line.status == Status.RUNNING
 
 
+class TestTreeProjectionCacheRefresh:
+    def test_dynamic_child_graft_refreshes_role_cache(self):
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy Foreman",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[
+                    RoleGroupDefinition(
+                        role="webserver",
+                        tasks=[
+                            TaskDefinition(
+                                name="Install nginx",
+                                role="webserver",
+                                tags=[],
+                                play_id="p1",
+                                play_order=0,
+                                task_order=0,
+                            )
+                        ],
+                    )
+                ],
+            )
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-24T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-24T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy Foreman"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-24T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "p1"},
+            }
+        )
+
+        projection = TreeProjection.from_run_state(state)
+        assert projection._task_role("Install nginx") == "webserver"
+
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-24T10:00:03Z",
+                "task": {"id": "t2", "name": "Poll async status"},
+                "play": {"id": "p1"},
+            }
+        )
+
+        assert projection._task_role("Poll async status") == "webserver"
+        labels = [ln.label for ln in projection.tree_lines(budget=25)]
+        assert any(label.startswith("Poll async status") for label in labels)
+
+
+class TestTreeLinesNestedChildIdentity:
+    def _same_name_children_state(self) -> RunState:
+        state = RunState(playbook="site.yml")
+
+        include_a = TaskDefinition(
+            name="Include A",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=0,
+        )
+        include_a.children.append(
+            TaskDefinition(
+                name="Shared child",
+                role=None,
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=-1,
+                is_dynamic=True,
+            )
+        )
+
+        include_b = TaskDefinition(
+            name="Include B",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=1,
+        )
+        include_b.children.append(
+            TaskDefinition(
+                name="Shared child",
+                role=None,
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=-1,
+                is_dynamic=True,
+            )
+        )
+
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy",
+                hosts="all",
+                resolved_hosts=["web1", "web2"],
+                tasks=[include_a, include_b],
+            )
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-24T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-24T10:00:01Z",
+                "play": {"id": "play-1", "name": "Deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-24T10:00:02Z",
+                "task": {"id": "a", "name": "Include A"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-24T10:00:03Z",
+                "task": {"id": "b", "name": "Include B"},
+                "host": "web2",
+            }
+        )
+        # Reverse the child arrival order: the projection must still keep
+        # each runtime row attached to the correct parent branch.
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-24T10:00:04Z",
+                "task": {"id": "c2", "name": "Shared child"},
+                "host": "web2",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-24T10:00:05Z",
+                "task": {"id": "c1", "name": "Shared child"},
+                "host": "web1",
+            }
+        )
+        return state
+
+    def test_same_name_child_rows_do_not_swap_branches(self):
+        state = self._same_name_children_state()
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=20)
+
+        task_groups: list[tuple[str, list[str]]] = []
+        current_hosts: list[str] | None = None
+        for ln in lines:
+            if ln.kind == "task":
+                current_hosts = []
+                task_groups.append((ln.label.split("  ")[0], current_hosts))
+            elif ln.kind == "host" and current_hosts is not None:
+                current_hosts.append(ln.label)
+
+        assert task_groups == [
+            ("Include A", ["web1"]),
+            ("Shared child", ["web1"]),
+            ("Include B", ["web2"]),
+            ("Shared child", ["web2"]),
+        ]
+
+
 class TestTreeLinesTaskIdentity:
     def _same_name_concurrent_tasks_state(self) -> RunState:
         state = RunState(playbook="site.yml")
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -816,9 +1089,7 @@ class TestTreeLinesPreflightTaskIdentity:
                 ],
             )
         ]
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -865,6 +1136,223 @@ class TestTreeLinesPreflightTaskIdentity:
 
         assert task_labels == ["Install nginx", "Install nginx"]
         assert host_groups == [["web1"], ["web2"]]
+
+
+class TestTreeLinesAsyncTaskIdentity:
+    def _async_task_collision_state(self) -> RunState:
+        """Build a state where async launcher and async-status rows share a name.
+
+        The launcher and poller come from the real-world ``deploy_vms.yml``
+        async shape (different ``task.path`` values), but they intentionally
+        share a display name here so the path-aware grafting logic has to keep
+        the later async-status branch separate.
+        """
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="deploy",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Async job",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                        path="server-setup/playbooks/proxmox/deploy_vms.yml:10",
+                    ),
+                    TaskDefinition(
+                        name="Async job",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=1,
+                        path="server-setup/playbooks/proxmox/deploy_vms.yml:61",
+                    ),
+                ],
+            )
+        ]
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_start",
+                "_timestamp": "2026-05-24T10:00:00Z",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-24T10:00:01Z",
+                "play": {"id": "p1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-24T10:00:02Z",
+                "task": {
+                    "id": "launch-1",
+                    "name": "Async job",
+                    "path": "server-setup/playbooks/proxmox/deploy_vms.yml:10",
+                },
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-24T10:00:03Z",
+                "task": {
+                    "id": "launch-1",
+                    "name": "Async job",
+                    "path": "server-setup/playbooks/proxmox/deploy_vms.yml:10",
+                },
+                "hosts": {
+                    "web1": {
+                        "ok": True,
+                        "changed": True,
+                        "action": "ansible.builtin.command",
+                        "ansible_job_id": "j1",
+                        "started": True,
+                        "finished": False,
+                    }
+                },
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-24T10:00:10Z",
+                "task": {
+                    "id": "poll-1",
+                    "name": "Async job",
+                    "path": "server-setup/playbooks/proxmox/deploy_vms.yml:61",
+                },
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-24T10:00:11Z",
+                "task": {
+                    "id": "poll-1",
+                    "name": "Async job",
+                    "path": "server-setup/playbooks/proxmox/deploy_vms.yml:61",
+                },
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-24T10:00:12Z",
+                "task": {
+                    "id": "child-1",
+                    "name": "Unknown child",
+                    "path": "server-setup/playbooks/proxmox/deploy_vms.yml:99",
+                },
+                "play": {"id": "p1"},
+            }
+        )
+        return state
+
+    def test_async_launcher_and_async_status_keep_their_own_branch(self):
+        state = self._async_task_collision_state()
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=20, now=datetime(2026, 5, 24, 10, 0, 12, tzinfo=timezone.utc))
+
+        task_labels = [ln.label.split("  ")[0] for ln in lines if ln.kind == "task"]
+        assert task_labels == ["Async job", "Unknown child"]
+
+
+class TestTreeLinesDelegatedTaskIdentity:
+    def _delegated_twin_state(self) -> tuple[RunState, str, str]:
+        """Build two same-name tasks where one mirrors a delegated server-setup step.
+
+        The delegated task path comes from ``deploy_vms.yml`` (``delegate_to`` on the
+        ``Create Template VMs`` looped task). The non-delegated twin uses a separate
+        path from ``snapshot.yml``. They intentionally share the same visible name so
+        the projection has to use ``task.path`` instead of runtime arrival order.
+        """
+        delegated_path = "server-setup/playbooks/proxmox/deploy_vms.yml:134"
+        normal_path = "server-setup/roles/podman_service_update/tasks/snapshot.yml:13"
+
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="deploy",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Shared coordination task",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                        path=delegated_path,
+                    ),
+                    TaskDefinition(
+                        name="Shared coordination task",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=1,
+                        path=normal_path,
+                    ),
+                ],
+            )
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-24T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-24T10:00:01Z",
+                "play": {"id": "p1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-24T10:00:02Z",
+                "task": {"id": "normal-1", "name": "Shared coordination task", "path": normal_path},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-24T10:00:03Z",
+                "task": {
+                    "id": "delegated-1",
+                    "name": "Shared coordination task",
+                    "path": delegated_path,
+                },
+                "host": "web1",
+            }
+        )
+        return state, delegated_path, normal_path
+
+    def test_delegated_twin_tasks_follow_path_order_not_arrival_order(self):
+        state, delegated_path, normal_path = self._delegated_twin_state()
+
+        assert getattr(state.plays["p1"].tasks["delegated-1"], "path", None) == delegated_path
+        assert getattr(state.plays["p1"].tasks["normal-1"], "path", None) == normal_path
+
+        projection = TreeProjection.from_run_state(state)
+        items = projection._play_running_and_pending(state.plays["p1"])
+
+        assert [(kind, getattr(runtime, "path", None)) for kind, _, _, runtime in items] == [
+            ("running", delegated_path),
+            ("running", normal_path),
+        ]
 
 
 class TestTreeLinesPruning:
