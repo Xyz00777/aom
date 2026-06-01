@@ -61,3 +61,92 @@
     `task.name`, so two live task executions with different ids but the same
     visible label collapse into one task row. Guarded by
     `tests/unit/test_tree_projection.py::TestTreeLinesTaskIdentity::test_same_name_concurrent_tasks_stay_separate`.
+
+## 2026-05-24 Verification notes
+
+- The durable-projection / row-lease slice passed the targeted checks:
+  `tests/unit/test_tree_projection.py`,
+  `tests/compact/test_tree_projection_lifecycle.py`, and
+  `tests/integration/test_replay_determinism.py`.
+- A full-suite attempt (`uv run pytest tests/ -q`) still reports unrelated
+  pre-existing failures in `tests/compact/test_inspect_text_golden.py`,
+  `tests/integration/test_playbook_parser.py`, and
+  `tests/integration/test_session.py`.
+- The projection-reset gap issue is addressed by the new revision-aware cache
+  refresh path; the old invalidation note above is now historical context.
+
+## 2026-05-24 Async launcher / async-status identity gotcha
+
+- Same-name async launcher and async-status tasks can look identical if the
+  matcher only consults task names. Without `task.path`, the later async-status
+  child grafts under the launcher branch and the tree order flips. The fix here
+  was to key the task-definition lookup by `task.path` first, then fall back to
+  name.
+
+## 2026-05-24 Pyright import-resolution caveat
+
+- Pyright in this workspace still reported `ansible_aom` imports as missing in
+  `tests/unit/test_tree_classify_and_role_labels.py` until the file opted out
+  of `reportMissingImports`; the directive keeps diagnostics clean without
+  changing runtime behavior.
+
+## 2026-05-24 Delegated task regression verification
+
+- Focused delegated-task regression passed, and the touched Python files were
+  diagnostics-clean after the path-aware task matching change.
+- Full-suite status remained unchanged: 15 failures, 2583 passed, 18 skipped,
+  with the same unrelated failures in `tests/compact/test_inspect_text_golden.py`,
+  `tests/integration/test_playbook_parser.py`, and `tests/integration/test_session.py`.
+
+## 2026-05-25 run_once / serial gotcha
+
+- The JSONL stream does not appear to expose a stable batch discriminator by
+  default, so repeated `run_once` executions under `serial` cannot be fixed by
+  task name/path alone. The model needs an explicit batch/window key (or an
+  equivalent play-execution discriminator) to avoid row reuse across batches.
+
+## 2026-05-25 run_once / serial probe details
+
+- Verified on ansible-core 2.20.4: `serial: 1` causes the play to emit multiple
+  `v2_playbook_on_play_start` events with the same `play.id`/`play.path`.
+- `v2_playbook_on_task_start` and `v2_runner_on_ok` keep the same `task.id`/
+  `task.path` across batches; the runner payload only changes `hosts.*`.
+- There is no explicit `batch` / `window` field in the JSONL event payload we
+  probed, so path-based task identity alone is insufficient for batch reuse.
+- The batch boundary is only observable via the repeated play-start event's
+  `play.duration.start` timestamp.
+- `v2_playbook_on_task_start` under linear strategy synthesizes all resolved
+  hosts, so the serial-window regression probe should prefer
+  `v2_runner_on_start`/`v2_runner_on_ok` when the goal is to isolate the
+  window discriminator instead of host fan-out.
+
+## 2026-05-25 Large-output stall probe
+
+- Session `019e5c71-98c2-7000-8d73-47021467f5d4` looked like a frozen tree, but
+  the diagnostics fit backlog/backpressure: `pty_bytes=2343117`,
+  `pexpect_timeouts=247`, `events_received=196`, `stall_count_max=4`.
+- The stall path is in `ansible/runner.py`: `_drive()` waits on newline/EOF/
+  TIMEOUT, and only `_feed()` calls `PtyStreamParser.feed_line()` after a
+  complete line is available. No newline means no JSONL event, no state update.
+- Compact rendering is also intentionally rate-limited (`Display.update()` and
+  `_render_status_panel()` both coalesce at ~250 ms), so a noisy PTY can make
+  the tree *look* stale even while the child is still producing output.
+- `TreeProjection` reuse is not the corruption point here: it refreshes caches
+  on `RunState._tree_revision` changes, but normal task/host status updates are
+  read live from the mutable state on each render.
+
+- Final fix: `CompactRenderer.print_log()` now opportunistically calls the
+  compact repaint path, and `Display.print_log()` no longer resets the shared
+  status throttle. That keeps status/tree refresh cadence independent from log
+  bursts, so long output storms can still surface fresh panel state at the
+  normal 4 Hz ceiling.
+- Buffer decision: the suspected parser/cache ceiling was **not** implicated.
+  The session evidence still fits backlog/lag, so `MAX_LOG_LINES` and the JSONL
+  carry cap remain unchanged and bounded.
+
+## 2026-05-25 Session rotation tie-breaker
+
+- `cleanup_old_sessions()` now uses `(start_time, session_dir.name)` as the
+  sort key, so fallback-only directories with identical mtimes are pruned
+  deterministically. This preserves `meta.json` start-time precedence while
+  making coarse-filesystem cleanup stable.

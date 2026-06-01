@@ -230,6 +230,14 @@ RichLog's `write()` method accepts `scroll_end` parameter - pass `scroll_end=sel
   reordering without needing full snapshot fixtures.
 - **TC-148** (Timeout default): 9 tests — DEFAULT_PASSWORD_TIMEOUT=60, type checks, timeout constant availability
 
+## 2026-05-25 run_once / serial window probe
+
+- Real `ansible.posix.jsonl` output for `serial: 1` repeats `v2_playbook_on_play_start` once per batch.
+- The repeated play-start events keep the same `play.id` and `play.path`, and the repeated task events keep the same `task.id` and `task.path`.
+- The only stream field that clearly changes at the batch/window boundary is `play.duration.start` on each repeated `v2_playbook_on_play_start` event.
+- For the `run_once: true` task under `serial: 1`, the task row still reappears once per batch with the same task identity; the host field changes from `web1` → `web2` → `web3` across batches.
+- Recommendation: treat `play.duration.start` (or an internal ordinal derived from repeated play-start events) as the smallest stable batch/window discriminator and scope runtime play/task row identity with it.
+
 ## 2026-05-08 nom-style Display Backend Swap (branch: feat/nom-compact-renderer)
 
 ### What changed
@@ -238,6 +246,15 @@ RichLog's `write()` method accepts `scroll_end` parameter - pass `scroll_end=sel
   ANSI cursor positioning + DEC mode 2026 (synchronized output). Public
   API (`start`/`stop`/`update`/`print_log`/`clear`, `is_running`, `is_tty`)
   is preserved so `CompactRenderer` needs no changes. Each frame is wrapped
+
+## 2026-05-24 Tree meta-task normalization
+
+- Compact tree projection now treats explicit `meta: ...` tasks as hostless
+  control-flow rows: the task stays visible, but synthetic host leaves are
+  suppressed even when runtime fallback data is present.
+- Caveat: the heuristic is intentionally narrow and string-based; if Ansible
+  introduces other hostless pseudo-actions, add them explicitly instead of
+  broadening the fallback.
   in BSU (`\x1b[?2026h`) / ESU (`\x1b[?2026l`) so multi-line redraws apply
   atomically without flicker.
 - **250 ms refresh throttle ported.** `Display.update()` records the
@@ -248,6 +265,33 @@ RichLog's `write()` method accepts `scroll_end` parameter - pass `scroll_end=sel
 - **`compact/renderer.py::handle_completion`**: now prints the final
   summary on stdout when `is_tty=False`. Closes PQ6 — without this, a
   piped run produced zero final-state output because `Display.update()`
+
+## 2026-05-25 run_once / serial replay identity
+
+- `serial` is a play-level batching directive, not a separate strategy.
+  `run_once` executes once per active batch, so the same logical task can
+  legitimately reappear across multiple execution windows in one play.
+- The existing `task.path` disambiguation still covers same-name async /
+  delegated rows inside a batch, but it does **not** distinguish repeated
+  `run_once` windows across serial batches.
+- The missing dimension is batch identity: play identity alone is too
+  coarse, and per-task runtime identity alone is too fine. The durable
+  key needs to include the current batch/window.
+
+## 2026-05-24 Phase 0 replay harness / frame coverage
+
+### Deterministic replay helper
+- Added `ansible_aom.core.replay.iter_tree_frames()` as a pure helper that
+  reuses one `TreeProjection` across successive JSONL events.
+- This preserves projection-local continuity state during replay, which is
+  required for frame-by-frame assertions instead of final-snapshot-only checks.
+
+### Frame-level regression shape
+- The replay regression now inspects per-frame task groups, not just the final
+  tree text.
+- Same-name concurrent task rows can be asserted by grouping each frame’s task
+  label with the attached host leaves; that catches row swapping / collapse if
+  it ever regresses.
   is a no-op in non-TTY mode.
 - **`core/session.py::cleanup_old_sessions`**: was using `datetime.now()`
   as the fallback sort key for sessions without `meta.json`, giving every
@@ -266,6 +310,16 @@ RichLog's `write()` method accepts `scroll_end` parameter - pass `scroll_end=sel
 - Rewrote 5 tests in `tests/integration/test_compact_renderer.py` that
   asserted Rich Live implementation details (`_live`, `_console.show_cursor`,
   `live.refresh_per_second`) to assert observable behaviour: non-TTY
+
+## 2026-05-25 Sticky fallback identity split
+
+- `TreeProjection._last_running_play_id` stays on the legacy plain runtime
+  play id for sticky-fallback compatibility and test expectations.
+- Window-aware lease/selection now uses a separate internal runtime identity
+  (`play_id + window_start/window_ordinal`) so repeated `serial` / `run_once`
+  batches still disambiguate active play windows.
+- This split keeps public sticky state stable while preserving batch-safe
+  selection and lease lookup in the projection layer.
   produces no ANSI, `stop()` emits the show-cursor sequence, throttle
   coalesces frames within 250 ms.
 
@@ -365,6 +419,19 @@ older Pythons or accept ruff's preference. Project is currently 3.14-only
   the mapping (`STATUS_ICONS_ASCII`) but the renderer hard-codes the
   Unicode forms in `format_status_bar` and `handle_completion`. Needs
   a `supports_unicode()` detector + icon-set parameter threading.
+
+## 2026-05-24 Delegated task identity normalization
+
+- `TaskRunState.path` now persists the upstream JSONL task path, so core
+  projection can distinguish same-name delegated/non-delegated task rows
+  without repurposing host attribution.
+- `TreeProjection._play_running_and_pending()` now prefers exact
+  `task.path` matches before bare-name heuristics, which keeps the
+  delegated and non-delegated twins in preflight order even when runtime
+  arrival order is reversed.
+- Regression added in `tests/unit/test_tree_projection.py` using the
+  real server-setup delegate example (`deploy_vms.yml:134`) and a
+  non-delegated twin (`snapshot.yml:13`).
 
 ## 2026-05-10 TTY UX fixes + nom-style streaming logs (same branch)
 
@@ -1682,6 +1749,17 @@ cd68065 fix(tree): don't skip upcoming plays in sticky fallback
 - Current coverage mostly checks final frames or two-frame sticky cases; no existing test asserts row identity churn across a longer replay sequence.
 - No fixture today captures a hostile frame sequence specifically for tree flicker; likely need a new replay JSONL fixture plus per-event frame snapshots.
 
+## 2026-05-24 Ancestry-aware child matching
+
+- `TreeProjection._play_running_and_pending()` now walks preflight tasks recursively and
+  prefers runtime candidates whose host set overlaps the current ancestor branch before
+  falling back to flat arrival order.
+- That keeps repeated child labels under different include/import parents attached to the
+  correct branch instead of swapping host leaves when runtime arrivals interleave.
+- Caveat: if two same-name branches expose identical host sets, the projection still falls
+  back to the existing arrival-order tie-break; add a stronger runtime ancestry signal if a
+  future repro needs it.
+
 ## 2026-05-24 Shared recursive preflight traversal
 
 - Added a shared `iter_preflight_task_defs()` helper in `core/models.py` and
@@ -1696,3 +1774,91 @@ cd68065 fix(tree): don't skip upcoming plays in sticky fallback
   when the prefix has no whitespace, so literal task names like ``Install
   foo : bar`` stay ungrouped while include_role-style ``podman : ...`` and
   ``nginx : ...`` tasks still group and count correctly.
+
+## 2026-05-24 Phase 2 durable projection / row leases
+
+- Added a private ``RunState._tree_revision`` counter that bumps when
+  definitions are reassigned or dynamic tasks are grafted. ``TreeProjection``
+  now watches that revision and refreshes its role memo in place instead of
+  being recreated.
+- ``CompactRenderer`` no longer invalidates ``_projection`` on task/host start
+  events; the same projection instance now survives successive events and
+  quiet gaps while the core projection refreshes itself lazily.
+- Added short-lived internal row leases in ``core/tree.py`` so the sticky play
+  anchor and row continuity metadata age out intentionally instead of living
+  forever as a side effect of caching.
+- Lease bookkeeping is time-bounded (UTC timestamps) and pruned during
+  projection passes, which keeps the continuity state small while still
+  preserving gap stability.
+- Targeted verification: ``uv run pytest tests/unit/test_tree_projection.py
+  tests/compact/test_tree_projection_lifecycle.py
+  tests/integration/test_replay_determinism.py -q`` → passed.
+
+## 2026-05-24 Play-boundary borrowing tightening
+
+- `TreeProjection._play_running_and_pending()` now only classifies tasks
+  owned by the current play; generic same-name cross-play borrowing was
+  removed so hostile transition windows do not leak rows across play
+  boundaries.
+- `include_cross_play` remains as a compatibility knob for existing call
+  sites, but explicit ownership still needs to be modeled before any
+  borrowing can return safely.
+- Added regression coverage that keeps a play's own RUNNING task visible
+  while a same-name task in another play stays pending instead of being
+  borrowed.
+
+## 2026-05-24 Async launcher / async-status path disambiguation
+
+- `RunState._graft_or_match_task()` now prefers `task.path` over bare
+  task name when both are available. That keeps an async launcher row
+  and a later async-status row from stealing the same parent cursor when
+  they share a display name.
+- The runtime JSONL `task.path` field is the right discriminator for
+  these real-world async shapes because the launcher and poller live at
+  different file:line coordinates in the playbook, even when the visible
+  labels are identical.
+- Targeted verification passed:
+  `uv run pytest tests/unit/test_run_state_index.py tests/unit/test_tree_projection.py tests/unit/test_dynamic_expansion.py -q`.
+
+## 2026-05-25 run_once / serial window normalization
+
+- `PlayRunState` now records `window_start` from `play.duration.start` and
+  an ordinal fallback for repeated play-start windows.
+- `v2_playbook_on_play_start` now creates a fresh play window, so repeated
+  `run_once` batches don't inherit prior task-host state.
+- Tree projection scopes runtime task leases by the play-window identity,
+  which keeps the same logical task row from being reused across serial
+  batches.
+
+
+## 2026-05-25 Compact noisy-output QA
+- Targeted compact renderer regression tests passed: 117/117 in `tests/compact/test_render_dirty_flag.py`, `tests/compact/test_display_ansi.py`, `tests/compact/test_renderer_stats.py`, `tests/integration/test_compact_renderer.py`, `tests/unit/test_renderer_stats_parity.py`.
+- Ordinary compact smoke passed on `.sisyphus/test-fixtures/simple.yml` after installing missing `ansible.posix` collection in the local uv environment.
+- Noisy-output smoke passed with a synthetic local playbook emitting sustained stdout (`/tmp/opencode/aom-noisy-smoke/noisy_slow.yml`); compact renderer completed with final host/task summary and no obvious freeze.
+- Initial smoke failure was environment-related (`ansible.posix.jsonl` missing), not a renderer regression.
+
+## 2026-05-25 Tree gap-state anchor expiry
+
+- Root cause: `TreeProjection.tree_lines()` dropped `active_play_id` to `None` once the play lease expired and no fresh running play was found, which let the next quiet frame widen back out to every completed play.
+- Fix: keep the last running play pinned by its internal runtime identity even after the lease ages out; leases still expire for continuity metadata, but they no longer control play selection.
+- Added regressions for both the lease-expiry gap and the hostless meta-task gap so earlier completed plays stay hidden while the current play remains anchored.
+
+## 2026-05-25 Failed loop inspect fixture restore
+
+- Restored `tests/fixtures/sessions/019e4520-fa64-7000-a627-000000000002/stderr.log`
+  with the documented brew-cask tail so the failed-loop inspect golden test can
+  render the stderr header and curl 404 line again.
+
+## 2026-05-25 TUI replay mypy cleanup
+
+- Cleared the last `uv run mypy src/ansible_aom` blockers in the TUI/replay
+  path with typing-only changes: explicit tree-node narrowing for
+  `set_label()`, a real `str | None` pane-id return, and a dynamic completer
+  assignment via `setattr()`.
+
+## 2026-05-25 Tree sticky fallback cleanup
+
+- Removed the bare play-header fallback from `TreeProjection.tree_lines()` so a
+  play only stays visible while it still has running/pending surface.
+- Updated sticky regressions to expect completed plays to disappear on quiet
+  frames, while active plays still render normally while work remains.
