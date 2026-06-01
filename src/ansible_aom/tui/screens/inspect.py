@@ -477,6 +477,12 @@ class InspectApp(App):
 
     BINDINGS = [
         Binding("q", "quit", "Quit"),
+        # Textual's default binds ctrl+c to ``help_quit`` (a notification
+        # nudging the user toward ctrl+q) because ctrl+c doubles as copy
+        # when an Input/TextArea is focused. The inspect view is read-only
+        # with no such widgets — copy is on y/R — so honour the reflex and
+        # make ctrl+c actually quit. priority beats the focused widget.
+        Binding("ctrl+c", "quit", "Quit", show=False, priority=True),
         # Pane navigation
         Binding("tab", "focus_next_pane", "Next pane", show=False),
         Binding("shift+tab", "focus_prev_pane", "Prev pane", show=False),

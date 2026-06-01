@@ -132,6 +132,24 @@ async def test_tasks_pane_shows_tree_for_selected_run(state_dir: Path):
 
 
 @pytest.mark.asyncio
+async def test_ctrl_c_quits_the_app(state_dir: Path):
+    """Ctrl+C must terminate the inspect TUI.
+
+    Textual's default binds Ctrl+C to ``help_quit``, which only flashes a
+    "Press Ctrl+Q to quit" notification instead of exiting. Users hit
+    Ctrl+C reflexively, so the inspect app rebinds it to a real quit.
+    """
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("ctrl+c")
+        await pilot.pause()
+        assert app._exit is True
+
+
+@pytest.mark.asyncio
 async def test_detail_pane_shows_failure_msg(state_dir: Path):
     from ansible_aom.tui.screens.inspect import InspectApp
 
