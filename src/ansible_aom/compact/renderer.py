@@ -1027,6 +1027,15 @@ class CompactRenderer:
             suffix = self._inline_duration_suffix(event, event_time)
             lines: list[str] = []
             for host, result in event.get("hosts", {}).items():
+                # Looped task: expand the per-item ``results`` array into
+                # one line per item (matching ansible's default callback)
+                # instead of a single aggregate host line. The jsonl
+                # callback emits no per-item events, so this array is the
+                # only source of per-item detail.
+                item_lines = self._loop_item_lines(host, result)
+                if item_lines:
+                    lines.extend(item_lines)
+                    continue
                 if suffix:
                     self._current_task_inline_duration_hosts.add(host)
                 if result.get("changed"):
@@ -1041,6 +1050,13 @@ class CompactRenderer:
             suffix = self._inline_duration_suffix(event, event_time)
             lines = []
             for host, result in event.get("hosts", {}).items():
+                # Looped task that failed: the per-item lines (including
+                # the ``failed:`` item) replace the aggregate ``fatal:``
+                # line, matching ansible's default callback.
+                item_lines = self._loop_item_lines(host, result)
+                if item_lines:
+                    lines.extend(item_lines)
+                    continue
                 if suffix:
                     self._current_task_inline_duration_hosts.add(host)
                 msg = _truncate_msg(result.get("msg", "") or "")
@@ -1090,6 +1106,47 @@ class CompactRenderer:
                 self._last_task_uuid = None
                 self._last_task_name = None
                 self._last_task_start_time = None
+
+    def _loop_item_lines(self, host: str, result: dict) -> list[str]:
+        """Expand a looped task's per-host ``results`` array into log lines.
+
+        Returns one line per loop item — ``ok``/``changed``/``failed``/
+        ``skipping`` with an ``=> (item=<label>)`` suffix — coloured like
+        ansible's default callback. Returns an empty list when ``result``
+        has no loop (``results`` absent/empty), so callers fall back to the
+        single aggregate host line.
+
+        The item label mirrors ``core.inspect_model._make_loop_item``:
+        ``_ansible_item_label`` when ansible computed one, else the raw
+        ``item`` value. Per-item lines carry no inline duration (ansible
+        doesn't time individual items either); the per-task summary line
+        still reports the loop's total wall time.
+        """
+        results = result.get("results")
+        if not isinstance(results, list) or not results:
+            return []
+        lines: list[str] = []
+        for raw in results:
+            if not isinstance(raw, dict):
+                continue
+            label = str(raw.get("_ansible_item_label") or raw.get("item") or "")
+            if raw.get("failed"):
+                msg = _truncate_msg(raw.get("msg", "") or "")
+                text = f"failed: [{host}] => (item={label})"
+                if msg:
+                    text += f" => {msg}"
+                lines.append(_wrap(text, _RED, self._colorize))
+            elif raw.get("skipped"):
+                lines.append(
+                    _wrap(f"skipping: [{host}] => (item={label})", _CYAN, self._colorize)
+                )
+            elif raw.get("changed"):
+                lines.append(
+                    _wrap(f"changed: [{host}] => (item={label})", _YELLOW, self._colorize)
+                )
+            else:
+                lines.append(_wrap(f"ok: [{host}] => (item={label})", _GREEN, self._colorize))
+        return lines
 
     def _inline_duration_suffix(self, event: dict, event_time: float | None) -> str:
         """Return `` (2.3s)`` for the per-host result line, or empty.
