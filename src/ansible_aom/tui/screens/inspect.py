@@ -32,9 +32,7 @@ Other shortcuts:
 
 from __future__ import annotations
 
-import base64
 import shutil
-import sys
 from pathlib import Path
 
 from rich.text import Text
@@ -101,18 +99,25 @@ _RUN_STATUS_COLOR = {
 }
 
 
-def _copy_to_clipboard(text: str) -> None:
-    """Best-effort clipboard copy: try pyperclip, then OSC52, then no-op."""
+def _copy_to_clipboard(app: App, text: str) -> None:
+    """Best-effort clipboard copy from within the running TUI.
+
+    Routes through Textual's :meth:`App.copy_to_clipboard` so the OSC52
+    escape is written via Textual's driver. A raw ``sys.stdout`` write
+    never reaches the terminal while Textual owns the alternate screen,
+    which is why ``y``/``R`` silently failed to copy before.
+
+    Also attempts ``pyperclip`` when it is importable so the host's
+    native clipboard is populated on terminals lacking OSC52 support;
+    it is an optional extra, so its absence is ignored.
+    """
+    app.copy_to_clipboard(text)
     try:
         import pyperclip  # type: ignore[import-untyped]
 
         pyperclip.copy(text)
-        return
     except Exception:
         pass
-    encoded = base64.b64encode(text.encode("utf-8")).decode("ascii")
-    sys.stdout.write(f"\033]52;c;{encoded}\a")
-    sys.stdout.flush()
 
 
 def _stats_label(stats: StatusCounts) -> str:
@@ -993,11 +998,11 @@ class InspectApp(App):
 
     def action_copy_rerun(self) -> None:
         cmd = self._build_rerun_command()
-        _copy_to_clipboard(cmd)
+        _copy_to_clipboard(self.app, cmd)
         self.notify(f"Copied: {cmd[:60]}…" if len(cmd) > 60 else f"Copied: {cmd}")
 
     def action_yank_detail(self) -> None:
-        _copy_to_clipboard(self._detail_text)
+        _copy_to_clipboard(self.app, self._detail_text)
         self.notify("Detail yanked to clipboard")
 
     def action_help(self) -> None:

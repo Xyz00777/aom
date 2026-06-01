@@ -146,12 +146,7 @@ async def test_detail_pane_shows_failure_msg(state_dir: Path):
 
 
 @pytest.mark.asyncio
-async def test_r_copies_rerun_command(state_dir: Path, monkeypatch):
-    copied: list[str] = []
-    monkeypatch.setattr(
-        "ansible_aom.tui.screens.inspect._copy_to_clipboard",
-        lambda text: copied.append(text),
-    )
+async def test_r_copies_rerun_command(state_dir: Path):
     from ansible_aom.tui.screens.inspect import InspectApp
 
     app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
@@ -159,10 +154,11 @@ async def test_r_copies_rerun_command(state_dir: Path, monkeypatch):
         await pilot.pause()
         await pilot.press("R")
         await pilot.pause()
+        copied = app.clipboard
     assert copied, "Expected R to copy a rerun command"
-    assert "aom rerun" in copied[0]
-    assert "--limit" in copied[0]
-    assert "Install brew casks" in copied[0]
+    assert "aom rerun" in copied
+    assert "--limit" in copied
+    assert "Install brew casks" in copied
 
 
 @pytest.mark.asyncio
@@ -638,21 +634,25 @@ async def test_detail_block_includes_action_and_no_session_stderr(state_dir: Pat
 
 
 @pytest.mark.asyncio
-async def test_y_yanks_detail(state_dir: Path, monkeypatch):
-    copied: list[str] = []
-    monkeypatch.setattr(
-        "ansible_aom.tui.screens.inspect._copy_to_clipboard",
-        lambda text: copied.append(text),
-    )
+async def test_y_yanks_detail(state_dir: Path):
+    """``y`` must put the Detail body on the Textual app clipboard.
+
+    Regression: the copy was written straight to ``sys.stdout`` while
+    Textual owned the terminal, so the OSC52 sequence never reached it.
+    Routing through ``App.copy_to_clipboard`` is the reliable path —
+    assert the app clipboard actually carries the detail text.
+    """
     from ansible_aom.tui.screens.inspect import InspectApp
 
     app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
     async with app.run_test() as pilot:
         await pilot.pause()
+        detail = app._detail_text
         await pilot.press("y")
         await pilot.pause()
-    assert copied
-    assert "One or more items failed" in copied[0]
+        copied = app.clipboard
+    assert copied == detail
+    assert "One or more items failed" in copied
 
 
 @pytest.mark.asyncio
