@@ -139,10 +139,9 @@ class CompactRenderer:
         self._render_calls: int = 0
         self._log_writes: int = 0
         # HS-3: cached TreeProjection. ``TreeProjection`` memoizes its
-        # role-index per instance, so keeping the same instance alive
-        # across renders survives the O(P_def × T_def) role-resolve
-        # build cost. Invalidated (set to ``None``) on state-shape
-        # mutating events; rebuilt lazily at the next render.
+        # role-index per instance and now refreshes its own shape-aware
+        # caches when the underlying RunState revision changes, so the
+        # same instance can survive across renders and quiet gaps.
         self._projection: TreeProjection | None = None
         # HS-2: incremental task counters. The format-layer functions
         # ``count_completed_tasks`` / ``count_total_tasks_seen`` walked
@@ -246,9 +245,6 @@ class CompactRenderer:
         # per-host RUNNING entries under linear strategy, where the
         # JSONL callback does not emit v2_runner_on_start).
         self._state.definitions = list(self._definitions)
-        # HS-3: definitions changed → invalidate the cached projection
-        # so role-index memoization rebuilds from the new tree shape.
-        self._projection = None
         # HS-1/HS-8: mark dirty so the next render computes against the
         # fresh definitions.
         self._panel_dirty = True
@@ -273,16 +269,6 @@ class CompactRenderer:
 
         # Update RunState with the event
         self._state.handle_event(event)
-
-        event_type = event.get("_event", "")
-        if event_type in (
-            "v2_playbook_on_task_start",
-            "v2_playbook_on_handler_task_start",
-            "v2_runner_on_start",
-        ):
-            # Task/host start events can add new tree nodes or role/name
-            # mappings, so rebuild the cached projection for the next frame.
-            self._projection = None
 
         # HS-2: bump the incremental counters using the freshly-mutated
         # state. Done after ``handle_event`` so the task's hosts dict
@@ -440,9 +426,9 @@ class CompactRenderer:
         )
 
         # --- Regions 2 & 3: tree + host rows -------------------------------
-        # HS-3: reuse the cached projection between renders. It's
-        # invalidated by ``update_state`` and ``set_definitions`` when
-        # the state shape can change.
+        # HS-3: reuse the cached projection between renders. The
+        # projection refreshes its own revision-aware caches when the
+        # underlying RunState shape changes.
         if self._projection is None or self._projection._state is not self._state:
             self._projection = TreeProjection.from_run_state(self._state)
         projection = self._projection
@@ -565,6 +551,11 @@ class CompactRenderer:
         """
         self._log_writes += 1
         self._display.print_log(message)
+        # Sustained log storms can otherwise starve panel refreshes: the
+        # display writes the log immediately, then this periodic repaint keeps
+        # the tree/status panel moving on the same cadence as quiet ticks.
+        if self._state is not None and self._display.is_tty and self._display.is_running:
+            self._render_status_panel()
 
     def add_warning(self, message: str, is_deprecation: bool = False) -> None:
         """Add a warning or deprecation detected from PTY stream.

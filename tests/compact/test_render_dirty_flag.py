@@ -1,3 +1,5 @@
+# pyright: reportMissingImports=false
+
 """TC-PERF-040..041 — dirty-flag gating for ``_render_status_panel``.
 
 The status panel is computed on every event, but ``Display.update``
@@ -12,8 +14,9 @@ now keeps a ``_panel_dirty`` flag and a "last compute" timestamp so:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
+from ansible_aom.compact.display import Display
 from ansible_aom.compact.renderer import CompactRenderer
 
 
@@ -70,3 +73,32 @@ class TestDirtyFlagGating:
         r.tick()
 
         assert r._render_calls == baseline
+
+    def test_perf_042_log_storm_triggers_periodic_panel_refresh(self) -> None:
+        """Sustained log output still lets the compact panel repaint.
+
+        The log path used to reset the shared display throttle, which let
+        heavy output bursts starve status/tree refreshes. The renderer now
+        keeps log timing separate and repaints periodically even when no
+        new JSONL event arrives.
+        """
+        r = _renderer()
+        r._display = MagicMock(spec=Display)
+        r._display.is_tty = True
+        r._display.is_running = True
+        r._display.print_log = MagicMock()
+        r._display.update = MagicMock()
+        r._last_panel_compute_time = 0.0
+        r._panel_dirty = False
+
+        with patch("ansible_aom.compact.renderer.time") as mock_time:
+            mock_time.time.return_value = 100.0
+            mock_time.monotonic.side_effect = [1.0, 1.0, 1.1, 1.3, 1.3]
+
+            r.print_log("log line 1")
+            r.print_log("log line 2")
+            r.print_log("log line 3")
+
+        assert r._display.print_log.call_count == 3
+        assert r._display.update.call_count == 2
+        assert r._render_calls == 2

@@ -125,10 +125,10 @@ class Display:
         # Number of terminal rows the current status block occupies.
         # 0 means nothing is currently drawn that needs to be cleared.
         self._status_rows = 0
-        # Monotonic timestamp of the last status frame written to stdout.
-        # 0.0 means we've never written, so the first update goes through
-        # without waiting for the throttle window.
-        self._last_update_time = 0.0
+        # Monotonic timestamp of the last *status* frame written to stdout.
+        # Log frames do not touch this clock; compact mode needs status/tree
+        # refresh cadence to stay independent from log storms.
+        self._last_status_update_time = 0.0
         # R4: True when the terminal is below MINIMUM_SIZE. Degraded
         # mode disables the live panel entirely and falls back to a
         # plain log-only stream. Re-checked on every update() so the
@@ -251,7 +251,7 @@ class Display:
             self._is_running = True
             # Reset throttle so the very first re-enabled frame goes
             # through immediately rather than waiting on a stale clock.
-            self._last_update_time = 0.0
+            self._last_status_update_time = 0.0
 
         if self._degraded:
             return
@@ -259,7 +259,9 @@ class Display:
             return
 
         now = time.monotonic()
-        if self._last_update_time and (now - self._last_update_time) < _THROTTLE_INTERVAL_S:
+        if self._last_status_update_time and (
+            now - self._last_status_update_time
+        ) < _THROTTLE_INTERVAL_S:
             return
 
         rendered = self._content
@@ -268,7 +270,7 @@ class Display:
         sys.stdout.write(frame)
         sys.stdout.flush()
         self._status_rows = new_rows
-        self._last_update_time = now
+        self._last_status_update_time = now
 
     def print_log(self, message: str) -> None:
         """Print a log line above the status block.
@@ -293,10 +295,6 @@ class Display:
         sys.stdout.write(frame)
         sys.stdout.flush()
         self._status_rows = new_rows
-        # The status was just redrawn as part of this frame, so reset the
-        # throttle clock — the next update() should compete from "now".
-        self._last_update_time = time.monotonic()
-
     def clear(self) -> None:
         """Erase the status content (but leave the display running)."""
         self._content = ""
