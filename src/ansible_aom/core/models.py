@@ -137,6 +137,11 @@ class HostRunState:
     message: str = ""
     start_time: datetime | None = None
     end_time: datetime | None = None
+    # Number of loop items this host has completed so far, tallied live
+    # from ``v2_runner_item_on_*`` events. Drives the tree row's
+    # ``(N items)`` progress hint while the loop runs. Reset to a fresh
+    # HostRunState (count 0) when the aggregate terminal event lands.
+    loop_items_done: int = 0
 
 
 @dataclass
@@ -675,9 +680,29 @@ class RunState:
         still lands at loop end and is the source of truth for final state.
         Registering them here (rather than letting them fall through to
         ``unknown_events``) keeps the run-quality report clean.
+
+        The only state mutation is a per-host ``loop_items_done`` tally
+        used by the tree row. The host is marked RUNNING if not already
+        present — under the linear strategy there is no ``v2_runner_on_start``
+        and these item events are the first per-host signal of the loop.
         """
-        # No state mutation yet — the per-host loop counter for the TUI row
-        # is wired up in a later step.
+        task_data = event.get("task", {})
+        task_id = task_data.get("id", "")
+        play_id = self._resolve_play_id(event)
+        play = self.plays.get(play_id)
+        if play is None:
+            return
+        task = play.tasks.get(task_id)
+        if task is None:
+            return
+        for hostname in event.get("hosts", {}):
+            if not hostname:
+                continue
+            host = task.hosts.get(hostname)
+            if host is None:
+                host = HostRunState(hostname=hostname, status=Status.RUNNING, start_time=ts)
+                task.hosts[hostname] = host
+            host.loop_items_done += 1
 
     def _handle_v2_runner_on_ok(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_ok event."""

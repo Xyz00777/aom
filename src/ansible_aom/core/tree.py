@@ -156,6 +156,21 @@ def _effective_status(hs: HostRunState) -> Status:
     return Status.CHANGED if hs.status == Status.OK and hs.changed else hs.status
 
 
+def _host_leaf_label(hostname: str, hs: HostRunState) -> str:
+    """Host-leaf label, with a ``(N items)`` loop-progress hint when live.
+
+    A looped task tallies completed items per host (``loop_items_done``)
+    from ``v2_runner_item_on_*`` events. While the loop runs we surface
+    that running count so the row isn't frozen at the task name for the
+    whole loop. ansible never reports a loop's total up front, so this is
+    a bare count — a ``N/total`` form arrives once a prior-run total is
+    available. Non-looped hosts (count 0) render the bare hostname.
+    """
+    if hs.loop_items_done > 0:
+        return f"{hostname}  ({hs.loop_items_done} items)"
+    return hostname
+
+
 def _runtime_role_from_task_name(task_name: str) -> str | None:
     """Infer an include_role-style runtime role from a task name.
 
@@ -629,7 +644,10 @@ class TreeProjection:
             if leased_play_id is not None:
                 self._last_running_play_runtime_id = leased_play_id
                 for runtime, _ in ordered_plays:
-                    if runtime is not None and self._play_runtime_identity(runtime) == leased_play_id:
+                    if (
+                        runtime is not None
+                        and self._play_runtime_identity(runtime) == leased_play_id
+                    ):
                         self._remember_running_play(runtime)
                         break
                 active_play_id = leased_play_id
@@ -828,7 +846,7 @@ class TreeProjection:
                             TreeLine(
                                 depth=task_depth + 1,
                                 kind="host",
-                                label=hostname,
+                                label=_host_leaf_label(hostname, hs),
                                 glyph=None,
                                 status=hs.status,
                                 elapsed_s=elapsed,
