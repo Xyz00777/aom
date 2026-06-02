@@ -37,6 +37,36 @@ from ansible_aom.session.store import SessionManager
 logger = logging.getLogger(__name__)
 
 
+def _bundled_callback_dir() -> Path | None:
+    """Resolve the directory holding AOM's bundled ``aom_jsonl`` callback.
+
+    Returns the ``callback/`` package data dir when it exists and contains
+    the plugin, else None so the caller can fall back to the upstream
+    ``ansible.posix.jsonl`` callback rather than break the run.
+    """
+    callback_dir = Path(__file__).resolve().parent / "callback"
+    if (callback_dir / "aom_jsonl.py").is_file():
+        return callback_dir
+    return None
+
+
+def _callback_env() -> dict[str, str]:
+    """Return the env overrides that select AOM's stdout callback.
+
+    Prefers the bundled ``aom_jsonl`` plugin (which streams per-item loop
+    events live); falls back to ``ansible.posix.jsonl`` when the bundled
+    dir can't be resolved, so a packaging glitch costs only live item
+    streaming — never the whole run.
+    """
+    callback_dir = _bundled_callback_dir()
+    if callback_dir is not None:
+        return {
+            "ANSIBLE_CALLBACK_PLUGINS": str(callback_dir),
+            "ANSIBLE_STDOUT_CALLBACK": "aom_jsonl",
+        }
+    return {"ANSIBLE_STDOUT_CALLBACK": "ansible.posix.jsonl"}
+
+
 def _default_session_dir() -> Path:
     """Spec-standard location for live session directories.
 
@@ -278,7 +308,7 @@ def run_playbook(
 
     executable, args = _build_command(playbook, ansible_args)
     env = os.environ.copy()
-    env["ANSIBLE_STDOUT_CALLBACK"] = "ansible.posix.jsonl"
+    env.update(_callback_env())
 
     parser = PtyStreamParser()
     renderer.start(playbook, ansible_args)
