@@ -355,6 +355,9 @@ class RunState:
             "v2_runner_on_failed": self._handle_v2_runner_on_failed,
             "v2_runner_on_skipped": self._handle_v2_runner_on_skipped,
             "v2_runner_on_unreachable": self._handle_v2_runner_on_unreachable,
+            "v2_runner_item_on_ok": self._handle_v2_runner_item_on,
+            "v2_runner_item_on_failed": self._handle_v2_runner_item_on,
+            "v2_runner_item_on_skipped": self._handle_v2_runner_item_on,
             "v2_playbook_on_stats": self._handle_v2_playbook_on_stats,
         }
 
@@ -662,6 +665,19 @@ class RunState:
                 status=Status.RUNNING,
                 start_time=ts,
             )
+
+    def _handle_v2_runner_item_on(self, event: dict[str, Any], ts: datetime) -> None:
+        """Handle a per-item loop event (``v2_runner_item_on_*``).
+
+        These are additive, live-progress signals emitted by the bundled
+        ``aom_jsonl`` callback once per loop iteration. They must NOT affect
+        host/task status counts — the aggregate ``v2_runner_on_*`` event
+        still lands at loop end and is the source of truth for final state.
+        Registering them here (rather than letting them fall through to
+        ``unknown_events``) keeps the run-quality report clean.
+        """
+        # No state mutation yet — the per-host loop counter for the TUI row
+        # is wired up in a later step.
 
     def _handle_v2_runner_on_ok(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_ok event."""

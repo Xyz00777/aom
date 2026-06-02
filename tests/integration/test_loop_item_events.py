@@ -25,6 +25,30 @@ FIXTURES_DIR = Path(__file__).resolve().parents[2] / ".sisyphus" / "test-fixture
 CALLBACK_DIR = Path(__file__).resolve().parents[2] / "src" / "ansible_aom" / "ansible" / "callback"
 
 
+def _ansible_collection_paths() -> list[str]:
+    """Search-path entries reported by ``ansible-galaxy collection list``.
+
+    A sandboxed ``HOME`` hides collections installed under the real home
+    (e.g. ``~/.ansible/collections``), so callers that override ``HOME``
+    must forward these paths via ``ANSIBLE_COLLECTIONS_PATH``.
+    """
+    try:
+        result = subprocess.run(
+            ["ansible-galaxy", "collection", "list"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except subprocess.SubprocessError, OSError:
+        return []
+    paths: list[str] = []
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if line.startswith("# ") and "collections" in line:
+            paths.append(line[2:].strip())
+    return paths
+
+
 def _has_ansible_posix() -> bool:
     if shutil.which("ansible-galaxy") is None:
         return False
@@ -79,6 +103,56 @@ def _run_playbook(playbook: Path) -> list[dict]:
         except json.JSONDecodeError:
             continue
     return events
+
+
+def _run_aom(playbook: Path, home_dir: Path) -> subprocess.CompletedProcess[str]:
+    """Spawn ``python -m ansible_aom <playbook>`` against a sandboxed HOME.
+
+    Exercises the full pipeline: the runner selects the bundled aom_jsonl
+    callback, which streams item events through the compact renderer.
+    """
+    import sys
+
+    env = os.environ.copy()
+    env["HOME"] = str(home_dir)
+    collection_paths = _ansible_collection_paths()
+    if collection_paths:
+        env["ANSIBLE_COLLECTIONS_PATH"] = ":".join(collection_paths)
+    return subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "ansible_aom",
+            str(playbook),
+            "-i",
+            "localhost,",
+            "-c",
+            "local",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=60,
+    )
+
+
+@_NEEDS_ANSIBLE
+class TestLoopItemStreamingEndToEnd:
+    """The full ``aom`` pipeline renders one line per loop item, once each."""
+
+    def test_each_item_line_appears_exactly_once(self, tmp_path) -> None:
+        result = _run_aom(FIXTURES_DIR / "with_loop.yml", tmp_path)
+        assert result.returncode == 0, (
+            f"aom returned {result.returncode}\n"
+            f"--- stdout ---\n{result.stdout}\n--- stderr ---\n{result.stderr}"
+        )
+        out = result.stdout
+        # Per-item lines present (live streaming), and not duplicated by the
+        # end-of-loop aggregate expansion (dedup).
+        for fruit in ("apple", "banana", "cherry"):
+            assert out.count(f"(item={fruit})") == 1, (
+                f"expected exactly one line for {fruit}, got {out.count(f'(item={fruit})')}\n{out}"
+            )
 
 
 @_NEEDS_ANSIBLE

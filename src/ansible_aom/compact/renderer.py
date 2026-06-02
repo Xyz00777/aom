@@ -126,6 +126,14 @@ class CompactRenderer:
         # duplication on single-host runs (and on run_once / delegated
         # tasks in multi-host runs).
         self._current_task_inline_duration_hosts: set[str] = set()
+        # ``(host, task_id)`` pairs for which we have already streamed
+        # per-item loop lines from ``v2_runner_item_on_*`` events. The
+        # aggregate ``v2_runner_on_ok``/``on_failed`` then suppresses its
+        # own ``results[]`` expansion for these pairs so items aren't
+        # rendered twice. Empty under the plain ``ansible.posix.jsonl``
+        # fallback (no item events), where the aggregate expansion stays
+        # the only source of per-item lines.
+        self._streamed_loop_items: set[tuple[str, str]] = set()
         # Optional prior-run stats for the preflight "Last run" hint.
         # Must be set via :meth:`set_prior_run` BEFORE
         # :meth:`set_definitions` so the hint is included in the
@@ -1025,13 +1033,18 @@ class CompactRenderer:
             self._flush_pending_skips(force_individual=True)
             self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
+            task_id = event.get("task", {}).get("id", "")
             lines: list[str] = []
             for host, result in event.get("hosts", {}).items():
-                # Looped task: expand the per-item ``results`` array into
-                # one line per item (matching ansible's default callback)
-                # instead of a single aggregate host line. The jsonl
-                # callback emits no per-item events, so this array is the
-                # only source of per-item detail.
+                # Items already streamed live from v2_runner_item_on_* —
+                # the aggregate adds nothing per-item, so skip it entirely.
+                if (host, task_id) in self._streamed_loop_items:
+                    continue
+                # Looped task (plain jsonl fallback): expand the per-item
+                # ``results`` array into one line per item (matching
+                # ansible's default callback) instead of a single aggregate
+                # host line — this array is the only source of per-item
+                # detail when no item events streamed.
                 item_lines = self._loop_item_lines(host, result)
                 if item_lines:
                     lines.extend(item_lines)
@@ -1048,11 +1061,16 @@ class CompactRenderer:
             self._flush_pending_skips(force_individual=True)
             self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
+            task_id = event.get("task", {}).get("id", "")
             lines = []
             for host, result in event.get("hosts", {}).items():
-                # Looped task that failed: the per-item lines (including
-                # the ``failed:`` item) replace the aggregate ``fatal:``
-                # line, matching ansible's default callback.
+                # Items already streamed live (including the failed item) —
+                # the aggregate fatal line would duplicate them, so skip.
+                if (host, task_id) in self._streamed_loop_items:
+                    continue
+                # Looped task that failed (plain jsonl fallback): the
+                # per-item lines (including the ``failed:`` item) replace
+                # the aggregate ``fatal:`` line, matching ansible's default.
                 item_lines = self._loop_item_lines(host, result)
                 if item_lines:
                     lines.extend(item_lines)
@@ -1093,6 +1111,32 @@ class CompactRenderer:
             # or worth collapsing (all-skipped task). The flush
             # happens at task transition or stats.
             self._pending_skipped_hosts.extend(event.get("hosts", {}).keys())
+        elif name in (
+            "v2_runner_item_on_ok",
+            "v2_runner_item_on_failed",
+            "v2_runner_item_on_skipped",
+        ):
+            # Live per-item loop streaming: render this one item's line the
+            # moment it completes (the bundled ``aom_jsonl`` callback emits
+            # one such event per iteration). Mark ``(host, task_id)`` as
+            # streamed so the eventual aggregate ``v2_runner_on_ok``/
+            # ``on_failed`` suppresses its own ``results[]`` expansion and
+            # we don't render the item twice.
+            task_id = event.get("task", {}).get("id", "")
+            streamed_lines: list[str] = []
+            for host, raw in event.get("hosts", {}).items():
+                if not isinstance(raw, dict):
+                    continue
+                self._streamed_loop_items.add((host, task_id))
+                streamed_lines.append(self._format_loop_item_line(host, raw))
+            if streamed_lines:
+                # A real (non-skipped) item means the task produced output,
+                # so buffered skip lines should print individually — same
+                # rule the aggregate result handlers apply.
+                if name != "v2_runner_item_on_skipped":
+                    self._flush_pending_skips(force_individual=True)
+                    self._current_task_had_nonskipped_result = True
+                self._display.print_log("\n".join(streamed_lines))
         elif name == "v2_playbook_on_stats":
             # Drain the final task's skipped buffer with the same
             # mixed-vs-all-skipped rule we use at task transitions.
@@ -1125,28 +1169,30 @@ class CompactRenderer:
         results = result.get("results")
         if not isinstance(results, list) or not results:
             return []
-        lines: list[str] = []
-        for raw in results:
-            if not isinstance(raw, dict):
-                continue
-            label = str(raw.get("_ansible_item_label") or raw.get("item") or "")
-            if raw.get("failed"):
-                msg = _truncate_msg(raw.get("msg", "") or "")
-                text = f"failed: [{host}] => (item={label})"
-                if msg:
-                    text += f" => {msg}"
-                lines.append(_wrap(text, _RED, self._colorize))
-            elif raw.get("skipped"):
-                lines.append(
-                    _wrap(f"skipping: [{host}] => (item={label})", _CYAN, self._colorize)
-                )
-            elif raw.get("changed"):
-                lines.append(
-                    _wrap(f"changed: [{host}] => (item={label})", _YELLOW, self._colorize)
-                )
-            else:
-                lines.append(_wrap(f"ok: [{host}] => (item={label})", _GREEN, self._colorize))
-        return lines
+        return [self._format_loop_item_line(host, raw) for raw in results if isinstance(raw, dict)]
+
+    def _format_loop_item_line(self, host: str, raw: dict) -> str:
+        """Format one loop item's result as a coloured log line.
+
+        Returns ``ok``/``changed``/``failed``/``skipping: [host] =>
+        (item=<label>)`` coloured like ansible's default callback. Shared
+        by the end-of-loop aggregate expansion (:meth:`_loop_item_lines`)
+        and the live ``v2_runner_item_on_*`` streaming path so both render
+        identically. The label mirrors ``core.inspect_model._make_loop_item``:
+        ``_ansible_item_label`` when ansible computed one, else ``item``.
+        """
+        label = str(raw.get("_ansible_item_label") or raw.get("item") or "")
+        if raw.get("failed"):
+            msg = _truncate_msg(raw.get("msg", "") or "")
+            text = f"failed: [{host}] => (item={label})"
+            if msg:
+                text += f" => {msg}"
+            return _wrap(text, _RED, self._colorize)
+        if raw.get("skipped"):
+            return _wrap(f"skipping: [{host}] => (item={label})", _CYAN, self._colorize)
+        if raw.get("changed"):
+            return _wrap(f"changed: [{host}] => (item={label})", _YELLOW, self._colorize)
+        return _wrap(f"ok: [{host}] => (item={label})", _GREEN, self._colorize)
 
     def _inline_duration_suffix(self, event: dict, event_time: float | None) -> str:
         """Return `` (2.3s)`` for the per-host result line, or empty.

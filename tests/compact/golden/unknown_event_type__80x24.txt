@@ -5,4 +5,4 @@ TASK [Touch file] **************************************************
 changed: [localhost] (2.0s)
 [10:00:05] Touch file — (5.0s)
 probe.yml | 1/1 hosts | 1/1 tasks | 0:00:00 *
-  (1 unknown events: v2_runner_item_on_ok×1)
+  (1 unknown events: v2_runner_on_future_probe×1)

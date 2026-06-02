@@ -408,8 +408,10 @@ def _events_unknown_event_type() -> list[dict]:
         },
         # A future ansible-core (or third-party callback) emits a new
         # event type AOM doesn't model. R5 surfaces it in the footer.
+        # (``v2_runner_item_on_*`` are now modelled for live loop
+        # streaming, so this uses a fabricated name that stays unknown.)
         {
-            "_event": "v2_runner_item_on_ok",
+            "_event": "v2_runner_on_future_probe",
             "_timestamp": _ts(3),
             "task": {"id": "t1", "name": "Touch file"},
             "play": {"id": "p1"},
