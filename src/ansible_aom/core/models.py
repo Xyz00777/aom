@@ -280,6 +280,12 @@ class RunState:
     # with no _event field at all are degenerate (not "future-version
     # drift") and aren't counted here.
     unknown_events: dict[str, int] = field(default_factory=dict)
+    # Loop item totals from a matching prior run: ``{task.path: {host:
+    # item_count}}``. Injected via the renderer's ``set_prior_run`` so the
+    # tree can show ``N/total`` while a loop runs. Empty when there is no
+    # prior run (live count falls back to a bare ``(N items)``). This is
+    # reference data, not execution state — it is never mutated by events.
+    loop_totals: dict[str, dict[str, int]] = field(default_factory=dict)
     # HS-5/HS-6: name → definition lookup dicts, built once when
     # ``definitions`` is assigned. They replace the per-event linear
     # scans in ``_graft_or_match_task`` and ``_resolve_play_hosts``.

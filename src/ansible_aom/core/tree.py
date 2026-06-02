@@ -156,19 +156,23 @@ def _effective_status(hs: HostRunState) -> Status:
     return Status.CHANGED if hs.status == Status.OK and hs.changed else hs.status
 
 
-def _host_leaf_label(hostname: str, hs: HostRunState) -> str:
-    """Host-leaf label, with a ``(N items)`` loop-progress hint when live.
+def _host_leaf_label(hostname: str, hs: HostRunState, total: int | None = None) -> str:
+    """Host-leaf label, with a loop-progress hint when live.
 
     A looped task tallies completed items per host (``loop_items_done``)
     from ``v2_runner_item_on_*`` events. While the loop runs we surface
-    that running count so the row isn't frozen at the task name for the
-    whole loop. ansible never reports a loop's total up front, so this is
-    a bare count — a ``N/total`` form arrives once a prior-run total is
-    available. Non-looped hosts (count 0) render the bare hostname.
+    that count so the row isn't frozen at the task name for the whole loop.
+
+    ansible never reports a loop's total up front, so the form depends on
+    whether a matching prior run supplied one (``total``): ``N/total`` when
+    known, else a bare ``(N items)``. Non-looped hosts (count 0) render the
+    bare hostname.
     """
-    if hs.loop_items_done > 0:
-        return f"{hostname}  ({hs.loop_items_done} items)"
-    return hostname
+    if hs.loop_items_done <= 0:
+        return hostname
+    if total is not None and total > 0:
+        return f"{hostname}  {hs.loop_items_done}/{total}"
+    return f"{hostname}  ({hs.loop_items_done} items)"
 
 
 def _runtime_role_from_task_name(task_name: str) -> str | None:
@@ -836,6 +840,7 @@ class TreeProjection:
                     # task row visible, but never project host leaves.
                     pass
                 elif runtime.hosts:
+                    loop_totals = self._state.loop_totals.get(runtime.path or "", {})
                     for hostname, hs in runtime.hosts.items():
                         elapsed = (
                             (now - hs.start_time).total_seconds()
@@ -846,7 +851,7 @@ class TreeProjection:
                             TreeLine(
                                 depth=task_depth + 1,
                                 kind="host",
-                                label=_host_leaf_label(hostname, hs),
+                                label=_host_leaf_label(hostname, hs, loop_totals.get(hostname)),
                                 glyph=None,
                                 status=hs.status,
                                 elapsed_s=elapsed,

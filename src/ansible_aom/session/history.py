@@ -16,7 +16,7 @@ storage layer rather than in pure ``core/``.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 
@@ -32,6 +32,51 @@ class PriorRun:
     task_count: int
     host_count: int
     end_time: datetime
+    # Loop item totals mined from this session's recorded aggregate
+    # events: ``{task.path: {host: item_count}}``. Lets a re-run show a
+    # live ``N/total`` loop count. Empty for sessions recorded before
+    # event capture, or whose tasks had no loops.
+    loop_totals: dict[str, dict[str, int]] = field(default_factory=dict)
+
+
+def _mine_loop_totals(session_path: Path) -> dict[str, dict[str, int]]:
+    """Mine ``{task.path: {host: item_count}}`` from a session's events.
+
+    Scans ``events.jsonl`` for aggregate terminal events
+    (``v2_runner_on_ok`` / ``v2_runner_on_failed``) whose per-host result
+    carries a non-empty ``results`` array — the signature of a loop — and
+    records the loop length per task path per host. Best-effort: a missing
+    or malformed events file yields an empty mapping (the live run falls
+    back to a bare running count).
+    """
+    events_file = session_path / "events.jsonl"
+    if not events_file.is_file():
+        return {}
+    totals: dict[str, dict[str, int]] = {}
+    try:
+        with open(events_file) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if event.get("_event") not in ("v2_runner_on_ok", "v2_runner_on_failed"):
+                    continue
+                path = event.get("task", {}).get("path")
+                if not path:
+                    continue
+                for host, result in event.get("hosts", {}).items():
+                    if not isinstance(result, dict):
+                        continue
+                    results = result.get("results")
+                    if isinstance(results, list) and results:
+                        totals.setdefault(path, {})[host] = len(results)
+    except OSError:
+        return {}
+    return totals
 
 
 def _parse_iso(value: str | None) -> datetime | None:
@@ -80,7 +125,7 @@ def find_previous_run(
         # lookup.
         return None
 
-    best: tuple[datetime, PriorRun] | None = None
+    best: tuple[datetime, PriorRun, Path] | None = None
 
     for entry in session_dir.iterdir():
         if not entry.is_dir():
@@ -125,6 +170,10 @@ def find_previous_run(
             end_time=end_time,
         )
         if best is None or end_time > best[0]:
-            best = (end_time, candidate)
+            best = (end_time, candidate, entry)
 
-    return best[1] if best else None
+    if best is None:
+        return None
+    # Mine loop totals only for the winning session — reading every
+    # session's events.jsonl just to discard all but one would be wasteful.
+    return replace(best[1], loop_totals=_mine_loop_totals(best[2]))

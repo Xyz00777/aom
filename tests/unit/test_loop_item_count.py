@@ -83,6 +83,32 @@ class TestTreeRendersCount:
             f"expected '(3 items)' in {[ln.label for ln in host_lines]}"
         )
 
+    def test_running_host_leaf_shows_n_over_total_when_known(
+        self, event_playbook_start, event_play_start
+    ):
+        # A prior run supplied this loop's total (12) via state.loop_totals,
+        # keyed by task path, so the row reads "5/12" mid-loop.
+        task_start = {
+            "_event": "v2_playbook_on_task_start",
+            "_timestamp": "2026-04-20T10:00:02Z",
+            "task": {"id": "task-uuid-1", "name": "Install nginx", "path": "site.yml:5"},
+            "play": {"id": "play-uuid-1"},
+        }
+        state = RunState(playbook="site.yml")
+        for ev in (event_playbook_start, event_play_start, task_start):
+            state.handle_event(ev)
+        state.loop_totals = {"site.yml:5": {"web1": 12}}
+        for i in range(5):
+            state.handle_event(_item_event("web1", f"item{i}"))
+
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=50, now=datetime.now(timezone.utc))
+        host_lines = [ln for ln in lines if ln.kind == "host" and "web1" in ln.label]
+        assert host_lines
+        assert any("5/12" in ln.label for ln in host_lines), (
+            f"expected '5/12' in {[ln.label for ln in host_lines]}"
+        )
+
     def test_no_count_when_no_items(
         self, event_playbook_start, event_play_start, event_task_start, event_runner_start
     ):

@@ -166,9 +166,18 @@ class AOMApp(App[None]):
         self._run_state.definitions = list(definitions)
         self._dirty += 1
 
-    def set_prior_run(self, prior_run: object) -> None:  # noqa: ARG002
-        """Renderer Protocol no-op — the TUI doesn't surface the prior-run hint yet."""
-        return
+    def set_prior_run(self, prior_run: object) -> None:
+        """Renderer Protocol: copy the prior run's loop totals onto the state.
+
+        The TUI doesn't surface the "Last run" hint line yet, but it does
+        use the mined ``loop_totals`` so the tree can render ``N/total``
+        loop progress live. ``prior_run`` is typed ``object`` to keep this
+        module free of a ``session`` import; we read ``loop_totals`` if it
+        is present.
+        """
+        loop_totals = getattr(prior_run, "loop_totals", None)
+        self._run_state.loop_totals = dict(loop_totals) if loop_totals else {}
+        self._dirty += 1
 
     def add_warning(self, message: str, is_deprecation: bool = False) -> None:
         """Renderer Protocol: bump counters; widgets can read them.

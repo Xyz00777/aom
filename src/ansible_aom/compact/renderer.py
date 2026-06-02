@@ -227,8 +227,13 @@ class CompactRenderer:
         Must be called before :meth:`set_definitions` so the hint line
         is included in the one-shot startup summary. ``None`` means no
         matching prior run — the line is silently omitted.
+
+        The prior run's mined ``loop_totals`` are also copied onto the
+        RunState so the tree can render ``N/total`` loop progress live.
         """
         self._prior_run = prior_run
+        if self._state is not None:
+            self._state.loop_totals = dict(prior_run.loop_totals) if prior_run else {}
 
     def set_definitions(self, definitions: list) -> None:
         """Store preflight definitions and emit the startup summary.
