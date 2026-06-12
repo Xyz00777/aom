@@ -29,6 +29,7 @@ from ansible_aom.ansible.preflight import run_preflight
 from ansible_aom.core import diagnostics
 from ansible_aom.core.models import WarningType, count_leaf_tasks
 from ansible_aom.core.parser import PtyStreamParser
+from ansible_aom.core.prompt_channel import ENV_VAR
 from ansible_aom.core.run_config import build_run_config_key
 from ansible_aom.renderer.protocol import Renderer
 from ansible_aom.session.history import find_previous_run
@@ -48,6 +49,41 @@ def _bundled_callback_dir() -> Path | None:
     if (callback_dir / "aom_jsonl.py").is_file():
         return callback_dir
     return None
+
+
+def _bundled_collections_dir() -> Path | None:
+    """Resolve the root holding AOM's bundled ansible collections.
+
+    This is the directory that *contains* ``ansible_collections/`` so it can be
+    placed on ``ANSIBLE_COLLECTIONS_PATH``. Returns None when the tree is missing
+    (packaging glitch) so the caller degrades to "plugin resolvable only if the
+    user installed the collection" rather than breaking the run.
+    """
+    root = Path(__file__).resolve().parent / "collections"
+    if (root / "ansible_collections" / "aom" / "interactive").is_dir():
+        return root
+    return None
+
+
+def _provision_prompt_channel_env(env: dict[str, str], *, base_dir: Path | None = None) -> Path:
+    """Create a per-run prompt control dir and register it (+ the collection) in env.
+
+    Returns the control directory path. The directory is unique per run; the
+    runner removes it on teardown. ``base_dir`` is an injection point for tests;
+    production passes None and a temp dir is used.
+    """
+    import tempfile
+
+    parent = base_dir if base_dir is not None else Path(tempfile.gettempdir())
+    control_dir = Path(tempfile.mkdtemp(prefix="aom-prompt-", dir=parent))
+    env[ENV_VAR] = str(control_dir)
+
+    collections_root = _bundled_collections_dir()
+    if collections_root is not None:
+        existing = env.get("ANSIBLE_COLLECTIONS_PATH", "")
+        parts = [str(collections_root), *([existing] if existing else [])]
+        env["ANSIBLE_COLLECTIONS_PATH"] = os.pathsep.join(parts)
+    return control_dir
 
 
 def _callback_env() -> dict[str, str]:
@@ -342,6 +378,10 @@ def run_playbook(
     executable, args = _build_command(playbook, ansible_args)
     env = os.environ.copy()
     env.update(_callback_env())
+    from ansible_aom.ansible.prompt_channel import PromptChannel
+
+    prompt_control_dir = _provision_prompt_channel_env(env)
+    prompt_channel = PromptChannel(prompt_control_dir)
 
     parser = PtyStreamParser()
     renderer.start(playbook, ansible_args)
@@ -459,6 +499,16 @@ def run_playbook(
         renderer.handle_completion(130, "crashed")
         return 130
     finally:
+        try:
+            prompt_channel.drain()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("prompt channel drain failed: %s", exc)
+        try:
+            import shutil
+
+            shutil.rmtree(prompt_control_dir, ignore_errors=True)
+        except Exception:  # noqa: BLE001
+            pass
         renderer.stop()
         try:
             stderr_tty = sys.stderr.isatty()
