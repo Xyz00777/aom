@@ -1,0 +1,15 @@
+# .sisyphus/test-fixtures/serial_pause_multi.yml
+# serial: 1 forces ansible to re-run the play per host, so the pause fires
+# once per host with that host's templated prompt. Used by AOM's integration
+# test to prove per-host prompts arrive sequentially.
+- name: Per-host confirm
+  hosts: web
+  gather_facts: false
+  serial: 1
+  tasks:
+    - name: Confirm deployment
+      ansible.builtin.pause:
+        prompt: "Deploy to {{ inventory_hostname }}? Press Enter to continue"
+    - name: Note
+      ansible.builtin.debug:
+        msg: "deployed {{ inventory_hostname }}"
