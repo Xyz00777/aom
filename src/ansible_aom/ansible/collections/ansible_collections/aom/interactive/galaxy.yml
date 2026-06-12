@@ -1,0 +1,10 @@
+namespace: aom
+name: interactive
+version: 0.1.0
+readme: README.md
+authors:
+  - AOM
+description: Per-host interactive prompts that cooperate with the AOM monitor.
+license:
+  - GPL-3.0-or-later
+build_ignore: []
