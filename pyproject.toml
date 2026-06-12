@@ -3,7 +3,7 @@
 
 [project]
 name = "ansible-aom"
-version = "0.97.2"
+version = "0.90.1"
 description = "Ansible Output Monitor - nom-style TUI for ansible-playbook"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
@@ -99,15 +99,6 @@ disallow_untyped_defs = true
 module = "ansible_aom.ansible.callback.*"
 disallow_untyped_defs = false
 disallow_untyped_calls = false
-
-[[tool.mypy.overrides]]
-# The bundled aom.interactive collection plugins (action/module) run inside the
-# ansible subprocess against unstubbed ansible base classes; never imported by
-# AOM, so strict typing buys nothing here (same rationale as the callback above).
-module = "ansible_aom.ansible.collections.*"
-disallow_untyped_defs = false
-disallow_untyped_calls = false
-ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # The vendored ansible collections (incl. ansible.posix.jsonl) ship no stubs.

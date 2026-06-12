@@ -26,11 +26,18 @@ from typing import Any
 import pexpect
 
 from ansible_aom.ansible.preflight import run_preflight
-from ansible_aom.ansible.prompt_channel import PromptChannel
 from ansible_aom.core import diagnostics
 from ansible_aom.core.models import WarningType, count_leaf_tasks
 from ansible_aom.core.parser import PtyStreamParser
-from ansible_aom.core.prompt_channel import ENV_VAR
+
+# Re-exported under their historical underscore-prefixed names so existing
+# tests that patch / import them from this module keep working unchanged.
+from ansible_aom.core.prompts import (
+    looks_like_interactive_prompt as _looks_like_interactive_prompt,
+)
+from ansible_aom.core.prompts import (
+    reconstruct_pause_prompt as _reconstruct_pause_prompt,
+)
 from ansible_aom.core.run_config import build_run_config_key
 from ansible_aom.renderer.protocol import Renderer
 from ansible_aom.session.history import find_previous_run
@@ -52,81 +59,6 @@ def _bundled_callback_dir() -> Path | None:
     return None
 
 
-def _bundled_collections_dir() -> Path | None:
-    """Resolve the root holding AOM's bundled ansible collections.
-
-    This is the directory that *contains* ``ansible_collections/`` so it can be
-    placed on ``ANSIBLE_COLLECTIONS_PATH``. Returns None when the tree is missing
-    (packaging glitch) so the caller degrades to "plugin resolvable only if the
-    user installed the collection" rather than breaking the run.
-    """
-    root = Path(__file__).resolve().parent / "collections"
-    if (root / "ansible_collections" / "aom" / "interactive").is_dir():
-        return root
-    return None
-
-
-def _ansible_default_collections_paths() -> list[str]:
-    """Return ansible's default COLLECTIONS_PATHS as a list of directory strings.
-
-    These are the paths ansible-core scans when ``ANSIBLE_COLLECTIONS_PATH`` is
-    not set — typically ``~/.ansible/collections`` and
-    ``/usr/share/ansible/collections``. We include them when building our own
-    ``ANSIBLE_COLLECTIONS_PATH`` so that setting the bundled-collections dir does
-    not shadow system-installed collections (e.g. ``ansible.posix``) that the
-    ``aom_jsonl`` callback imports at load time.
-
-    Falls back to ansible's well-known default directories when ansible-core is
-    not importable in AOM's interpreter (e.g. a standalone ``aom`` install that
-    only shells out to a system ``ansible-playbook``). That fallback matters
-    because we *override* ``ANSIBLE_COLLECTIONS_PATH`` for the subprocess; without
-    it we would shadow the subprocess's system collections (``ansible.posix``),
-    breaking the ``aom_jsonl`` callback that imports them at load time.
-    """
-    try:
-        import ansible.constants as _ac  # noqa: PLC0415 — lazy: only needed once
-
-        paths = _ac.COLLECTIONS_PATHS
-        if isinstance(paths, list):
-            resolved = [str(p) for p in paths if p]
-            if resolved:
-                return resolved
-    except Exception:  # noqa: BLE001 — best-effort, fall through to defaults
-        pass
-    # Ansible isn't importable here (or returned nothing) — use its documented
-    # defaults so we never fully shadow the subprocess's collection search path.
-    return [str(Path.home() / ".ansible" / "collections"), "/usr/share/ansible/collections"]
-
-
-def _provision_prompt_channel_env(env: dict[str, str], *, base_dir: Path | None = None) -> Path:
-    """Create a per-run prompt control dir and register it (+ the collection) in env.
-
-    Returns the control directory path. The directory is unique per run; the
-    runner removes it on teardown. ``base_dir`` is an injection point for tests;
-    production passes None and a temp dir is used.
-    """
-    import tempfile
-
-    parent = base_dir if base_dir is not None else Path(tempfile.gettempdir())
-    control_dir = Path(tempfile.mkdtemp(prefix="aom-prompt-", dir=parent))
-    env[ENV_VAR] = str(control_dir)
-
-    collections_root = _bundled_collections_dir()
-    if collections_root is not None:
-        existing = env.get("ANSIBLE_COLLECTIONS_PATH", "")
-        # Include ansible's default paths so prepending our bundled dir does not
-        # shadow system-installed collections (ansible.posix etc.).
-        defaults = _ansible_default_collections_paths()
-        parts: list[str] = [str(collections_root)]
-        if existing:
-            parts.append(existing)
-        for d in defaults:
-            if d not in parts:
-                parts.append(d)
-        env["ANSIBLE_COLLECTIONS_PATH"] = os.pathsep.join(parts)
-    return control_dir
-
-
 def _callback_env() -> dict[str, str]:
     """Return the env overrides that select AOM's stdout callback.
 
@@ -142,39 +74,6 @@ def _callback_env() -> dict[str, str]:
             "ANSIBLE_STDOUT_CALLBACK": "aom_jsonl",
         }
     return {"ANSIBLE_STDOUT_CALLBACK": "ansible.posix.jsonl"}
-
-
-def _emit_bypass_prompt_warnings(
-    *,
-    playbook: str,
-    resolved_host_counts: list[int],
-    renderer: Renderer,
-) -> None:
-    """Best-effort: warn when a per-host pause prompt will be collapsed.
-
-    Reads + parses the playbook YAML, aligns each top-level play with its
-    resolved host count (by order), and forwards
-    ``detect_bypass_host_loop_prompts`` results through ``renderer.add_warning``.
-
-    Wrapped end-to-end in try/except: a lint must never abort or slow a run, so
-    any read/parse/alignment problem yields silence.
-    """
-    try:
-        import yaml  # noqa: PLC0415 — lazy; only needed for the lint
-
-        from ansible_aom.core.preflight_lints import detect_bypass_host_loop_prompts
-
-        with open(playbook, encoding="utf-8") as fh:
-            doc = yaml.safe_load(fh)
-        if not isinstance(doc, list):
-            return
-        # Top-level plays only; skip import_playbook entries (no 'hosts').
-        plays = [p for p in doc if isinstance(p, dict) and "hosts" in p]
-        pairs = list(zip(plays, resolved_host_counts))
-        for message in detect_bypass_host_loop_prompts(pairs):
-            renderer.add_warning(message, False)
-    except Exception as exc:  # noqa: BLE001 — lint is strictly best-effort
-        logger.debug("bypass-prompt lint skipped: %s", exc)
 
 
 def _default_session_dir() -> Path:
@@ -378,10 +277,9 @@ def _trace(label: str, **fields: object) -> None:
     sys.stderr.flush()
 
 
-# The pure prompt-detection heuristic lives in core/prompts.py. Re-exported
-# under its historical underscore-prefixed name so existing tests that
-# patch / import from this module keep working unchanged.
-from ansible_aom.core.prompts import looks_like_interactive_prompt as _looks_like_interactive_prompt
+# The pure prompt-detection heuristics live in core/prompts.py; they're
+# imported (with their historical underscore aliases) at the top of this
+# module so the runner can call them in the hot PTY loop.
 
 
 def _build_command(playbook: str, ansible_args: list[str]) -> tuple[str, list[str]]:
@@ -419,8 +317,6 @@ def run_playbook(
     executable, args = _build_command(playbook, ansible_args)
     env = os.environ.copy()
     env.update(_callback_env())
-    prompt_control_dir = _provision_prompt_channel_env(env)
-    prompt_channel = PromptChannel(prompt_control_dir)
 
     parser = PtyStreamParser()
     renderer.start(playbook, ansible_args)
@@ -473,12 +369,6 @@ def run_playbook(
         renderer.add_warning(err, False)
         sink.record_stderr(err)
 
-    _emit_bypass_prompt_warnings(
-        playbook=playbook,
-        resolved_host_counts=[len(p.resolved_hosts) for p in pre_result.definitions],
-        renderer=renderer,
-    )
-
     child: pexpect.spawn | None = None
     try:
         try:
@@ -505,9 +395,7 @@ def run_playbook(
         if profiler is not None:
             profiler.enable()
         try:
-            exit_code = _drive(
-                child, parser, renderer, timeout, sink, diag=diag, prompt_channel=prompt_channel
-            )
+            exit_code = _drive(child, parser, renderer, timeout, sink, diag=diag)
         finally:
             if profiler is not None:
                 profiler.disable()
@@ -540,16 +428,6 @@ def run_playbook(
         renderer.handle_completion(130, "crashed")
         return 130
     finally:
-        try:
-            prompt_channel.drain()
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("prompt channel drain failed: %s", exc)
-        try:
-            import shutil
-
-            shutil.rmtree(prompt_control_dir, ignore_errors=True)
-        except Exception:  # noqa: BLE001
-            pass
         renderer.stop()
         try:
             stderr_tty = sys.stderr.isatty()
@@ -569,7 +447,6 @@ def _drive(
     sink: _SessionSink | _NullSink,
     *,
     diag: diagnostics.RunDiagnostics | None = None,
-    prompt_channel: PromptChannel | None = None,
 ) -> int:
     """Read the PTY until EOF, feeding lines to the parser/renderer.
 
@@ -620,11 +497,6 @@ def _drive(
             # ends a silent window, including the "already-handled"
             # window marked by negative stall_count.
             stall_count = 0
-            # Service a pending per-host confirm even while other hosts keep
-            # streaming output (so the loop never goes quiet enough to TIMEOUT).
-            # Cheap when nothing is pending — just a control-dir glob.
-            if prompt_channel is not None:
-                prompt_channel.poll(renderer)
         elif idx == eof_idx:
             _trace("eof", leftover=(child.before or "")[:200])
             _flush_pending(child, parser, renderer, sink)
@@ -638,19 +510,21 @@ def _drive(
             # header line was already consumed before the prompt's
             # TIMEOUT fired.
             prior = parser.plaintext_lines[-1] if parser.plaintext_lines else None
+            # Rebuild a multi-line ``|`` pause block whose terminating
+            # ``:`` landed on its own line (the bare-colon ``prior`` alone
+            # carries no signal — the identifying header is lines back).
+            prompt_block = _reconstruct_pause_prompt(parser.plaintext_lines)
             _trace(
                 "timeout",
                 stall_count=stall_count,
                 buffer=(getattr(child, "buffer", "") or "")[:200],
                 before=(getattr(child, "before", "") or "")[:200],
                 prior=(prior or "")[:120],
+                block=(prompt_block or "")[:200],
             )
-            stall_count = _handle_timeout_branch(child, renderer, sink, stall_count, prior)
-            if prompt_channel is not None:
-                # Drain all currently-pending per-host requests this tick so N
-                # parallel hosts don't wait N timeouts to all be answered.
-                while prompt_channel.poll(renderer):
-                    pass
+            stall_count = _handle_timeout_branch(
+                child, renderer, sink, stall_count, prior, prompt_block
+            )
             if diag is not None:
                 diag.note_timeout()
                 diag.note_stall(stall_count if stall_count > 0 else 0)
@@ -744,6 +618,7 @@ def _handle_timeout_branch(
     sink: _SessionSink | _NullSink,
     stall_count: int,
     prior_plaintext: str | None = None,
+    prompt_block: str | None = None,
 ) -> int:
     """Handle a TIMEOUT in `_drive`. Return the new ``stall_count``.
 
@@ -797,6 +672,15 @@ def _handle_timeout_branch(
     # captured prompt.
     if not pending and prior_plaintext and _looks_like_interactive_prompt(prior_plaintext):
         _fire_prompt(child, renderer, sink, prior_plaintext, prior_plaintext)
+        return -1
+
+    # Case 2b: a multi-line ``|`` block ``prompt:`` whose terminating
+    # ``:`` landed on its own newline-terminated line. The buffer is
+    # empty and the immediate prior line is a bare ``:`` (no signal), so
+    # the block is reconstructed from recent plaintext at the call site
+    # and the ``[Task name]`` header inside it identifies the pause.
+    if not pending and prompt_block and _looks_like_interactive_prompt(prompt_block):
+        _fire_prompt(child, renderer, sink, prompt_block, None)
         return -1
 
     if pending:

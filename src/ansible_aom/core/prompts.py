@@ -144,3 +144,58 @@ def looks_like_interactive_prompt(pending: str, prior_plaintext: str | None = No
         if _BRACKETED_HEADER_RE.fullmatch(prior_clean):
             return True
     return False
+
+
+def reconstruct_pause_prompt(plaintext_lines: list[str], max_lookback: int = 100) -> str | None:
+    """Rebuild a multi-line ``ansible.builtin.pause`` block from recent plaintext.
+
+    A YAML block-scalar ``prompt:`` (``|``, ``>``, …) keeps a trailing
+    newline, so ansible's ``"[%s]\\n%s:"`` pause format puts the
+    terminating ``:`` on its OWN line. Every line of the block ends in
+    ``\\r\\n``, so pexpect's newline matcher consumes the whole block and
+    the unread PTY buffer is empty when the read TIMEOUTs. Neither the
+    (empty) buffer nor the immediate prior line — a bare ``:`` — carries
+    a signal, and the identifying ``[Task name]`` header may be many
+    lines back (e.g. behind a long deploy-preview block). So the
+    line-at-a-time detection misses it and the child blocks on stdin
+    forever.
+
+    Walk backwards from the LITERAL last line: when it ends in a prompt
+    terminator (``:`` or ``?``), look within ``max_lookback`` lines for an
+    *anchor* that identifies the block:
+
+    * a ``[Task name]`` header line — preferred, since it starts the
+      block and gives the fullest context; OR
+    * an interactive-marker line (``Press Enter``, ``(yes/no)``, …) —
+      the fallback that keeps detection working when the header has
+      scrolled out of the window above a long preview block.
+
+    Return the block from the chosen anchor to the end, joined with
+    newlines, so the caller can hand it to
+    :func:`looks_like_interactive_prompt`. Else None.
+
+    The last line must be the terminator itself (no skipping trailing
+    blanks): once the prompt is answered the PTY echoes a newline, which
+    becomes a blank last line — refusing to walk past it is what stops a
+    just-answered block from being re-surfaced and re-fired.
+    """
+    if not plaintext_lines:
+        return None
+    tail_idx = len(plaintext_lines) - 1
+    tail = _strip_ansi(plaintext_lines[tail_idx]).rstrip()
+    if not tail or tail[-1] not in (":", "?"):
+        return None
+    lo = max(0, tail_idx - max_lookback)
+    marker_idx: int | None = None
+    for i in range(tail_idx, lo - 1, -1):
+        clean = _strip_ansi(plaintext_lines[i]).strip()
+        # A header starts the block — best anchor; stop and use it.
+        if _BRACKETED_HEADER_RE.fullmatch(clean):
+            return "\n".join(plaintext_lines[i : tail_idx + 1])
+        # Remember the nearest marker line as a fallback anchor; keep
+        # scanning in case a header sits further back (fuller context).
+        if marker_idx is None and any(m in clean for m in INTERACTIVE_PROMPT_MARKERS):
+            marker_idx = i
+    if marker_idx is not None:
+        return "\n".join(plaintext_lines[marker_idx : tail_idx + 1])
+    return None

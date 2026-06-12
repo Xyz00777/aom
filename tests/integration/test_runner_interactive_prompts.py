@@ -280,6 +280,66 @@ class TestNewlineTerminatedPromptPath:
         assert captured.read_text() == "staging"
 
 
+class TestMultilineBlockPromptColonOnOwnLine:
+    """The exact production bug: a YAML ``|`` block-scalar ``prompt:``.
+
+    A ``|`` block keeps a trailing newline on the prompt value, so
+    ansible's ``"[%s]\\n%s:"`` format puts the terminating ``:`` on its
+    OWN line. Every line ends in ``\\r\\n``, so pexpect consumes the whole
+    block and ``child.buffer`` is empty when TIMEOUT fires — and the
+    immediate prior line is the bare ``:`` (no signal). The runner must
+    reconstruct the block (header → colon) from recent plaintext and
+    still fire the prompt, otherwise the play blocks on stdin forever.
+    """
+
+    def _fake_block_prompt(self, prompt: str, captured: Path) -> tuple[str, list[str]]:
+        prompt_repr = repr(prompt)
+        path_repr = repr(str(captured))
+        code = textwrap.dedent(
+            f"""
+            import sys
+            sys.stdout.write({prompt_repr})
+            sys.stdout.flush()
+            line = sys.stdin.readline().rstrip("\\r\\n")
+            with open({path_repr}, "w") as f:
+                f.write(line)
+            sys.exit(0)
+            """
+        )
+        return sys.executable, ["-c", code]
+
+    def test_colon_on_own_line_block_round_trip(self, tmp_path: Path) -> None:
+        from ansible_aom.ansible.runner import run_playbook
+
+        renderer = MagicMock()
+        renderer.handle_interactive_prompt.return_value = ""  # Enter
+        captured = tmp_path / "captured.txt"
+
+        # Exact bytes captured from a real ansible-playbook run of a
+        # ``pause:`` whose ``prompt:`` is a YAML ``|`` block: header,
+        # body lines, a blank line, the marker line, then a lone ``:``.
+        prompt = (
+            "[Confirm deployment]\r\n"
+            "Deploy to epistree (epistree.com)?\r\n"
+            "\r\n"
+            "Press Enter to continue or Ctrl+C to abort\r\n"
+            ":\r\n"
+        )
+        cmd, args = self._fake_block_prompt(prompt, captured)
+
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
+            exit_code = run_playbook(
+                "playbook.yml", [], renderer, timeout=0.2, session_dir=tmp_path
+            )
+
+        assert exit_code == 0
+        renderer.handle_interactive_prompt.assert_called_once()
+        surfaced = renderer.handle_interactive_prompt.call_args.args[0]
+        assert "Confirm deployment" in surfaced
+        assert captured.exists()
+        assert captured.read_text() == ""
+
+
 class TestKeyboardInterruptDuringPromptAborts:
     """Ctrl+C at the prompt must abort the playbook, not silently continue.
 

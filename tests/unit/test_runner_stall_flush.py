@@ -331,6 +331,69 @@ class TestSentinelPreventsRefiring:
         assert any("[aom]" in line and "prompt" in line for line in printed), printed
 
 
+class TestMultilinePauseBlock:
+    """A YAML ``|`` block ``prompt:`` puts the terminating ``:`` on its own
+    newline-terminated line, so the buffer AND the immediate prior line
+    carry no signal — only the reconstructed block does.
+    """
+
+    def test_reconstructed_block_fires_prompt(self) -> None:
+        child = _FakeChild(buffer_value="")
+        renderer = MagicMock()
+        renderer.handle_interactive_prompt.return_value = ""
+        sink = _FakeSink()
+
+        block = (
+            "[Confirm deployment]\n"
+            "Deploy to localhost (example.com)?\n\n"
+            "Press Enter to continue or Ctrl+C to abort\n:"
+        )
+
+        new_count = _handle_timeout_branch(
+            child,
+            renderer,
+            sink,
+            stall_count=0,
+            # The immediate prior line is the bare colon — no signal.
+            prior_plaintext=":",
+            prompt_block=block,
+        )
+
+        renderer.handle_interactive_prompt.assert_called_once()
+        assert child.sent_lines == [""]
+        assert new_count == -1
+
+    def test_no_block_and_bare_colon_prior_does_not_fire(self) -> None:
+        """Without a reconstructed block, a lone colon stays unrecognised
+        (it's the genuinely-ambiguous case the stall net handles)."""
+        child = _FakeChild(buffer_value="")
+        renderer = MagicMock()
+        sink = _FakeSink()
+
+        new_count = _handle_timeout_branch(
+            child, renderer, sink, stall_count=0, prior_plaintext=":", prompt_block=None
+        )
+
+        renderer.handle_interactive_prompt.assert_not_called()
+        assert new_count == 0
+
+    def test_sentinel_blocks_reconstructed_block_refiring(self) -> None:
+        child = _FakeChild(buffer_value="")
+        renderer = MagicMock()
+        sink = _FakeSink()
+
+        _handle_timeout_branch(
+            child,
+            renderer,
+            sink,
+            stall_count=-1,
+            prior_plaintext=":",
+            prompt_block="[Confirm deployment]\nProceed:",
+        )
+
+        renderer.handle_interactive_prompt.assert_not_called()
+
+
 class TestStallHintBeforeFlush:
     """Earlier visible hint before the flush threshold."""
 

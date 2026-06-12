@@ -99,33 +99,6 @@ aom inspect prune --days 30           # delete sessions older than N days
 ansible verbosity, not AOM verbosity. The AOM debug flag is
 `--verbose` (long form only).
 
-### Per-host prompts
-
-`ansible.builtin.pause` runs **once per batch** (it bypasses the host loop), so a
-prompt like `Deploy to {{ inventory_hostname }}?` in a multi-host play shows only
-the first host and one Enter releases all hosts.
-
-- For per-host confirmation, set `serial: 1` on the play — ansible then prompts
-  once per host and AOM shows each in turn.
-- AOM warns at startup when it spots a per-host prompt in a non-serial multi-host
-  play.
-
-#### Strategy-independent per-host prompts
-
-For per-host confirmation without `serial: 1` (e.g. parallel forks), use the
-bundled `aom.interactive.confirm` action:
-
-```yaml
-- name: Confirm deployment
-  aom.interactive.confirm:
-    prompt: "Deploy to {{ inventory_hostname }}? "
-```
-
-Under AOM each host gets its own prompt and answer. Typing `no`/`abort` fails that
-host only; Enter continues. Run **without** AOM the playbook still works — the
-action falls back to reading stdin (install the collection so plain
-`ansible-playbook` can resolve it).
-
 ## How it works
 
 ```

@@ -311,35 +311,3 @@ Full suite: 1749 passing, 6 skipped (up from 1710; +39 net).
    has their bytes sitting in the OS stdin buffer; `input()` reads
    them immediately. Considered acceptable behaviour — the user's
    intent is to respond either way.
-
-## Multi-host prompts (2026-06-12)
-
-`ansible.builtin.pause` sets `BYPASS_HOST_LOOP = True`: in a non-serial
-multi-host play it runs once, templating against the first host and applying one
-answer to all. Two supported per-host paths:
-
-1. **`serial: 1`** — the play re-runs per host, so pause fires per host with that
-   host's prompt. AOM already detects/routes these sequentially (validated;
-   `tests/integration/test_serial_pause_multihost.py`). A preflight lint
-   (`core/preflight_lints.py`) warns when a per-host prompt sits in a non-serial
-   multi-host play.
-2. **`aom.interactive.confirm`** (Phase 2) — a per-host action plugin that does
-   not bypass the host loop and talks to AOM over a FIFO control channel, so
-   per-host prompts work regardless of strategy (incl. parallel forks).
-
-Note: ansible only emits a pause prompt when it considers stdin interactive (a
-process-group / tcgetpgrp check in `Display.prompt_until`). When that check fails
-(e.g. a non-interactive harness), ansible silently skips the pause — AOM can only
-forward prompts ansible actually emits. The Phase 2 FIFO channel sidesteps this
-entirely because the plugin reads its answer from a FIFO, not a TTY.
-
-## Status: Phase 2 (aom.interactive.confirm) shipped (2026-06-12)
-
-Per-host prompts now work regardless of strategy via the bundled
-`aom.interactive.confirm` action plugin. It does not bypass the host loop, writes
-a per-host request into `$AOM_PROMPT_CONTROL_DIR` and blocks on a FIFO for the
-answer; the runner polls the control dir in its drive loop and routes each request
-through `renderer.handle_interactive_prompt`. Falls back to stdin when run without
-AOM. Abort fails only the aborted host. The runner includes ansible's default
-collection paths when injecting `ANSIBLE_COLLECTIONS_PATH` so the bundled dir never
-shadows system collections (which the aom_jsonl callback imports).
