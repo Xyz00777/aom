@@ -1254,6 +1254,12 @@ async def show_password_modal(self, prompt: str) -> str:
 | Rendering pause | Stop Rich Live | Suspend app or overlay modal |
 | Timeout | 60s default | 60s default |
 
+**Per-host prompts.** `ansible.builtin.pause` bypasses the host loop and prompts
+once per batch. For per-host confirmation use `serial: 1` (AOM forwards each
+host's prompt sequentially) or the `aom.interactive.confirm` action plugin. AOM
+emits a startup warning when a per-host prompt is found in a non-serial
+multi-host play.
+
 ### 5.8 Host Name Resolution
 
 AOM resolves host patterns to actual inventory hostnames using `--list-hosts` during the LOADING_TASKS phase. This provides the complete host list BEFORE execution begins.
