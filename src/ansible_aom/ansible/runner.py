@@ -67,6 +67,39 @@ def _callback_env() -> dict[str, str]:
     return {"ANSIBLE_STDOUT_CALLBACK": "ansible.posix.jsonl"}
 
 
+def _emit_bypass_prompt_warnings(
+    *,
+    playbook: str,
+    resolved_host_counts: list[int],
+    renderer: Renderer,
+) -> None:
+    """Best-effort: warn when a per-host pause prompt will be collapsed.
+
+    Reads + parses the playbook YAML, aligns each top-level play with its
+    resolved host count (by order), and forwards
+    ``detect_bypass_host_loop_prompts`` results through ``renderer.add_warning``.
+
+    Wrapped end-to-end in try/except: a lint must never abort or slow a run, so
+    any read/parse/alignment problem yields silence.
+    """
+    try:
+        import yaml  # noqa: PLC0415 — lazy; only needed for the lint
+
+        from ansible_aom.core.preflight_lints import detect_bypass_host_loop_prompts
+
+        with open(playbook, encoding="utf-8") as fh:
+            doc = yaml.safe_load(fh)
+        if not isinstance(doc, list):
+            return
+        # Top-level plays only; skip import_playbook entries (no 'hosts').
+        plays = [p for p in doc if isinstance(p, dict) and "hosts" in p]
+        pairs = list(zip(plays, resolved_host_counts))
+        for message in detect_bypass_host_loop_prompts(pairs):
+            renderer.add_warning(message, False)
+    except Exception as exc:  # noqa: BLE001 — lint is strictly best-effort
+        logger.debug("bypass-prompt lint skipped: %s", exc)
+
+
 def _default_session_dir() -> Path:
     """Spec-standard location for live session directories.
 
@@ -360,6 +393,12 @@ def run_playbook(
     for err in pre_result.errors:
         renderer.add_warning(err, False)
         sink.record_stderr(err)
+
+    _emit_bypass_prompt_warnings(
+        playbook=playbook,
+        resolved_host_counts=[len(p.resolved_hosts) for p in pre_result.definitions],
+        renderer=renderer,
+    )
 
     child: pexpect.spawn | None = None
     try:
