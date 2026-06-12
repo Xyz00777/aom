@@ -1,0 +1,13 @@
+# .sisyphus/test-fixtures/aom_confirm_multi.yml
+# No serial: proves aom.interactive.confirm fires per host even when the play
+# runs all hosts together (the case plain pause cannot do).
+- name: Per-host confirm without serial
+  hosts: web
+  gather_facts: false
+  tasks:
+    - name: Confirm deployment
+      aom.interactive.confirm:
+        prompt: "Deploy to {{ inventory_hostname }}? "
+    - name: Note
+      ansible.builtin.debug:
+        msg: "deployed {{ inventory_hostname }}"

@@ -66,6 +66,31 @@ def _bundled_collections_dir() -> Path | None:
     return None
 
 
+def _ansible_default_collections_paths() -> list[str]:
+    """Return ansible's default COLLECTIONS_PATHS as a list of directory strings.
+
+    These are the paths ansible-core scans when ``ANSIBLE_COLLECTIONS_PATH`` is
+    not set — typically ``~/.ansible/collections`` and
+    ``/usr/share/ansible/collections``. We include them when building our own
+    ``ANSIBLE_COLLECTIONS_PATH`` so that setting the bundled-collections dir does
+    not shadow system-installed collections (e.g. ``ansible.posix``) that the
+    ``aom_jsonl`` callback imports at load time.
+
+    Returns an empty list on any import/attribute error — the caller falls back
+    to not appending defaults, which is the pre-fix behaviour and fine when the
+    system paths are already on the parent process's ``ANSIBLE_COLLECTIONS_PATH``.
+    """
+    try:
+        import ansible.constants as _ac  # noqa: PLC0415 — lazy: only needed once
+
+        paths = _ac.COLLECTIONS_PATHS
+        if isinstance(paths, list):
+            return [str(p) for p in paths if p]
+    except Exception:  # noqa: BLE001 — best-effort
+        pass
+    return []
+
+
 def _provision_prompt_channel_env(env: dict[str, str], *, base_dir: Path | None = None) -> Path:
     """Create a per-run prompt control dir and register it (+ the collection) in env.
 
@@ -82,7 +107,15 @@ def _provision_prompt_channel_env(env: dict[str, str], *, base_dir: Path | None 
     collections_root = _bundled_collections_dir()
     if collections_root is not None:
         existing = env.get("ANSIBLE_COLLECTIONS_PATH", "")
-        parts = [str(collections_root), *([existing] if existing else [])]
+        # Include ansible's default paths so prepending our bundled dir does not
+        # shadow system-installed collections (ansible.posix etc.).
+        defaults = _ansible_default_collections_paths()
+        parts: list[str] = [str(collections_root)]
+        if existing:
+            parts.append(existing)
+        for d in defaults:
+            if d not in parts:
+                parts.append(d)
         env["ANSIBLE_COLLECTIONS_PATH"] = os.pathsep.join(parts)
     return control_dir
 
