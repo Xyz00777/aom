@@ -76,19 +76,26 @@ def _ansible_default_collections_paths() -> list[str]:
     not shadow system-installed collections (e.g. ``ansible.posix``) that the
     ``aom_jsonl`` callback imports at load time.
 
-    Returns an empty list on any import/attribute error — the caller falls back
-    to not appending defaults, which is the pre-fix behaviour and fine when the
-    system paths are already on the parent process's ``ANSIBLE_COLLECTIONS_PATH``.
+    Falls back to ansible's well-known default directories when ansible-core is
+    not importable in AOM's interpreter (e.g. a standalone ``aom`` install that
+    only shells out to a system ``ansible-playbook``). That fallback matters
+    because we *override* ``ANSIBLE_COLLECTIONS_PATH`` for the subprocess; without
+    it we would shadow the subprocess's system collections (``ansible.posix``),
+    breaking the ``aom_jsonl`` callback that imports them at load time.
     """
     try:
         import ansible.constants as _ac  # noqa: PLC0415 — lazy: only needed once
 
         paths = _ac.COLLECTIONS_PATHS
         if isinstance(paths, list):
-            return [str(p) for p in paths if p]
-    except Exception:  # noqa: BLE001 — best-effort
+            resolved = [str(p) for p in paths if p]
+            if resolved:
+                return resolved
+    except Exception:  # noqa: BLE001 — best-effort, fall through to defaults
         pass
-    return []
+    # Ansible isn't importable here (or returned nothing) — use its documented
+    # defaults so we never fully shadow the subprocess's collection search path.
+    return [str(Path.home() / ".ansible" / "collections"), "/usr/share/ansible/collections"]
 
 
 def _provision_prompt_channel_env(env: dict[str, str], *, base_dir: Path | None = None) -> Path:
