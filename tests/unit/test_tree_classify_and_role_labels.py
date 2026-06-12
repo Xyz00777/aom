@@ -1192,6 +1192,17 @@ class TestCrossPlayLookupIsolation:
                 "host": "db1",
             }
         )
+        # Play 2 starting finalises play 1 (plays run sequentially —
+        # RunState._finalize_play). This test models the transient state
+        # where play 1 is still active alongside play 2, so re-arm play 1's
+        # running task that the play-2 start just completed.
+        from ansible_aom.core.models import HostRunState, Status
+
+        _t1 = state.plays["play-1"].tasks["t1"]
+        _t1.status = Status.RUNNING
+        _t1.hosts["web1"] = HostRunState(
+            hostname="web1", status=Status.RUNNING, start_time=_t1.start_time
+        )
         return state
 
     def test_completed_play_skipped_when_other_play_running(self) -> None:
@@ -1712,6 +1723,20 @@ class TestStickyFallbackTreeRender:
                 "task": {"id": "t2", "name": "Install postgres"},
                 "host": "db1",
             }
+        )
+
+        # Two concurrently-running plays only occur transiently in a real
+        # run: a second play starting now finalises the first (ansible runs
+        # plays sequentially — see RunState._finalize_play), which is what
+        # stops e.g. a pause from lingering as RUNNING. Re-arm play 1's
+        # running task so this test still exercises the renderer's
+        # both-plays-render projection for that transient state.
+        from ansible_aom.core.models import HostRunState, Status
+
+        _t1 = state.plays["play-1"].tasks["t1"]
+        _t1.status = Status.RUNNING
+        _t1.hosts["web1"] = HostRunState(
+            hostname="web1", status=Status.RUNNING, start_time=_t1.start_time
         )
 
         p = TreeProjection.from_run_state(state)

@@ -553,6 +553,17 @@ class TestTreeLinesPlayIdentity:
                 "host": "db1",
             }
         )
+        # The second play starting finalises the first (plays run
+        # sequentially — RunState._finalize_play). This test asserts both
+        # same-named play executions stay visible, so re-arm play 1's
+        # running task that the play-2 start just completed.
+        from ansible_aom.core.models import HostRunState, Status
+
+        _t1 = state.plays["p1"].tasks["t1"]
+        _t1.status = Status.RUNNING
+        _t1.hosts["web1"] = HostRunState(
+            hostname="web1", status=Status.RUNNING, start_time=_t1.start_time
+        )
         return state
 
     def test_duplicate_play_names_keep_both_executions_visible(self):

@@ -385,6 +385,32 @@ class RunState:
             self.start_time = ts
             self.status = Status.RUNNING
 
+    def _finalize_play(self, play: "PlayRunState", ts: datetime) -> None:
+        """Force-complete a play whose work is definitively done.
+
+        Any host still marked RUNNING is transitioned to OK (with an
+        ``end_time``); any RUNNING task becomes COMPLETED. Used when a
+        boundary proves the play is over but a terminal event never
+        arrived — notably ``ansible.builtin.pause``, which emits no
+        ``v2_runner_on_ok``, so without this its host lingers as
+        ``(1 running)`` in the tree for the rest of the run. Hosts that
+        already hold a terminal status (OK/CHANGED/FAILED/…) are left
+        untouched.
+        """
+        for task in play.tasks.values():
+            for hostname in list(task.hosts):
+                hs = task.hosts[hostname]
+                if hs.status == Status.RUNNING:
+                    task.hosts[hostname] = HostRunState(
+                        hostname=hostname,
+                        status=Status.OK,
+                        changed=False,
+                        start_time=hs.start_time,
+                        end_time=ts,
+                    )
+            if task.status == Status.RUNNING:
+                task.status = Status.COMPLETED
+
     def _handle_v2_playbook_on_play_start(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_playbook_on_play_start event."""
         play_data = event.get("play", {})
@@ -392,6 +418,19 @@ class RunState:
         play_name = play_data.get("name", "").strip()
         play_window_start = _parse_play_window_start(play_data)
         play_window_ordinal = self._play_window_counts.get(play_id, 0)
+
+        # A new play starting is definitive proof that every prior play is
+        # done — ansible runs plays sequentially. Finalise prior plays now
+        # so a pause (or any action with no terminal event) that was the
+        # last task of its play doesn't stay RUNNING in the tree. Skip the
+        # same play_id (serial batches re-emit play_start for one play and
+        # the entry is replaced below anyway).
+        for prior_id, prior in self.plays.items():
+            if prior_id == play_id:
+                continue
+            self._finalize_play(prior, ts)
+            if prior.status == Status.RUNNING:
+                prior.status = Status.COMPLETED
 
         self._current_play_id = play_id
         self._play_window_counts[play_id] = play_window_ordinal + 1
@@ -857,16 +896,4 @@ class RunState:
         # Clean up stale RUNNING hosts: the playbook is done, so any host
         # still marked RUNNING has a missing terminal event.
         for play in self.plays.values():
-            for task in play.tasks.values():
-                for hostname in list(task.hosts):
-                    hs = task.hosts[hostname]
-                    if hs.status == Status.RUNNING:
-                        task.hosts[hostname] = HostRunState(
-                            hostname=hostname,
-                            status=Status.OK,
-                            changed=False,
-                            start_time=hs.start_time,
-                            end_time=ts,
-                        )
-                if task.status == Status.RUNNING:
-                    task.status = Status.COMPLETED
+            self._finalize_play(play, ts)
