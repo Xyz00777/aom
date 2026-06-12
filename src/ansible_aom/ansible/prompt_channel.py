@@ -13,7 +13,9 @@ the run; worst case the worker stays blocked until ``drain`` unblocks it on tear
 
 from __future__ import annotations
 
+import errno
 import logging
+import os
 from pathlib import Path
 from typing import Protocol
 
@@ -47,13 +49,32 @@ class PromptChannel:
         reqs.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0.0)
         return reqs
 
-    def _answer(self, request_id: str, answer: str) -> None:
-        """Write a single answer line to the request's FIFO (best-effort)."""
+    def _answer(self, request_id: str, answer: str, *, block: bool) -> None:
+        """Write a single answer line to the request's FIFO (best-effort).
+
+        ``block=True`` (the live ``poll`` path): open with a plain blocking
+        ``O_WRONLY`` so the write waits for the plugin worker to attach as
+        reader. The worker wrote its ``.req`` then immediately opens the FIFO
+        for read, so blocking here also closes that tiny rename→open race.
+
+        ``block=False`` (the ``drain``/teardown path): open with ``O_NONBLOCK``
+        so a *dead* worker — e.g. ansible was force-killed on Ctrl+C before we
+        could answer — yields ``ENXIO`` instead of blocking forever. A blocking
+        open here would wedge the runner's ``finally`` and the terminal would
+        never be restored.
+        """
         fifo = self._dir / f"{request_id}{FIFO_SUFFIX}"
+        flags = os.O_WRONLY if block else os.O_WRONLY | os.O_NONBLOCK
         try:
-            # Opening for write blocks until the plugin opens for read — which it
-            # already has (it wrote the .req then blocked on the FIFO).
-            with open(fifo, "w", encoding="utf-8") as fh:
+            fd = os.open(str(fifo), flags)
+        except OSError as exc:
+            # ENXIO on the non-blocking path simply means no reader is attached
+            # (worker already gone) — expected on teardown, not worth logging.
+            if not (exc.errno == errno.ENXIO and not block):
+                logger.debug("prompt channel answer open failed (%s): %s", fifo.name, exc)
+            return
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 fh.write(answer + "\n")
         except OSError as exc:
             logger.debug("prompt channel answer write failed (%s): %s", fifo.name, exc)
@@ -76,7 +97,7 @@ class PromptChannel:
             return False
 
         answer = renderer.handle_interactive_prompt(request.prompt)
-        self._answer(request.id, answer)
+        self._answer(request.id, answer, block=True)
         self._handled.add(req_path.stem)
         try:
             req_path.unlink(missing_ok=True)
@@ -92,7 +113,7 @@ class PromptChannel:
         """
         for req_path in self._pending():
             stem = req_path.stem
-            self._answer(stem, "")
+            self._answer(stem, "", block=False)
             self._handled.add(stem)
             try:
                 req_path.unlink(missing_ok=True)

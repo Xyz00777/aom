@@ -39,6 +39,15 @@ def test_warns_when_serial_greater_than_one():
     assert len(detect_bypass_host_loop_prompts([(_play([PAUSE_TASK], serial=5), 10)])) == 1
 
 
+def test_no_warning_when_serial_list_all_ones():
+    assert detect_bypass_host_loop_prompts([(_play([PAUSE_TASK], serial=[1, 1]), 3)]) == []
+
+
+def test_warns_when_serial_list_has_larger_batch():
+    # serial: [1, 5] -> the size-5 batch still collapses, so warn.
+    assert len(detect_bypass_host_loop_prompts([(_play([PAUSE_TASK], serial=[1, 5]), 6)])) == 1
+
+
 def test_no_warning_when_prompt_has_no_host_var():
     task = {"name": "Pause", "ansible.builtin.pause": {"prompt": "Continue? Enter to go"}}
     assert detect_bypass_host_loop_prompts([(_play([task]), 3)]) == []

@@ -17,4 +17,10 @@ author:
   - AOM
 """
 
+EXAMPLES = r"""
+- name: Confirm deployment per host
+  aom.interactive.confirm:
+    prompt: "Deploy to {{ inventory_hostname }}? "
+"""
+
 RETURN = r""" # """

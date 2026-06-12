@@ -58,7 +58,9 @@ def _is_serial_one(play: dict) -> bool:
     """
     serial = play.get("serial")
     if isinstance(serial, list):
-        serial = serial[0] if serial else None
+        # A list is safe only if *every* batch is size 1 — ``serial: [1, 5]``
+        # still collapses the second (size-5) batch, so it must still warn.
+        return bool(serial) and all(str(s) == "1" for s in serial)
     return str(serial) == "1"
 
 

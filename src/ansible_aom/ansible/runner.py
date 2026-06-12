@@ -620,6 +620,11 @@ def _drive(
             # ends a silent window, including the "already-handled"
             # window marked by negative stall_count.
             stall_count = 0
+            # Service a pending per-host confirm even while other hosts keep
+            # streaming output (so the loop never goes quiet enough to TIMEOUT).
+            # Cheap when nothing is pending — just a control-dir glob.
+            if prompt_channel is not None:
+                prompt_channel.poll(renderer)
         elif idx == eof_idx:
             _trace("eof", leftover=(child.before or "")[:200])
             _flush_pending(child, parser, renderer, sink)

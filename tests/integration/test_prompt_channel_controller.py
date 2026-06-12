@@ -82,3 +82,31 @@ def test_drain_sends_empty_answer_to_outstanding_requests(tmp_path):
     channel.drain()  # teardown: unblock any worker with an empty (=continue) answer
     t.join(2)
     assert captured == [""]
+
+
+def test_drain_does_not_hang_when_worker_is_dead(tmp_path):
+    """A stale request whose plugin worker died (no FIFO reader) must not block.
+
+    On Ctrl+C the runner force-kills ansible (and its plugin workers) and *then*
+    calls ``drain`` in its ``finally``. A blocking ``open(fifo, "w")`` would hang
+    forever because nobody is reading — wedging teardown so the terminal is never
+    restored. ``drain`` must use a non-blocking write and skip dead workers.
+    """
+    ctrl = tmp_path / "ctrl"
+    ctrl.mkdir()
+    channel = PromptChannel(ctrl)
+    # FIFO + .req exist but NO reader is ever attached (the worker is "dead").
+    _drop_request(ctrl, "web1", "Deploy? ")
+
+    done = threading.Event()
+
+    def run_drain() -> None:
+        channel.drain()
+        done.set()
+
+    t = threading.Thread(target=run_drain)
+    t.start()
+    assert done.wait(5), "drain() hung with no FIFO reader attached"
+    t.join(1)
+    # The stale request is still tombstoned/cleaned up.
+    assert list(ctrl.glob(f"*{REQUEST_SUFFIX}")) == []
