@@ -26,6 +26,7 @@ from typing import Any
 import pexpect
 
 from ansible_aom.ansible.preflight import run_preflight
+from ansible_aom.ansible.prompt_channel import PromptChannel
 from ansible_aom.core import diagnostics
 from ansible_aom.core.models import WarningType, count_leaf_tasks
 from ansible_aom.core.parser import PtyStreamParser
@@ -378,8 +379,6 @@ def run_playbook(
     executable, args = _build_command(playbook, ansible_args)
     env = os.environ.copy()
     env.update(_callback_env())
-    from ansible_aom.ansible.prompt_channel import PromptChannel
-
     prompt_control_dir = _provision_prompt_channel_env(env)
     prompt_channel = PromptChannel(prompt_control_dir)
 
@@ -466,7 +465,9 @@ def run_playbook(
         if profiler is not None:
             profiler.enable()
         try:
-            exit_code = _drive(child, parser, renderer, timeout, sink, diag=diag)
+            exit_code = _drive(
+                child, parser, renderer, timeout, sink, diag=diag, prompt_channel=prompt_channel
+            )
         finally:
             if profiler is not None:
                 profiler.disable()
@@ -528,6 +529,7 @@ def _drive(
     sink: _SessionSink | _NullSink,
     *,
     diag: diagnostics.RunDiagnostics | None = None,
+    prompt_channel: PromptChannel | None = None,
 ) -> int:
     """Read the PTY until EOF, feeding lines to the parser/renderer.
 
@@ -599,6 +601,11 @@ def _drive(
                 prior=(prior or "")[:120],
             )
             stall_count = _handle_timeout_branch(child, renderer, sink, stall_count, prior)
+            if prompt_channel is not None:
+                # Drain all currently-pending per-host requests this tick so N
+                # parallel hosts don't wait N timeouts to all be answered.
+                while prompt_channel.poll(renderer):
+                    pass
             if diag is not None:
                 diag.note_timeout()
                 diag.note_stall(stall_count if stall_count > 0 else 0)
