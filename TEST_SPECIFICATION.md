@@ -4762,6 +4762,27 @@ direction of dependencies.
 
 ---
 
+## Section 5.10 Supplement: Per-host aom.interactive.confirm (Phase 2)
+
+- TC-513: serial:1 + pause yields one per-host prompt under AOM
+  (`tests/integration/test_serial_pause_multihost.py`).
+- TC-514: bypass-host-loop prompt lint warns / stays silent appropriately
+  (`tests/unit/test_preflight_lints.py`).
+- TC-515: runner forwards bypass-prompt lint warnings; swallows bad YAML
+  (`tests/unit/test_runner_preflight_lint.py`).
+- TC-516: prompt-channel request schema round-trips; abort words recognized
+  (`tests/unit/test_prompt_channel.py`).
+- TC-517: controller routes each answer to its FIFO; drain unblocks pending
+  (`tests/integration/test_prompt_channel_controller.py`).
+- TC-518: runner provisions control dir + collection env
+  (`tests/unit/test_runner_prompt_env.py`).
+- TC-519: runner services channel requests during the drive loop
+  (`tests/integration/test_runner_prompt_channel_e2e.py`).
+- TC-520: aom.interactive.confirm fires per host without serial
+  (`tests/integration/test_aom_confirm_plugin.py`).
+
+---
+
 ## Test Priority Summary
 
 | Priority | Count |
@@ -4771,7 +4792,7 @@ direction of dependencies.
 | medium | 130 |
 | low | 23 |
 
-**Total Test Cases: 512**
+**Total Test Cases: 520**
 
 ---
 
@@ -4781,3 +4802,4 @@ direction of dependencies.
 |---------|------|---------|
 | 1.0 | 2026-04-20 | Initial test specification from SPECIFICATION.md v1.8 |
 | 1.1 | 2026-04-20 | Added v1.8 supplement: WarningType/WarningEntry test cases (TC-496-TC-503), Deprecation filter panel (TC-504-TC-506), Compact mode warning display (TC-507-TC-508), Warning configuration (TC-509-TC-512), fixed TC-141 WARNING_PATTERNS description |
+| 1.2 | 2026-06-12 | Added Phase 2 per-host prompt test cases (TC-513-TC-520) for aom.interactive.confirm |

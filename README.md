@@ -110,6 +110,22 @@ the first host and one Enter releases all hosts.
 - AOM warns at startup when it spots a per-host prompt in a non-serial multi-host
   play.
 
+#### Strategy-independent per-host prompts
+
+For per-host confirmation without `serial: 1` (e.g. parallel forks), use the
+bundled `aom.interactive.confirm` action:
+
+```yaml
+- name: Confirm deployment
+  aom.interactive.confirm:
+    prompt: "Deploy to {{ inventory_hostname }}? "
+```
+
+Under AOM each host gets its own prompt and answer. Typing `no`/`abort` fails that
+host only; Enter continues. Run **without** AOM the playbook still works — the
+action falls back to reading stdin (install the collection so plain
+`ansible-playbook` can resolve it).
+
 ## How it works
 
 ```

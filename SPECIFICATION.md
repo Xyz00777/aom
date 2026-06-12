@@ -1260,6 +1260,12 @@ host's prompt sequentially) or the `aom.interactive.confirm` action plugin. AOM
 emits a startup warning when a per-host prompt is found in a non-serial
 multi-host play.
 
+The `aom.interactive.confirm` action plugin provides per-host prompts regardless
+of strategy. It does not bypass the host loop, so ansible runs it once per host;
+under AOM it exchanges a prompt request and answer over a FIFO control channel
+(`AOM_PROMPT_CONTROL_DIR`), and falls back to stdin when run without AOM. Aborting
+a host (`no`/`abort`) fails only that host; other hosts proceed.
+
 ### 5.8 Host Name Resolution
 
 AOM resolves host patterns to actual inventory hostnames using `--list-hosts` during the LOADING_TASKS phase. This provides the complete host list BEFORE execution begins.

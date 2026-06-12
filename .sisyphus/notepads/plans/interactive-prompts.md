@@ -332,3 +332,14 @@ process-group / tcgetpgrp check in `Display.prompt_until`). When that check fail
 (e.g. a non-interactive harness), ansible silently skips the pause — AOM can only
 forward prompts ansible actually emits. The Phase 2 FIFO channel sidesteps this
 entirely because the plugin reads its answer from a FIFO, not a TTY.
+
+## Status: Phase 2 (aom.interactive.confirm) shipped (2026-06-12)
+
+Per-host prompts now work regardless of strategy via the bundled
+`aom.interactive.confirm` action plugin. It does not bypass the host loop, writes
+a per-host request into `$AOM_PROMPT_CONTROL_DIR` and blocks on a FIFO for the
+answer; the runner polls the control dir in its drive loop and routes each request
+through `renderer.handle_interactive_prompt`. Falls back to stdin when run without
+AOM. Abort fails only the aborted host. The runner includes ansible's default
+collection paths when injecting `ANSIBLE_COLLECTIONS_PATH` so the bundled dir never
+shadows system collections (which the aom_jsonl callback imports).
