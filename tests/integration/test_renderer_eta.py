@@ -120,6 +120,65 @@ def test_unmatched_path_does_not_count(monkeypatch) -> None:
     assert renderer._done_prior_s == 10.0
 
 
+def test_long_running_task_burns_estimate_down(monkeypatch) -> None:
+    # Regression: a long in-flight task used to *inflate* the ETA because
+    # its known prior duration wasn't credited until completion. It must
+    # now burn down. Profile: 3 short (5s) + 1 long (85s) = 100s.
+    import ansible_aom.compact.renderer as rmod
+
+    holder = {"t": 1000.0}
+    monkeypatch.setattr(rmod.time, "time", lambda: holder["t"])
+
+    renderer = CompactRenderer(is_tty=True)
+    display = _FakeDisplay()
+    monkeypatch.setattr(renderer, "_display", display)
+    renderer.start("site.yml", [])  # _start_time captured at t=1000
+    renderer.set_prior_run(_prior({"s1": 5.0, "s2": 5.0, "s3": 5.0, "long": 85.0}))
+    play = PlayDefinition(
+        id="1",
+        name="web",
+        hosts="all",
+        resolved_hosts=["w1"],
+        tasks=[_task("a", 0), _task("b", 1), _task("c", 2), _task("d", 3)],
+    )
+    renderer.set_definitions([play])
+    renderer.update_state(
+        {
+            "_event": "v2_playbook_on_play_start",
+            "_timestamp": "t",
+            "play": {"id": "1", "name": "web"},
+        }
+    )
+
+    # Three short tasks complete on pace → done_prior 15 (gate open).
+    for i, (tid, path) in enumerate([("t1", "s1"), ("t2", "s2"), ("t3", "s3")]):
+        holder["t"] = 1000.0 + (i + 1) * 5.0
+        _complete_task(renderer, tid=tid, name=path, path=path, ts="2026-06-02T10:00:00Z")
+    assert renderer._done_prior_s == 15.0
+
+    # Long task starts (no completion yet) and runs for 40s.
+    holder["t"] = 1015.0
+    renderer.update_state(
+        {
+            "_event": "v2_playbook_on_task_start",
+            "_timestamp": "2026-06-02T10:00:15Z",
+            "task": {"id": "tL", "name": "long", "path": "long"},
+            "play": {"id": "1"},
+        }
+    )
+    assert "tL" in renderer._running_task_starts
+    holder["t"] = 1055.0  # 40s into the long task; elapsed 55s
+    renderer._last_panel_compute_time = 0.0
+    renderer.tick()
+    # covered = 15 + min(40, 85) = 55; pace = 55/55 = 1; remaining = 100-55 = 45.
+    assert any("~45s left" in f for f in display.frames), display.frames
+
+    # Completing the long task pops it from the in-flight set.
+    holder["t"] = 1100.0
+    _complete_task(renderer, tid="tL", name="long", path="long", ts="2026-06-02T10:00:55Z")
+    assert "tL" not in renderer._running_task_starts
+
+
 def test_no_estimate_without_prior(monkeypatch) -> None:
     renderer = CompactRenderer(is_tty=True)
     display = _FakeDisplay()

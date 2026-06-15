@@ -49,7 +49,7 @@ from ansible_aom.compact.format import (
 )
 from ansible_aom.compact.password import handle_password_prompt as do_handle_password_prompt
 from ansible_aom.core import diagnostics
-from ansible_aom.core.estimate import RunEstimate, project_remaining
+from ansible_aom.core.estimate import RunEstimate, in_flight_credit_s, project_remaining
 from ansible_aom.core.heartbeat import HeartbeatTracker, LivenessState  # noqa: F401
 from ansible_aom.core.icons import is_unicode_terminal
 from ansible_aom.core.models import RunState, Status
@@ -172,6 +172,13 @@ class CompactRenderer:
         self._estimate: RunEstimate | None = None
         self._done_prior_s: float = 0.0
         self._matched_tasks: int = 0
+        # Currently-running tasks: ``task_id -> (task.path, start_wall)``,
+        # where ``start_wall`` is ``time.time()`` at the task's first
+        # announcement (same clock as the status-bar elapsed). Lets the ETA
+        # credit a long in-flight task's progress against its prior
+        # duration instead of letting it inflate the estimate. Entries are
+        # popped when the task completes.
+        self._running_task_starts: dict[str, tuple[str, float]] = {}
         # Tasks whose TASK [..] header has already been printed. Under
         # the free strategy ansible.posix.jsonl emits v2_runner_on_start
         # per host instead of one v2_playbook_on_task_start up front, so
@@ -214,6 +221,7 @@ class CompactRenderer:
         # same way ``_prior_run`` isn't — only the per-run accumulators are.
         self._done_prior_s = 0.0
         self._matched_tasks = 0
+        self._running_task_starts = {}
 
         # Initialize RunState
         self._state = RunState(playbook=playbook)
@@ -329,6 +337,13 @@ class CompactRenderer:
         event_type = event.get("_event", "")
         if event_type == "v2_playbook_on_task_start":
             self._tasks_seen += 1
+            self._record_running_start(event)
+            return
+        if event_type == "v2_runner_on_start":
+            # Free strategy announces tasks per-host here instead of via
+            # task_start; record the first sighting so in-flight credit
+            # works under both strategies.
+            self._record_running_start(event)
             return
         if event_type not in (
             "v2_runner_on_ok",
@@ -358,6 +373,9 @@ class CompactRenderer:
         if all(hs.status != Status.RUNNING for hs in task.hosts.values()):
             self._completed_task_ids.add(task_id)
             self._tasks_completed += 1
+            # No longer in flight: its prior wall now lands in done_prior
+            # below rather than as in-flight credit.
+            self._running_task_starts.pop(task_id, None)
             # Accumulate covered prior wall for the live ETA. Keyed by the
             # task path (the only cross-run-stable identity); a path absent
             # from the prior profile — a new or edited task — contributes 0
@@ -368,6 +386,23 @@ class CompactRenderer:
                 if wall is not None:
                     self._done_prior_s += wall
                     self._matched_tasks += 1
+
+    def _record_running_start(self, event: dict) -> None:
+        """Note when a task entered flight, for the live ETA's in-flight credit.
+
+        Records ``task_id -> (task.path, wall_now)`` on the task's first
+        announcement (task_start under linear, the first runner_on_start
+        under free). Only tasks carrying both an id and a path are tracked
+        — a path is needed to look up the prior duration to credit against —
+        and only the first sighting wins so a per-host fan-out doesn't reset
+        the clock.
+        """
+        task = event.get("task", {})
+        task_id = task.get("id")
+        path = task.get("path")
+        if not task_id or not path or task_id in self._running_task_starts:
+            return
+        self._running_task_starts[task_id] = (path, time.time())
 
     def tick(self) -> None:
         """Refresh the status panel without processing an event.
@@ -450,17 +485,25 @@ class CompactRenderer:
             if s in (Status.OK, Status.CHANGED, Status.SKIPPED, Status.COMPLETED)
         )
 
-        elapsed = time.time() - self._start_time
-        remaining_seconds = (
-            project_remaining(
+        now_wall = time.time()
+        elapsed = now_wall - self._start_time
+        remaining_seconds: float | None = None
+        if self._estimate is not None:
+            # Credit tasks still in flight against their prior duration so a
+            # long-running task burns the estimate down instead of inflating
+            # it (the pace ratio would otherwise climb while done_prior sits
+            # frozen until the task completes).
+            credit = in_flight_credit_s(
+                self._estimate,
+                [(path, now_wall - start) for path, start in self._running_task_starts.values()],
+            )
+            remaining_seconds = project_remaining(
                 self._estimate,
                 done_prior_s=self._done_prior_s,
                 matched_tasks=self._matched_tasks,
                 elapsed_s=elapsed,
+                in_flight_credit_s=credit,
             )
-            if self._estimate is not None
-            else None
-        )
         status_bar = format_status_bar(
             playbook=self._playbook,
             hosts_completed=hosts_completed,

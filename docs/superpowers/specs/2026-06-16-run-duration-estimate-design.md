@@ -25,9 +25,10 @@ prior session and track how much of that prior wall-clock the current run
 has *covered*, then scale the remainder by the observed pace.
 
 ```
-done_prior   = Σ task_wall_s[path]  for every task path completed so far
-pace_ratio   = elapsed / done_prior            # <1 ⇒ faster than last time
-remaining    = pace_ratio × (prior_wall_total_s − done_prior)
+covered      = Σ prior_wall[path] for completed tasks        (done_prior)
+             + Σ min(run_elapsed, prior_wall[path]) for in-flight tasks
+pace_ratio   = elapsed / covered               # <1 ⇒ faster than last time
+remaining    = pace_ratio × (prior_wall_total_s − covered)
 ```
 
 Why this formulation (covered-work accumulation) rather than matching the
@@ -36,13 +37,28 @@ Why this formulation (covered-work accumulation) rather than matching the
 - We never have to predict upcoming tasks (`--list-tasks` doesn't expand
   `include_tasks`, so we couldn't reliably anyway).
 - Uneven tasks are handled intrinsically: completing a big task jumps
-  `done_prior` a lot.
+  `covered` a lot.
 - Skips self-correct: a task skipped this run that ran for 30 s last run
-  advances `done_prior` by ~30 s while `elapsed` barely moves →
+  advances `covered` by ~30 s while `elapsed` barely moves →
   `pace_ratio` drops → ETA shrinks. Correct.
 - New/edited tasks whose paths don't match the prior map contribute 0 to
-  `done_prior` → graceful underestimate of progress, absorbed partly by
+  `covered` → graceful underestimate of progress, absorbed partly by
   `pace_ratio`, and bounded by the clamp (below).
+
+### In-flight credit (amended 2026-06-16)
+
+The first cut accumulated `done_prior` only at task *completion*. That
+inflated the ETA during a long-running task: `done_prior` froze while
+`elapsed` climbed, so `pace_ratio` rose and `remaining` grew (then pinned at
+the 5× clamp) — the opposite of what should happen while the run works
+through a task it *knew* would be long. Fix: credit each in-flight task
+`min(run_elapsed, prior_wall[path])` into `covered` (capped at its prior
+duration so a genuine overrun still counts against pace). The renderer
+records `task_id → (path, start_wall)` on the task's first announcement
+(task_start / first runner_on_start) and pops it on completion; the credit
+is recomputed each render. The warmup gate stays on *completed* work
+(`done_prior`, `matched_tasks`) — an in-flight credit refines an estimate
+but never trips the gate open on its own.
 
 ## Robustness: warmup gate + clamp
 
