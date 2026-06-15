@@ -158,9 +158,7 @@ def test_total_tasks_seen_no_cache_falls_back_to_preflight_runtime_max() -> None
     # Populate runtime with more tasks than preflight
     play_state = PlayRunState(play_id="1", name="Test")
     for i in range(5):
-        play_state.tasks[f"uuid-{i}"] = TaskRunState(
-            task_id=f"uuid-{i}", name=f"Task {i}"
-        )
+        play_state.tasks[f"uuid-{i}"] = TaskRunState(task_id=f"uuid-{i}", name=f"Task {i}")
     state.plays["1"] = play_state
 
     # max(preflight=2, runtime=5, cached=0) = 5

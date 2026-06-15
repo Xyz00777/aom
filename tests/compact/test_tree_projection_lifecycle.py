@@ -195,9 +195,7 @@ class TestProjectionLifecycle:
         r._render_status_panel()
         assert isinstance(r._projection, TreeProjection)
         active_rows = [
-            ln.label
-            for ln in r._projection.tree_lines(20)
-            if ln.kind == "play" and ln.depth == 1
+            ln.label for ln in r._projection.tree_lines(20) if ln.kind == "play" and ln.depth == 1
         ]
         assert active_rows == ["play: active"]
 
@@ -207,8 +205,6 @@ class TestProjectionLifecycle:
         r.update_state(_runner_ok())
 
         play_rows = [
-            ln.label
-            for ln in r._projection.tree_lines(20)
-            if ln.kind == "play" and ln.depth == 1
+            ln.label for ln in r._projection.tree_lines(20) if ln.kind == "play" and ln.depth == 1
         ]
         assert play_rows == []

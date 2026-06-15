@@ -9,10 +9,10 @@ See SPECIFICATION.md Section 6.1 for model definitions.
 
 import logging
 import re
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from collections.abc import Iterator, Sequence
 from typing import Any, cast
 
 logger = logging.getLogger(__name__)

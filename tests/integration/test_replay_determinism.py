@@ -31,12 +31,12 @@ import pytest
 
 from ansible_aom.ansible.preflight import PreParseResult
 from ansible_aom.ansible.runner import run_playbook
-from ansible_aom.core.replay import iter_tree_frames
 from ansible_aom.compact.renderer import CompactRenderer
+from ansible_aom.core.replay import iter_tree_frames
 from ansible_aom.drivers.replay import replay_session
 from ansible_aom.formats.json import JsonRenderer
-from tests.fixtures.sessions.conftest import load_session_dict
 from tests._utils import normalize_json_summary, normalize_render_output
+from tests.fixtures.sessions.conftest import load_session_dict
 
 
 # Three event streams of increasing complexity. Each is a list of dicts
@@ -264,6 +264,8 @@ EVENT_STREAMS: tuple[tuple[str, list[dict], int], ...] = (
 # default repr (a JSON-stringified events list) doesn't dominate test
 # names.
 EVENT_IDS = [s[0] for s in EVENT_STREAMS]
+
+
 def _tree_frame_signatures(
     session: dict,
 ) -> list[tuple[tuple[str, int, str], ...]]:

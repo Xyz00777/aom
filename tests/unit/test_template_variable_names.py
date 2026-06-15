@@ -21,7 +21,9 @@ from ansible_aom.core.models import (
 from ansible_aom.core.tree import TreeProjection
 
 
-def _play_def(play_id: str, name: str, tasks: list, hosts: list[str] | None = None) -> PlayDefinition:
+def _play_def(
+    play_id: str, name: str, tasks: list, hosts: list[str] | None = None
+) -> PlayDefinition:
     return PlayDefinition(
         id=play_id,
         name=name,
@@ -32,8 +34,9 @@ def _play_def(play_id: str, name: str, tasks: list, hosts: list[str] | None = No
 
 
 def _td(name, role=None, pid="1", order=0):
-    return TaskDefinition(name=name, role=role, tags=[], play_id=pid,
-                          play_order=0, task_order=order)
+    return TaskDefinition(
+        name=name, role=role, tags=[], play_id=pid, play_order=0, task_order=order
+    )
 
 
 class TestTemplateVariableNameMismatch:
@@ -44,40 +47,49 @@ class TestTemplateVariableNameMismatch:
         task 'Get ID for angie-sidecar' so it does not appear as pending."""
         state = RunState(playbook="site.yml")
         state.definitions = [
-            _play_def("p1", "deploy", [
-                _td("Get the user ID for {{ username }}", pid="1", order=0),
-                _td("Install nginx", pid="1", order=1),
-            ]),
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    _td("Get the user ID for {{ username }}", pid="1", order=0),
+                    _td("Install nginx", pid="1", order=1),
+                ],
+            ),
         ]
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
-        state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-05-22T10:00:01Z",
-            "play": {"id": "play-1", "name": "deploy"},
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "deploy"},
+            }
+        )
         # Runtime sends RESOLVED name
-        state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-05-22T10:00:02Z",
-            "task": {"id": "t1", "name": "Get the user ID for angie-sidecar"},
-            "play": {"id": "play-1"},
-        })
-        state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-05-22T10:00:03Z",
-            "task": {"id": "t1", "name": "Get the user ID for angie-sidecar"},
-            "host": "web1",
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "Get the user ID for angie-sidecar"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t1", "name": "Get the user ID for angie-sidecar"},
+                "host": "web1",
+            }
+        )
 
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
 
         # The task must NOT appear as pending (□)
         template_task_pending = [
-            ln for ln in lines
-            if ln.kind == "task"
-            and "{{ username }}" in ln.label
-            and ln.status == Status.PENDING
+            ln
+            for ln in lines
+            if ln.kind == "task" and "{{ username }}" in ln.label and ln.status == Status.PENDING
         ]
         assert len(template_task_pending) == 0, (
             f"template variable task should not appear as pending, got: "
@@ -86,10 +98,9 @@ class TestTemplateVariableNameMismatch:
 
         # The task must appear as RUNNING (◐) with the resolved name
         running_tasks = [
-            ln for ln in lines
-            if ln.kind == "task"
-            and "angie-sidecar" in ln.label
-            and ln.status == Status.RUNNING
+            ln
+            for ln in lines
+            if ln.kind == "task" and "angie-sidecar" in ln.label and ln.status == Status.RUNNING
         ]
         assert len(running_tasks) >= 1, (
             f"resolved runtime task must appear as running, got: "
@@ -101,28 +112,38 @@ class TestTemplateVariableNameMismatch:
         name has {{ variable }} but runtime name is resolved."""
         state = RunState(playbook="site.yml")
         state.definitions = [
-            _play_def("p1", "deploy", [
-                _td("Check if user {{ username }} already exists", pid="1", order=0),
-            ]),
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    _td("Check if user {{ username }} already exists", pid="1", order=0),
+                ],
+            ),
         ]
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
-        state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-05-22T10:00:01Z",
-            "play": {"id": "play-1", "name": "deploy"},
-        })
-        state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-05-22T10:00:02Z",
-            "task": {"id": "t1", "name": "Check if user podman already exists"},
-            "play": {"id": "play-1"},
-        })
-        state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-05-22T10:00:03Z",
-            "task": {"id": "t1", "name": "Check if user podman already exists"},
-            "host": "web1",
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "Check if user podman already exists"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t1", "name": "Check if user podman already exists"},
+                "host": "web1",
+            }
+        )
 
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
@@ -140,28 +161,38 @@ class TestTemplateVariableNameMismatch:
         running from runtime-only path)."""
         state = RunState(playbook="site.yml")
         state.definitions = [
-            _play_def("p1", "deploy", [
-                _td("Ensure user {{ username }} exists", pid="1", order=0),
-            ]),
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    _td("Ensure user {{ username }} exists", pid="1", order=0),
+                ],
+            ),
         ]
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
-        state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-05-22T10:00:01Z",
-            "play": {"id": "play-1", "name": "deploy"},
-        })
-        state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-05-22T10:00:02Z",
-            "task": {"id": "t1", "name": "Ensure user podman exists"},
-            "play": {"id": "play-1"},
-        })
-        state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-05-22T10:00:03Z",
-            "task": {"id": "t1", "name": "Ensure user podman exists"},
-            "host": "web1",
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "Ensure user podman exists"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t1", "name": "Ensure user podman exists"},
+                "host": "web1",
+            }
+        )
 
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
@@ -177,29 +208,44 @@ class TestTemplateVariableNameMismatch:
         name and appear under the correct role header."""
         state = RunState(playbook="site.yml")
         state.definitions = [
-            _play_def("p1", "deploy", [
-                _td("Check if user {{ username }} already exists", role="podman", pid="1", order=0),
-                _td("Ensure user {{ username }} exists", role="podman", pid="1", order=1),
-            ]),
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    _td(
+                        "Check if user {{ username }} already exists",
+                        role="podman",
+                        pid="1",
+                        order=0,
+                    ),
+                    _td("Ensure user {{ username }} exists", role="podman", pid="1", order=1),
+                ],
+            ),
         ]
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
-        state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-05-22T10:00:01Z",
-            "play": {"id": "play-1", "name": "deploy"},
-        })
-        state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-05-22T10:00:02Z",
-            "task": {"id": "t1", "name": "podman : Check if user podman already exists"},
-            "play": {"id": "play-1"},
-        })
-        state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-05-22T10:00:03Z",
-            "task": {"id": "t1", "name": "podman : Check if user podman already exists"},
-            "host": "web1",
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "podman : Check if user podman already exists"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t1", "name": "podman : Check if user podman already exists"},
+                "host": "web1",
+            }
+        )
 
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
@@ -211,9 +257,12 @@ class TestTemplateVariableNameMismatch:
         )
 
         # The running task must appear under the role (depth > role depth)
-        podman_idx = next(i for i, ln in enumerate(lines) if ln.kind == "role" and "podman" in ln.label)
+        podman_idx = next(
+            i for i, ln in enumerate(lines) if ln.kind == "role" and "podman" in ln.label
+        )
         running_under_role = [
-            ln for ln in lines[podman_idx + 1:]
+            ln
+            for ln in lines[podman_idx + 1 :]
             if ln.kind == "task" and ln.status == Status.RUNNING
         ]
         assert len(running_under_role) >= 1, (
@@ -227,51 +276,67 @@ class TestTemplateVariableNameMismatch:
         runtime must be dropped from the tree, not shown as pending."""
         state = RunState(playbook="site.yml")
         state.definitions = [
-            _play_def("p1", "deploy", [
-                _td("Get user ID for {{ user }}", pid="1", order=0),
-                _td("Install nginx", pid="1", order=1),
-            ]),
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    _td("Get user ID for {{ user }}", pid="1", order=0),
+                    _td("Install nginx", pid="1", order=1),
+                ],
+            ),
         ]
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
-        state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-05-22T10:00:01Z",
-            "play": {"id": "play-1", "name": "deploy"},
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "deploy"},
+            }
+        )
         # First task completed
-        state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-05-22T10:00:02Z",
-            "task": {"id": "t1", "name": "Get user ID for angie-sidecar"},
-            "play": {"id": "play-1"},
-        })
-        state.handle_event({
-            "_event": "v2_runner_on_ok",
-            "_timestamp": "2026-05-22T10:00:03Z",
-            "task": {"id": "t1", "name": "Get user ID for angie-sidecar"},
-            "play": {"id": "play-1"},
-            "hosts": {"web1": {"changed": False}},
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "Get user ID for angie-sidecar"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t1", "name": "Get user ID for angie-sidecar"},
+                "play": {"id": "play-1"},
+                "hosts": {"web1": {"changed": False}},
+            }
+        )
         # Second task running
-        state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-05-22T10:00:04Z",
-            "task": {"id": "t2", "name": "Install nginx"},
-            "play": {"id": "play-1"},
-        })
-        state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-05-22T10:00:05Z",
-            "task": {"id": "t2", "name": "Install nginx"},
-            "host": "web1",
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:04Z",
+                "task": {"id": "t2", "name": "Install nginx"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:05Z",
+                "task": {"id": "t2", "name": "Install nginx"},
+                "host": "web1",
+            }
+        )
 
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
 
         # The completed template-variable task should NOT appear
         template_tasks = [
-            ln for ln in lines if ln.kind == "task"
+            ln
+            for ln in lines
+            if ln.kind == "task"
             and ("{{ user }}" in ln.label or "angie-sidecar" in ln.label)
             and ln.status != Status.RUNNING
         ]

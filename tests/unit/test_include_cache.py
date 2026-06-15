@@ -33,6 +33,7 @@ from ansible_aom.core.models import (
 # parse_include_tasks_file
 # ---------------------------------------------------------------------------
 
+
 class TestParseIncludeTasksFile:
     """Unit tests for parse_include_tasks_file()."""
 
@@ -113,6 +114,7 @@ class TestParseIncludeTasksFile:
 # parse_role_tasks
 # ---------------------------------------------------------------------------
 
+
 class TestParseRoleTasks:
     """Unit tests for parse_role_tasks()."""
 
@@ -186,6 +188,7 @@ class TestParseRoleTasks:
 # _discover_include
 # ---------------------------------------------------------------------------
 
+
 class TestDiscoverInclude:
     """Unit tests for _discover_include()."""
 
@@ -255,6 +258,7 @@ class TestDiscoverInclude:
 # ---------------------------------------------------------------------------
 # _discover_role
 # ---------------------------------------------------------------------------
+
 
 class TestDiscoverRole:
     """Unit tests for _discover_role()."""
@@ -359,6 +363,7 @@ class TestDiscoverRole:
 # discover_include_with_runtime_path
 # ---------------------------------------------------------------------------
 
+
 class TestDiscoverIncludeWithRuntimePath:
     """Unit tests for discover_include_with_runtime_path()."""
 
@@ -373,9 +378,7 @@ class TestDiscoverIncludeWithRuntimePath:
     msg: found
 """)
         state = RunState(playbook=str(playbook))
-        entry = discover_include_with_runtime_path(
-            state, "tasks.yml:3", parent_role=None
-        )
+        entry = discover_include_with_runtime_path(state, "tasks.yml:3", parent_role=None)
         assert entry is not None
         assert entry.task_names == ["Runtime task"]
 
@@ -390,9 +393,7 @@ class TestDiscoverIncludeWithRuntimePath:
     msg: ok
 """)
         state = RunState(playbook=str(playbook))
-        entry = discover_include_with_runtime_path(
-            state, "plain.yml", parent_role=None
-        )
+        entry = discover_include_with_runtime_path(state, "plain.yml", parent_role=None)
         assert entry is not None
         assert entry.task_names == ["Plain task"]
 
@@ -401,15 +402,14 @@ class TestDiscoverIncludeWithRuntimePath:
         playbook = tmp_path / "site.yml"
         playbook.touch()
         state = RunState(playbook=str(playbook))
-        entry = discover_include_with_runtime_path(
-            state, "missing.yml:42", parent_role=None
-        )
+        entry = discover_include_with_runtime_path(state, "missing.yml:42", parent_role=None)
         assert entry is None
 
 
 # ---------------------------------------------------------------------------
 # resolve_includes_from_playbook
 # ---------------------------------------------------------------------------
+
 
 class TestResolveIncludesFromPlaybook:
     """Unit tests for resolve_includes_from_playbook()."""
@@ -485,7 +485,9 @@ class TestResolveIncludesFromPlaybook:
         playbook = tmp_path / "site.yml"
         (tmp_path / "pre.yml").write_text("- name: Pre task\n  debug:\n    msg: pre\n")
         (tmp_path / "post.yml").write_text("- name: Post task\n  debug:\n    msg: post\n")
-        (tmp_path / "handler_tasks.yml").write_text("- name: Handler task\n  debug:\n    msg: handler\n")
+        (tmp_path / "handler_tasks.yml").write_text(
+            "- name: Handler task\n  debug:\n    msg: handler\n"
+        )
         playbook.write_text("""
 - hosts: all
   pre_tasks:
@@ -526,9 +528,15 @@ class TestResolveIncludesFromPlaybook:
     def test_resolve_includes_from_playbook_nested_blocks(self, tmp_path: Path) -> None:
         """Includes inside block/rescue/always subsections are found."""
         playbook = tmp_path / "site.yml"
-        (tmp_path / "block_include.yml").write_text("- name: Block task\n  debug:\n    msg: block\n")
-        (tmp_path / "rescue_include.yml").write_text("- name: Rescue task\n  debug:\n    msg: rescue\n")
-        (tmp_path / "always_include.yml").write_text("- name: Always task\n  debug:\n    msg: always\n")
+        (tmp_path / "block_include.yml").write_text(
+            "- name: Block task\n  debug:\n    msg: block\n"
+        )
+        (tmp_path / "rescue_include.yml").write_text(
+            "- name: Rescue task\n  debug:\n    msg: rescue\n"
+        )
+        (tmp_path / "always_include.yml").write_text(
+            "- name: Always task\n  debug:\n    msg: always\n"
+        )
         playbook.write_text("""
 - hosts: all
   tasks:
@@ -569,6 +577,7 @@ class TestResolveIncludesFromPlaybook:
 # ---------------------------------------------------------------------------
 # CacheEntry property tests
 # ---------------------------------------------------------------------------
+
 
 class TestCacheEntryProperties:
     """Unit tests for IncludeCacheEntry.task_count and RoleCacheEntry.task_count."""

@@ -126,8 +126,7 @@ def test_tree_lines_respects_budget_with_upcoming_plays():
     # 5 plays, each with 8 tasks = playbook + 5 plays + 40 tasks = 46 lines,
     # far exceeding a budget of 10.
     definitions = [
-        _play_def(str(i), f"play {i}", [f"p{i}t{j}" for j in range(8)])
-        for i in range(5)
+        _play_def(str(i), f"play {i}", [f"p{i}t{j}" for j in range(8)]) for i in range(5)
     ]
     state = RunState(playbook="site.yml")
     state.definitions = definitions
@@ -205,6 +204,6 @@ def test_host_leaves_dropped_when_budget_tight():
     # Budget=3 fits playbook + play + task but no hosts.
     lines = p.tree_lines(budget=3)
     assert all(ln.kind != "host" for ln in lines), (
-        f"expected no host leaves with budget=3, but found some. "
-        f"Lines:\n" + "\n".join(f"  {ln.kind}: {ln.label}" for ln in lines)
+        "expected no host leaves with budget=3, but found some. "
+        "Lines:\n" + "\n".join(f"  {ln.kind}: {ln.label}" for ln in lines)
     )

@@ -29,23 +29,37 @@ def _state_with_two_plays() -> RunState:
     state = RunState(playbook="deploy.yml")
     state.definitions = [
         PlayDefinition(
-            id="1", name="Confirm deployment", hosts="localhost",
-            resolved_hosts=["localhost"], tasks=[],
+            id="1",
+            name="Confirm deployment",
+            hosts="localhost",
+            resolved_hosts=["localhost"],
+            tasks=[],
         ),
         PlayDefinition(
-            id="2", name="Deploy Kolai", hosts="localhost",
-            resolved_hosts=["localhost"], tasks=[],
+            id="2",
+            name="Deploy Kolai",
+            hosts="localhost",
+            resolved_hosts=["localhost"],
+            tasks=[],
         ),
     ]
     return state
 
 
 def _play_start(pid: str, name: str, ts: str) -> dict:
-    return {"_event": "v2_playbook_on_play_start", "_timestamp": ts, "play": {"id": pid, "name": name}}
+    return {
+        "_event": "v2_playbook_on_play_start",
+        "_timestamp": ts,
+        "play": {"id": pid, "name": name},
+    }
 
 
 def _task_start(tid: str, name: str, ts: str) -> dict:
-    return {"_event": "v2_playbook_on_task_start", "_timestamp": ts, "task": {"id": tid, "name": name}}
+    return {
+        "_event": "v2_playbook_on_task_start",
+        "_timestamp": ts,
+        "task": {"id": tid, "name": name},
+    }
 
 
 class TestPauseLingerCleared:
@@ -82,7 +96,9 @@ class TestPauseLingerCleared:
         proj = TreeProjection.from_run_state(state)
         rows = proj.host_rows()
         on_pause = [r for r in rows if r.current_task == "Confirm deployment"]
-        assert on_pause == [], f"pause still shown running: {[(r.hostname, r.current_task) for r in rows]}"
+        assert on_pause == [], (
+            f"pause still shown running: {[(r.hostname, r.current_task) for r in rows]}"
+        )
 
     def test_completed_prior_task_status_preserved(self) -> None:
         """Finalising a prior play must not stomp hosts that already have a
@@ -91,12 +107,14 @@ class TestPauseLingerCleared:
         state.handle_event(_play_start(_PLAY1, "Confirm deployment", "2026-06-13T10:00:00Z"))
         state.handle_event(_task_start(_PAUSE_TASK, "Confirm deployment", "2026-06-13T10:00:01Z"))
         # A real terminal event arrives (changed) before the next play.
-        state.handle_event({
-            "_event": "v2_runner_on_ok",
-            "_timestamp": "2026-06-13T10:00:02Z",
-            "task": {"id": _PAUSE_TASK, "name": "Confirm deployment"},
-            "hosts": {"localhost": {"changed": True}},
-        })
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-06-13T10:00:02Z",
+                "task": {"id": _PAUSE_TASK, "name": "Confirm deployment"},
+                "hosts": {"localhost": {"changed": True}},
+            }
+        )
         state.handle_event(_play_start(_PLAY2, "Deploy Kolai", "2026-06-13T10:00:05Z"))
 
         pause = state.plays[_PLAY1].tasks[_PAUSE_TASK]

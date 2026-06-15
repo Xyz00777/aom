@@ -45,9 +45,7 @@ class TestRuntimeRoleTaskCount:
                 ],
             )
         ]
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -107,8 +105,11 @@ class TestRuntimeRoleTaskCount:
         )
         # Task t3 has a RUNNING host
         t3 = state.plays["play-1"].tasks["t3"]
-        t3.hosts["web1"] = __import__("ansible_aom.core.models", fromlist=["HostRunState"]).HostRunState(
-            hostname="web1", status=Status.RUNNING,
+        t3.hosts["web1"] = __import__(
+            "ansible_aom.core.models", fromlist=["HostRunState"]
+        ).HostRunState(
+            hostname="web1",
+            status=Status.RUNNING,
             start_time=datetime(2026, 5, 22, 10, 0, 8, tzinfo=timezone.utc),
         )
         return state
@@ -120,7 +121,9 @@ class TestRuntimeRoleTaskCount:
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
         role_lines = [ln for ln in lines if ln.kind == "role"]
-        assert len(role_lines) >= 1, f"expected a podman role line, got {[ln.label for ln in lines]}"
+        assert len(role_lines) >= 1, (
+            f"expected a podman role line, got {[ln.label for ln in lines]}"
+        )
         podman_role = [ln for ln in role_lines if "podman" in ln.label]
         assert len(podman_role) >= 1, f"expected podman role, got {[ln.label for ln in role_lines]}"
         assert "(2 tasks)" in podman_role[0].label, (
@@ -170,9 +173,7 @@ class TestRuntimeRoleTaskCount:
                 ],
             )
         ]
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -190,14 +191,17 @@ class TestRuntimeRoleTaskCount:
             }
         )
         t1 = state.plays["play-1"].tasks["t1"]
-        t1.hosts["web1"] = __import__("ansible_aom.core.models", fromlist=["HostRunState"]).HostRunState(
-            hostname="web1", status=Status.RUNNING,
+        t1.hosts["web1"] = __import__(
+            "ansible_aom.core.models", fromlist=["HostRunState"]
+        ).HostRunState(
+            hostname="web1",
+            status=Status.RUNNING,
             start_time=datetime(2026, 5, 22, 10, 0, 2, tzinfo=timezone.utc),
         )
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
         role_lines = [ln for ln in lines if ln.kind == "role" and "podman" in ln.label]
-        assert len(role_lines) >= 1, f"expected podman role line"
+        assert len(role_lines) >= 1, "expected podman role line"
         # Should be 2 tasks (from preflight), NOT 3 (2 preflight + 1 runtime double-counted)
         assert "(2 tasks)" in role_lines[0].label, (
             f"podman preflight tasks should not be double-counted with runtime, got: {role_lines[0].label}"
@@ -219,9 +223,7 @@ class TestRuntimeRoleTaskCount:
                 ],
             )
         ]
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -238,8 +240,11 @@ class TestRuntimeRoleTaskCount:
             }
         )
         t1 = state.plays["play-1"].tasks["t1"]
-        t1.hosts["web1"] = __import__("ansible_aom.core.models", fromlist=["HostRunState"]).HostRunState(
-            hostname="web1", status=Status.RUNNING,
+        t1.hosts["web1"] = __import__(
+            "ansible_aom.core.models", fromlist=["HostRunState"]
+        ).HostRunState(
+            hostname="web1",
+            status=Status.RUNNING,
             start_time=datetime(2026, 5, 22, 10, 0, 2, tzinfo=timezone.utc),
         )
         p = TreeProjection.from_run_state(state)
@@ -262,9 +267,7 @@ class TestRuntimeRoleTaskCount:
                 tasks=[],  # No preflight tasks!
             )
         ]
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -274,19 +277,22 @@ class TestRuntimeRoleTaskCount:
         )
         # Three podman tasks at runtime
         for i, name in enumerate(["podman : Install", "podman : Configure", "podman : Enable"]):
-            tid = f"t{i+1}"
+            tid = f"t{i + 1}"
             state.handle_event(
                 {
                     "_event": "v2_playbook_on_task_start",
-                    "_timestamp": f"2026-05-22T10:00:0{2+i}Z",
+                    "_timestamp": f"2026-05-22T10:00:0{2 + i}Z",
                     "task": {"id": tid, "name": name},
                     "play": {"id": "play-1"},
                 }
             )
         # First task has RUNNING host
         t1 = state.plays["play-1"].tasks["t1"]
-        t1.hosts["web1"] = __import__("ansible_aom.core.models", fromlist=["HostRunState"]).HostRunState(
-            hostname="web1", status=Status.RUNNING,
+        t1.hosts["web1"] = __import__(
+            "ansible_aom.core.models", fromlist=["HostRunState"]
+        ).HostRunState(
+            hostname="web1",
+            status=Status.RUNNING,
             start_time=datetime(2026, 5, 22, 10, 0, 2, tzinfo=timezone.utc),
         )
         p = TreeProjection.from_run_state(state)

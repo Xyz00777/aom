@@ -10,6 +10,7 @@ then assert on the projection.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import cast
 
 from ansible_aom.core.models import (
     PlayDefinition,
@@ -20,7 +21,6 @@ from ansible_aom.core.models import (
     count_leaf_tasks,
 )
 from ansible_aom.core.tree import HostRow, TreeLine, TreeProjection
-from typing import cast
 
 
 def _state_with_running_task(

@@ -34,7 +34,7 @@ def _ansible_collection_paths() -> list[str]:
             text=True,
             timeout=15,
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except FileNotFoundError, subprocess.TimeoutExpired:
         return []
     if result.returncode != 0:
         return []
@@ -68,7 +68,7 @@ def _has_ansible_posix() -> bool:
             timeout=15,
             env=env,
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except FileNotFoundError, subprocess.TimeoutExpired:
         return False
     if result.returncode != 0:
         return False

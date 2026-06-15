@@ -110,9 +110,7 @@ class TestOkChangedLoop:
     def test_no_bare_aggregate_host_line(self):
         r = _renderer()
         r._emit_event_log(_task_start("Echo each fruit", "u1"))
-        r._emit_event_log(
-            _loop_ok("localhost", [_item("apple", changed=True)], "u1", changed=True)
-        )
+        r._emit_event_log(_loop_ok("localhost", [_item("apple", changed=True)], "u1", changed=True))
         # The aggregate per-host line a non-looped task would emit must
         # NOT appear — only the per-item line carries the status.
         assert "changed: [localhost]\n" not in _all_text(r) + "\n"
@@ -174,9 +172,7 @@ class TestFailedLoop:
     def test_failed_item_is_red(self):
         r = _renderer(colorize=True)
         r._emit_event_log(_task_start("T", "u1"))
-        r._emit_event_log(
-            _loop_failed("localhost", [_item("b", failed=True, msg="boom")], "u1")
-        )
+        r._emit_event_log(_loop_failed("localhost", [_item("b", failed=True, msg="boom")], "u1"))
         assert any(_RED in ln and "item=b" in ln for ln in _logged(r))
 
 
@@ -198,9 +194,7 @@ class TestSkippedItem:
     def test_skipped_item_is_cyan(self):
         r = _renderer(colorize=True)
         r._emit_event_log(_task_start("T", "u1"))
-        r._emit_event_log(
-            _loop_ok("localhost", [_item("y", skipped=True)], "u1")
-        )
+        r._emit_event_log(_loop_ok("localhost", [_item("y", skipped=True)], "u1"))
         assert any(_CYAN in ln and "item=y" in ln for ln in _logged(r))
 
 

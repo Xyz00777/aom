@@ -104,11 +104,13 @@ class TestStaleRunningCleanup:
         assert task_b.hosts["ipa1"].status == Status.RUNNING
 
         # Simulate playbook completion
-        state.handle_event({
-            "_event": "v2_playbook_on_stats",
-            "_timestamp": "2026-05-22T10:00:30Z",
-            "stats": {},
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_stats",
+                "_timestamp": "2026-05-22T10:00:30Z",
+                "stats": {},
+            }
+        )
 
         # After cleanup: ipa1 should no longer be RUNNING
         assert task_b.hosts["ipa1"].status != Status.RUNNING, (
@@ -123,15 +125,19 @@ class TestStaleRunningCleanup:
         # Before cleanup: host overview shows ipa1 stuck on "Reset connection"
         p = TreeProjection.from_run_state(state)
         rows = p.host_rows(now=datetime(2026, 5, 22, 10, 1, 0, tzinfo=timezone.utc))
-        stuck = [r for r in rows if r.current_task is not None and "Reset" in (r.current_task or "")]
+        stuck = [
+            r for r in rows if r.current_task is not None and "Reset" in (r.current_task or "")
+        ]
         assert len(stuck) > 0, "precondition: at least one host stuck on 'Reset connection'"
 
         # Simulate playbook completion
-        state.handle_event({
-            "_event": "v2_playbook_on_stats",
-            "_timestamp": "2026-05-22T10:00:30Z",
-            "stats": {},
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_stats",
+                "_timestamp": "2026-05-22T10:00:30Z",
+                "stats": {},
+            }
+        )
 
         # After cleanup: no host should show as still running a task
         p2 = TreeProjection.from_run_state(state)
@@ -151,11 +157,13 @@ class TestStaleRunningCleanup:
         task_b = state.plays["play-abc-123"].tasks["t-b"]
         ipa2_before = task_b.hosts["ipa2"]
 
-        state.handle_event({
-            "_event": "v2_playbook_on_stats",
-            "_timestamp": "2026-05-22T10:00:30Z",
-            "stats": {},
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_stats",
+                "_timestamp": "2026-05-22T10:00:30Z",
+                "stats": {},
+            }
+        )
 
         # ipa2's status should be unchanged
         ipa2_after = task_b.hosts["ipa2"]
@@ -167,11 +175,13 @@ class TestStaleRunningCleanup:
         playbook completion when all hosts in the task have terminal status."""
         state = _make_state_with_stale_running()
 
-        state.handle_event({
-            "_event": "v2_playbook_on_stats",
-            "_timestamp": "2026-05-22T10:00:30Z",
-            "stats": {},
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_stats",
+                "_timestamp": "2026-05-22T10:00:30Z",
+                "stats": {},
+            }
+        )
 
         # Task B had ipa1 stuck as RUNNING; after cleanup ipa1 should be
         # terminal, so _classify should return "completed" for task B.
@@ -238,13 +248,19 @@ class TestHostRowsCurrentTask:
         state = RunState(playbook="site.yml")
         state.definitions = [
             PlayDefinition(
-                id="1", name="deploy", hosts="all", resolved_hosts=["web1"], tasks=[],
+                id="1",
+                name="deploy",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[],
             )
         ]
 
         play_id = "play-1"
         state.plays[play_id] = PlayRunState(
-            play_id=play_id, name="deploy", status=Status.RUNNING,
+            play_id=play_id,
+            name="deploy",
+            status=Status.RUNNING,
         )
 
         task = TaskRunState(

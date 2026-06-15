@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 # pyright: reportMissingImports=false
-
 from ansible_aom.core.models import PlayDefinition, RunState, Status, TaskDefinition
 from ansible_aom.core.tree import TreeProjection
 

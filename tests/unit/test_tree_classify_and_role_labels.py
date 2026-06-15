@@ -506,9 +506,7 @@ class TestDynamicChildrenAsPendingInTree:
             )
         ]
         state = RunState(playbook="test.yml", definitions=defs)
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -570,9 +568,7 @@ class TestDynamicChildrenAsPendingInTree:
             )
         ]
         state = RunState(playbook="test.yml", definitions=defs)
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -641,9 +637,7 @@ class TestDynamicChildrenAsPendingInTree:
             )
         ]
         state = RunState(playbook="test.yml", definitions=defs)
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -725,9 +719,7 @@ class TestDynamicChildrenAsPendingInTree:
             )
         ]
         state = RunState(playbook="test.yml", definitions=defs)
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -747,9 +739,7 @@ class TestDynamicChildrenAsPendingInTree:
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
         role_lines = [ln for ln in lines if ln.kind == "role" and "nginx" in ln.label]
-        assert len(role_lines) >= 1, (
-            f"Expected nginx role header, got {[ln.label for ln in lines]}"
-        )
+        assert len(role_lines) >= 1, f"Expected nginx role header, got {[ln.label for ln in lines]}"
         # The pending dynamic child should appear under the nginx role header
         # (depth 3, not depth 2).
         pending_under_role = [
@@ -760,9 +750,9 @@ class TestDynamicChildrenAsPendingInTree:
         assert len(pending_under_role) >= 1, (
             f"Dynamic child should appear at depth 3 under role header, got lines: {lines}"
         )
-        assert any(
-            "Dynamic A" in ln.label for ln in pending_under_role
-        ), f"Dynamic A not found under role at depth 3: {[ln.label for ln in pending_under_role]}"
+        assert any("Dynamic A" in ln.label for ln in pending_under_role), (
+            f"Dynamic A not found under role at depth 3: {[ln.label for ln in pending_under_role]}"
+        )
 
     def test_host_leaves_for_running_dynamic_child(self) -> None:
         """TC-324: Running dynamic child shows host leaves under it."""
@@ -799,9 +789,7 @@ class TestDynamicChildrenAsPendingInTree:
             )
         ]
         state = RunState(playbook="test.yml", definitions=defs)
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -873,9 +861,7 @@ class TestDynamicChildrenAsPendingInTree:
             )
         ]
         state = RunState(playbook="test.yml", definitions=defs)
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -985,9 +971,7 @@ class TestCrossPlayLookupIsolation:
                 ],
             ),
         ]
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"})
         # --- Play 1 events (all completed) ---
         state.handle_event(
             {
@@ -1143,9 +1127,7 @@ class TestCrossPlayLookupIsolation:
                 ],
             ),
         ]
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -1215,9 +1197,7 @@ class TestCrossPlayLookupIsolation:
 
         # Play 2 is running; play 1 (completed) should be skipped.
         play_lines = {ln.label: ln for ln in lines if ln.kind == "play"}
-        assert "play: Deploy database" in play_lines, (
-            "Running play 2 must appear in tree"
-        )
+        assert "play: Deploy database" in play_lines, "Running play 2 must appear in tree"
         assert "play: Deploy webservers" not in play_lines, (
             "Completed play 1 must be skipped when another play has running items"
         )
@@ -1226,9 +1206,7 @@ class TestCrossPlayLookupIsolation:
         play1_task_lines = [
             ln for ln in lines if ln.kind == "task" and ln.label.startswith("Install nginx")
         ]
-        assert len(play1_task_lines) == 0, (
-            "Completed play's tasks must not appear in tree"
-        )
+        assert len(play1_task_lines) == 0, "Completed play's tasks must not appear in tree"
 
     def test_completed_play_no_stale_pending_handler_tasks(self) -> None:
         """TC-CROSS-1: A completed play whose handler tasks ran under a
@@ -1280,9 +1258,7 @@ class TestCrossPlayLookupIsolation:
                 ],
             ),
         ]
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"})
         # Play 1: "Install nginx" completes, then "Restart nginx" runs as
         # a handler under a different play UUID.
         state.handle_event(
@@ -1375,9 +1351,7 @@ class TestCrossPlayLookupIsolation:
 
         # Only the running play 2 should appear.
         play_lines = [ln.label for ln in lines if ln.kind == "play"]
-        assert "play: Deploy database" in play_lines, (
-            f"Running play must appear, got: {play_lines}"
-        )
+        assert "play: Deploy database" in play_lines, f"Running play must appear, got: {play_lines}"
         assert "play: Deploy webservers" not in play_lines, (
             f"Completed play must be skipped, got: {play_lines}"
         )
@@ -1413,9 +1387,7 @@ class TestCrossPlayLookupIsolation:
                 ],
             ),
         ]
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -1534,9 +1506,7 @@ class TestStickyFallbackTreeRender:
                 ],
             ),
         ]
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"})
         # Play 1: start + complete its single task
         state.handle_event(
             {
@@ -1675,9 +1645,7 @@ class TestStickyFallbackTreeRender:
                 ],
             ),
         ]
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -1795,9 +1763,7 @@ class TestStickyFallbackTreeRender:
         ]
         # Fire events: start play 1 and complete its single task (gap state).
         # Tree is visible because play 1 has tasks, but no running items.
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"})
         state.handle_event(
             {
                 "_event": "v2_playbook_on_play_start",
@@ -1887,9 +1853,7 @@ class TestStickyFallbackTreeRender:
                 ],
             ),
         ]
-        state.handle_event(
-            {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"}
-        )
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"})
         # Play 1: completed
         state.handle_event(
             {
@@ -1972,6 +1936,4 @@ class TestStickyFallbackTreeRender:
         assert "play: Start services" not in play_labels2, (
             "Completed Play 2 must disappear once it has no running/pending surface"
         )
-        assert "play: Install deps" not in play_labels2, (
-            "Completed Play 1 must stay filtered"
-        )
+        assert "play: Install deps" not in play_labels2, "Completed Play 1 must stay filtered"

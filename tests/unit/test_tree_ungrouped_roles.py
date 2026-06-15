@@ -23,7 +23,9 @@ from ansible_aom.core.models import (
 from ansible_aom.core.tree import TreeProjection
 
 
-def _play_def(play_id: str, name: str, tasks: list, hosts: list[str] | None = None) -> PlayDefinition:
+def _play_def(
+    play_id: str, name: str, tasks: list, hosts: list[str] | None = None
+) -> PlayDefinition:
     return PlayDefinition(
         id=play_id,
         name=name,
@@ -42,31 +44,53 @@ class TestUngroupedRoleTasksInTree:
         """Play with a running podman task (1 task, below grouping threshold)."""
         state = RunState(playbook="site.yml")
         state.definitions = [
-            _play_def("p1", "deploy", [
-                TaskDefinition(name="Install nginx", role=None, tags=[], play_id="p1",
-                                play_order=0, task_order=0),
-                TaskDefinition(name="Deploy podman container", role="podman", tags=[],
-                                play_id="p1", play_order=0, task_order=1),
-            ]),
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    TaskDefinition(
+                        name="Install nginx",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="Deploy podman container",
+                        role="podman",
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=1,
+                    ),
+                ],
+            ),
         ]
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
-        state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-05-22T10:00:01Z",
-            "play": {"id": "play-1", "name": "deploy"},
-        })
-        state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-05-22T10:00:02Z",
-            "task": {"id": "t1", "name": "Deploy podman container"},
-            "play": {"id": "play-1"},
-        })
-        state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-05-22T10:00:03Z",
-            "task": {"id": "t1", "name": "Deploy podman container"},
-            "host": "web1",
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "Deploy podman container"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t1", "name": "Deploy podman container"},
+                "host": "web1",
+            }
+        )
         return state
 
     def test_ungrouped_role_appears_under_role_header(self):
@@ -77,15 +101,21 @@ class TestUngroupedRoleTasksInTree:
         lines = p.tree_lines(budget=25)
 
         role_lines = [ln for ln in lines if ln.kind == "role"]
-        assert len(role_lines) >= 1, f"expected role line for podman, got {[ln.label for ln in lines]}"
+        assert len(role_lines) >= 1, (
+            f"expected role line for podman, got {[ln.label for ln in lines]}"
+        )
         assert "podman" in role_lines[0].label
 
         # The podman task must have depth=3 (under role), not depth=2 (play level).
-        podman_task_lines = [ln for ln in lines if ln.kind == "task" and "podman" in ln.label.lower()]
+        podman_task_lines = [
+            ln for ln in lines if ln.kind == "task" and "podman" in ln.label.lower()
+        ]
         # It might not contain "podman" in the label, check by role grouping instead
-        podman_role_idx = next(i for i, ln in enumerate(lines) if ln.kind == "role" and "podman" in ln.label)
+        podman_role_idx = next(
+            i for i, ln in enumerate(lines) if ln.kind == "role" and "podman" in ln.label
+        )
         # Task after role must have depth > role depth
-        for ln in lines[podman_role_idx + 1:]:
+        for ln in lines[podman_role_idx + 1 :]:
             if ln.kind == "task":
                 assert ln.depth > lines[podman_role_idx].depth, (
                     f"task under podman role must have depth > role depth, "
@@ -98,31 +128,53 @@ class TestUngroupedRoleTasksInTree:
         from definitions, e.g. '(2 tasks)' when there are 2 podman tasks."""
         state = RunState(playbook="site.yml")
         state.definitions = [
-            _play_def("p1", "deploy", [
-                TaskDefinition(name="Deploy container", role="podman", tags=[],
-                                play_id="p1", play_order=0, task_order=0),
-                TaskDefinition(name="Configure network", role="podman", tags=[],
-                                play_id="p1", play_order=0, task_order=1),
-            ]),
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    TaskDefinition(
+                        name="Deploy container",
+                        role="podman",
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="Configure network",
+                        role="podman",
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=1,
+                    ),
+                ],
+            ),
         ]
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
-        state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-05-22T10:00:01Z",
-            "play": {"id": "play-1", "name": "deploy"},
-        })
-        state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-05-22T10:00:02Z",
-            "task": {"id": "t1", "name": "Deploy container"},
-            "play": {"id": "play-1"},
-        })
-        state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-05-22T10:00:03Z",
-            "task": {"id": "t1", "name": "Deploy container"},
-            "host": "web1",
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "Deploy container"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t1", "name": "Deploy container"},
+                "host": "web1",
+            }
+        )
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
         role_lines = [ln for ln in lines if ln.kind == "role"]
@@ -136,10 +188,20 @@ class TestUngroupedRoleTasksInTree:
         not just for RoleGroupDefinition entries."""
         state = RunState(playbook="site.yml")
         state.definitions = [
-            _play_def("p1", "deploy", [
-                TaskDefinition(name="Deploy container", role="podman", tags=[],
-                                play_id="p1", play_order=0, task_order=0),
-            ]),
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    TaskDefinition(
+                        name="Deploy container",
+                        role="podman",
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                ],
+            ),
         ]
         p = TreeProjection.from_run_state(state)
         result = p._task_role("Deploy container")
@@ -189,33 +251,61 @@ class TestPendingPlayUngroupedRoles:
         play level."""
         state = RunState(playbook="site.yml")
         state.definitions = [
-            _play_def("p1", "deploy", [
-                TaskDefinition(name="Install nginx", role=None, tags=[], play_id="p1",
-                                play_order=0, task_order=0),
-                TaskDefinition(name="Deploy container", role="podman", tags=[],
-                                play_id="p1", play_order=0, task_order=1),
-                TaskDefinition(name="Configure network", role="podman", tags=[],
-                                play_id="p1", play_order=0, task_order=2),
-            ]),
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    TaskDefinition(
+                        name="Install nginx",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="Deploy container",
+                        role="podman",
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=1,
+                    ),
+                    TaskDefinition(
+                        name="Configure network",
+                        role="podman",
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=2,
+                    ),
+                ],
+            ),
         ]
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
-        state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-05-22T10:00:01Z",
-            "play": {"id": "play-1", "name": "deploy"},
-        })
-        state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-05-22T10:00:02Z",
-            "task": {"id": "t1", "name": "Install nginx"},
-            "play": {"id": "play-1"},
-        })
-        state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-05-22T10:00:03Z",
-            "task": {"id": "t1", "name": "Install nginx"},
-            "host": "web1",
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "host": "web1",
+            }
+        )
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
 
@@ -227,8 +317,10 @@ class TestPendingPlayUngroupedRoles:
         )
 
         # Podman tasks must have depth > role depth (not at play level)
-        podman_idx = next(i for i, ln in enumerate(lines) if ln.kind == "role" and "podman" in ln.label)
-        for ln in lines[podman_idx + 1:]:
+        podman_idx = next(
+            i for i, ln in enumerate(lines) if ln.kind == "role" and "podman" in ln.label
+        )
+        for ln in lines[podman_idx + 1 :]:
             if ln.kind == "task":
                 assert ln.depth > lines[podman_idx].depth, (
                     f"task under podman role at depth={ln.depth}, role at depth={lines[podman_idx].depth}"
@@ -240,32 +332,54 @@ class TestPendingPlayUngroupedRoles:
         definitions, not just from visible running+pending items."""
         state = RunState(playbook="site.yml")
         state.definitions = [
-            _play_def("p1", "deploy", [
-                TaskDefinition(name="Deploy container", role="podman", tags=[],
-                                play_id="p1", play_order=0, task_order=0),
-                TaskDefinition(name="Configure network", role="podman", tags=[],
-                                play_id="p1", play_order=0, task_order=1),
-            ]),
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    TaskDefinition(
+                        name="Deploy container",
+                        role="podman",
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="Configure network",
+                        role="podman",
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=1,
+                    ),
+                ],
+            ),
         ]
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
-        state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-05-22T10:00:01Z",
-            "play": {"id": "play-1", "name": "deploy"},
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "deploy"},
+            }
+        )
         # First task is running, second is pending
-        state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-05-22T10:00:02Z",
-            "task": {"id": "t1", "name": "Deploy container"},
-            "play": {"id": "play-1"},
-        })
-        state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-05-22T10:00:03Z",
-            "task": {"id": "t1", "name": "Deploy container"},
-            "host": "web1",
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "Deploy container"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t1", "name": "Deploy container"},
+                "host": "web1",
+            }
+        )
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
 
@@ -289,10 +403,20 @@ class TestRolePrefixStripping:
         not None."""
         state = RunState(playbook="site.yml")
         state.definitions = [
-            _play_def("p1", "deploy", [
-                TaskDefinition(name="Install Podman", role="podman", tags=[],
-                                play_id="p1", play_order=0, task_order=0),
-            ]),
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    TaskDefinition(
+                        name="Install Podman",
+                        role="podman",
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                ],
+            ),
         ]
         p = TreeProjection.from_run_state(state)
         assert p._task_role("podman : Install Podman") == "podman"
@@ -303,31 +427,53 @@ class TestRolePrefixStripping:
         rendered under the 'role: podman' header, not at play level."""
         state = RunState(playbook="site.yml")
         state.definitions = [
-            _play_def("p1", "deploy", [
-                TaskDefinition(name="Install Podman", role="podman", tags=[],
-                                play_id="p1", play_order=0, task_order=0),
-                TaskDefinition(name="Update home directory", role="podman", tags=[],
-                                play_id="p1", play_order=0, task_order=1),
-            ]),
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    TaskDefinition(
+                        name="Install Podman",
+                        role="podman",
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="Update home directory",
+                        role="podman",
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=1,
+                    ),
+                ],
+            ),
         ]
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
-        state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-05-22T10:00:01Z",
-            "play": {"id": "play-1", "name": "deploy"},
-        })
-        state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-05-22T10:00:02Z",
-            "task": {"id": "t1", "name": "podman : Install Podman"},
-            "play": {"id": "play-1"},
-        })
-        state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-05-22T10:00:03Z",
-            "task": {"id": "t1", "name": "podman : Install Podman"},
-            "host": "web1",
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "podman : Install Podman"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t1", "name": "podman : Install Podman"},
+                "host": "web1",
+            }
+        )
 
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
@@ -337,9 +483,11 @@ class TestRolePrefixStripping:
         assert "podman" in role_lines[0].label
 
         # Task under podman role must have depth > role depth
-        podman_idx = next(i for i, ln in enumerate(lines) if ln.kind == "role" and "podman" in ln.label)
+        podman_idx = next(
+            i for i, ln in enumerate(lines) if ln.kind == "role" and "podman" in ln.label
+        )
         task_under_role = next(
-            (ln for ln in lines[podman_idx + 1:] if ln.kind == "task"),
+            (ln for ln in lines[podman_idx + 1 :] if ln.kind == "task"),
             None,
         )
         assert task_under_role is not None, "expected a task under podman role"
@@ -352,29 +500,45 @@ class TestRolePrefixStripping:
         carries the 'role : ' prefix."""
         state = RunState(playbook="site.yml")
         state.definitions = [
-            _play_def("p1", "deploy", [
-                TaskDefinition(name="Install Podman", role="podman", tags=[],
-                                play_id="p1", play_order=0, task_order=0),
-            ]),
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    TaskDefinition(
+                        name="Install Podman",
+                        role="podman",
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                ],
+            ),
         ]
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
-        state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-05-22T10:00:01Z",
-            "play": {"id": "play-1", "name": "deploy"},
-        })
-        state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-05-22T10:00:02Z",
-            "task": {"id": "t1", "name": "podman : Install Podman"},
-            "play": {"id": "play-1"},
-        })
-        state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-05-22T10:00:03Z",
-            "task": {"id": "t1", "name": "podman : Install Podman"},
-            "host": "web1",
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "podman : Install Podman"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t1", "name": "podman : Install Podman"},
+                "host": "web1",
+            }
+        )
 
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
@@ -390,31 +554,53 @@ class TestRolePrefixStripping:
         level AND under a role header (the double-rendering bug)."""
         state = RunState(playbook="site.yml")
         state.definitions = [
-            _play_def("p1", "deploy", [
-                TaskDefinition(name="Install nginx", role=None, tags=[], play_id="p1",
-                                play_order=0, task_order=0),
-                TaskDefinition(name="Deploy container", role="podman", tags=[],
-                                play_id="p1", play_order=0, task_order=1),
-            ]),
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    TaskDefinition(
+                        name="Install nginx",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="Deploy container",
+                        role="podman",
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=1,
+                    ),
+                ],
+            ),
         ]
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
-        state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-05-22T10:00:01Z",
-            "play": {"id": "play-1", "name": "deploy"},
-        })
-        state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-05-22T10:00:02Z",
-            "task": {"id": "t1", "name": "Install nginx"},
-            "play": {"id": "play-1"},
-        })
-        state.handle_event({
-            "_event": "v2_runner_on_start",
-            "_timestamp": "2026-05-22T10:00:03Z",
-            "task": {"id": "t1", "name": "Install nginx"},
-            "host": "web1",
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "host": "web1",
+            }
+        )
 
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)

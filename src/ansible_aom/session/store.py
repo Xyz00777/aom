@@ -461,7 +461,7 @@ def cleanup_old_sessions(
                     start_time = datetime.fromisoformat(start_time_str.replace("Z", "+00:00"))
                     sessions.append((session_path, start_time, session_path.name, meta))
                     continue
-            except (json.JSONDecodeError, ValueError):
+            except json.JSONDecodeError, ValueError:
                 pass
         sessions.append((session_path, fallback_time, session_path.name, {}))
 

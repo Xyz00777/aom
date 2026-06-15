@@ -259,9 +259,10 @@ class Display:
             return
 
         now = time.monotonic()
-        if self._last_status_update_time and (
-            now - self._last_status_update_time
-        ) < _THROTTLE_INTERVAL_S:
+        if (
+            self._last_status_update_time
+            and (now - self._last_status_update_time) < _THROTTLE_INTERVAL_S
+        ):
             return
 
         rendered = self._content
@@ -295,6 +296,7 @@ class Display:
         sys.stdout.write(frame)
         sys.stdout.flush()
         self._status_rows = new_rows
+
     def clear(self) -> None:
         """Erase the status content (but leave the display running)."""
         self._content = ""
