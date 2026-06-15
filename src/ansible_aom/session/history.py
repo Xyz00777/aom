@@ -37,6 +37,12 @@ class PriorRun:
     # live ``N/total`` loop count. Empty for sessions recorded before
     # event capture, or whose tasks had no loops.
     loop_totals: dict[str, dict[str, int]] = field(default_factory=dict)
+    # Per-task wall-clock profile for the live ETA: ``{task.path:
+    # per_occurrence_avg_seconds}`` plus the sum of every mined inter-task
+    # delta. Both empty / 0.0 for sessions recorded before event capture —
+    # the renderer then shows no estimate. See :mod:`ansible_aom.core.estimate`.
+    task_wall_s: dict[str, float] = field(default_factory=dict)
+    prior_wall_total_s: float = 0.0
 
 
 def _mine_loop_totals(session_path: Path) -> dict[str, dict[str, int]]:
@@ -77,6 +83,69 @@ def _mine_loop_totals(session_path: Path) -> dict[str, dict[str, int]]:
     except OSError:
         return {}
     return totals
+
+
+def _mine_task_wall(session_path: Path) -> tuple[dict[str, float], float]:
+    """Mine ``({task.path: per_occurrence_avg_s}, total_s)`` from a session.
+
+    A task's wall duration is the gap between its ``v2_playbook_on_task_start``
+    and the *next* task start (or ``v2_playbook_on_stats`` for the final
+    task) — true wall time, including fork/parallelism/overhead, which is
+    what the live ETA projects against. A recurring path (role/include run
+    twice) accumulates total + count and is exposed as the per-occurrence
+    average; the returned total is the full sum of every delta.
+
+    Best-effort: a missing/malformed events file, an unparseable timestamp,
+    or a start event lacking a path drops only the affected delta and yields
+    an empty profile in the worst case (the renderer shows no estimate).
+    """
+    events_file = session_path / "events.jsonl"
+    if not events_file.is_file():
+        return {}, 0.0
+    totals: dict[str, float] = {}
+    counts: dict[str, int] = {}
+    prev_path: str | None = None
+    prev_ts: datetime | None = None
+    grand_total = 0.0
+
+    def _close(path: str | None, start: datetime | None, end: datetime | None) -> None:
+        nonlocal grand_total
+        if path is None or start is None or end is None:
+            return
+        delta = (end - start).total_seconds()
+        if delta < 0:
+            return
+        totals[path] = totals.get(path, 0.0) + delta
+        counts[path] = counts.get(path, 0) + 1
+        grand_total += delta
+
+    try:
+        with open(events_file) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                kind = event.get("_event")
+                if kind not in ("v2_playbook_on_task_start", "v2_playbook_on_stats"):
+                    continue
+                ts = _parse_iso(event.get("_timestamp"))
+                if kind == "v2_playbook_on_task_start":
+                    _close(prev_path, prev_ts, ts)
+                    prev_path = event.get("task", {}).get("path")
+                    prev_ts = ts
+                else:  # v2_playbook_on_stats — close the final task
+                    _close(prev_path, prev_ts, ts)
+                    prev_path = None
+                    prev_ts = None
+    except OSError:
+        return {}, 0.0
+
+    averages = {path: totals[path] / counts[path] for path in totals}
+    return averages, grand_total
 
 
 def _parse_iso(value: str | None) -> datetime | None:
@@ -174,6 +243,13 @@ def find_previous_run(
 
     if best is None:
         return None
-    # Mine loop totals only for the winning session — reading every
-    # session's events.jsonl just to discard all but one would be wasteful.
-    return replace(best[1], loop_totals=_mine_loop_totals(best[2]))
+    # Mine loop totals + the per-task wall profile only for the winning
+    # session — reading every session's events.jsonl just to discard all
+    # but one would be wasteful.
+    task_wall_s, prior_wall_total_s = _mine_task_wall(best[2])
+    return replace(
+        best[1],
+        loop_totals=_mine_loop_totals(best[2]),
+        task_wall_s=task_wall_s,
+        prior_wall_total_s=prior_wall_total_s,
+    )

@@ -171,6 +171,7 @@ def format_status_bar(
     colorize: bool = False,
     mode_label: str = "",
     liveness: LivenessState | None = None,
+    remaining_seconds: float | None = None,
 ) -> str:
     """Format the status bar for compact mode display.
 
@@ -260,6 +261,15 @@ def format_status_bar(
         parts[-1] = f"{parts[-1]} {live_seg}"
 
     parts.append(_wrap(elapsed_str, _DIM, colorize))
+
+    if remaining_seconds is not None:
+        # Hug the elapsed segment (single space, no separator pipe) so the
+        # ETA reads as an annotation on the clock — "elapsed, ~this much
+        # left" — rather than a peer counter. Dimmed like elapsed itself.
+        eta_seg = _wrap(f"~{format_duration_compact(remaining_seconds)} left", _DIM, colorize)
+        # Two spaces (not one): with no separator pipe, the wider gap keeps
+        # the ETA visually distinct from the elapsed clock it annotates.
+        parts[-1] = f"{parts[-1]}  {eta_seg}"
 
     sep = _wrap(sep_glyph, _DIM, colorize)
     return f" {sep} ".join(parts)

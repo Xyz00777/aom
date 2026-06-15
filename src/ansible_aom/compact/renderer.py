@@ -49,6 +49,7 @@ from ansible_aom.compact.format import (
 )
 from ansible_aom.compact.password import handle_password_prompt as do_handle_password_prompt
 from ansible_aom.core import diagnostics
+from ansible_aom.core.estimate import RunEstimate, project_remaining
 from ansible_aom.core.heartbeat import HeartbeatTracker, LivenessState  # noqa: F401
 from ansible_aom.core.icons import is_unicode_terminal
 from ansible_aom.core.models import RunState, Status
@@ -162,6 +163,15 @@ class CompactRenderer:
         self._tasks_seen: int = 0
         self._tasks_completed: int = 0
         self._completed_task_ids: set[str] = set()
+        # Live run-duration estimate. ``_estimate`` is built from the
+        # matching prior run's per-task wall profile in ``set_prior_run``;
+        # ``_done_prior_s`` / ``_matched_tasks`` accumulate covered prior
+        # work as tasks complete (bumped alongside ``_tasks_completed``,
+        # under the same once-per-task guard). The status bar feeds these
+        # through ``project_remaining``. See :mod:`ansible_aom.core.estimate`.
+        self._estimate: RunEstimate | None = None
+        self._done_prior_s: float = 0.0
+        self._matched_tasks: int = 0
         # Tasks whose TASK [..] header has already been printed. Under
         # the free strategy ansible.posix.jsonl emits v2_runner_on_start
         # per host instead of one v2_playbook_on_task_start up front, so
@@ -200,6 +210,10 @@ class CompactRenderer:
         self._tasks_completed = 0
         self._completed_task_ids = set()
         self._announced_task_uuids = set()
+        # ``_estimate`` is set by ``set_prior_run`` and not reset here, the
+        # same way ``_prior_run`` isn't — only the per-run accumulators are.
+        self._done_prior_s = 0.0
+        self._matched_tasks = 0
 
         # Initialize RunState
         self._state = RunState(playbook=playbook)
@@ -232,6 +246,13 @@ class CompactRenderer:
         RunState so the tree can render ``N/total`` loop progress live.
         """
         self._prior_run = prior_run
+        if prior_run is not None and prior_run.prior_wall_total_s > 0:
+            self._estimate = RunEstimate(
+                task_wall_s=dict(prior_run.task_wall_s),
+                prior_wall_total_s=prior_run.prior_wall_total_s,
+            )
+        else:
+            self._estimate = None
         if self._state is not None:
             self._state.loop_totals = dict(prior_run.loop_totals) if prior_run else {}
 
@@ -337,6 +358,16 @@ class CompactRenderer:
         if all(hs.status != Status.RUNNING for hs in task.hosts.values()):
             self._completed_task_ids.add(task_id)
             self._tasks_completed += 1
+            # Accumulate covered prior wall for the live ETA. Keyed by the
+            # task path (the only cross-run-stable identity); a path absent
+            # from the prior profile — a new or edited task — contributes 0
+            # and isn't counted as matched. Same once-per-task guard as the
+            # counter above, so each occurrence adds its average exactly once.
+            if self._estimate is not None:
+                wall = self._estimate.task_wall_s.get(event.get("task", {}).get("path", ""))
+                if wall is not None:
+                    self._done_prior_s += wall
+                    self._matched_tasks += 1
 
     def tick(self) -> None:
         """Refresh the status panel without processing an event.
@@ -420,6 +451,16 @@ class CompactRenderer:
         )
 
         elapsed = time.time() - self._start_time
+        remaining_seconds = (
+            project_remaining(
+                self._estimate,
+                done_prior_s=self._done_prior_s,
+                matched_tasks=self._matched_tasks,
+                elapsed_s=elapsed,
+            )
+            if self._estimate is not None
+            else None
+        )
         status_bar = format_status_bar(
             playbook=self._playbook,
             hosts_completed=hosts_completed,
@@ -427,6 +468,7 @@ class CompactRenderer:
             warnings=self._warnings_count,
             deprecations=self._deprecations_count,
             elapsed_seconds=elapsed,
+            remaining_seconds=remaining_seconds,
             tasks_completed=self._tasks_completed,
             tasks_total=max(
                 count_total_tasks(self._definitions),
