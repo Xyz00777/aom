@@ -352,6 +352,18 @@ class CompactRenderer:
             # works under both strategies.
             self._record_running_start(event)
             return
+        if event_type in ("v2_playbook_on_play_start", "v2_playbook_on_stats"):
+            # A new play (or the final stats event) is proof that every prior
+            # play is done: RunState._finalize_play flips their lingering
+            # RUNNING hosts to a terminal status *in place*, without emitting
+            # any v2_runner_on_* the per-event branch below could hook.
+            # ``ansible.builtin.pause`` is the canonical case — it yields no
+            # v2_runner_on_ok at all. Reconcile every newly-terminal task so
+            # _tasks_completed keeps matching the count_completed_tasks oracle
+            # (HS-2). These boundary events are rare (once per play / once at
+            # end), so the full walk is cheap beside the per-runner-event path.
+            self._reconcile_completed_tasks()
+            return
         if event_type not in (
             "v2_runner_on_ok",
             "v2_runner_on_failed",
@@ -378,19 +390,46 @@ class CompactRenderer:
         if task is None or not task.hosts:
             return
         if all(hs.status != Status.RUNNING for hs in task.hosts.values()):
-            self._completed_task_ids.add(task_id)
-            self._tasks_completed += 1
-            # No longer in flight: fold it into completed progress instead.
-            # Its recorded start gives this run's actual wall (the work-pace
-            # numerator); fall back to the prior wall if we never saw a start
-            # (neutral, pace ≈ 1). Keyed by task path — the only cross-run
-            # stable identity; an unmatched path contributes nothing.
-            start = self._running_task_starts.pop(task_id, None)
-            if self._estimate is not None:
-                path = event.get("task", {}).get("path", "")
-                prior_wall = self._estimate.task_wall_s.get(path)
-                actual_wall = (time.time() - start[1]) if start is not None else (prior_wall or 0.0)
-                add_completed(self._estimate, self._progress, path, actual_wall)
+            path = event.get("task", {}).get("path", "") or (task.path or "")
+            self._count_completed_task(task_id, path)
+
+    def _reconcile_completed_tasks(self) -> None:
+        """Count tasks finalised in RunState without a terminal runner event.
+
+        ``RunState._finalize_play`` (fired at play-start and stats
+        boundaries) flips a play's lingering RUNNING hosts to terminal in
+        place, so a pause — or any action with no v2_runner_on_* result —
+        never reaches the per-event branch in ``_bump_task_counters``. Walk
+        every play once and count any task that is now terminal and not yet
+        counted, mirroring ``count_completed_tasks`` exactly so the
+        incremental counter cannot drift below the oracle (HS-2).
+        """
+        if self._state is None:
+            return
+        for play in self._state.plays.values():
+            for task_id, task in play.tasks.items():
+                if task_id in self._completed_task_ids or not task.hosts:
+                    continue
+                if all(hs.status != Status.RUNNING for hs in task.hosts.values()):
+                    self._count_completed_task(task_id, task.path or "")
+
+    def _count_completed_task(self, task_id: str, path: str) -> None:
+        """Fold one finished task into the incremental progress counters.
+
+        Idempotent via ``_completed_task_ids``. The task is no longer in
+        flight, so its recorded start gives this run's actual wall (the
+        work-pace numerator); fall back to the prior wall when no start was
+        recorded — a finalised pause has none (neutral, pace ≈ 1). Keyed by
+        task path, the only cross-run stable identity; an unmatched path
+        contributes nothing.
+        """
+        self._completed_task_ids.add(task_id)
+        self._tasks_completed += 1
+        start = self._running_task_starts.pop(task_id, None)
+        if self._estimate is not None:
+            prior_wall = self._estimate.task_wall_s.get(path)
+            actual_wall = (time.time() - start[1]) if start is not None else (prior_wall or 0.0)
+            add_completed(self._estimate, self._progress, path, actual_wall)
 
     def _record_running_start(self, event: dict) -> None:
         """Note when a task entered flight, for the live ETA's in-flight credit.
