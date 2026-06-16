@@ -43,6 +43,13 @@ class PriorRun:
     # the renderer then shows no estimate. See :mod:`ansible_aom.core.estimate`.
     task_wall_s: dict[str, float] = field(default_factory=dict)
     prior_wall_total_s: float = 0.0
+    # Result-segmented profile: ``variable_paths`` are the task paths whose
+    # prior result was ``changed`` (or failed/unreachable) — the variable
+    # work — and ``prior_var_total_s`` is the wall those paths account for.
+    # The rest is the fixed (ok/skipped) floor. Used to scale only the
+    # variable part of the ETA. See :mod:`ansible_aom.core.estimate`.
+    variable_paths: frozenset[str] = field(default_factory=frozenset)
+    prior_var_total_s: float = 0.0
 
 
 def _mine_loop_totals(session_path: Path) -> dict[str, dict[str, int]]:
@@ -85,25 +92,33 @@ def _mine_loop_totals(session_path: Path) -> dict[str, dict[str, int]]:
     return totals
 
 
-def _mine_task_wall(session_path: Path) -> tuple[dict[str, float], float]:
-    """Mine ``({task.path: per_occurrence_avg_s}, total_s)`` from a session.
+def _mine_task_wall(
+    session_path: Path,
+) -> tuple[dict[str, float], float, frozenset[str], float]:
+    """Mine the per-task wall profile + result segmentation from a session.
 
-    A task's wall duration is the gap between its ``v2_playbook_on_task_start``
-    and the *next* task start (or ``v2_playbook_on_stats`` for the final
-    task) — true wall time, including fork/parallelism/overhead, which is
-    what the live ETA projects against. A recurring path (role/include run
-    twice) accumulates total + count and is exposed as the per-occurrence
-    average; the returned total is the full sum of every delta.
+    Returns ``(averages, total_s, variable_paths, variable_total_s)``:
+
+    - ``averages`` maps ``task.path`` to its per-occurrence average wall, the
+      gap between its ``v2_playbook_on_task_start`` and the *next* task start
+      (or ``v2_playbook_on_stats`` for the final task) — true wall time,
+      including fork/parallelism/overhead. A recurring path accumulates and is
+      exposed as the average; ``total_s`` is the full sum of every delta.
+    - ``variable_paths`` are the paths whose terminal result was ``changed``
+      (any host) or failed/unreachable — the variable work. Paths seen only
+      as ``ok``-without-change or ``skipped`` stay in the fixed floor.
+    - ``variable_total_s`` is the wall those variable paths account for.
 
     Best-effort: a missing/malformed events file, an unparseable timestamp,
-    or a start event lacking a path drops only the affected delta and yields
+    or a start event lacking a path drops only the affected datum and yields
     an empty profile in the worst case (the renderer shows no estimate).
     """
     events_file = session_path / "events.jsonl"
     if not events_file.is_file():
-        return {}, 0.0
+        return {}, 0.0, frozenset(), 0.0
     totals: dict[str, float] = {}
     counts: dict[str, int] = {}
+    variable: set[str] = set()
     prev_path: str | None = None
     prev_ts: datetime | None = None
     grand_total = 0.0
@@ -130,22 +145,32 @@ def _mine_task_wall(session_path: Path) -> tuple[dict[str, float], float]:
                 except json.JSONDecodeError:
                     continue
                 kind = event.get("_event")
-                if kind not in ("v2_playbook_on_task_start", "v2_playbook_on_stats"):
-                    continue
-                ts = _parse_iso(event.get("_timestamp"))
                 if kind == "v2_playbook_on_task_start":
+                    ts = _parse_iso(event.get("_timestamp"))
                     _close(prev_path, prev_ts, ts)
                     prev_path = event.get("task", {}).get("path")
                     prev_ts = ts
-                else:  # v2_playbook_on_stats — close the final task
-                    _close(prev_path, prev_ts, ts)
+                elif kind == "v2_playbook_on_stats":
+                    _close(prev_path, prev_ts, _parse_iso(event.get("_timestamp")))
                     prev_path = None
                     prev_ts = None
+                elif kind in ("v2_runner_on_failed", "v2_runner_on_unreachable"):
+                    path = event.get("task", {}).get("path")
+                    if path:
+                        variable.add(path)
+                elif kind == "v2_runner_on_ok":
+                    path = event.get("task", {}).get("path")
+                    if path and any(
+                        isinstance(h, dict) and h.get("changed")
+                        for h in event.get("hosts", {}).values()
+                    ):
+                        variable.add(path)
     except OSError:
-        return {}, 0.0
+        return {}, 0.0, frozenset(), 0.0
 
     averages = {path: totals[path] / counts[path] for path in totals}
-    return averages, grand_total
+    variable_total = sum(totals[path] for path in variable if path in totals)
+    return averages, grand_total, frozenset(variable), variable_total
 
 
 def _parse_iso(value: str | None) -> datetime | None:
@@ -246,10 +271,12 @@ def find_previous_run(
     # Mine loop totals + the per-task wall profile only for the winning
     # session — reading every session's events.jsonl just to discard all
     # but one would be wasteful.
-    task_wall_s, prior_wall_total_s = _mine_task_wall(best[2])
+    task_wall_s, prior_wall_total_s, variable_paths, prior_var_total_s = _mine_task_wall(best[2])
     return replace(
         best[1],
         loop_totals=_mine_loop_totals(best[2]),
         task_wall_s=task_wall_s,
         prior_wall_total_s=prior_wall_total_s,
+        variable_paths=variable_paths,
+        prior_var_total_s=prior_var_total_s,
     )

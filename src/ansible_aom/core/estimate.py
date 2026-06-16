@@ -2,26 +2,34 @@
 
 The "Last run: N tasks in T" hint already tells the user a matching prior
 session existed and how long it took. This module turns that prior into a
-*live* remaining-time estimate using a covered-prior-work model:
+*live* remaining-time estimate.
 
-    covered    = Σ prior_wall[path] for completed tasks   (done_prior)
-               + Σ min(run_elapsed, prior_wall[path]) for in-flight tasks
-    pace_ratio = elapsed / covered               # <1 ⇒ faster than last time
-    remaining  = pace_ratio × (prior_wall_total_s − covered)
+Result-segmented model
+----------------------
+Empirically (measured across repeated real runs), a task's wall time splits
+cleanly by its result:
 
-Accumulating *covered* prior work (rather than matching the upcoming task
-list, which ``--list-tasks`` can't reliably enumerate) makes the model
-self-correcting: a big task completing jumps ``covered`` a lot, and a task
-skipped this run that ran for 30 s last run advances ``covered`` by ~30 s
-while ``elapsed`` barely moves — so the pace ratio drops and the ETA shrinks
-honestly. Crucially, in-flight tasks are credited too (capped at their prior
-duration): without that, a long-running task would freeze ``covered`` while
-``elapsed`` climbed, inflating the estimate instead of burning it down.
+- ``ok`` / ``skipped`` tasks are ~constant run-to-run — an idempotency
+  check that finds nothing to do costs about the same every time. These
+  form a *fixed floor*.
+- ``changed`` (and failed/unreachable) tasks carry essentially all the
+  run-to-run variance — they do the actual, variable work.
 
-Robustness lives in :func:`project_remaining`: a warmup gate suppresses the
-noisy early window and a clamp bounds the pace ratio, so a first run (no
-prior) or a diverged playbook (shifted task paths → few matches) degrades
-to "no estimate" rather than an absurd number.
+So we mine each prior task's wall AND whether it was variable, then project:
+
+    remaining = (fixed_total − covered_fixed)              # unscaled floor
+              + clamp(work_pace) × (var_total − covered_var)
+    work_pace = Σ actual_wall(variable tasks done) / Σ prior_wall(same)
+
+Scaling only the variable part by a pace measured only from variable tasks
+avoids the classic failure of a single global pace: on a fast re-run (most
+tasks ``ok``) a global pace would wrongly shrink the constant floor too.
+
+Covered work accumulates as tasks complete (:func:`add_completed`) and is
+topped up each render by in-flight tasks (:func:`add_in_flight`) so a long
+running task burns the estimate down instead of inflating it. A warmup gate
+(on *completed* work only) and the pace clamp keep first runs and diverged
+playbooks degrading to "no estimate" rather than garbage.
 
 Pure: no I/O, no global state. Lives in ``core/`` so both the compact
 renderer and a future TUI can share one definition.
@@ -29,19 +37,21 @@ renderer and a future TUI can share one definition.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from dataclasses import dataclass
 
-# Clamp the observed pace ratio so a diverged playbook (few path matches →
-# tiny ``done_prior``) can't blow the ETA up, and an all-cached run can't
-# collapse it to ~0 either.
-_PACE_MIN = 0.2
+# Clamp the observed work pace. The high bound stops a single anomalously
+# slow task blowing the variable projection up. The low bound is loose (not
+# the 0.2 a *global* pace would use) because the fixed floor is now projected
+# separately — so a genuinely fast re-run, where variable tasks are cached
+# and run near-instantly, can legitimately push the work pace well below 0.2.
+# A small floor (not 0) just avoids predicting a literal zero from early noise.
+_PACE_MIN = 0.05
 _PACE_MAX = 5.0
 
-# Warmup gate: emit no estimate until the run has covered at least this
-# fraction of the prior wall-clock AND completed at least this many tasks
-# that matched the prior profile. Below either threshold the pace ratio is
-# too noisy to trust.
+# Warmup gate: emit no estimate until the run has *completed* at least this
+# fraction of the prior wall-clock AND this many tasks that matched the prior
+# profile. Confidence comes from finished tasks; an in-flight credit can
+# refine an estimate but never trips the gate open on its own.
 _WARMUP_FRACTION = 0.10
 _WARMUP_MIN_TASKS = 2
 
@@ -50,91 +60,127 @@ _WARMUP_MIN_TASKS = 2
 class RunEstimate:
     """Per-task wall-time profile mined from a matching prior run.
 
-    ``task_wall_s`` maps a task ``path`` to its per-occurrence average
-    wall-clock duration; ``prior_wall_total_s`` is the sum of every mined
-    inter-task delta (so ``done_prior`` reaches it exactly when every prior
-    task has re-run). An empty profile / zero total means "no usable prior"
-    and :func:`project_remaining` returns ``None``.
+    ``task_wall_s`` maps a task ``path`` to its per-occurrence average wall
+    duration. ``variable_paths`` is the subset whose prior result was
+    ``changed`` (or failed/unreachable) — the rest are the fixed floor.
+    ``prior_wall_total_s`` is the sum of every mined inter-task delta;
+    ``prior_var_total_s`` is the portion attributable to variable paths. An
+    empty profile / zero total means "no usable prior" and
+    :func:`project_remaining` returns ``None``.
     """
 
     task_wall_s: dict[str, float]
+    variable_paths: frozenset[str]
     prior_wall_total_s: float
+    prior_var_total_s: float
+
+    @property
+    def prior_fixed_total_s(self) -> float:
+        return max(self.prior_wall_total_s - self.prior_var_total_s, 0.0)
+
+    def is_variable(self, path: str) -> bool:
+        return path in self.variable_paths
 
 
-def covered_prior_s(estimate: RunEstimate, completed_paths: Iterable[str]) -> tuple[float, int]:
-    """Sum per-occurrence prior wall for ``completed_paths``.
+@dataclass
+class RunProgress:
+    """Mutable covered-work accumulators for the live run.
 
-    Returns ``(done_prior_s, matched_tasks)``. A completed path absent from
-    the prior profile (a new or edited task) contributes 0 and is not
-    counted as matched — that under-counts progress on a diverged playbook,
-    which the warmup gate then refuses to estimate from.
+    ``covered_fixed_s`` / ``covered_var_s`` are the prior wall covered so far,
+    bucketed by each task's *prior* result. ``var_actual_s`` is the actual
+    wall spent on variable-prior tasks (the work-pace numerator).
+    ``completed_covered_s`` and ``matched_tasks`` count *completed* work only
+    and drive the warmup gate — in-flight top-ups deliberately don't touch
+    them.
     """
-    done = 0.0
-    matched = 0
-    for path in completed_paths:
-        wall = estimate.task_wall_s.get(path)
-        if wall is None:
-            continue
-        done += wall
-        matched += 1
-    return done, matched
+
+    covered_fixed_s: float = 0.0
+    covered_var_s: float = 0.0
+    var_actual_s: float = 0.0
+    completed_covered_s: float = 0.0
+    matched_tasks: int = 0
+
+    def copy(self) -> RunProgress:
+        return RunProgress(
+            covered_fixed_s=self.covered_fixed_s,
+            covered_var_s=self.covered_var_s,
+            var_actual_s=self.var_actual_s,
+            completed_covered_s=self.completed_covered_s,
+            matched_tasks=self.matched_tasks,
+        )
 
 
-def in_flight_credit_s(estimate: RunEstimate, running: Iterable[tuple[str, float]]) -> float:
-    """Prior wall already covered by *currently running* tasks.
+def add_completed(
+    estimate: RunEstimate, progress: RunProgress, path: str, actual_wall_s: float
+) -> None:
+    """Fold a just-completed task into ``progress`` by its prior bucket.
 
-    ``running`` is ``(path, running_elapsed_s)`` per in-flight task. Each
-    contributes ``min(running_elapsed, prior_wall[path])`` — we credit the
-    task's progress up to its known prior duration, but no further, so that
-    an overrun (the task taking longer than last time) counts against the
-    pace ratio rather than masking it. Unknown paths (new/edited tasks)
-    contribute 0; negative elapsed (clock skew) floors at 0.
+    A path absent from the prior profile (new/edited task) is ignored — it
+    contributes nothing and is not counted as matched. Variable-prior tasks
+    record both their prior wall (covered) and this run's actual wall (the
+    work-pace numerator); fixed-prior tasks record prior wall only.
     """
-    total = 0.0
-    for path, run_elapsed in running:
-        wall = estimate.task_wall_s.get(path)
-        if wall is None:
-            continue
-        total += min(max(run_elapsed, 0.0), wall)
-    return total
+    wall = estimate.task_wall_s.get(path)
+    if wall is None:
+        return
+    progress.matched_tasks += 1
+    progress.completed_covered_s += wall
+    if estimate.is_variable(path):
+        progress.covered_var_s += wall
+        progress.var_actual_s += max(actual_wall_s, 0.0)
+    else:
+        progress.covered_fixed_s += wall
 
 
-def project_remaining(
-    estimate: RunEstimate,
-    done_prior_s: float,
-    matched_tasks: int,
-    elapsed_s: float,
-    in_flight_credit_s: float = 0.0,
-) -> float | None:
+def add_in_flight(
+    estimate: RunEstimate, progress: RunProgress, path: str, run_elapsed_s: float
+) -> None:
+    """Top up ``progress`` with a still-running task's partial progress.
+
+    Credits ``min(run_elapsed, prior_wall)`` to the covered bucket — capped
+    at the prior duration so an overrun counts against the work pace rather
+    than masking it — and the full ``run_elapsed`` to ``var_actual_s`` for
+    variable tasks. Never advances ``completed_covered_s`` / ``matched_tasks``
+    (the gate is on completed work). Unknown paths contribute nothing.
+    """
+    wall = estimate.task_wall_s.get(path)
+    if wall is None:
+        return
+    run_elapsed = max(run_elapsed_s, 0.0)
+    credit = min(run_elapsed, wall)
+    if estimate.is_variable(path):
+        progress.covered_var_s += credit
+        progress.var_actual_s += run_elapsed
+    else:
+        progress.covered_fixed_s += credit
+
+
+def project_remaining(estimate: RunEstimate, progress: RunProgress) -> float | None:
     """Project remaining wall-clock seconds, or ``None`` if not estimable.
 
-    ``None`` is returned for: no usable prior profile, the warmup window
-    (too few matched tasks or too little *completed* prior wall covered),
-    and the defensive ``covered <= 0`` case.
+    ``None`` for: no usable prior profile, or the warmup window (too few
+    completed matched tasks / too little completed prior wall).
 
-    Otherwise the run's covered prior wall is ``done_prior + in-flight
-    credit`` (the latter crediting the *currently running* tasks against
-    their prior duration so a long task burns the estimate down instead of
-    inflating it — see :func:`in_flight_credit_s`), capped at the prior
-    total. The pace ratio (``elapsed / covered``) is clamped to
-    ``[0.2, 5.0]`` and applied to the uncovered prior wall; the result
-    floors at 0 (a run that overran its prior shows "0s left", not a
-    negative).
-
-    The warmup gate is deliberately checked against ``done_prior_s`` alone
-    — confidence comes from *completed* tasks, so an in-flight credit can
-    refine an estimate but never trip the gate open on its own.
+    Otherwise the uncovered fixed floor is added unscaled to the uncovered
+    variable work scaled by the clamped work pace (``var_actual /
+    covered_var``, defaulting to 1.0 before any variable task is measured).
+    Both remainders floor at 0.
     """
     if estimate.prior_wall_total_s <= 0:
         return None
-    if matched_tasks < _WARMUP_MIN_TASKS:
+    if progress.matched_tasks < _WARMUP_MIN_TASKS:
         return None
-    if done_prior_s < _WARMUP_FRACTION * estimate.prior_wall_total_s:
+    if progress.completed_covered_s < _WARMUP_FRACTION * estimate.prior_wall_total_s:
         return None
-    covered = min(done_prior_s + in_flight_credit_s, estimate.prior_wall_total_s)
-    if covered <= 0:
-        return None
-    pace = elapsed_s / covered
-    pace = min(max(pace, _PACE_MIN), _PACE_MAX)
-    remaining = pace * (estimate.prior_wall_total_s - covered)
-    return max(remaining, 0.0)
+
+    rem_fixed = max(estimate.prior_fixed_total_s - progress.covered_fixed_s, 0.0)
+    rem_var = max(estimate.prior_var_total_s - progress.covered_var_s, 0.0)
+
+    if progress.covered_var_s > 0:
+        work_pace = progress.var_actual_s / progress.covered_var_s
+        work_pace = min(max(work_pace, _PACE_MIN), _PACE_MAX)
+    else:
+        # No variable work measured yet — assume this run matches the prior.
+        work_pace = 1.0
+
+    return rem_fixed + work_pace * rem_var

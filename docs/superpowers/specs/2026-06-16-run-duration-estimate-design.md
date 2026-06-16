@@ -60,6 +60,41 @@ is recomputed each render. The warmup gate stays on *completed* work
 (`done_prior`, `matched_tasks`) — an in-flight credit refines an estimate
 but never trips the gate open on its own.
 
+### Result-segmented pace (amended 2026-06-16)
+
+A single global `pace_ratio` mis-scales the *fixed floor*. Measured across
+repeated real runs, `ok`/`skipped` tasks are ~constant run-to-run (idempotency
+checks) while `changed` (and failed/unreachable) tasks carry essentially all
+the variance. On a fast re-run a global pace (e.g. 0.28) wrongly shrinks the
+constant floor too.
+
+Fix: mine each prior task's result and split the prior wall into a fixed
+floor (ok/skipped) and a variable part (changed/failed/unreachable). Project:
+
+```
+remaining = (fixed_total − covered_fixed)                    # unscaled floor
+          + clamp(work_pace) × (var_total − covered_var)
+work_pace = Σ actual_wall(variable tasks, in flight+done)
+          / Σ prior_wall(variable tasks, in flight+done)     # default 1.0
+```
+
+`covered_*` accumulate by each task's *prior* bucket via
+`add_completed`/`add_in_flight` on a `RunProgress`; the renderer holds the
+completed-only progress and folds in-flight tasks into a copy each render.
+The pace clamp low bound drops to **0.05** (was 0.2): with the floor protected
+separately, a genuinely fast re-run can push the variable pace well below 0.2
+(cached installs run near-instantly). Mining classifies a path variable if any
+host reported `changed`, or the task failed/was unreachable; ok-without-change
+and skipped stay in the floor.
+
+Empirically validated end-to-end on a real slow→fast `site.yml` rerun (203s
+prior → 58s actual): the segmented projection tracked true-remaining within
+~1s throughout, where the old global-pace model under-predicted 3–4×.
+
+Known follow-up: the warmup gate keys on covered *prior wall*, so on a fast
+re-run where the big variable tasks complete late, the estimate appears late.
+A count-based or time-based warmup would surface it earlier.
+
 ## Robustness: warmup gate + clamp
 
 Early in a run `done_prior` is tiny, so `pace_ratio` is noisy; a diverged

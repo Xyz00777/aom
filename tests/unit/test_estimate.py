@@ -1,181 +1,206 @@
-"""Pure run-duration projection — covered-prior-work + live pace.
+"""Pure run-duration projection — result-segmented covered-prior-work.
 
-``project_remaining`` turns "how much of the prior run's wall-clock have
-we covered" plus "how long that took us" into a remaining-time estimate,
-with a warmup gate and a pace clamp so first runs and diverged playbooks
-degrade to "no estimate" rather than garbage.
+Prior wall splits into a *fixed* floor (tasks that were ok/skipped last run
+— empirically ~constant) and a *variable* part (tasks that were changed —
+where all the run-to-run variance lives). The fixed floor is projected
+unscaled; the variable part is scaled by a work-pace measured only from
+the variable tasks' actual-vs-prior wall.
 """
 
 from __future__ import annotations
 
 from ansible_aom.core.estimate import (
     RunEstimate,
-    covered_prior_s,
-    in_flight_credit_s,
+    RunProgress,
+    add_completed,
+    add_in_flight,
     project_remaining,
 )
 
 
-def _est(task_wall: dict[str, float]) -> RunEstimate:
-    return RunEstimate(task_wall_s=task_wall, prior_wall_total_s=sum(task_wall.values()))
+def _est(
+    fixed: dict[str, float] | None = None,
+    variable: dict[str, float] | None = None,
+) -> RunEstimate:
+    fixed = fixed or {}
+    variable = variable or {}
+    task_wall = {**fixed, **variable}
+    return RunEstimate(
+        task_wall_s=task_wall,
+        variable_paths=frozenset(variable),
+        prior_wall_total_s=sum(task_wall.values()),
+        prior_var_total_s=sum(variable.values()),
+    )
 
 
-# --- covered_prior_s -------------------------------------------------------
+# --- RunEstimate -----------------------------------------------------------
 
 
-def test_covered_sums_matched_paths_and_counts_them() -> None:
-    est = _est({"a.yml:1": 10.0, "a.yml:2": 20.0, "a.yml:3": 30.0})
-    done, matched = covered_prior_s(est, ["a.yml:1", "a.yml:3"])
-    assert done == 40.0
-    assert matched == 2
+def test_fixed_total_is_total_minus_variable() -> None:
+    est = _est(fixed={"a": 10.0}, variable={"b": 30.0})
+    assert est.prior_fixed_total_s == 10.0
+    assert est.is_variable("b") is True
+    assert est.is_variable("a") is False
 
 
-def test_covered_ignores_unmatched_paths() -> None:
-    est = _est({"a.yml:1": 10.0})
-    done, matched = covered_prior_s(est, ["a.yml:1", "new.yml:99"])
-    assert done == 10.0
-    assert matched == 1  # the unmatched path is not counted
+# --- add_completed accumulation -------------------------------------------
 
 
-def test_covered_adds_per_occurrence_average_each_time() -> None:
-    # A recurring path stores a per-occurrence average; each completion
-    # adds it again.
-    est = _est({"role.yml:1": 5.0})
-    done, matched = covered_prior_s(est, ["role.yml:1", "role.yml:1"])
-    assert done == 10.0
-    assert matched == 2
+def test_add_completed_buckets_by_prior_result() -> None:
+    est = _est(fixed={"ok1": 5.0}, variable={"ch1": 20.0})
+    prog = RunProgress()
+    add_completed(est, prog, "ok1", actual_wall_s=4.0)
+    add_completed(est, prog, "ch1", actual_wall_s=8.0)
+    assert prog.covered_fixed_s == 5.0
+    assert prog.covered_var_s == 20.0  # prior wall, not actual
+    assert prog.var_actual_s == 8.0  # actual wall of the variable task
+    assert prog.completed_covered_s == 25.0
+    assert prog.matched_tasks == 2
+
+
+def test_add_completed_ignores_unmatched_path() -> None:
+    est = _est(fixed={"ok1": 5.0})
+    prog = RunProgress()
+    add_completed(est, prog, "new.yml:9", actual_wall_s=3.0)
+    assert prog.matched_tasks == 0
+    assert prog.completed_covered_s == 0.0
+
+
+def test_add_completed_fixed_task_does_not_touch_var_actual() -> None:
+    est = _est(fixed={"ok1": 5.0})
+    prog = RunProgress()
+    add_completed(est, prog, "ok1", actual_wall_s=99.0)
+    assert prog.var_actual_s == 0.0
+
+
+# --- add_in_flight (does not advance the gate) -----------------------------
+
+
+def test_add_in_flight_credits_variable_bucket_and_actual() -> None:
+    est = _est(variable={"long": 80.0})
+    prog = RunProgress()
+    add_in_flight(est, prog, "long", run_elapsed_s=40.0)
+    assert prog.covered_var_s == 40.0  # min(40, 80)
+    assert prog.var_actual_s == 40.0
+    assert prog.completed_covered_s == 0.0  # in-flight never advances the gate
+    assert prog.matched_tasks == 0
+
+
+def test_add_in_flight_caps_credit_at_prior_but_not_actual() -> None:
+    est = _est(variable={"long": 80.0})
+    prog = RunProgress()
+    add_in_flight(est, prog, "long", run_elapsed_s=120.0)  # overrun
+    assert prog.covered_var_s == 80.0  # credit capped at prior wall
+    assert prog.var_actual_s == 120.0  # actual is the real (over)time
+
+
+def test_add_in_flight_fixed_task_credits_floor_only() -> None:
+    est = _est(fixed={"chk": 5.0})
+    prog = RunProgress()
+    add_in_flight(est, prog, "chk", run_elapsed_s=3.0)
+    assert prog.covered_fixed_s == 3.0
+    assert prog.var_actual_s == 0.0
 
 
 # --- project_remaining: gates ---------------------------------------------
 
 
 def test_no_prior_returns_none() -> None:
-    est = RunEstimate(task_wall_s={}, prior_wall_total_s=0.0)
-    assert project_remaining(est, done_prior_s=0.0, matched_tasks=0, elapsed_s=5.0) is None
+    est = _est()
+    assert project_remaining(est, RunProgress()) is None
 
 
 def test_warmup_min_tasks_gate() -> None:
-    est = _est({f"a.yml:{i}": 10.0 for i in range(10)})  # total 100
-    # 1 matched task, 10% covered — fails the min-tasks gate.
-    assert project_remaining(est, done_prior_s=10.0, matched_tasks=1, elapsed_s=10.0) is None
+    est = _est(fixed={f"a{i}": 10.0 for i in range(10)})  # total 100
+    prog = RunProgress(completed_covered_s=10.0, covered_fixed_s=10.0, matched_tasks=1)
+    assert project_remaining(est, prog) is None
 
 
 def test_warmup_fraction_gate() -> None:
-    est = _est({f"a.yml:{i}": 10.0 for i in range(10)})  # total 100
-    # 2 matched but only 5% of prior wall covered — fails the fraction gate.
-    assert project_remaining(est, done_prior_s=5.0, matched_tasks=2, elapsed_s=5.0) is None
+    est = _est(fixed={f"a{i}": 10.0 for i in range(10)})  # total 100
+    prog = RunProgress(completed_covered_s=5.0, covered_fixed_s=5.0, matched_tasks=2)
+    assert project_remaining(est, prog) is None
 
 
-def test_gates_open_returns_estimate() -> None:
-    est = _est({f"a.yml:{i}": 10.0 for i in range(10)})  # total 100
-    # 2 matched, 20% covered, on-pace (elapsed == done_prior).
-    remaining = project_remaining(est, done_prior_s=20.0, matched_tasks=2, elapsed_s=20.0)
-    assert remaining == 80.0  # pace 1.0 × (100 - 20)
+# --- project_remaining: the segmented model -------------------------------
 
 
-# --- project_remaining: pace --------------------------------------------
+def test_fixed_floor_projected_unscaled() -> None:
+    # All fixed work; nothing variable. Remaining is just the uncovered
+    # floor, never scaled — even though we've completed faster/slower.
+    est = _est(fixed={f"a{i}": 10.0 for i in range(10)})  # total 100
+    prog = RunProgress(completed_covered_s=20.0, covered_fixed_s=20.0, matched_tasks=2)
+    assert project_remaining(est, prog) == 80.0
 
 
-def test_fast_rerun_shrinks_remaining() -> None:
-    est = _est({f"a.yml:{i}": 10.0 for i in range(10)})  # total 100
-    # Covered 50 of prior wall in only 10s → pace 0.2 → remaining halves of half.
-    remaining = project_remaining(est, done_prior_s=50.0, matched_tasks=5, elapsed_s=10.0)
-    assert remaining == 0.2 * 50.0  # 10.0
+def test_variable_remainder_scaled_by_work_pace() -> None:
+    # Fixed floor 40 (covered 40) + variable 60 (covered 20 so far, and that
+    # 20 of prior variable work actually took only 10s → work_pace 0.5).
+    est = _est(
+        fixed={f"f{i}": 10.0 for i in range(4)},  # 40
+        variable={f"v{i}": 20.0 for i in range(3)},  # 60
+    )
+    prog = RunProgress(
+        completed_covered_s=60.0,
+        covered_fixed_s=40.0,
+        covered_var_s=20.0,
+        var_actual_s=10.0,  # pace 0.5
+        matched_tasks=5,
+    )
+    # rem_fixed = 0; rem_var_prior = 40; work_pace 0.5 → 20.
+    assert project_remaining(est, prog) == 20.0
 
 
-def test_pace_clamped_low() -> None:
-    est = _est({f"a.yml:{i}": 10.0 for i in range(10)})  # total 100
-    # Absurdly fast (pace would be 0.01) → clamped to 0.2.
-    remaining = project_remaining(est, done_prior_s=50.0, matched_tasks=5, elapsed_s=0.5)
-    assert remaining == 0.2 * 50.0
+def test_fast_rerun_keeps_floor_but_collapses_variable() -> None:
+    # site.yml-shaped: 20s fixed floor (constant), 174s prior variable work
+    # that this run is blowing through at pace ~0.17.
+    est = _est(fixed={"floor": 20.0}, variable={"work": 174.0})
+    prog = RunProgress(
+        completed_covered_s=20.0,  # floor done
+        covered_fixed_s=20.0,
+        covered_var_s=87.0,  # half the variable prior covered
+        var_actual_s=15.0,  # ...in only 15s → pace ~0.17
+        matched_tasks=2,
+    )
+    remaining = project_remaining(est, prog)
+    # floor fully covered (rem_fixed 0) + 0.1724 × 87 ≈ 15.0
+    assert remaining is not None
+    assert 14.0 < remaining < 16.0
 
 
-def test_pace_clamped_high() -> None:
-    est = _est({f"a.yml:{i}": 10.0 for i in range(10)})  # total 100
-    # Far slower than prior (pace would be 20) → clamped to 5.0.
-    remaining = project_remaining(est, done_prior_s=50.0, matched_tasks=5, elapsed_s=1000.0)
-    assert remaining == 5.0 * 50.0
+def test_work_pace_defaults_to_one_before_any_variable_completes() -> None:
+    est = _est(fixed={"f1": 20.0, "f2": 20.0}, variable={"v1": 60.0})  # total 100
+    prog = RunProgress(completed_covered_s=40.0, covered_fixed_s=40.0, matched_tasks=2)
+    # No variable work measured yet → assume on-pace (×1): rem_var = 60.
+    assert project_remaining(est, prog) == 60.0
+
+
+def test_work_pace_clamped_low() -> None:
+    est = _est(fixed={"f": 10.0}, variable={"v1": 45.0, "v2": 45.0})  # total 100
+    prog = RunProgress(
+        completed_covered_s=55.0,
+        covered_fixed_s=10.0,
+        covered_var_s=45.0,
+        var_actual_s=0.1,  # pace 0.0022 → clamped to floor 0.05
+        matched_tasks=2,
+    )
+    # rem_fixed 0 + clamp(0.05) × 45 = 2.25
+    assert project_remaining(est, prog) == 45.0 * 0.05
+
+
+def test_work_pace_clamped_high() -> None:
+    est = _est(fixed={"f": 10.0}, variable={"v1": 45.0, "v2": 45.0})  # total 100
+    prog = RunProgress(
+        completed_covered_s=55.0,
+        covered_fixed_s=10.0,
+        covered_var_s=45.0,
+        var_actual_s=900.0,  # pace 20 → clamped to ceiling 5.0
+        matched_tasks=2,
+    )
+    assert project_remaining(est, prog) == 45.0 * 5.0
 
 
 def test_remaining_never_negative() -> None:
-    est = _est({"a.yml:1": 10.0, "a.yml:2": 10.0})  # total 20
-    # Covered more than total (new tasks pushed done_prior past prior) —
-    # remaining floors at 0 rather than going negative.
-    remaining = project_remaining(est, done_prior_s=25.0, matched_tasks=2, elapsed_s=25.0)
-    assert remaining == 0.0
-
-
-# --- in_flight_credit_s ----------------------------------------------------
-
-
-def test_in_flight_credit_sums_min_of_elapsed_and_prior() -> None:
-    est = _est({"long.yml:1": 80.0, "mid.yml:1": 30.0})
-    # long has run 40s (< its 80s prior) → credit 40; mid has run 50s
-    # (> its 30s prior) → credit caps at 30.
-    credit = in_flight_credit_s(est, [("long.yml:1", 40.0), ("mid.yml:1", 50.0)])
-    assert credit == 70.0
-
-
-def test_in_flight_credit_ignores_unknown_paths() -> None:
-    est = _est({"long.yml:1": 80.0})
-    credit = in_flight_credit_s(est, [("long.yml:1", 10.0), ("new.yml:9", 99.0)])
-    assert credit == 10.0
-
-
-def test_in_flight_credit_floors_negative_elapsed() -> None:
-    est = _est({"long.yml:1": 80.0})
-    # Clock skew shouldn't produce negative credit.
-    assert in_flight_credit_s(est, [("long.yml:1", -5.0)]) == 0.0
-
-
-# --- project_remaining: in-flight credit (the long-task burn-down) ---------
-
-
-def test_long_running_task_burns_down_instead_of_inflating() -> None:
-    # 4 short (5s) + 1 long (80s) = 100s prior; long task runs last.
-    est = RunEstimate(
-        task_wall_s={"s1": 5.0, "s2": 5.0, "s3": 5.0, "s4": 5.0, "long": 80.0},
-        prior_wall_total_s=100.0,
-    )
-    done_prior = 20.0  # all four short tasks completed
-    # The long task runs; on pace its run-elapsed == time past the short
-    # tasks, so covered == elapsed and remaining burns down 80 → 0.
-    for run_elapsed, expected in [(0.0, 80.0), (20.0, 60.0), (40.0, 40.0), (80.0, 0.0)]:
-        credit = in_flight_credit_s(est, [("long", run_elapsed)])
-        elapsed = done_prior + run_elapsed  # on pace
-        remaining = project_remaining(
-            est,
-            done_prior_s=done_prior,
-            matched_tasks=4,
-            elapsed_s=elapsed,
-            in_flight_credit_s=credit,
-        )
-        assert remaining == expected
-
-
-def test_in_flight_credit_does_not_open_warmup_gate() -> None:
-    est = _est({f"a.yml:{i}": 10.0 for i in range(10)})  # total 100
-    # Only 1 completed task, but a big in-flight credit — the gate is on
-    # *completed* work, so this still returns None.
-    remaining = project_remaining(
-        est,
-        done_prior_s=10.0,
-        matched_tasks=1,
-        elapsed_s=10.0,
-        in_flight_credit_s=40.0,
-    )
-    assert remaining is None
-
-
-def test_in_flight_credit_capped_at_total_floors_remaining() -> None:
-    est = _est({"a.yml:1": 10.0, "long": 30.0})  # total 40
-    # done 10, long task overran (credit caps at its 30 prior) → covered 40
-    # == total → remaining floors at 0 even while the task still runs.
-    remaining = project_remaining(
-        est,
-        done_prior_s=10.0,
-        matched_tasks=1 + 1,
-        elapsed_s=200.0,
-        in_flight_credit_s=30.0,
-    )
-    assert remaining == 0.0
+    est = _est(fixed={"f1": 10.0, "f2": 10.0})  # total 20
+    prog = RunProgress(completed_covered_s=25.0, covered_fixed_s=25.0, matched_tasks=2)
+    assert project_remaining(est, prog) == 0.0

@@ -14,7 +14,7 @@ from ansible_aom.core.models import PlayDefinition, TaskDefinition
 from ansible_aom.session.history import PriorRun
 
 
-def _prior(task_wall: dict[str, float]) -> PriorRun:
+def _prior(task_wall: dict[str, float], variable: frozenset[str] = frozenset()) -> PriorRun:
     from datetime import datetime, timezone
 
     return PriorRun(
@@ -25,6 +25,8 @@ def _prior(task_wall: dict[str, float]) -> PriorRun:
         end_time=datetime(2026, 6, 1, tzinfo=timezone.utc),
         task_wall_s=dict(task_wall),
         prior_wall_total_s=sum(task_wall.values()),
+        variable_paths=variable,
+        prior_var_total_s=sum(task_wall[p] for p in variable),
     )
 
 
@@ -95,7 +97,7 @@ def test_no_eta_below_warmup_gate(monkeypatch) -> None:
     _complete_task(renderer, tid="t1", name="a", path="site.yml:1", ts="2026-06-02T10:00:00Z")
     renderer._last_panel_compute_time = 0.0
     renderer.tick()
-    assert renderer._matched_tasks == 1
+    assert renderer._progress.matched_tasks == 1
     assert all("left" not in f for f in display.frames), display.frames
 
 
@@ -106,8 +108,8 @@ def test_eta_appears_once_gate_opens(monkeypatch) -> None:
     _complete_task(renderer, tid="t2", name="b", path="site.yml:2", ts="2026-06-02T10:00:00Z")
     renderer._last_panel_compute_time = 0.0
     renderer.tick()
-    assert renderer._matched_tasks == 2
-    assert renderer._done_prior_s == 20.0
+    assert renderer._progress.matched_tasks == 2
+    assert renderer._progress.completed_covered_s == 20.0
     assert any("left" in f for f in display.frames), display.frames
 
 
@@ -116,8 +118,8 @@ def test_unmatched_path_does_not_count(monkeypatch) -> None:
     _complete_task(renderer, tid="t1", name="a", path="site.yml:1", ts="2026-06-02T10:00:00Z")
     # A path absent from the prior profile (edited playbook) contributes 0.
     _complete_task(renderer, tid="t9", name="new", path="new.yml:99", ts="2026-06-02T10:00:00Z")
-    assert renderer._matched_tasks == 1
-    assert renderer._done_prior_s == 10.0
+    assert renderer._progress.matched_tasks == 1
+    assert renderer._progress.completed_covered_s == 10.0
 
 
 def test_long_running_task_burns_estimate_down(monkeypatch) -> None:
@@ -133,7 +135,9 @@ def test_long_running_task_burns_estimate_down(monkeypatch) -> None:
     display = _FakeDisplay()
     monkeypatch.setattr(renderer, "_display", display)
     renderer.start("site.yml", [])  # _start_time captured at t=1000
-    renderer.set_prior_run(_prior({"s1": 5.0, "s2": 5.0, "s3": 5.0, "long": 85.0}))
+    renderer.set_prior_run(
+        _prior({"s1": 5.0, "s2": 5.0, "s3": 5.0, "long": 85.0}, variable=frozenset({"long"}))
+    )
     play = PlayDefinition(
         id="1",
         name="web",
@@ -154,7 +158,7 @@ def test_long_running_task_burns_estimate_down(monkeypatch) -> None:
     for i, (tid, path) in enumerate([("t1", "s1"), ("t2", "s2"), ("t3", "s3")]):
         holder["t"] = 1000.0 + (i + 1) * 5.0
         _complete_task(renderer, tid=tid, name=path, path=path, ts="2026-06-02T10:00:00Z")
-    assert renderer._done_prior_s == 15.0
+    assert renderer._progress.completed_covered_s == 15.0
 
     # Long task starts (no completion yet) and runs for 40s.
     holder["t"] = 1015.0
@@ -177,6 +181,70 @@ def test_long_running_task_burns_estimate_down(monkeypatch) -> None:
     holder["t"] = 1100.0
     _complete_task(renderer, tid="tL", name="long", path="long", ts="2026-06-02T10:00:55Z")
     assert "tL" not in renderer._running_task_starts
+
+
+def test_fixed_floor_not_scaled_by_fast_variable_task(monkeypatch) -> None:
+    # Fast rerun: a variable task that was slow last run now flies, but the
+    # fixed floor remaining must NOT be dragged down with it.
+    import ansible_aom.compact.renderer as rmod
+
+    holder = {"t": 1000.0}
+    monkeypatch.setattr(rmod.time, "time", lambda: holder["t"])
+
+    renderer = CompactRenderer(is_tty=True)
+    display = _FakeDisplay()
+    monkeypatch.setattr(renderer, "_display", display)
+    renderer.start("site.yml", [])
+    # floor = f1+f2 = 40 (fixed); variable v1=30 (will run fast), plus 30 more
+    # variable still to come (v2, uncompleted) → var_total 60.
+    renderer.set_prior_run(
+        _prior(
+            {"f1": 20.0, "f2": 20.0, "v1": 30.0, "v2": 30.0},
+            variable=frozenset({"v1", "v2"}),
+        )
+    )
+    play = PlayDefinition(
+        id="1", name="web", hosts="all", resolved_hosts=["w1"], tasks=[_task("a", 0)]
+    )
+    renderer.set_definitions([play])
+    renderer.update_state(
+        {
+            "_event": "v2_playbook_on_play_start",
+            "_timestamp": "t",
+            "play": {"id": "1", "name": "web"},
+        }
+    )
+    # Two fixed tasks complete on pace (covered_fixed 40), then v1 (prior 30s)
+    # completes in just 3s → work_pace 0.1.
+    holder["t"] = 1010.0
+    _complete_task(renderer, tid="t1", name="f1", path="f1", ts="2026-06-02T10:00:00Z")
+    _complete_task(renderer, tid="t2", name="f2", path="f2", ts="2026-06-02T10:00:00Z")
+    holder["t"] = 1013.0
+    renderer.update_state(
+        {
+            "_event": "v2_playbook_on_task_start",
+            "_timestamp": "x",
+            "task": {"id": "tv1", "name": "v1", "path": "v1"},
+            "play": {"id": "1"},
+        }
+    )
+    holder["t"] = 1016.0  # v1 takes 3s of actual wall (prior was 30s)
+    renderer.update_state(
+        {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "x",
+            "task": {"id": "tv1", "name": "v1", "path": "v1"},
+            "play": {"id": "1"},
+            "hosts": {"w1": {"changed": True}},
+        }
+    )
+    # covered_fixed=40 (floor done), covered_var=30, var_actual=3 → pace 0.1.
+    assert renderer._progress.covered_var_s == 30.0
+    assert renderer._progress.var_actual_s == 3.0
+    renderer._last_panel_compute_time = 0.0
+    renderer.tick()
+    # rem_fixed = 40-40 = 0; rem_var = 60-30 = 30; ×clamp(0.1) = 3 → "~3s left".
+    assert any("~3s left" in f for f in display.frames), display.frames
 
 
 def test_no_estimate_without_prior(monkeypatch) -> None:

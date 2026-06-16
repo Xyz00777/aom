@@ -49,7 +49,13 @@ from ansible_aom.compact.format import (
 )
 from ansible_aom.compact.password import handle_password_prompt as do_handle_password_prompt
 from ansible_aom.core import diagnostics
-from ansible_aom.core.estimate import RunEstimate, in_flight_credit_s, project_remaining
+from ansible_aom.core.estimate import (
+    RunEstimate,
+    RunProgress,
+    add_completed,
+    add_in_flight,
+    project_remaining,
+)
 from ansible_aom.core.heartbeat import HeartbeatTracker, LivenessState  # noqa: F401
 from ansible_aom.core.icons import is_unicode_terminal
 from ansible_aom.core.models import RunState, Status
@@ -163,15 +169,15 @@ class CompactRenderer:
         self._tasks_seen: int = 0
         self._tasks_completed: int = 0
         self._completed_task_ids: set[str] = set()
-        # Live run-duration estimate. ``_estimate`` is built from the
-        # matching prior run's per-task wall profile in ``set_prior_run``;
-        # ``_done_prior_s`` / ``_matched_tasks`` accumulate covered prior
-        # work as tasks complete (bumped alongside ``_tasks_completed``,
-        # under the same once-per-task guard). The status bar feeds these
-        # through ``project_remaining``. See :mod:`ansible_aom.core.estimate`.
+        # Live run-duration estimate. ``_estimate`` is the matching prior
+        # run's result-segmented per-task wall profile (built in
+        # ``set_prior_run``); ``_progress`` accumulates covered prior work as
+        # tasks complete (bumped alongside ``_tasks_completed``, under the
+        # same once-per-task guard). The status bar feeds these — plus
+        # in-flight top-ups computed each render — through
+        # ``project_remaining``. See :mod:`ansible_aom.core.estimate`.
         self._estimate: RunEstimate | None = None
-        self._done_prior_s: float = 0.0
-        self._matched_tasks: int = 0
+        self._progress: RunProgress = RunProgress()
         # Currently-running tasks: ``task_id -> (task.path, start_wall)``,
         # where ``start_wall`` is ``time.time()`` at the task's first
         # announcement (same clock as the status-bar elapsed). Lets the ETA
@@ -219,8 +225,7 @@ class CompactRenderer:
         self._announced_task_uuids = set()
         # ``_estimate`` is set by ``set_prior_run`` and not reset here, the
         # same way ``_prior_run`` isn't — only the per-run accumulators are.
-        self._done_prior_s = 0.0
-        self._matched_tasks = 0
+        self._progress = RunProgress()
         self._running_task_starts = {}
 
         # Initialize RunState
@@ -257,7 +262,9 @@ class CompactRenderer:
         if prior_run is not None and prior_run.prior_wall_total_s > 0:
             self._estimate = RunEstimate(
                 task_wall_s=dict(prior_run.task_wall_s),
+                variable_paths=prior_run.variable_paths,
                 prior_wall_total_s=prior_run.prior_wall_total_s,
+                prior_var_total_s=prior_run.prior_var_total_s,
             )
         else:
             self._estimate = None
@@ -373,19 +380,17 @@ class CompactRenderer:
         if all(hs.status != Status.RUNNING for hs in task.hosts.values()):
             self._completed_task_ids.add(task_id)
             self._tasks_completed += 1
-            # No longer in flight: its prior wall now lands in done_prior
-            # below rather than as in-flight credit.
-            self._running_task_starts.pop(task_id, None)
-            # Accumulate covered prior wall for the live ETA. Keyed by the
-            # task path (the only cross-run-stable identity); a path absent
-            # from the prior profile — a new or edited task — contributes 0
-            # and isn't counted as matched. Same once-per-task guard as the
-            # counter above, so each occurrence adds its average exactly once.
+            # No longer in flight: fold it into completed progress instead.
+            # Its recorded start gives this run's actual wall (the work-pace
+            # numerator); fall back to the prior wall if we never saw a start
+            # (neutral, pace ≈ 1). Keyed by task path — the only cross-run
+            # stable identity; an unmatched path contributes nothing.
+            start = self._running_task_starts.pop(task_id, None)
             if self._estimate is not None:
-                wall = self._estimate.task_wall_s.get(event.get("task", {}).get("path", ""))
-                if wall is not None:
-                    self._done_prior_s += wall
-                    self._matched_tasks += 1
+                path = event.get("task", {}).get("path", "")
+                prior_wall = self._estimate.task_wall_s.get(path)
+                actual_wall = (time.time() - start[1]) if start is not None else (prior_wall or 0.0)
+                add_completed(self._estimate, self._progress, path, actual_wall)
 
     def _record_running_start(self, event: dict) -> None:
         """Note when a task entered flight, for the live ETA's in-flight credit.
@@ -489,21 +494,15 @@ class CompactRenderer:
         elapsed = now_wall - self._start_time
         remaining_seconds: float | None = None
         if self._estimate is not None:
-            # Credit tasks still in flight against their prior duration so a
-            # long-running task burns the estimate down instead of inflating
-            # it (the pace ratio would otherwise climb while done_prior sits
-            # frozen until the task completes).
-            credit = in_flight_credit_s(
-                self._estimate,
-                [(path, now_wall - start) for path, start in self._running_task_starts.values()],
-            )
-            remaining_seconds = project_remaining(
-                self._estimate,
-                done_prior_s=self._done_prior_s,
-                matched_tasks=self._matched_tasks,
-                elapsed_s=elapsed,
-                in_flight_credit_s=credit,
-            )
+            # Top up a copy of completed progress with tasks still in flight,
+            # crediting each against its prior duration so a long-running task
+            # burns the estimate down instead of inflating it. The copy keeps
+            # in-flight work out of the warmup gate (which is on completed
+            # work only).
+            progress = self._progress.copy()
+            for path, start in self._running_task_starts.values():
+                add_in_flight(self._estimate, progress, path, now_wall - start)
+            remaining_seconds = project_remaining(self._estimate, progress)
         status_bar = format_status_bar(
             playbook=self._playbook,
             hosts_completed=hosts_completed,

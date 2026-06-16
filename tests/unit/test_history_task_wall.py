@@ -46,6 +46,15 @@ def _stats(ts: str) -> dict:
     return {"_event": "v2_playbook_on_stats", "_timestamp": ts}
 
 
+def _result(path: str, ts: str, *, event: str = "v2_runner_on_ok", changed: bool = False) -> dict:
+    return {
+        "_event": event,
+        "_timestamp": ts,
+        "task": {"path": path},
+        "hosts": {"w1": {"changed": changed}},
+    }
+
+
 def _prior(tmp_path: Path, playbook: Path) -> object:
     key = build_run_config_key(playbook=str(playbook), ansible_args=[])
     return find_previous_run(tmp_path / "sessions", key, host_count=1)
@@ -88,6 +97,69 @@ def test_recurring_path_stores_per_occurrence_average(tmp_path: Path) -> None:
     assert prior is not None
     assert prior.task_wall_s == {"role.yml:1": 20.0}  # (10 + 30) / 2
     assert prior.prior_wall_total_s == 40.0  # full sum, not the average
+
+
+def test_classifies_changed_tasks_as_variable(tmp_path: Path) -> None:
+    pb = tmp_path / "site.yml"
+    pb.write_text("")
+    _write_session_with_events(
+        tmp_path / "sessions",
+        sid="aaa",
+        playbook=str(pb),
+        events=[
+            _task_start("site.yml:1", "2026-06-01T10:00:00Z"),
+            _result("site.yml:1", "2026-06-01T10:00:05Z", changed=False),  # ok → fixed
+            _task_start("site.yml:2", "2026-06-01T10:00:10Z"),  # task:1 wall 10s
+            _result("site.yml:2", "2026-06-01T10:00:20Z", changed=True),  # changed → variable
+            _stats("2026-06-01T10:00:40Z"),  # task:2 wall 30s
+        ],
+    )
+    prior = _prior(tmp_path, pb)
+    assert prior is not None
+    assert prior.task_wall_s == {"site.yml:1": 10.0, "site.yml:2": 30.0}
+    assert prior.variable_paths == frozenset({"site.yml:2"})
+    # Only the changed task's wall counts toward the variable total.
+    assert prior.prior_var_total_s == 30.0
+    assert prior.prior_wall_total_s == 40.0
+
+
+def test_failed_and_unreachable_count_as_variable(tmp_path: Path) -> None:
+    pb = tmp_path / "site.yml"
+    pb.write_text("")
+    _write_session_with_events(
+        tmp_path / "sessions",
+        sid="aaa",
+        playbook=str(pb),
+        events=[
+            _task_start("site.yml:1", "2026-06-01T10:00:00Z"),
+            _result("site.yml:1", "2026-06-01T10:00:05Z", event="v2_runner_on_failed"),
+            _task_start("site.yml:2", "2026-06-01T10:00:10Z"),
+            _result("site.yml:2", "2026-06-01T10:00:15Z", event="v2_runner_on_skipped"),
+            _stats("2026-06-01T10:00:20Z"),
+        ],
+    )
+    prior = _prior(tmp_path, pb)
+    assert prior is not None
+    # failed → variable; skipped → fixed.
+    assert prior.variable_paths == frozenset({"site.yml:1"})
+
+
+def test_no_terminal_events_means_all_fixed(tmp_path: Path) -> None:
+    pb = tmp_path / "site.yml"
+    pb.write_text("")
+    _write_session_with_events(
+        tmp_path / "sessions",
+        sid="aaa",
+        playbook=str(pb),
+        events=[
+            _task_start("site.yml:1", "2026-06-01T10:00:00Z"),
+            _stats("2026-06-01T10:00:10Z"),
+        ],
+    )
+    prior = _prior(tmp_path, pb)
+    assert prior is not None
+    assert prior.variable_paths == frozenset()
+    assert prior.prior_var_total_s == 0.0
 
 
 def test_missing_events_file_yields_empty_profile(tmp_path: Path) -> None:

@@ -102,7 +102,7 @@ wheels = [
 
 [[package]]
 name = "ansible-aom"
-version = "0.91.1"
+version = "0.92.0"
 source = { editable = "." }
 dependencies = [
     { name = "argcomplete" },
