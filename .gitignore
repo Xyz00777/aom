@@ -29,6 +29,8 @@ htmlcov/
 
 # Logs
 *.log
+# …but session test fixtures mirror real session dirs, which include stderr.log
+!tests/fixtures/sessions/**/stderr.log
 
 # IDE
 .idea/

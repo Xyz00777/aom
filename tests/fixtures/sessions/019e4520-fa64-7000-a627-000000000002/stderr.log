@@ -1,0 +1,14 @@
+==> Downloading https://github.com/koekeishiya/amethyst/releases/download/v0.20.3/Amethyst.zip
+Already downloaded: /Users/ci/Library/Caches/Homebrew/downloads/Amethyst.zip
+==> Downloading https://github.com/pqrs-org/Karabiner-Elements/releases/download/v14.13.0/Karabiner-Elements.dmg
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+curl: (22) The requested URL returned error: 404
+Error: Download failed on Cask 'karabiner-elements'.
+==> Downloading https://github.com/rxhanson/Rectangle/releases/download/v0.65/Rectangle.dmg
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:--  0:00:30 --:--:--     0
+curl: (28) Operation timed out after 30000 ms
+Error: Download failed on Cask 'rectangle'.
