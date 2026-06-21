@@ -371,7 +371,7 @@ class CompactRenderer:
             "v2_runner_on_unreachable",
         ):
             return
-        task_id = event.get("task", {}).get("id", "")
+        task_id = self._task_dict(event).get("id", "")
         if not task_id or task_id in self._completed_task_ids:
             return
         play_id = self._state._resolve_play_id(event)
@@ -390,7 +390,7 @@ class CompactRenderer:
         if task is None or not task.hosts:
             return
         if all(hs.status != Status.RUNNING for hs in task.hosts.values()):
-            path = event.get("task", {}).get("path", "") or (task.path or "")
+            path = self._task_dict(event).get("path", "") or (task.path or "")
             self._count_completed_task(task_id, path)
 
     def _reconcile_completed_tasks(self) -> None:
@@ -441,7 +441,7 @@ class CompactRenderer:
         and only the first sighting wins so a per-host fan-out doesn't reset
         the clock.
         """
-        task = event.get("task", {})
+        task = self._task_dict(event)
         task_id = task.get("id")
         path = task.get("path")
         if not task_id or not path or task_id in self._running_task_starts:
@@ -1102,6 +1102,27 @@ class CompactRenderer:
         if task_uuid:
             self._announced_task_uuids.add(task_uuid)
 
+    def _task_dict(self, event: dict) -> dict:
+        """Extract the ``task`` field as a dict.
+
+        ansible.posix.jsonl may emit ``task`` as a bare UUID string or
+        ``None`` when the mitogen transport drops mid-task.  Return an
+        empty dict in those cases so callers can safely call ``.get()``.
+        """
+        task = event.get("task")
+        return task if isinstance(task, dict) else {}
+
+    def _hosts_dict(self, event: dict) -> dict:
+        """Extract the ``hosts`` field as a dict.
+
+        mitogen bulk-reconnect events can emit ``hosts`` as a list of
+        hostnames instead of the canonical ``{hostname: result}`` dict.
+        Return an empty dict so callers can safely call ``.items()`` or
+        iterate without materialising bogus host entries.
+        """
+        hosts = event.get("hosts")
+        return hosts if isinstance(hosts, dict) else {}
+
     def _emit_event_log(self, event: dict) -> None:
         """Print one nom-style log line for a JSONL event.
 
@@ -1131,7 +1152,7 @@ class CompactRenderer:
             play_name = event.get("play", {}).get("name", "") or "(unnamed)"
             self._display.print_log(f"\nPLAY [{play_name}] " + "*" * 50)
         elif name == "v2_playbook_on_task_start":
-            task = event.get("task", {})
+            task = self._task_dict(event)
             self._announce_task(
                 task_uuid=task.get("id", ""),
                 task_name=task.get("name", "") or "(unnamed)",
@@ -1143,7 +1164,7 @@ class CompactRenderer:
             # events. Use the first runner_start per task as the
             # fallback signal for the TASK header so the streaming log
             # is still anchored to a task name.
-            task = event.get("task", {})
+            task = self._task_dict(event)
             task_uuid = task.get("id", "")
             if task_uuid and task_uuid not in self._announced_task_uuids:
                 self._announce_task(
@@ -1161,9 +1182,9 @@ class CompactRenderer:
             self._flush_pending_skips(force_individual=True)
             self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
-            task_id = event.get("task", {}).get("id", "")
+            task_id = self._task_dict(event).get("id", "")
             lines: list[str] = []
-            for host, result in event.get("hosts", {}).items():
+            for host, result in self._hosts_dict(event).items():
                 # Items already streamed live from v2_runner_item_on_* —
                 # the aggregate adds nothing per-item, so skip it entirely.
                 if (host, task_id) in self._streamed_loop_items:
@@ -1189,9 +1210,9 @@ class CompactRenderer:
             self._flush_pending_skips(force_individual=True)
             self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
-            task_id = event.get("task", {}).get("id", "")
+            task_id = self._task_dict(event).get("id", "")
             lines = []
-            for host, result in event.get("hosts", {}).items():
+            for host, result in self._hosts_dict(event).items():
                 # Items already streamed live (including the failed item) —
                 # the aggregate fatal line would duplicate them, so skip.
                 if (host, task_id) in self._streamed_loop_items:
@@ -1220,7 +1241,7 @@ class CompactRenderer:
             self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
             lines = []
-            for host, result in event.get("hosts", {}).items():
+            for host, result in self._hosts_dict(event).items():
                 if suffix:
                     self._current_task_inline_duration_hosts.add(host)
                 msg = _truncate_msg(result.get("msg", "") or "")
@@ -1238,7 +1259,7 @@ class CompactRenderer:
             # they're worth printing one-by-one (mixed-result task)
             # or worth collapsing (all-skipped task). The flush
             # happens at task transition or stats.
-            self._pending_skipped_hosts.extend(event.get("hosts", {}).keys())
+            self._pending_skipped_hosts.extend(self._hosts_dict(event).keys())
         elif name in (
             "v2_runner_item_on_ok",
             "v2_runner_item_on_failed",
@@ -1250,9 +1271,9 @@ class CompactRenderer:
             # streamed so the eventual aggregate ``v2_runner_on_ok``/
             # ``on_failed`` suppresses its own ``results[]`` expansion and
             # we don't render the item twice.
-            task_id = event.get("task", {}).get("id", "")
+            task_id = self._task_dict(event).get("id", "")
             streamed_lines: list[str] = []
-            for host, raw in event.get("hosts", {}).items():
+            for host, raw in self._hosts_dict(event).items():
                 if not isinstance(raw, dict):
                     continue
                 self._streamed_loop_items.add((host, task_id))
@@ -1332,7 +1353,7 @@ class CompactRenderer:
         """
         if event_time is None:
             return ""
-        task_id = event.get("task", {}).get("id", "")
+        task_id = self._task_dict(event).get("id", "")
         start = self._task_start_times.get(task_id)
         if start is None:
             return ""

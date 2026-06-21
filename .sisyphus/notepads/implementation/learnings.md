@@ -1862,3 +1862,61 @@ cd68065 fix(tree): don't skip upcoming plays in sticky fallback
   play only stays visible while it still has running/pending surface.
 - Updated sticky regressions to expect completed plays to disappear on quiet
   frames, while active plays still render normally while work remains.
+
+## 2026-06-21 Task: mitogen-models-fix
+
+### Problem
+ansible.posix.jsonl emits events with non-canonical `task`/`hosts` shapes when mitogen drops the SSH link mid-task. Three shapes crashed `RunState`:
+1. `task` as bare UUID string → `.get()` on `str` raises `AttributeError`
+2. `task` as `None` → `.get()` on `NoneType` raises `AttributeError`
+3. `hosts` as list → `.items()` on `list` or `for hostname in list` materialises bogus host entries
+
+### Helpers Added
+- `RunState._task_dict(event) -> dict[str, Any]` — returns `event["task"]` if it's a `dict`, else `{}`. Mirrors the `isinstance(play_data, dict)` guard in `_resolve_play_id` (line 458).
+- `RunState._hosts_dict(event) -> dict[str, Any]` — returns `event["hosts"]` if it's a `dict`, else `{}`. Prevents `.items()` crash on list-shaped hosts and prevents string-iteration in the skipped handler.
+
+### Handlers Patched
+All 7 handlers that accessed `task` or `hosts` from event payloads:
+1. `_handle_v2_playbook_on_task_start` — `task_data = self._task_dict(event)`
+2. `_handle_v2_runner_on_start` — `task_data = self._task_dict(event)`
+3. `_handle_v2_runner_item_on` — `task_data = self._task_dict(event)` + `for hostname in self._hosts_dict(event)`
+4. `_handle_v2_runner_on_ok` — `task_data = self._task_dict(event)` + `hosts_data = self._hosts_dict(event)`
+5. `_handle_v2_runner_on_failed` — `task_data = self._task_dict(event)` + `hosts_data = self._hosts_dict(event)`
+6. `_handle_v2_runner_on_skipped` — `task_data = self._task_dict(event)` + `hosts_data = self._hosts_dict(event)`
+7. `_handle_v2_runner_on_unreachable` — `task_data = self._task_dict(event)` + `hosts_data = self._hosts_dict(event)`
+
+### Behavioural Contract
+- Malformed events silently drop (no state change, no exception).
+- Pre-existing RUNNING hosts remain RUNNING (TC-MITOGEN-1..6).
+- Subsequent well-formed events still mutate state correctly (TC-MITOGEN-7).
+- Malformed payloads of the runner_on_* family are NOT counted as unknown (the event type is known; only the payload is malformed).
+
+### Key Pattern
+The project already had `isinstance(play_data, dict)` in `_resolve_play_id` (line 458) for the same defensive pattern on the `play` field. The `_task_dict` and `_hosts_dict` helpers follow this same idiom but extract it into reusable private methods.
+
+## 2026-06-21 Task: mitogen-renderer-fix
+
+### Helpers added to `CompactRenderer` (mirroring `core/models.py`)
+
+- `_task_dict(event) -> dict`: Returns `event["task"]` if it's a dict, else `{}`. Defensive against mitogen-distorted `task: "uuid-string"` or `task: None`.
+- `_hosts_dict(event) -> dict`: Returns `event["hosts"]` if it's a dict, else synthesises `{host: {}}` from the singular `host` key, else `{}`. Defensive against mitogen-distorted `hosts: ["host1", "host2"]`.
+
+### Call sites patched (14 total)
+
+**`_emit_event_log`**: 6 `_task_dict` replacements (task_start, runner_start, runner_on_ok, runner_on_failed, item_on_*), 5 `_hosts_dict` replacements (runner_on_ok, runner_on_failed, runner_on_unreachable, runner_on_skipped, item_on_*).
+
+**`_inline_duration_suffix`**: 1 `_task_dict` replacement for `task_id` lookup.
+
+**`_bump_task_counters`**: 2 `_task_dict` replacements (task_id lookup, path lookup).
+
+**`_start_running_task`**: 1 `_task_dict` replacement (task dict extraction).
+
+### Key insight: `host` singular fallback
+
+TC-MITOGEN-106 revealed that `_hosts_dict` must also handle the case where `hosts` is absent but `host` (singular) is present. Mitogen events sometimes carry `host: "foreman"` instead of `hosts: {"foreman": {}}`. Without this fallback, the renderer silently skips the event entirely, producing no log output for otherwise well-formed events. The fix synthesises `{hostname: {}}` from the singular key so the normal iteration path still works.
+
+### Test results
+- `tests/compact/test_mitogen_robustness.py`: 8/8 pass (TC-MITOGEN-100..107)
+- `tests/compact/`: 367 pass, 0 fail
+- `tests/`: 2727 pass, 6 skip, 1 xfail, 0 fail
+- mypy: clean

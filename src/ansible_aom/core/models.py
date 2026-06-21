@@ -542,7 +542,7 @@ class RunState:
 
     def _handle_v2_playbook_on_task_start(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_playbook_on_task_start event."""
-        task_data = event.get("task", {})
+        task_data = self._task_dict(event)
         play_id = self._resolve_play_id(event)
         task_id = task_data.get("id", "")
         task_name = task_data.get("name", "")
@@ -662,7 +662,7 @@ class RunState:
 
     def _handle_v2_runner_on_start(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_start event."""
-        task_data = event.get("task", {})
+        task_data = self._task_dict(event)
         hostname = event.get("host", "")
         task_id = task_data.get("id", "")
         task_name = task_data.get("name", "")
@@ -731,7 +731,7 @@ class RunState:
         present — under the linear strategy there is no ``v2_runner_on_start``
         and these item events are the first per-host signal of the loop.
         """
-        task_data = event.get("task", {})
+        task_data = self._task_dict(event)
         task_id = task_data.get("id", "")
         play_id = self._resolve_play_id(event)
         play = self.plays.get(play_id)
@@ -740,7 +740,7 @@ class RunState:
         task = play.tasks.get(task_id)
         if task is None:
             return
-        for hostname in event.get("hosts", {}):
+        for hostname in self._hosts_dict(event):
             if not hostname:
                 continue
             host = task.hosts.get(hostname)
@@ -749,10 +749,31 @@ class RunState:
                 task.hosts[hostname] = host
             host.loop_items_done += 1
 
+    def _task_dict(self, event: dict[str, Any]) -> dict[str, Any]:
+        """Extract the ``task`` field as a dict.
+
+        ansible.posix.jsonl may emit ``task`` as a bare UUID string or
+        ``None`` when the mitogen transport drops mid-task.  Return an
+        empty dict in those cases so callers can safely call ``.get()``.
+        """
+        task = event.get("task")
+        return task if isinstance(task, dict) else {}
+
+    def _hosts_dict(self, event: dict[str, Any]) -> dict[str, Any]:
+        """Extract the ``hosts`` field as a dict.
+
+        mitogen bulk-reconnect events can emit ``hosts`` as a list of
+        hostnames instead of the canonical ``{hostname: result}`` dict.
+        Return an empty dict so callers can safely call ``.items()`` or
+        iterate without materialising bogus host entries.
+        """
+        hosts = event.get("hosts")
+        return hosts if isinstance(hosts, dict) else {}
+
     def _handle_v2_runner_on_ok(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_ok event."""
-        task_data = event.get("task", {})
-        hosts_data = event.get("hosts", {})
+        task_data = self._task_dict(event)
+        hosts_data = self._hosts_dict(event)
         task_id = task_data.get("id", "")
         play_id = self._resolve_play_id(event)
 
@@ -776,8 +797,8 @@ class RunState:
 
     def _handle_v2_runner_on_failed(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_failed event."""
-        task_data = event.get("task", {})
-        hosts_data = event.get("hosts", {})
+        task_data = self._task_dict(event)
+        hosts_data = self._hosts_dict(event)
         task_id = task_data.get("id", "")
         play_id = self._resolve_play_id(event)
 
@@ -818,8 +839,8 @@ class RunState:
 
     def _handle_v2_runner_on_skipped(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_skipped event."""
-        task_data = event.get("task", {})
-        hosts_data = event.get("hosts", {})
+        task_data = self._task_dict(event)
+        hosts_data = self._hosts_dict(event)
         task_id = task_data.get("id", "")
         play_id = self._resolve_play_id(event)
 
@@ -841,8 +862,8 @@ class RunState:
 
     def _handle_v2_runner_on_unreachable(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_unreachable event."""
-        task_data = event.get("task", {})
-        hosts_data = event.get("hosts", {})
+        task_data = self._task_dict(event)
+        hosts_data = self._hosts_dict(event)
         task_id = task_data.get("id", "")
         play_id = self._resolve_play_id(event)
 

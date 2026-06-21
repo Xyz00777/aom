@@ -1812,3 +1812,223 @@ class TestEventProcessingEdgeCases:
         run_state.handle_event(event_stats)
         assert run_state.status == Status.COMPLETED
         assert run_state.end_time is not None
+
+
+# ==============================================================================
+# TC-MITOGEN: handle_event robustness to malformed event payloads
+# ==============================================================================
+#
+# When mitogen drops the SSH link mid-task, ansible.posix.jsonl sometimes
+# emits events whose payloads do not match the documented JSONL shape:
+#
+#   1. ``task`` is a bare UUID string instead of a dict (the JSONL callback
+#      serialises the parent task as just an id when the runner never
+#      received a path).
+#   2. ``task`` is null (mitogen shimmed actions sometimes yield task=None
+#      at the leaf).
+#   3. ``hosts`` is a list instead of a dict (mitogen aggregates per-host
+#      results into a list under a single event on bulk reconnects).
+#
+# Historically AOM crashed on all three with AttributeError, aborting the
+# whole runner thread mid-playbook. The user-visible symptom was that the
+# log area kept scrolling but the bottom status panel froze — because the
+# runner process had died, leaving only ansible's already-buffered PTY
+# output visible. The state machine must instead tolerate the malformed
+# payloads: silently drop the offending event and continue with the next.
+# ==============================================================================
+
+
+def _seed_run_state() -> RunState:
+    """Build a RunState with one play, one task, and one host already RUNNING.
+
+    The fixture mirrors what a real mid-run state looks like when mitogen
+    finally drops. Tests then send a single malformed terminal event and
+    assert the runner survives without raising and without corrupting
+    the existing state.
+    """
+    rs = RunState(playbook="site.yml")
+    rs.handle_event(
+        {
+            "_event": "v2_playbook_on_start",
+            "_timestamp": "2026-04-20T10:00:00Z",
+        }
+    )
+    rs.handle_event(
+        {
+            "_event": "v2_playbook_on_play_start",
+            "_timestamp": "2026-04-20T10:00:01Z",
+            "play": {"id": "p1", "name": "Install Foreman"},
+        }
+    )
+    rs.handle_event(
+        {
+            "_event": "v2_playbook_on_task_start",
+            "_timestamp": "2026-04-20T10:00:02Z",
+            "task": {"id": "t1", "name": "Install NFS utils", "path": "main.yml:1"},
+            "play": {"id": "p1"},
+        }
+    )
+    rs.handle_event(
+        {
+            "_event": "v2_runner_on_start",
+            "_timestamp": "2026-04-20T10:00:03Z",
+            "task": {"id": "t1", "name": "Install NFS utils", "path": "main.yml:1"},
+            "play": {"id": "p1"},
+            "host": "foreman",
+        }
+    )
+    return rs
+
+
+class TestHandleEventMalformedPayloads:
+    """TC-MITOGEN-1..6: handle_event must tolerate mitogen-distorted payloads.
+
+    The mitogen SSH transport can drop mid-task. The JSONL callback then
+    emits events with task/hosts fields whose shapes diverge from the
+    canonical contract — these tests pin the requirement that AOM does
+    NOT crash on them, and that the pre-existing in-flight state is
+    preserved (a single bad event must not corrupt the run).
+    """
+
+    def test_runner_unreachable_with_task_as_string_does_not_raise(self) -> None:
+        """TC-MITOGEN-1: ``task`` as a bare UUID string must be tolerated.
+
+        ansible.posix.jsonl emits ``task`` as a string when the runner
+        never received a path for the parent task — the canonical
+        failure mode of a mitogen SSH drop mid-task. The state machine
+        previously crashed with ``AttributeError: 'str' object has no
+        attribute 'get'`` from ``_handle_v2_runner_on_unreachable``.
+        """
+        rs = _seed_run_state()
+        bad_event = {
+            "_event": "v2_runner_on_unreachable",
+            "_timestamp": "2026-04-20T10:00:04Z",
+            "task": "t1",  # bare UUID string, NOT a dict
+            "play": {"id": "p1"},
+            "host": "foreman",
+            "msg": "MITOGEN: rpc failed: broken pipe",
+        }
+        # Must not raise.
+        rs.handle_event(bad_event)
+        # The pre-existing RUNNING host foreman is still tracked —
+        # the bad event silently drops rather than overwriting with
+        # a half-populated host entry.
+        host = rs.plays["p1"].tasks["t1"].hosts["foreman"]
+        assert host.status == Status.RUNNING
+
+    def test_runner_failed_with_task_as_none_does_not_raise(self) -> None:
+        """TC-MITOGEN-2: ``task: None`` must be tolerated.
+
+        Mitogen-shimmed actions sometimes yield task=None at the leaf
+        when the transport races the dispatcher. The state machine
+        previously crashed with ``AttributeError: 'NoneType' object
+        has no attribute 'get'``.
+        """
+        rs = _seed_run_state()
+        bad_event = {
+            "_event": "v2_runner_on_failed",
+            "_timestamp": "2026-04-20T10:00:04Z",
+            "task": None,
+            "play": {"id": "p1"},
+            "host": "foreman",
+            "msg": "MITOGEN: orphaned event",
+        }
+        rs.handle_event(bad_event)
+        host = rs.plays["p1"].tasks["t1"].hosts["foreman"]
+        assert host.status == Status.RUNNING
+
+    def test_runner_ok_with_hosts_as_list_does_not_raise(self) -> None:
+        """TC-MITOGEN-3: ``hosts`` as a list must be tolerated.
+
+        Mitogen aggregates per-host results into a list under a single
+        event during bulk reconnects. ``hosts_data.items()`` previously
+        raised ``AttributeError: 'list' object has no attribute 'items'``.
+        """
+        rs = _seed_run_state()
+        bad_event = {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "2026-04-20T10:00:04Z",
+            "task": {"id": "t1", "name": "Install NFS utils", "path": "main.yml:1"},
+            "play": {"id": "p1"},
+            "hosts": ["foreman", "ds5"],  # list, NOT dict
+        }
+        rs.handle_event(bad_event)
+        # No fake host entries were materialised — the event silently
+        # drops. The pre-existing in-flight host is untouched.
+        hosts = rs.plays["p1"].tasks["t1"].hosts
+        assert set(hosts) == {"foreman"}
+        assert hosts["foreman"].status == Status.RUNNING
+
+    def test_runner_unreachable_with_hosts_as_list_does_not_raise(self) -> None:
+        """TC-MITOGEN-4: ``hosts: list`` on unreachable must also be tolerated."""
+        rs = _seed_run_state()
+        bad_event = {
+            "_event": "v2_runner_on_unreachable",
+            "_timestamp": "2026-04-20T10:00:04Z",
+            "task": {"id": "t1", "name": "Install NFS utils", "path": "main.yml:1"},
+            "play": {"id": "p1"},
+            "hosts": ["foreman", "ds5"],
+        }
+        rs.handle_event(bad_event)
+        host = rs.plays["p1"].tasks["t1"].hosts["foreman"]
+        assert host.status == Status.RUNNING
+
+    def test_runner_failed_with_hosts_as_list_does_not_raise(self) -> None:
+        """TC-MITOGEN-5: ``hosts: list`` on failed must also be tolerated."""
+        rs = _seed_run_state()
+        bad_event = {
+            "_event": "v2_runner_on_failed",
+            "_timestamp": "2026-04-20T10:00:04Z",
+            "task": {"id": "t1", "name": "Install NFS utils", "path": "main.yml:1"},
+            "play": {"id": "p1"},
+            "hosts": ["foreman"],
+        }
+        rs.handle_event(bad_event)
+        host = rs.plays["p1"].tasks["t1"].hosts["foreman"]
+        assert host.status == Status.RUNNING
+
+    def test_runner_skipped_with_hosts_as_list_does_not_raise(self) -> None:
+        """TC-MITOGEN-6: ``hosts: list`` on skipped must also be tolerated."""
+        rs = _seed_run_state()
+        bad_event = {
+            "_event": "v2_runner_on_skipped",
+            "_timestamp": "2026-04-20T10:00:04Z",
+            "task": {"id": "t1", "name": "Install NFS utils", "path": "main.yml:1"},
+            "play": {"id": "p1"},
+            "hosts": ["foreman"],
+        }
+        rs.handle_event(bad_event)
+        host = rs.plays["p1"].tasks["t1"].hosts["foreman"]
+        assert host.status == Status.RUNNING
+
+    def test_recovery_after_malformed_event(self) -> None:
+        """TC-MITOGEN-7: A malformed event does not poison subsequent events.
+
+        After dropping a bad mitogen event, the runner must continue
+        processing well-formed events normally. This is the "single bad
+        event must not corrupt the run" requirement that fixes the
+        user-visible symptom of a frozen panel.
+        """
+        rs = _seed_run_state()
+        rs.handle_event(
+            {
+                "_event": "v2_runner_on_unreachable",
+                "_timestamp": "2026-04-20T10:00:04Z",
+                "task": "t1",
+                "play": {"id": "p1"},
+                "host": "foreman",
+            }
+        )
+        # A subsequent well-formed event must still mutate state correctly.
+        rs.handle_event(
+            {
+                "_event": "v2_runner_on_failed",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "t1", "name": "Install NFS utils", "path": "main.yml:1"},
+                "play": {"id": "p1"},
+                "hosts": {"foreman": {"failed": True, "msg": "recovered"}},
+            }
+        )
+        host = rs.plays["p1"].tasks["t1"].hosts["foreman"]
+        assert host.status == Status.FAILED
+        assert rs.status == Status.FAILED
