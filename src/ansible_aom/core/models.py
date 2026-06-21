@@ -439,13 +439,24 @@ class RunState:
             self.start_time = ts
             self.status = Status.RUNNING
 
-        self.plays[play_id] = PlayRunState(
-            play_id=play_id,
-            name=play_name,
-            status=Status.RUNNING,
-            window_start=play_window_start,
-            window_ordinal=play_window_ordinal,
-        )
+        if play_id in self.plays:
+            existing = self.plays[play_id]
+            existing.name = play_name
+            existing.status = Status.RUNNING
+            existing.window_start = play_window_start
+            existing.window_ordinal = play_window_ordinal
+            self._finalize_play(existing, ts)
+            for task in existing.tasks.values():
+                if task.status == Status.COMPLETED:
+                    task.hosts.clear()
+        else:
+            self.plays[play_id] = PlayRunState(
+                play_id=play_id,
+                name=play_name,
+                status=Status.RUNNING,
+                window_start=play_window_start,
+                window_ordinal=play_window_ordinal,
+            )
 
     def _resolve_play_id(self, event: dict[str, Any]) -> str:
         """Resolve play_id from event or _current_play_id.
@@ -547,10 +558,11 @@ class RunState:
         task_id = task_data.get("id", "")
         task_name = task_data.get("name", "")
         task_path = task_data.get("path")
+        play_missing = play_id not in self.plays
 
         self._graft_or_match_task(task_id, task_name, task_path)
 
-        if play_id not in self.plays:
+        if play_missing:
             self.plays[play_id] = PlayRunState(
                 play_id=play_id,
                 name="",
@@ -606,15 +618,7 @@ class RunState:
                         continue
                     if all(hs.status != Status.RUNNING for hs in other_task.hosts.values()):
                         other_task.status = Status.COMPLETED
-                    elif p.play_id == play.play_id:
-                        # Not all hosts are terminal — under linear
-                        # strategy, within the same play, the previous
-                        # task MUST be complete on every host when a
-                        # new task starts. Any host still RUNNING has
-                        # a missing terminal event (e.g. meta:
-                        # reset_connection, silent skips).
-                        # Force-transition them to OK — the playbook
-                        # already moved past this task.
+                    elif p.play_id == play.play_id or play_missing:
                         for hostname in list(other_task.hosts):
                             hs = other_task.hosts[hostname]
                             if hs.status == Status.RUNNING:
@@ -626,6 +630,8 @@ class RunState:
                                     end_time=ts,
                                 )
                         other_task.status = Status.COMPLETED
+                    else:
+                        continue
 
     def _resolve_play_hosts(self, play: "PlayRunState") -> list[str]:
         """Look up preflight resolved_hosts for a runtime play.

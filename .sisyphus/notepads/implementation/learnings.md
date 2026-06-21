@@ -238,6 +238,12 @@ RichLog's `write()` method accepts `scroll_end` parameter - pass `scroll_end=sel
 - For the `run_once: true` task under `serial: 1`, the task row still reappears once per batch with the same task identity; the host field changes from `web1` → `web2` → `web3` across batches.
 - Recommendation: treat `play.duration.start` (or an internal ordinal derived from repeated play-start events) as the smallest stable batch/window discriminator and scope runtime play/task row identity with it.
 
+## 2026-06-21 Play boundary regression repros
+
+- Added `tests/unit/test_play_boundary_state.py` to pin two play-boundary regressions in `core.models`.
+- Duplicate `v2_playbook_on_play_start` for the same `play.id` currently replaces the whole `PlayRunState`, so the repro asserts that completed task entries must survive the second play-start.
+- The cross-play meta-task repro needs the next play's first `v2_playbook_on_task_start` before any boundary finalization can mask the issue; otherwise `_finalize_play()` makes the state look healthy too early.
+
 ## 2026-05-08 nom-style Display Backend Swap (branch: feat/nom-compact-renderer)
 
 ### What changed
