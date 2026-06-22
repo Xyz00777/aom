@@ -108,7 +108,8 @@ def test_filters_out_mismatched_host_count(tmp_path: Path) -> None:
     assert find_previous_run(sessions, key, host_count=2) is None
 
 
-def test_filters_out_mismatched_run_config(tmp_path: Path) -> None:
+def test_fallback_loose_match_when_config_differs(tmp_path: Path) -> None:
+    """Different tags still match via the loose fallback (same playbook + host count)."""
     pb = tmp_path / "site.yml"
     pb.write_text("")
     sessions = tmp_path / "sessions"
@@ -116,7 +117,7 @@ def test_filters_out_mismatched_run_config(tmp_path: Path) -> None:
         sessions,
         sid="aaa",
         playbook=str(pb),
-        ansible_args=["--tags", "web"],
+        ansible_args=["--tags", "web", "-i", "inv.ini"],
         status="completed",
         start="2026-05-18T10:00:00Z",
         end="2026-05-18T10:01:23Z",
@@ -125,7 +126,10 @@ def test_filters_out_mismatched_run_config(tmp_path: Path) -> None:
         host_count=2,
     )
     key = build_run_config_key(playbook=str(pb), ansible_args=["--tags", "db"])
-    assert find_previous_run(sessions, key, host_count=2) is None
+    prior = find_previous_run(sessions, key, host_count=2)
+    assert prior is not None
+    assert prior.session_id == "aaa"
+    assert prior.task_count == 47
 
 
 def test_skips_non_completed_status(tmp_path: Path) -> None:
@@ -197,6 +201,101 @@ def test_prior_run_end_time_parsed_to_datetime(tmp_path: Path) -> None:
     prior = find_previous_run(sessions, key, host_count=2)
     assert prior is not None
     assert prior.end_time == datetime(2026, 5, 20, 10, 1, 0, tzinfo=timezone.utc)
+
+
+def test_strict_match_takes_precedence_over_loose(tmp_path: Path) -> None:
+    """When both an exact and a loose match exist, the exact (most recent) is chosen."""
+    pb = tmp_path / "site.yml"
+    pb.write_text("")
+    sessions = tmp_path / "sessions"
+    # Older session with exact match (same tags)
+    _write_session(
+        sessions,
+        sid="exact_older",
+        playbook=str(pb),
+        ansible_args=["--tags", "deploy"],
+        status="completed",
+        start="2026-05-17T10:00:00Z",
+        end="2026-05-17T10:05:00Z",
+        duration=300.0,
+        task_count=40,
+        host_count=2,
+    )
+    # Newer session with loose match only (different tags)
+    _write_session(
+        sessions,
+        sid="loose_newer",
+        playbook=str(pb),
+        ansible_args=["--tags", "web"],
+        status="completed",
+        start="2026-05-19T10:00:00Z",
+        end="2026-05-19T10:02:00Z",
+        duration=120.0,
+        task_count=20,
+        host_count=2,
+    )
+    key = build_run_config_key(playbook=str(pb), ansible_args=["--tags", "deploy"])
+    prior = find_previous_run(sessions, key, host_count=2)
+    assert prior is not None
+    # Should return the exact (older) match, not the loose (newer) one
+    assert prior.session_id == "exact_older"
+    assert prior.duration_seconds == 300.0
+    assert prior.task_count == 40
+
+
+def test_loose_match_filters_mismatched_host_count(tmp_path: Path) -> None:
+    """Loose fallback still requires host count to match."""
+    pb = tmp_path / "site.yml"
+    pb.write_text("")
+    sessions = tmp_path / "sessions"
+    _write_session(
+        sessions,
+        sid="aaa",
+        playbook=str(pb),
+        ansible_args=["--tags", "web"],
+        status="completed",
+        start="2026-05-18T10:00:00Z",
+        end="2026-05-18T10:01:23Z",
+        duration=83.0,
+        task_count=47,
+        host_count=5,
+    )
+    key = build_run_config_key(playbook=str(pb), ansible_args=["--tags", "db"])
+    assert find_previous_run(sessions, key, host_count=2) is None
+
+
+def test_loose_match_works_with_any_flag_variation(tmp_path: Path) -> None:
+    """Loose fallback ignores tags, limit, extra_vars, diff, check, step."""
+    pb = tmp_path / "site.yml"
+    pb.write_text("")
+    sessions = tmp_path / "sessions"
+    _write_session(
+        sessions,
+        sid="prev",
+        playbook=str(pb),
+        ansible_args=[
+            "--tags",
+            "web",
+            "--limit",
+            "web1",
+            "-e",
+            "env=prod",
+            "--diff",
+            "--check",
+            "--step",
+        ],
+        status="completed",
+        start="2026-05-18T10:00:00Z",
+        end="2026-05-18T10:01:23Z",
+        duration=83.0,
+        task_count=47,
+        host_count=2,
+    )
+    # Current run: completely different flags, same playbook + host count
+    key = build_run_config_key(playbook=str(pb), ansible_args=[])
+    prior = find_previous_run(sessions, key, host_count=2)
+    assert prior is not None
+    assert prior.session_id == "prev"
 
 
 def test_corrupt_meta_is_skipped(tmp_path: Path) -> None:

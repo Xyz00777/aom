@@ -50,7 +50,8 @@ def test_session_then_history_roundtrip(tmp_path: Path) -> None:
     assert prior.duration_seconds >= 0.0
 
 
-def test_different_tags_do_not_match(tmp_path: Path) -> None:
+def test_different_tags_match_via_fallback(tmp_path: Path) -> None:
+    """Different tags still match via loose fallback (same playbook + host count)."""
     pb = tmp_path / "play.yml"
     pb.write_text("")
 
@@ -60,7 +61,10 @@ def test_different_tags_do_not_match(tmp_path: Path) -> None:
     mgr.end_session(sid, "completed", preflight_task_count=12, resolved_host_count=2)
 
     key = build_run_config_key(playbook=str(pb), ansible_args=["--tags", "db"])
-    assert find_previous_run(sessions_dir, key, host_count=2) is None
+    prior = find_previous_run(sessions_dir, key, host_count=2)
+    assert prior is not None
+    assert prior.session_id == sid
+    assert prior.task_count == 12
 
 
 def test_different_host_count_does_not_match(tmp_path: Path) -> None:

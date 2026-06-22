@@ -19,6 +19,7 @@ import json
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from ansible_aom.core.run_config import RunConfigKey, build_run_config_key
 
@@ -182,6 +183,99 @@ def _parse_iso(value: str | None) -> datetime | None:
         return None
 
 
+def _iter_completed_sessions(
+    session_dir: Path,
+) -> list[tuple[datetime, dict[str, Any], Path]]:
+    """Yield ``(end_time, meta, session_path)`` for every valid completed session.
+
+    Filters out sessions whose ``meta.json`` is missing or malformed,
+    whose status is not ``completed``, or whose required fields
+    (``preflight_task_count``, ``resolved_host_count``, ``duration_seconds``,
+    ``end_time``) are absent. The result is sorted newest-first by
+    ``end_time``.
+    """
+    if not session_dir.is_dir():
+        return []
+    result: list[tuple[datetime, dict[str, Any], Path]] = []
+    for entry in session_dir.iterdir():
+        if not entry.is_dir():
+            continue
+        meta_file = entry / "meta.json"
+        if not meta_file.exists():
+            continue
+        try:
+            with open(meta_file) as f:
+                meta: dict[str, Any] = json.load(f)
+        except json.JSONDecodeError, OSError:
+            continue
+        if meta.get("status") != "completed":
+            continue
+        task_count = meta.get("preflight_task_count")
+        host_count_val = meta.get("resolved_host_count")
+        duration = meta.get("duration_seconds")
+        if task_count is None or host_count_val is None or duration is None:
+            continue
+        end_time = _parse_iso(meta.get("end_time"))
+        if end_time is None:
+            continue
+        result.append((end_time, meta, entry))
+    result.sort(key=lambda x: x[0], reverse=True)
+    return result
+
+
+def _match_strict(meta: dict[str, Any], key: RunConfigKey, host_count: int) -> bool:
+    """True when the stored session matches the current invocation exactly."""
+    if meta.get("resolved_host_count") != host_count:
+        return False
+    candidate_key = build_run_config_key(
+        playbook=meta.get("playbook", ""),
+        ansible_args=list(meta.get("ansible_args", [])),
+    )
+    return candidate_key == key
+
+
+def _match_loose(meta: dict[str, Any], key: RunConfigKey, host_count: int) -> bool:
+    """True when the stored session matches the current invocation loosely.
+
+    Loose matching compares only the resolved playbook path and the host
+    count — tags, limit, extra vars, and other run-config flags are
+    intentionally ignored. This gives the user a useful prior even when
+    they vary flags between runs (different ``--tags``, ``--diff`` on/off,
+    etc.).
+    """
+    if meta.get("resolved_host_count") != host_count:
+        return False
+    stored_playbook = meta.get("playbook", "")
+    if not isinstance(stored_playbook, str):
+        return False
+    return str(Path(stored_playbook).resolve()) == key.playbook
+
+
+def _build_prior(meta: dict[str, Any], entry: Path, end_time: datetime) -> PriorRun:
+    return PriorRun(
+        session_id=str(meta.get("session_id", entry.name)),
+        duration_seconds=float(meta["duration_seconds"]),
+        task_count=int(meta["preflight_task_count"]),
+        host_count=int(meta["resolved_host_count"]),
+        end_time=end_time,
+    )
+
+
+def _mine_and_replace(prior: PriorRun, session_path: Path) -> PriorRun:
+    """Mine per-task wall and loop totals for *prior*, returning a new PriorRun."""
+    task_wall_s, prior_wall_total_s, variable_paths, prior_var_total_s = _mine_task_wall(
+        session_path
+    )
+    return replace(
+        prior,
+        loop_totals=_mine_loop_totals(session_path),
+        task_wall_s=task_wall_s,
+        prior_wall_total_s=prior_wall_total_s,
+        variable_paths=variable_paths,
+        prior_var_total_s=prior_var_total_s,
+    )
+
+
 def find_previous_run(
     session_dir: Path,
     key: RunConfigKey,
@@ -189,18 +283,18 @@ def find_previous_run(
 ) -> PriorRun | None:
     """Return the most recent completed session matching ``(key, host_count)``.
 
-    Iterates session directories under ``session_dir``, parses each
-    ``meta.json``, and keeps the newest entry that:
+    Two-pass matching:
 
-    - has ``status == "completed"`` (failed / crashed / running runs
-      are unreliable estimates),
-    - has a parseable ``end_time``,
-    - has all of ``preflight_task_count``, ``resolved_host_count``,
-      and ``duration_seconds`` populated (pre-1.2 sessions lack the
-      new fields and are skipped),
-    - matches ``key`` exactly (rebuilt from the persisted
-      ``playbook`` + ``ansible_args``), and
-    - has ``resolved_host_count == host_count``.
+    1. **Strict** — the stored ``RunConfigKey`` (rebuilt from persisted
+       ``playbook`` + ``ansible_args``) must equal *key* exactly, **and**
+       the stored ``resolved_host_count`` must equal *host_count*.
+    2. **Loose** (fallback) — only the resolved playbook path and host
+       count must match. Tags, limit, extra vars, and other run-config
+       flags are ignored. This gives the user a useful prior even when
+       they vary flags between runs.
+
+    Both passes exclude sessions that are not ``completed``, missing
+    required fields, or pre-1.2 format.
 
     Args:
         session_dir: Directory containing per-session subdirectories.
@@ -213,70 +307,16 @@ def find_previous_run(
         none of the sessions qualify (including when ``session_dir``
         does not exist).
     """
-    if not session_dir.is_dir():
-        # Includes both "doesn't exist" and "exists but is a file" — a
-        # broken/blocker path on disk shouldn't crash the startup hint
-        # lookup.
+    candidates = _iter_completed_sessions(session_dir)
+    if not candidates:
         return None
 
-    best: tuple[datetime, PriorRun, Path] | None = None
+    for end_time, meta, entry in candidates:
+        if _match_strict(meta, key, host_count):
+            return _mine_and_replace(_build_prior(meta, entry, end_time), entry)
 
-    for entry in session_dir.iterdir():
-        if not entry.is_dir():
-            continue
-        meta_file = entry / "meta.json"
-        if not meta_file.exists():
-            continue
+    for end_time, meta, entry in candidates:
+        if _match_loose(meta, key, host_count):
+            return _mine_and_replace(_build_prior(meta, entry, end_time), entry)
 
-        try:
-            with open(meta_file) as f:
-                meta = json.load(f)
-        except json.JSONDecodeError, OSError:
-            continue
-
-        if meta.get("status") != "completed":
-            continue
-
-        task_count = meta.get("preflight_task_count")
-        resolved_host_count = meta.get("resolved_host_count")
-        duration = meta.get("duration_seconds")
-        if task_count is None or resolved_host_count is None or duration is None:
-            continue
-        if resolved_host_count != host_count:
-            continue
-
-        end_time = _parse_iso(meta.get("end_time"))
-        if end_time is None:
-            continue
-
-        candidate_key = build_run_config_key(
-            playbook=meta.get("playbook", ""),
-            ansible_args=list(meta.get("ansible_args", [])),
-        )
-        if candidate_key != key:
-            continue
-
-        candidate = PriorRun(
-            session_id=meta.get("session_id", entry.name),
-            duration_seconds=float(duration),
-            task_count=int(task_count),
-            host_count=int(resolved_host_count),
-            end_time=end_time,
-        )
-        if best is None or end_time > best[0]:
-            best = (end_time, candidate, entry)
-
-    if best is None:
-        return None
-    # Mine loop totals + the per-task wall profile only for the winning
-    # session — reading every session's events.jsonl just to discard all
-    # but one would be wasteful.
-    task_wall_s, prior_wall_total_s, variable_paths, prior_var_total_s = _mine_task_wall(best[2])
-    return replace(
-        best[1],
-        loop_totals=_mine_loop_totals(best[2]),
-        task_wall_s=task_wall_s,
-        prior_wall_total_s=prior_wall_total_s,
-        variable_paths=variable_paths,
-        prior_var_total_s=prior_var_total_s,
-    )
+    return None
