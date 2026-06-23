@@ -77,6 +77,14 @@ if TYPE_CHECKING:
 # segment animate at 4 FPS during quiet periods.
 _PANEL_COMPUTE_THROTTLE_S = 0.25
 _PANEL_TICK_REFRESH_S = 0.25
+# Dirty-path coalesce window. When state changes keep arriving faster
+# than ``_PANEL_COMPUTE_THROTTLE_S`` we still want to render *eventually*
+# (the old gate skipped every call within the throttle window, which
+# could starve the panel forever during a burst). This short window
+# collapses truly simultaneous events (e.g. one task_start followed by
+# five runner_on_ok within microseconds) without burning CPU, but lets
+# the next render proceed as soon as the burst settles.
+_PANEL_DIRTY_COALESCE_S = 0.05
 
 
 class CompactRenderer:
@@ -210,6 +218,13 @@ class CompactRenderer:
         # during quiet periods without computing on every tick().
         self._panel_dirty: bool = False
         self._last_panel_compute_time: float = 0.0
+        # HS-1/HS-8: monotonic timestamp of the most recent state change.
+        # Tracked separately from ``_last_panel_compute_time`` so the
+        # dirty-path gate can distinguish "last compute already saw the
+        # latest state" from "last compute is stale — render now". Without
+        # this split, a burst of state changes arriving faster than the
+        # compute throttle could starve the panel indefinitely.
+        self._last_state_change_monotonic: float = 0.0
 
     def start(self, playbook: str, args: list[str]) -> None:
         """Start rendering a playbook run.
@@ -305,8 +320,11 @@ class CompactRenderer:
         # JSONL callback does not emit v2_runner_on_start).
         self._state.definitions = list(self._definitions)
         # HS-1/HS-8: mark dirty so the next render computes against the
-        # fresh definitions.
+        # fresh definitions. Stamp the state-change clock so the
+        # dirty-path throttle gate can recognise "stale compute" vs
+        # "compute already saw this state".
         self._panel_dirty = True
+        self._last_state_change_monotonic = time.monotonic()
         self._render_status_panel()
 
     def update_state(self, event: dict) -> None:
@@ -337,6 +355,10 @@ class CompactRenderer:
         # HS-1/HS-8: mark the panel as needing recompute. The actual
         # decision to compute is gated inside ``_render_status_panel``.
         self._panel_dirty = True
+        # HS-1/HS-8: stamp the state-change clock so the dirty-path
+        # gate can recognise "stale compute" vs "already rendered this
+        # state".
+        self._last_state_change_monotonic = time.monotonic()
 
         # Refresh the status panel with current state + elapsed time.
         self._render_status_panel()
@@ -495,13 +517,33 @@ class CompactRenderer:
         # be coalesced away by Display.update (within the same 0.25 s
         # write window) or would just re-render the previous picture
         # (no state change, no meaningful clock advance).
+        #
+        # Dirty-path gating: the previous gate compared only against
+        # ``_last_panel_compute_time`` and skipped every call within the
+        # 0.25 s window. If state changes kept arriving faster than that,
+        # the gate kept suppressing forever — the panel froze on stale
+        # output. The fix tracks when the most recent state change
+        # arrived (``_last_state_change_monotonic``) and uses the
+        # comparison ``last_compute >= last_state_change`` to recognise
+        # "we already rendered this state" vs "we owe the user a render".
         now = time.monotonic()
-        last = self._last_panel_compute_time
-        if last > 0.0:
-            elapsed_since_compute = now - last
+        last_compute = self._last_panel_compute_time
+        if last_compute > 0.0:
+            elapsed_since_compute = now - last_compute
             if self._panel_dirty:
-                if elapsed_since_compute < _PANEL_COMPUTE_THROTTLE_S:
-                    return
+                last_change = self._last_state_change_monotonic
+                if last_compute >= last_change:
+                    # Last compute already saw the latest state — safe
+                    # to wait for the longer 1 s clock-advance refresh.
+                    if elapsed_since_compute < _PANEL_TICK_REFRESH_S:
+                        return
+                else:
+                    # Last compute is stale (state changed since).
+                    # Coalesce only a very short burst window so
+                    # simultaneous events don't fan out into multiple
+                    # computes, but render as soon as the burst settles.
+                    if elapsed_since_compute < _PANEL_DIRTY_COALESCE_S:
+                        return
             else:
                 if elapsed_since_compute < _PANEL_TICK_REFRESH_S:
                     return

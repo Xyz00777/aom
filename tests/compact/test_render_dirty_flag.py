@@ -102,3 +102,77 @@ class TestDirtyFlagGating:
         assert r._display.print_log.call_count == 3
         assert r._display.update.call_count == 2
         assert r._render_calls == 2
+
+    def test_perf_043_dirty_panel_renders_after_burst_settles(self) -> None:
+        """HS-1/HS-8: a sustained burst of state changes must not starve the
+        panel.
+
+        Regression for the bug where the dirty-path throttle compared only
+        against ``_last_panel_compute_time`` — if state changes arrived
+        faster than the 0.25 s throttle, every render call skipped and
+        the panel froze on stale output.
+
+        With the fix, the dirty path compares ``last_compute`` against
+        ``_last_state_change_monotonic``: when the last compute is stale
+        (a state change has happened since), the gate opens immediately
+        after the short coalesce window and the panel repaints.
+        """
+        r = _renderer()
+        r._last_panel_compute_time = 0.0
+        r._panel_dirty = False
+        r._render_calls = 0
+
+        # Drive one update_state so the renderer has a known compute
+        # timestamp and the dirty flag is clear.
+        r.update_state(_task_start("u1"))
+        assert r._render_calls == 1
+
+        # Simulate "compute happened 200 ms ago, then state changed".
+        # The old gate would skip because 0.2 s < 0.25 s; the new gate
+        # must render because the last compute predates the state change.
+        import time as _time
+
+        last_compute = r._last_panel_compute_time
+        r._last_panel_compute_time = _time.monotonic() - 0.2
+        r._last_state_change_monotonic = last_compute + 0.05  # 50 ms after compute
+        r._panel_dirty = True
+        baseline = r._render_calls
+
+        r._render_status_panel()
+
+        assert r._render_calls == baseline + 1
+        assert r._panel_dirty is False
+
+    def test_perf_044_dirty_with_fresh_compute_waits_for_tick_refresh(self) -> None:
+        """HS-1/HS-8: dirty but already-rendered state waits for the 1 s
+        clock-advance refresh rather than the 0.25 s compute throttle.
+
+        The split is what lets the dirty path distinguish "stale compute"
+        (render now) from "already saw this state" (wait up to 1 s).
+        """
+        r = _renderer()
+        r._last_panel_compute_time = 0.0
+        r._panel_dirty = False
+        r._render_calls = 0
+
+        r.update_state(_task_start("u1"))
+        assert r._render_calls == 1
+
+        # Set up: compute happened AFTER the most recent state change
+        # (compute 50 ms ago, state change 200 ms ago). The dirty-path
+        # "last compute already saw this state" branch is taken, so the
+        # gate waits up to 1 s for the tick refresh rather than
+        # rendering again.
+        import time as _time
+
+        now = _time.monotonic()
+        r._last_state_change_monotonic = now - 0.2
+        r._last_panel_compute_time = now - 0.05
+        r._panel_dirty = True
+        baseline = r._render_calls
+
+        r._render_status_panel()
+
+        # No render — gate waits up to 1 s for the tick refresh.
+        assert r._render_calls == baseline
+        assert r._panel_dirty is True
