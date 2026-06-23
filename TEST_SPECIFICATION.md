@@ -4760,6 +4760,132 @@ direction of dependencies.
 **Fixture/Setup:** Config file with warnings section
 **Edge Cases:** Missing warnings section (defaults apply), partial config (one field set)
 
+### TC-650: CLI --hide-state Flag Parsing
+**Section:** 3.2 CLI Flags
+**Priority:** P2 — Feature
+
+**Test Steps:**
+1. Run `aom --hide-state ok playbook.yml`.
+2. Run `aom --hide-state ok --hide-state skipped playbook.yml`.
+
+**Expected Outcome:**
+- The flag is accepted by the argument parser.
+- Multiple `--hide-state` invocations accumulate into a list.
+- Unknown values (e.g. `--hide-state foo`) are rejected with an error.
+
+### TC-651: --hide-state ok Suppresses ok: and changed: Lines
+**Section:** 4.1 Compact View — State Filtering
+**Priority:** P2 — Feature
+
+**Test Steps:**
+1. Run a playbook with `--hide-state ok` in compact mode.
+
+**Expected Outcome:**
+- No `ok: [host]` or `changed: [host]` lines appear in the scrollable log.
+- `TASK [name]` headers still print.
+- The bottom status panel still shows ok/changed counts correctly.
+- The events.jsonl recording contains all events (count matches unfiltered run).
+
+### TC-652: --hide-state skipped Suppresses skipping: Lines
+**Section:** 4.1 Compact View — State Filtering
+**Priority:** P2 — Feature
+
+**Test Steps:**
+1. Run a playbook with skipped tasks using `--hide-state skipped`.
+
+**Expected Outcome:**
+- No `skipping: [host]` or `… N host(s) skipped` lines appear.
+- `ok: [host]` and other state lines still print.
+- The host table's skipped column is unaffected.
+- RunState tracks skipped hosts correctly.
+
+### TC-653: --hide-state failed Suppresses fatal: FAILED! Lines
+**Section:** 4.1 Compact View — State Filtering
+**Priority:** P2 — Feature
+
+**Test Steps:**
+1. Run a playbook with a failed task using `--hide-state failed`.
+
+**Expected Outcome:**
+- No `fatal: [host]: FAILED! => …` lines appear.
+- The bottom panel still shows the failure count.
+- RunState tracks the failure.
+- The post-run failure recap prints as usual.
+
+### TC-654: --hide-state unreachable Suppresses fatal: UNREACHABLE! Lines
+**Section:** 4.1 Compact View — State Filtering
+**Priority:** P2 — Feature
+
+**Test Steps:**
+1. Run a playbook with an unreachable host using `--hide-state unreachable`.
+
+**Expected Outcome:**
+- No `fatal: [host]: UNREACHABLE! => …` lines appear.
+- The bottom panel still shows unreachable count.
+- RunState tracks the unreachable host.
+
+### TC-655: Multiple --hide-state Values Stack
+**Section:** 4.1 Compact View — State Filtering
+**Priority:** P2 — Feature
+
+**Test Steps:**
+1. Run `aom playbook.yml --hide-state ok --hide-state skipped`.
+
+**Expected Outcome:**
+- Both `ok:` / `changed:` and `skipping:` lines are suppressed.
+- Other state lines (failed, unreachable) still print.
+- The event recording is complete.
+
+### TC-656: Event Recording Unaffected by --hide-state
+**Section:** 4.1 Compact View — State Filtering
+**Priority:** P2 — Feature — Verification
+
+**Test Steps:**
+1. Run `aom playbook.yml --hide-state ok --hide-state skipped`.
+2. Read `~/.local/state/aom/sessions/<id>/events.jsonl`.
+
+**Expected Outcome:**
+- The events file contains all runner events, including those whose
+  log lines were suppressed.
+- The event count matches an unfiltered run of the same playbook.
+- `aom inspect <id>` shows complete results.
+
+### TC-657: aom inspect Unaffected by --hide-state
+**Section:** 4.1 Compact View — State Filtering
+**Priority:** P2 — Feature — Verification
+
+**Test Steps:**
+1. Run `aom playbook.yml --hide-state ok`.
+2. Run `aom inspect <session-id>`.
+3. Run `aom inspect <session-id> --failed`.
+
+**Expected Outcome:**
+- inspect output includes all tasks and hosts.
+- `--failed` list shows failed tasks that were suppressed from the live log.
+- inspect is driven from events.jsonl, not from the live log buffer.
+
+### TC-658: TUI Mode Ignores --hide-state
+**Section:** 4.2 Full TUI
+**Priority:** P2 — Feature — Boundary
+
+**Test Steps:**
+1. Run `aom --tui playbook.yml --hide-state ok`.
+
+**Expected Outcome:**
+- The TUI log panel shows all log lines regardless of the flag.
+- A warning may be printed to stderr that --hide-state only affects compact mode.
+
+### TC-659: Default Behaviour Unchanged
+**Section:** 4.1 Compact View — State Filtering
+**Priority:** P2 — Feature — Regression
+
+**Test Steps:**
+1. Run `aom playbook.yml` (no --hide-state flag).
+
+**Expected Outcome:**
+- All per-host result lines print as normal.
+- Error level matches pre-feature snapshots.
+
 ---
 
 ## Test Priority Summary

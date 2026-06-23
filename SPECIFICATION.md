@@ -235,6 +235,7 @@ aom inspect <session-id> --failed
 | `--verbose` / `-v` | flag | false | Print pre-execution diagnostics; enable DEBUG logging |
 | `--help` | flag | - | Show help message |
 | `--version` | flag | - | Show version |
+| `--hide-state` | repeatable choice | None | Suppress per-host lines of the given state from the live compact log. Repeatable (e.g. `--hide-state ok --hide-state skipped`). Choices: `ok`, `changed`, `failed`, `skipped`, `unreachable`. The status panel, event recording, and aom inspect are unaffected. |
 
 All other arguments pass through to ansible-playbook.
 
@@ -387,6 +388,45 @@ This works because:
 **Compact Mode Runtime Dependencies** (in addition to core):
 - `rich` (already required) — for Live display and Console formatting
 - Optional: `blessed` — for advanced ANSI cursor positioning (Phase 2)
+
+#### State Filtering
+
+AOM can suppress per-host result lines of specific states from the compact
+live log via the `--hide-state` flag, reducing visual noise when only failed
+or changed results matter.
+
+```
+aom site.yml --hide-state ok --hide-state skipped
+```
+
+**Gated event types** (suppressed when the corresponding state is hidden):
+
+| State | Suppressed lines |
+|-------|-----------------|
+| `ok` | `ok: [host]` and `changed: [host]` (they share a single JSONL event branch) |
+| `failed` | `fatal: [host]: FAILED! => …` |
+| `unreachable` | `fatal: [host]: UNREACHABLE! => …` |
+| `skipped` | `skipping: [host]` and `… N host(s) skipped` |
+
+**Never suppressed** (always printed regardless of `--hide-state`):
+
+- `PLAY [name]` banners
+- `TASK [name]` headers
+- The bottom status panel (`site.yml │ 2/3 hosts │ …`)
+- The per-host summary table
+- The post-run failure recap
+- `aom inspect` output
+- `aom replay` / `aom rerun` output
+
+**Recording**: The `~/.local/state/aom/sessions/*/events.jsonl` file always
+contains every event, regardless of `--hide-state`. The filter only affects
+what is printed to the terminal in compact mode.
+
+**TUI mode**: The Textual TUI (`--tui`) has its own log pipeline and is not
+affected by `--hide-state`. This is a compact-only flag in v1.
+
+**Default**: No states are hidden — all per-host lines print as usual, matching
+pre-`--hide-state` behaviour.
 
 ### 4.2 Full TUI (--tui mode)
 
