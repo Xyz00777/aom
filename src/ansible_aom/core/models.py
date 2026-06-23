@@ -424,13 +424,27 @@ class RunState:
         # so a pause (or any action with no terminal event) that was the
         # last task of its play doesn't stay RUNNING in the tree. Skip the
         # same play_id (serial batches re-emit play_start for one play and
-        # the entry is replaced below anyway).
+        # the entry is replaced below anyway). Skip plays under
+        # strategy: free — hosts run tasks independently there, so a
+        # play_start for the next play can arrive while the prior play's
+        # hosts are still running their tasks. Force-finalising them
+        # destroys live state and produces a stale "all OK" tree.
         for prior_id, prior in self.plays.items():
             if prior_id == play_id:
+                continue
+            if prior.detected_strategy == "free":
                 continue
             self._finalize_play(prior, ts)
             if prior.status == Status.RUNNING:
                 prior.status = Status.COMPLETED
+
+        # Cross-play graft guard — the cursor must reset at every play
+        # boundary so unknown tasks in the new play don't attach to the
+        # previous play's last matched task. Without this, an unknown
+        # task_start arriving between this play_start and the new play's
+        # first matched task would be grafted as a child of the prior
+        # play's last preflight task.
+        self._last_matched_task_def = None
 
         self._current_play_id = play_id
         self._play_window_counts[play_id] = play_window_ordinal + 1
@@ -458,16 +472,50 @@ class RunState:
                 window_ordinal=play_window_ordinal,
             )
 
-    def _resolve_play_id(self, event: dict[str, Any]) -> str:
-        """Resolve play_id from event or _current_play_id.
+    def _resolve_play_for_task(self, task_id: str) -> str | None:
+        """Return the play_id that already owns this task_id, or ``None``.
 
-        ansible-core >=2.20 omits the 'play' field from runner/task events,
-        so we fall back to the play_id tracked from the most recent
-        v2_playbook_on_play_start event.
+        Searches the runtime plays dict for a play whose ``tasks`` already
+        contains ``task_id``. Used as a fallback when an event arrives
+        without a ``play`` field but carries a ``task.id`` we have already
+        seen — we then know which play the event belongs to without
+        trusting the cursor (``_current_play_id``), which can have moved
+        forward under ``strategy: free`` even though late runner events for
+        the prior play are still streaming in.
+        """
+        if not task_id:
+            return None
+        for play_id, play in self.plays.items():
+            if task_id in play.tasks:
+                return play_id
+        return None
+
+    def _resolve_play_id(self, event: dict[str, Any]) -> str:
+        """Resolve play_id from event, _current_play_id, or task ownership.
+
+        Resolution order:
+
+        1. ``event["play"]["id"]`` when the event carries an explicit play.
+        2. The play that already owns ``event["task"]["id"]`` in our runtime
+           state — this catches ``v2_runner_on_*`` events that arrive after
+           a new ``v2_playbook_on_play_start`` has advanced ``_current_play_id``
+           but still reference a task that belongs to the previous play.
+        3. ``_current_play_id`` — last-resort cursor, used when the task is
+           brand new (e.g. ``v2_runner_item_on_*`` before any matching
+           ``v2_playbook_on_task_start`` has fired).
         """
         play_data = event.get("play")
         if play_data and isinstance(play_data, dict):
             return cast(str, play_data.get("id", ""))
+        # No explicit play on the event — look up the play that owns this
+        # task. Falls back to _current_play_id only when the task is brand
+        # new (e.g., v2_runner_item_on_* before any task_start has fired).
+        task_data = event.get("task")
+        task_id = task_data.get("id", "") if isinstance(task_data, dict) else ""
+        if task_id:
+            owner = self._resolve_play_for_task(task_id)
+            if owner is not None:
+                return owner
         return self._current_play_id or ""
 
     def _graft_or_match_task(
