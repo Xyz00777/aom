@@ -1086,3 +1086,261 @@ class TestFormatFlag:
 
         assert result == 0
         assert isinstance(captured_renderer["renderer"], JsonRenderer)
+
+
+class TestHideStateFlag:
+    """Tests for --hide-state flag."""
+
+    def test_hide_state_default_is_empty(self):
+        """No --hide-state flag → hide_state is None."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["playbook.yml"])
+        assert args.hide_state is None
+
+    def test_hide_state_accepts_single_value(self):
+        """--hide-state ok sets hide_state=["ok"]."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--hide-state", "ok", "playbook.yml"])
+        assert args.hide_state == ["ok"]
+
+    def test_hide_state_is_repeatable(self):
+        """--hide-state can be specified multiple times."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(
+            [
+                "--hide-state",
+                "ok",
+                "--hide-state",
+                "skipped",
+                "playbook.yml",
+            ]
+        )
+        assert args.hide_state == ["ok", "skipped"]
+
+    def test_hide_state_rejects_unknown_value(self, capsys):
+        """Unknown state values are rejected by argparse."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--hide-state", "unknown", "playbook.yml"])
+
+    def test_hide_state_all_valid_values(self):
+        """All choices are accepted."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(
+            [
+                "--hide-state",
+                "ok",
+                "--hide-state",
+                "changed",
+                "--hide-state",
+                "failed",
+                "--hide-state",
+                "skipped",
+                "--hide-state",
+                "unreachable",
+                "playbook.yml",
+            ]
+        )
+        assert sorted(args.hide_state) == ["changed", "failed", "ok", "skipped", "unreachable"]
+
+    def test_hide_state_does_not_appear_in_ansible_args(self):
+        """--hide-state must be consumed by argparse, not forwarded to ansible."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--hide-state", "ok", "playbook.yml", "-i", "inv.ini"])
+        assert args.hide_state == ["ok"]
+        assert args.ansible_args == ["-i", "inv.ini"]
+
+    def test_hide_state_comma_separated(self):
+        """--hide-state ok,skipped splits into ["ok", "skipped"]."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--hide-state", "ok,skipped", "playbook.yml"])
+        assert sorted(args.hide_state) == ["ok", "skipped"]
+
+    def test_hide_state_mixed_append_and_comma(self):
+        """--hide-state ok --hide-state skipped,failed combines both."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(
+            [
+                "--hide-state",
+                "ok",
+                "--hide-state",
+                "skipped,failed",
+                "playbook.yml",
+            ]
+        )
+        assert sorted(args.hide_state) == ["failed", "ok", "skipped"]
+
+    def test_hide_state_rejects_unknown_in_comma_separated(self, capsys):
+        """Unknown value in comma-separated list is rejected."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--hide-state", "ok,unknown,skipped", "playbook.yml"])
+
+    def test_hide_state_single_comma_not_required(self):
+        """Single value still works without any comma."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--hide-state", "ok", "playbook.yml"])
+        assert args.hide_state == ["ok"]
+
+    def test_hide_state_case_insensitive_ok(self):
+        """--hide-state OK is accepted and lowercased to 'ok'."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--hide-state", "OK", "playbook.yml"])
+        assert args.hide_state == ["ok"]
+
+    def test_hide_state_case_insensitive_mixed(self):
+        """--hide-state OK,Skipped is accepted and lowercased."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--hide-state", "OK,Skipped", "playbook.yml"])
+        assert sorted(args.hide_state) == ["ok", "skipped"]
+
+    def test_hide_state_case_insensitive_all_upper(self):
+        """All-uppercase state names are accepted and lowercased."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(
+            [
+                "--hide-state",
+                "OK",
+                "--hide-state",
+                "CHANGED",
+                "--hide-state",
+                "FAILED",
+                "playbook.yml",
+            ]
+        )
+        assert sorted(args.hide_state) == ["changed", "failed", "ok"]
+
+    def test_hide_state_case_insensitive_dedup(self):
+        """--hide-state ok,OK stores both tokens; dedup happens downstream."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--hide-state", "ok,OK", "playbook.yml"])
+        assert args.hide_state == ["ok", "ok"]
+
+    def test_hide_state_typo_suggests_skipped(self, capsys):
+        """Typo 'skip' suggests 'skipped'."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--hide-state", "skip", "playbook.yml"])
+        captured = capsys.readouterr()
+        assert "did you mean 'skipped'?" in captured.err
+
+    def test_hide_state_typo_suggests_failed(self, capsys):
+        """Typo 'fail' suggests 'failed'."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--hide-state", "fail", "playbook.yml"])
+        captured = capsys.readouterr()
+        assert "did you mean 'failed'?" in captured.err
+
+    def test_hide_state_random_garbage_no_suggestion(self, capsys):
+        """Random garbage value gets no 'did you mean' suggestion."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--hide-state", "xyz", "playbook.yml"])
+        captured = capsys.readouterr()
+        assert "did you mean" not in captured.err
+
+    def test_hide_state_error_includes_choices(self, capsys):
+        """Error message includes (choose from ...) listing valid states."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--hide-state", "bogus", "playbook.yml"])
+        captured = capsys.readouterr()
+        assert "choose from" in captured.err
+        assert "ok" in captured.err
+
+    def test_hide_state_typo_error_preserves_original_token(self, capsys):
+        """Error message shows the original (un-lowered) token in quotes."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--hide-state", "Skip", "playbook.yml"])
+        captured = capsys.readouterr()
+        assert "'Skip'" in captured.err
+
+
+class TestHideStateCompactPlumbing:
+    """--hide-state propagates from CLI to create_renderer/run_playbook."""
+
+    def test_hide_state_propagates_to_renderer(self):
+        """aom --hide-state ok playbook.yml → create_renderer gets hide_states=["ok"]."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0) as mock_run,
+            patch("ansible_aom.renderer.factory.create_renderer") as mock_create,
+            patch("sys.argv", ["aom", "--hide-state", "ok", "playbook.yml"]),
+        ):
+            assert main() == 0
+
+        # create_renderer should have been called with hide_states=["ok"]
+        _args, kwargs = mock_create.call_args
+        assert kwargs.get("hide_states") == ["ok"]
+
+    def test_hide_state_propagates_multiple_values(self):
+        """--hide-state ok --hide-state skipped → hide_states=["ok", "skipped"]."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0) as mock_run,
+            patch("ansible_aom.renderer.factory.create_renderer") as mock_create,
+            patch(
+                "sys.argv",
+                ["aom", "--hide-state", "ok", "--hide-state", "skipped", "playbook.yml"],
+            ),
+        ):
+            assert main() == 0
+
+        _args, kwargs = mock_create.call_args
+        assert sorted(kwargs.get("hide_states")) == ["ok", "skipped"]
+
+    def test_hide_state_default_propagates_empty_list(self):
+        """No --hide-state flag → create_renderer gets hide_states=[]."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0) as mock_run,
+            patch("ansible_aom.renderer.factory.create_renderer") as mock_create,
+            patch("sys.argv", ["aom", "playbook.yml"]),
+        ):
+            main()
+
+        _args, kwargs = mock_create.call_args
+        assert kwargs.get("hide_states") == []

@@ -5,14 +5,17 @@ See SPECIFICATION.md Section 3 for command interface details.
 """
 
 import argparse
+import difflib
 import logging
 import os
 import shutil
 import sys
+from collections.abc import Sequence
 
 import argcomplete
 
 from ansible_aom import __version__
+from ansible_aom.core.log_filter import VALID_STATES
 
 # Files we'll auto-discover as inventory when the user doesn't pass -i.
 # Order is preference order — `inventory.ini` wins over `hosts` because
@@ -121,6 +124,36 @@ def ensure_inventory_arg(ansible_args: list[str]) -> list[str]:
     if default is None:
         return ansible_args
     return ["-i", default, *ansible_args]
+
+
+class _HideStateAction(argparse.Action):
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: str | Sequence[str] | None,
+        option_string: str | None = None,
+    ) -> None:
+        choices_str = ", ".join(sorted(VALID_STATES))
+        accumulated: list[str] = list(getattr(namespace, self.dest) or [])
+        raw_values: list[str] = (
+            list(values) if isinstance(values, Sequence) and not isinstance(values, str)
+            else [values] if isinstance(values, str)
+            else []
+        )
+        for raw in raw_values:
+            for token in str(raw).split(","):
+                token = token.strip()
+                lowered = token.lower()
+                if lowered not in VALID_STATES:
+                    suggestion = difflib.get_close_matches(lowered, VALID_STATES, n=1, cutoff=0.6)
+                    hint = f"; did you mean {suggestion[0]!r}?" if suggestion else ""
+                    parser.error(
+                        f"argument --hide-state: invalid choice: {token!r} "
+                        f"(choose from {choices_str}){hint}"
+                    )
+                accumulated.append(lowered)
+        setattr(namespace, self.dest, accumulated)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -269,6 +302,21 @@ See README.md and SPECIFICATION.md in the source tree for full details.
     )
 
     parser.add_argument(
+        "--hide-state",
+        action=_HideStateAction,
+        nargs=1,
+        default=None,
+        dest="hide_state",
+        help=(
+            "Suppress per-host lines of the given state from the live compact log. "
+            "Accepts comma-separated values (e.g. --hide-state ok,skipped) or "
+            "repeatable invocations (e.g. --hide-state ok --hide-state skipped). "
+            "Choices: ok, changed, failed, skipped, unreachable. "
+            "The status panel, event recording, and aom inspect are unaffected."
+        ),
+    )
+
+    parser.add_argument(
         "--install-completion",
         choices=("bash", "zsh", "fish"),
         metavar="SHELL",
@@ -305,6 +353,7 @@ def _run_compact(
     ansible_args: list[str],
     record: bool = True,
     format: str = "compact",
+    hide_states: list[str] | None = None,
 ) -> int:
     """Spawn the streaming renderer (compact ANSI or end-of-run JSON) via a LiveDriver.
 
@@ -320,6 +369,7 @@ def _run_compact(
         renderer = create_renderer(
             mode=cast(RenderMode, format),
             is_tty=sys.stdout.isatty(),
+            hide_states=hide_states if hide_states is not None else [],
         )
         driver = LiveDriver(playbook, ansible_args, record=record)
         return driver.drive(renderer)
@@ -457,10 +507,22 @@ def main() -> int:
         ansible_args = ensure_inventory_arg(merge_limit_args(args.ansible_args))
 
         record = not args.no_record
+        hide_states: list[str] = list(args.hide_state) if args.hide_state is not None else []
+        if args.tui and hide_states:
+            print(
+                "aom: --hide-state only affects compact mode and is ignored in --tui.",
+                file=sys.stderr,
+            )
         try:
             if args.tui:
                 return _run_tui(args.playbook, ansible_args, record=record)
-            return _run_compact(args.playbook, ansible_args, record=record, format=args.format)
+            return _run_compact(
+                args.playbook,
+                ansible_args,
+                record=record,
+                format=args.format,
+                hide_states=hide_states,
+            )
         finally:
             # AOM_DEBUG=1 → single-line post-run digest on stderr. Silent
             # otherwise. Lands in finally so even a non-zero exit still
