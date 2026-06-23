@@ -1102,16 +1102,17 @@ class CompactRenderer:
         # OK+changed → CHANGED (same rule as tree projection).
         counts: dict[Status, int] = {}
         for hs in task.hosts.values():
-            effective = (
-                Status.CHANGED if hs.status == Status.OK and hs.changed else hs.status
-            )
-            if effective in (Status.FAILED, Status.UNREACHABLE, Status.CHANGED,
-                            Status.OK, Status.SKIPPED):
+            effective = Status.CHANGED if hs.status == Status.OK and hs.changed else hs.status
+            if effective in (
+                Status.FAILED,
+                Status.UNREACHABLE,
+                Status.CHANGED,
+                Status.OK,
+                Status.SKIPPED,
+            ):
                 counts[effective] = counts.get(effective, 0) + 1
 
-        has_errors = any(
-            counts.get(s, 0) > 0 for s in (Status.FAILED, Status.UNREACHABLE)
-        )
+        has_errors = any(counts.get(s, 0) > 0 for s in (Status.FAILED, Status.UNREACHABLE))
         # (Status, display label, ANSI colour, always_show)
         # FAILED/UNREACHABLE always appear even with --hide-state.
         # fmt: off

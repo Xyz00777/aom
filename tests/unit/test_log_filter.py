@@ -200,26 +200,42 @@ class TestShouldHideHostResult:
     # --- v2_runner_on_ok / v2_runner_item_on_ok: per-host changed field ---
 
     def test_ok_result_hidden_when_ok_in_hide_states(self) -> None:
-        assert should_hide_host_result({"changed": False}, "v2_runner_on_ok", frozenset({"ok"})) is True
+        assert (
+            should_hide_host_result({"changed": False}, "v2_runner_on_ok", frozenset({"ok"}))
+            is True
+        )
 
     def test_ok_result_visible_when_only_changed_in_hide_states(self) -> None:
-        assert should_hide_host_result({"changed": False}, "v2_runner_on_ok", frozenset({"changed"})) is False
+        assert (
+            should_hide_host_result({"changed": False}, "v2_runner_on_ok", frozenset({"changed"}))
+            is False
+        )
 
     def test_changed_result_hidden_when_changed_in_hide_states(self) -> None:
-        assert should_hide_host_result({"changed": True}, "v2_runner_on_ok", frozenset({"changed"})) is True
+        assert (
+            should_hide_host_result({"changed": True}, "v2_runner_on_ok", frozenset({"changed"}))
+            is True
+        )
 
     def test_changed_result_visible_when_only_ok_in_hide_states(self) -> None:
-        assert should_hide_host_result({"changed": True}, "v2_runner_on_ok", frozenset({"ok"})) is False
+        assert (
+            should_hide_host_result({"changed": True}, "v2_runner_on_ok", frozenset({"ok"}))
+            is False
+        )
 
     def test_ok_result_hidden_when_both_ok_and_changed_hidden(self) -> None:
         assert (
-            should_hide_host_result({"changed": False}, "v2_runner_on_ok", frozenset({"ok", "changed"}))
+            should_hide_host_result(
+                {"changed": False}, "v2_runner_on_ok", frozenset({"ok", "changed"})
+            )
             is True
         )
 
     def test_changed_result_hidden_when_both_ok_and_changed_hidden(self) -> None:
         assert (
-            should_hide_host_result({"changed": True}, "v2_runner_on_ok", frozenset({"ok", "changed"}))
+            should_hide_host_result(
+                {"changed": True}, "v2_runner_on_ok", frozenset({"ok", "changed"})
+            )
             is True
         )
 
@@ -230,7 +246,10 @@ class TestShouldHideHostResult:
         assert should_hide_host_result({"changed": True}, "v2_runner_on_ok", frozenset()) is False
 
     def test_ok_result_visible_when_only_failed_in_hide_states(self) -> None:
-        assert should_hide_host_result({"changed": False}, "v2_runner_on_ok", frozenset({"failed"})) is False
+        assert (
+            should_hide_host_result({"changed": False}, "v2_runner_on_ok", frozenset({"failed"}))
+            is False
+        )
 
     def test_missing_changed_defaults_to_false(self) -> None:
         """Result dict without 'changed' key is treated as ok (not changed)."""
@@ -243,17 +262,22 @@ class TestShouldHideHostResult:
 
     def test_item_ok_hidden_when_ok_in_hide_states(self) -> None:
         assert (
-            should_hide_host_result({"changed": False}, "v2_runner_item_on_ok", frozenset({"ok"})) is True
+            should_hide_host_result({"changed": False}, "v2_runner_item_on_ok", frozenset({"ok"}))
+            is True
         )
 
     def test_item_changed_visible_when_only_ok_in_hide_states(self) -> None:
         assert (
-            should_hide_host_result({"changed": True}, "v2_runner_item_on_ok", frozenset({"ok"})) is False
+            should_hide_host_result({"changed": True}, "v2_runner_item_on_ok", frozenset({"ok"}))
+            is False
         )
 
     def test_item_changed_hidden_when_changed_in_hide_states(self) -> None:
         assert (
-            should_hide_host_result({"changed": True}, "v2_runner_item_on_ok", frozenset({"changed"})) is True
+            should_hide_host_result(
+                {"changed": True}, "v2_runner_item_on_ok", frozenset({"changed"})
+            )
+            is True
         )
 
     # --- v2_runner_on_failed / v2_runner_item_on_failed ---
@@ -265,12 +289,17 @@ class TestShouldHideHostResult:
         assert should_hide_host_result({}, "v2_runner_on_failed", frozenset()) is False
 
     def test_item_failed_hidden_when_failed_in_hide_states(self) -> None:
-        assert should_hide_host_result({}, "v2_runner_item_on_failed", frozenset({"failed"})) is True
+        assert (
+            should_hide_host_result({}, "v2_runner_item_on_failed", frozenset({"failed"})) is True
+        )
 
     # --- v2_runner_on_unreachable ---
 
     def test_unreachable_hidden_when_unreachable_in_hide_states(self) -> None:
-        assert should_hide_host_result({}, "v2_runner_on_unreachable", frozenset({"unreachable"})) is True
+        assert (
+            should_hide_host_result({}, "v2_runner_on_unreachable", frozenset({"unreachable"}))
+            is True
+        )
 
     def test_unreachable_visible_with_empty_hide_states(self) -> None:
         assert should_hide_host_result({}, "v2_runner_on_unreachable", frozenset()) is False
@@ -284,7 +313,9 @@ class TestShouldHideHostResult:
         assert should_hide_host_result({}, "v2_runner_on_skipped", frozenset()) is False
 
     def test_item_skipped_hidden_when_skipped_in_hide_states(self) -> None:
-        assert should_hide_host_result({}, "v2_runner_item_on_skipped", frozenset({"skipped"})) is True
+        assert (
+            should_hide_host_result({}, "v2_runner_item_on_skipped", frozenset({"skipped"})) is True
+        )
 
     # --- Unknown event types: never hidden ---
 

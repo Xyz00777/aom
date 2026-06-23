@@ -137,8 +137,10 @@ class _HideStateAction(argparse.Action):
         choices_str = ", ".join(sorted(VALID_STATES))
         accumulated: list[str] = list(getattr(namespace, self.dest) or [])
         raw_values: list[str] = (
-            list(values) if isinstance(values, Sequence) and not isinstance(values, str)
-            else [values] if isinstance(values, str)
+            list(values)
+            if isinstance(values, Sequence) and not isinstance(values, str)
+            else [values]
+            if isinstance(values, str)
             else []
         )
         for raw in raw_values:

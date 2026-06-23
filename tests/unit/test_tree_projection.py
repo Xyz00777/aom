@@ -2139,8 +2139,12 @@ class TestTaskCompletionLifecycle:
                 hosts="webservers",
                 resolved_hosts=["web1"],
                 tasks=[
-                    TaskDefinition(name="T1", role=None, tags=[], play_id="pA", play_order=0, task_order=0),
-                    TaskDefinition(name="T2", role=None, tags=[], play_id="pA", play_order=0, task_order=1),
+                    TaskDefinition(
+                        name="T1", role=None, tags=[], play_id="pA", play_order=0, task_order=0
+                    ),
+                    TaskDefinition(
+                        name="T2", role=None, tags=[], play_id="pA", play_order=0, task_order=1
+                    ),
                 ],
             ),
             PlayDefinition(
@@ -2149,7 +2153,9 @@ class TestTaskCompletionLifecycle:
                 hosts="dbservers",
                 resolved_hosts=["db1"],
                 tasks=[
-                    TaskDefinition(name="T3", role=None, tags=[], play_id="pB", play_order=1, task_order=0),
+                    TaskDefinition(
+                        name="T3", role=None, tags=[], play_id="pB", play_order=1, task_order=0
+                    ),
                 ],
             ),
         ]
@@ -2213,9 +2219,7 @@ class TestTaskCompletionLifecycle:
         p = TreeProjection.from_run_state(state)
         play_lines = [ln for ln in p.tree_lines(budget=25) if ln.kind == "play"]
         play_names = [ln.label.removeprefix("play: ") for ln in play_lines]
-        assert play_names == ["Play A", "Play B"], (
-            f"both plays should appear; got {play_names!r}"
-        )
+        assert play_names == ["Play A", "Play B"], f"both plays should appear; got {play_names!r}"
 
         task_lines = [ln for ln in p.tree_lines(budget=25) if ln.kind == "task"]
         task_names = [ln.label.split("  ")[0] for ln in task_lines]

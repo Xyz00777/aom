@@ -86,9 +86,7 @@ def should_hide_event(event_type: str, hide_states: frozenset[str]) -> bool:
     return not states.isdisjoint(hide_states)
 
 
-def should_hide_host_result(
-    result: dict, event_type: str, hide_states: frozenset[str]
-) -> bool:
+def should_hide_host_result(result: dict, event_type: str, hide_states: frozenset[str]) -> bool:
     """True iff a single host's result should be suppressed from the live log.
 
     Unlike :func:`should_hide_event` which operates at the event level and
