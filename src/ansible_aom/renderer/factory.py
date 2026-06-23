@@ -27,6 +27,7 @@ def create_renderer(
     is_tty: bool = True,
     format: RenderFormat | None = None,
     mode: RenderMode | None = None,
+    hide_states: list[str] | None = None,
 ) -> Renderer:
     """Create the renderer selected by ``mode``.
 
@@ -44,6 +45,10 @@ def create_renderer(
             historical call sites don't need a same-PR migration.
         format: **Deprecated** — pass ``mode="json"`` instead. Same
             rationale as ``tui_mode``.
+        hide_states: List of host states to suppress from the compact
+            log (e.g. ``["ok", "skipped"]``). Forwarded to
+            ``CompactRenderer``; ignored by ``AOMApp`` and
+            ``JsonRenderer``.
 
     Returns:
         A :class:`Renderer` instance: :class:`CompactRenderer`,
@@ -62,7 +67,7 @@ def create_renderer(
 
     from ansible_aom.compact.renderer import CompactRenderer
 
-    return CompactRenderer(is_tty=is_tty)
+    return CompactRenderer(is_tty=is_tty, hide_states=hide_states or [])
 
 
 def _resolve_mode(
