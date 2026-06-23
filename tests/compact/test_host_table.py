@@ -163,3 +163,45 @@ def test_running_host_shows_current_task() -> None:
     rows = format_host_rows(p, width=120, ascii_mode=False, colorize=False)
     plain = _strip_sgr(rows[1])
     assert "Install nginx" in plain, plain
+
+
+def test_failed_host_shows_failed_task_in_suffix() -> None:
+    state = _state(["web1"])
+    play = PlayRunState(play_id="p1", name="deploy", status=Status.RUNNING)
+    task = TaskRunState(task_id="t-fail", name="Start service", status=Status.FAILED)
+    task.hosts["web1"] = HostRunState(hostname="web1", status=Status.FAILED)
+    play.tasks["t-fail"] = task
+    state.plays["p1"] = play
+
+    p = TreeProjection.from_run_state(state)
+    rows = format_host_rows(p, width=120, ascii_mode=False, colorize=False)
+    plain = _strip_sgr(rows[1])
+    assert "✖ Start service" in plain, plain
+
+
+def test_unreachable_host_shows_unreachable_task_in_suffix() -> None:
+    state = _state(["db1"])
+    play = PlayRunState(play_id="p1", name="deploy", status=Status.RUNNING)
+    task = TaskRunState(task_id="t-unreach", name="Gather facts", status=Status.UNREACHABLE)
+    task.hosts["db1"] = HostRunState(hostname="db1", status=Status.UNREACHABLE)
+    play.tasks["t-unreach"] = task
+    state.plays["p1"] = play
+
+    p = TreeProjection.from_run_state(state)
+    rows = format_host_rows(p, width=120, ascii_mode=False, colorize=False)
+    plain = _strip_sgr(rows[1])
+    assert "⊝ Gather facts" in plain, plain
+
+
+def test_failed_host_shows_X_in_ascii_mode() -> None:
+    state = _state(["web1"])
+    play = PlayRunState(play_id="p1", name="deploy", status=Status.RUNNING)
+    task = TaskRunState(task_id="t-fail", name="Start service", status=Status.FAILED)
+    task.hosts["web1"] = HostRunState(hostname="web1", status=Status.FAILED)
+    play.tasks["t-fail"] = task
+    state.plays["p1"] = play
+
+    p = TreeProjection.from_run_state(state)
+    rows = format_host_rows(p, width=120, ascii_mode=True, colorize=False)
+    plain = _strip_sgr(rows[1])
+    assert "X Start service" in plain, plain

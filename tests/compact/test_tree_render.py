@@ -105,11 +105,10 @@ def test_format_host_rows_unreachable_host_shows_unreachable():
     )
     p = TreeProjection.from_run_state(state)
     rows = format_host_rows(p, width=80, ascii_mode=False, colorize=False)
-    # Header now has an "unreachable" column. Host row has the suffix
-    # "unreachable" (because current_task is None and worst_status is
-    # UNREACHABLE).
+    # Header has an "unreachable" column. Host row suffix now shows the
+    # task name with the ⊝ glyph (not the bare word "unreachable").
     assert "unreachable" in rows[0]
-    assert "unreachable" in rows[1]
+    assert "⊝ Install nginx" in rows[1]
     # Bare count of 1 lands in the unreachable column.
     assert "1" in rows[1]
 

@@ -123,6 +123,11 @@ class HostRow:
     `counts` only carries non-zero entries. `worst_status` drives the
     hostname colour selection per the spec; `current_task` is None when
     the host is idle (between tasks) or after the run finishes.
+
+    `failed_task` / `failed_status` carry the name and status of the most
+    recent terminal failure on this host (FAILED or UNREACHABLE). They
+    are set only when the host is not currently RUNNING — a running task
+    always takes display precedence over a past failure.
     """
 
     hostname: str
@@ -130,6 +135,8 @@ class HostRow:
     worst_status: Status | None
     current_task: str | None
     current_elapsed_s: float | None
+    failed_task: str | None = None
+    failed_status: Status | None = None
 
 
 @dataclass
@@ -411,6 +418,9 @@ class TreeProjection:
         # Per-host accumulators.
         counts: dict[str, dict[Status, int]] = {}
         current: dict[str, tuple[str, float] | None] = {}
+        # Track the most recent terminal failure per host so the
+        # "on" column can name the failing task instead of "(idle)".
+        failed: dict[str, tuple[str, Status]] = {}
 
         # Preserve first-seen ordering — mirrors event order, which mirrors
         # ansible's host order under linear and roughly the start order
@@ -444,12 +454,15 @@ class TreeProjection:
                         Status.SKIPPED,
                     ):
                         counts[hostname][effective] = counts[hostname].get(effective, 0) + 1
+                        if effective in (Status.FAILED, Status.UNREACHABLE):
+                            failed[hostname] = (task.name, effective)
 
         rows: list[HostRow] = []
         for hostname in order:
             host_counts = counts[hostname]
             worst = self._worst_status_of(host_counts.keys())
             cur = current[hostname]
+            fail = failed.get(hostname)
             rows.append(
                 HostRow(
                     hostname=hostname,
@@ -457,6 +470,8 @@ class TreeProjection:
                     worst_status=worst,
                     current_task=cur[0] if cur else None,
                     current_elapsed_s=cur[1] if cur else None,
+                    failed_task=fail[0] if fail else None,
+                    failed_status=fail[1] if fail else None,
                 )
             )
             self._touch_host_lease(hostname, now)

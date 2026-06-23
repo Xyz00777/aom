@@ -266,6 +266,186 @@ class TestHostRows:
         assert rows["web1"].worst_status == Status.FAILED
         assert rows["web1"].counts == {Status.CHANGED: 1, Status.FAILED: 1}
 
+    def test_failed_host_tracks_failed_task_name(self):
+        """A host with a FAILED entry records the task name in failed_task."""
+        state = RunState(playbook="site.yml")
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_failed",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "hosts": {"web1": {"failed": True, "msg": "boom"}},
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        rows = {r.hostname: r for r in p.host_rows()}
+        assert rows["web1"].failed_task == "Install nginx"
+        assert rows["web1"].failed_status == Status.FAILED
+
+    def test_unreachable_host_tracks_failed_task_name(self):
+        """A host with an UNREACHABLE entry records the task name in failed_task."""
+        state = RunState(playbook="site.yml")
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "t1", "name": "Gather facts"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_unreachable",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "t1", "name": "Gather facts"},
+                "hosts": {"db1": {"unreachable": True}},
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        rows = {r.hostname: r for r in p.host_rows()}
+        assert rows["db1"].failed_task == "Gather facts"
+        assert rows["db1"].failed_status == Status.UNREACHABLE
+
+    def test_running_host_has_no_failed_task(self):
+        """A host currently running a task has no failed_task — running wins."""
+        state = self._multi_host_state()
+        p = TreeProjection.from_run_state(state)
+        rows = {r.hostname: r for r in p.host_rows()}
+        assert rows["web2"].current_task == "Configure firewall"
+        assert rows["web2"].failed_task is None
+
+    def test_ok_host_has_no_failed_task(self):
+        """A host that completed with OK has no failed_task."""
+        state = self._multi_host_state()
+        p = TreeProjection.from_run_state(state)
+        rows = {r.hostname: r for r in p.host_rows()}
+        assert rows["web1"].failed_task is None
+        assert rows["web1"].failed_status is None
+
+    def test_failed_task_tracks_most_recent_failure(self):
+        """When a host fails multiple tasks, the last one wins."""
+        state = RunState(playbook="site.yml")
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "t1", "name": "First task"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_failed",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "t1", "name": "First task"},
+                "hosts": {"web1": {"failed": True, "msg": "fail1"}},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:06Z",
+                "task": {"id": "t2", "name": "Second task"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_failed",
+                "_timestamp": "2026-04-20T10:00:07Z",
+                "task": {"id": "t2", "name": "Second task"},
+                "hosts": {"web1": {"failed": True, "msg": "fail2"}},
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        rows = {r.hostname: r for r in p.host_rows()}
+        assert rows["web1"].failed_task == "Second task"
+        assert rows["web1"].failed_status == Status.FAILED
+
+    def test_running_overrides_failed_task_in_display(self):
+        """A host that starts a new task after a failure shows the running
+        task (not the failed task) because the running task is more recent
+        activity — but failed_task still records the failure for fallback."""
+        state = RunState(playbook="site.yml")
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_failed",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "hosts": {"web1": {"failed": True, "msg": "boom"}},
+            }
+        )
+        # A new task starts — web1 is now RUNNING again
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:06Z",
+                "task": {"id": "t2", "name": "Configure app"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:07Z",
+                "task": {"id": "t2", "name": "Configure app"},
+                "host": "web1",
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        rows = {r.hostname: r for r in p.host_rows()}
+        assert rows["web1"].current_task == "Configure app"
+        assert rows["web1"].failed_task == "Install nginx"
+        assert rows["web1"].failed_status == Status.FAILED
+
 
 class TestTreeLinesBasic:
     def _running_task_state(self) -> RunState:

@@ -497,14 +497,21 @@ def format_host_rows(
                 )
             )
 
-        if row.worst_status == Status.UNREACHABLE and row.current_task is None:
-            suffix = _wrap("unreachable", _MAGENTA, colorize)
-        elif row.current_task is None:
-            suffix = _wrap("(idle)", _DIM, colorize)
-        else:
+        icons = STATUS_ICONS_ASCII if ascii_mode else STATUS_ICONS
+        if row.current_task is not None:
             elapsed = int(row.current_elapsed_s or 0)
             glyph = get_running_frame(animation_frame)
             suffix = f"{row.current_task}  {_wrap(f'{glyph} {elapsed}s', _CYAN, colorize)}"
+        elif row.failed_task is not None and row.failed_status == Status.FAILED:
+            suffix = f"{icons[Status.FAILED]} {row.failed_task}"
+            suffix = _wrap(suffix, _RED, colorize)
+        elif row.failed_task is not None and row.failed_status == Status.UNREACHABLE:
+            suffix = f"{icons[Status.UNREACHABLE]} {row.failed_task}"
+            suffix = _wrap(suffix, _MAGENTA, colorize)
+        elif row.worst_status == Status.UNREACHABLE:
+            suffix = _wrap("unreachable", _MAGENTA, colorize)
+        else:
+            suffix = _wrap("(idle)", _DIM, colorize)
 
         line = "  ".join([host_seg, *cells, suffix])
         if len(_strip_sgr(line)) > width:
