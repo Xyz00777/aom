@@ -132,7 +132,7 @@ class TestHandleCompletionRecap:
 
         out = capsys.readouterr().out
         recap_lines = [
-            line for line in out.splitlines() if "install nginx" in line and "web2" in line
+            line for line in out.splitlines() if "FAILED:" in line and "install nginx" in line
         ]
         assert len(recap_lines) == 1
         assert recap_lines[0].startswith("  "), f"expected leading indent, got {recap_lines[0]!r}"

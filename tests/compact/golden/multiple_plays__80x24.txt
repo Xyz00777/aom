@@ -5,11 +5,11 @@ TASK [Install nginx] **************************************************
 changed: [web1] (3.0s)
 
 PLAY [Configure db tier] **************************************************
-[10:00:07] Install nginx — (7.0s)
+[10:00:07] Install nginx — (7.0s)  (1 changed)
 
 TASK [Install postgres] **************************************************
 ok: [db1] (5.0s)
-[10:00:15] Install postgres — (15.0s)
+[10:00:15] Install postgres — (15.0s)  (1 ok)
 host  ok  changed  failed  on
 web1   0        1       0  (idle)
 db1    1        0       0  (idle)
