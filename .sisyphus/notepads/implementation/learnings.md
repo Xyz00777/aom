@@ -1926,3 +1926,33 @@ TC-MITOGEN-106 revealed that `_hosts_dict` must also handle the case where `host
 - `tests/compact/`: 367 pass, 0 fail
 - `tests/`: 2727 pass, 6 skip, 1 xfail, 0 fail
 - mypy: clean
+
+## Play-boundary state-machine bugs (June 2026)
+
+### Two bugs in `_handle_v2_playbook_on_play_start` (`src/ansible_aom/core/models.py:414`)
+
+**Bug 1 — Cross-play graft cursor leak.** `_last_matched_task_def` (declared at line 276) was set whenever a runtime task matched a preflight TaskDefinition but never reset on play boundaries. Result: an unknown task arriving after a new play's `play_start` but before its first matched `task_start` got grafted as a child of the PRIOR play's last preflight task, polluting the prior play's definition's `children` list.
+
+**Bug 2 — Force-finalisation under strategy: free.** The unconditional `_finalize_play` loop (lines 428-433) marked all RUNNING hosts/tasks of prior plays as OK/COMPLETED whenever the next play started. Under `strategy: free` (ansible-core 2.16+), the next play's `play_start` can arrive while prior-play hosts are still running. This produced a stale "all green" tree — the user's reported "task/host list not accurate" symptom.
+
+### Fix
+
+Both fixed in the same function:
+- Added `if prior.detected_strategy == "free": continue` inside the finalisation loop.
+- Added `self._last_matched_task_def = None` immediately after the loop, guarded by a comment explaining the cross-play graft invariant.
+
+### Regression tests added
+
+`tests/unit/test_play_boundary_state.py`: TC-BOUNDARY-4 (cross-play graft guard), TC-BOUNDARY-5 (free-strategy not auto-finalised), TC-BOUNDARY-6 (linear-strategy still finalised — guards against over-correction).
+
+### Verification
+
+- Both reproductions pass post-fix.
+- `git stash` of the fix confirms the new tests FAIL on the buggy code.
+- Full suite: 2148 passed (was 2145; +3 new tests).
+- mypy: clean.
+- ruff check: my files clean. Pre-existing ruff errors in `tree.py` (F841) and `tui/screens/inspect.py` (E501) are NOT in scope.
+
+### Lesson
+
+The `_last_matched_task_def` cursor is the same pattern as a stack-pointer in a recursive-descent parser: it must be pushed/popped on every grammar boundary. Play boundaries are the natural pop point — anything else is a bug.

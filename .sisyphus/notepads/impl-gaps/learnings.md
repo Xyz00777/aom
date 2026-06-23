@@ -177,6 +177,19 @@ while completed+empty plays still get skipped.
 
 **Key files**: `tree.py:_select_play_for_tree` — skip guard logic
 
+## --hide-state Comma-Separated Support (2026-06-22)
+
+**Change**: `--hide-state` now accepts both comma-separated values (`--hide-state ok,skipped`) and repeatable invocations (`--hide-state ok --hide-state skipped`).
+
+**Pattern**: Used `action="extend"` with a custom `type` function (`_comma_sep_state`) that splits on commas, validates each token, and returns a `list[str]`. Argparse's `extend` action flattens list-returning types into a single accumulated list.
+
+**Key details**:
+- `choices` parameter was removed (it conflicts with a list-returning `type` function — validation happens inside `_comma_sep_state` instead)
+- `action="extend"` is available in Python 3.8+ (project uses 3.14)
+- The `hide_state` attribute on the parsed namespace still arrives as `list[str]` — no downstream changes needed in `main()` or `_run_compact()`
+- Existing tests for repeatable invocation still pass unchanged
+- New tests cover: comma-separated, mixed append+comma, unknown in comma-separated, single value without comma
+
 ## Strategy Detection Corrected (resolved 2026-05-24)
 
 Strategy detection never flipped to "free" because `v2_runner_on_start`
@@ -187,3 +200,49 @@ from "linear" to "free" on first occurrence. This is correct because
 the JSONL callback guards `runner_on_start` behind `if self._is_lockstep: return`.
 
 **Key files**: `models.py:_handle_v2_runner_on_start` — strategy flip logic
+
+## Throttle Gate Render-Starvation Bug (resolved 2026-06-22)
+
+The dirty-path throttle in `_render_status_panel` could suppress renders
+indefinitely when state changes arrived faster than the 0.25 s window.
+
+**Symptom**: User reports "i already had a view with status changed but
+they did not get showed" — the panel froze on stale output during event
+bursts.
+
+**Root cause**: The original gate (lines 494-503) compared
+`elapsed_since_compute < _PANEL_COMPUTE_THROTTLE_S`. If state changes
+kept arriving faster than 0.25 s, every render call skipped AND
+`_last_panel_compute_time` was never updated — the timer couldn't
+"advance" past the throttle window. Result: 0 renders per second despite
+the panel being dirty.
+
+**Fix**: Split the clock in two:
+- `_last_panel_compute_time` — when the panel was last actually rendered
+- `_last_state_change_monotonic` — when state last changed
+
+Gate logic now branches on `last_compute >= last_change`:
+- If compute is AFTER the last state change → already saw this state →
+  wait up to 1 s for the tick refresh
+- If compute is BEFORE the last state change → stale compute → render
+  now (after a 50 ms coalesce window to absorb truly simultaneous events)
+
+`update_state` and `set_definitions` stamp `_last_state_change_monotonic`
+alongside `_panel_dirty = True`. Added `_PANEL_DIRTY_COALESCE_S = 0.05`
+constant for the burst-absorption window.
+
+**Files touched**:
+- `src/ansible_aom/compact/renderer.py` — gate logic, init, two stamp
+  sites
+- `tests/compact/test_render_dirty_flag.py` — `test_perf_043` (renders
+  after burst settles) and `test_perf_044` (waits for tick refresh when
+  compute is fresh)
+
+**Verification**: 2810 tests pass (was 2808, +2 from regression tests).
+mypy strict, ruff lint, ruff format — all clean.
+
+**Pattern**: When a throttle gate depends on a "did we render this yet?"
+check, the gate must advance the timer on EVERY call (even when it
+skips) OR it must distinguish "state changed since last render" from
+"no state changed" via a separate clock. Otherwise a fast-changing
+input can starve the output indefinitely.
