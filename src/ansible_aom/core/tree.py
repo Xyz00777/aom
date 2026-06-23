@@ -693,9 +693,22 @@ class TreeProjection:
             if runtime is not None:
                 if active_play_id is not None:
                     if self._play_runtime_identity(runtime) != active_play_id:
+                        # Force-finalized plays (e.g. linear strategy
+                        # advancing to the next play) get hidden even
+                        # when no task events arrived — otherwise their
+                        # preflight tasks would render as pending long
+                        # after the playbook moved past them.
+                        if runtime.status == Status.COMPLETED:
+                            continue
                         items = self._play_running_and_pending(runtime, include_cross_play=False)
-                        if not any(k == "running" for k, _, _, _ in items) and runtime.tasks:
-                            continue  # completed play (had tasks, now all done)
+                        # Hide plays whose every task is finished: no
+                        # running, no pending, only ``runtime.tasks``
+                        # left as completed history. A play with some
+                        # completed AND some still-pending tasks must
+                        # NOT be skipped — upcoming work is the user's
+                        # signal of progress.
+                        if not items and runtime.tasks:
+                            continue
                 idx_before = len(lines)
                 self._emit_runtime_play(lines, runtime, now)
             elif play_def is not None:
@@ -960,6 +973,14 @@ class TreeProjection:
             if not runtime.hosts:
                 return "running" if runtime.status == Status.RUNNING else "pending"
             if any(hs.status == Status.RUNNING for hs in runtime.hosts.values()):
+                return "running"
+            # A task with at least one FAILED or UNREACHABLE host must stay
+            # visible in the tree — otherwise the failure "vanishes" once all
+            # hosts reach terminal status (especially with --hide-state ok).
+            if any(
+                _effective_status(hs) in (Status.FAILED, Status.UNREACHABLE)
+                for hs in runtime.hosts.values()
+            ):
                 return "running"
             return "completed"
 

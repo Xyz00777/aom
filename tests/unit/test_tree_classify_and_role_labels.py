@@ -1937,3 +1937,169 @@ class TestStickyFallbackTreeRender:
             "Completed Play 2 must disappear once it has no running/pending surface"
         )
         assert "play: Install deps" not in play_labels2, "Completed Play 1 must stay filtered"
+
+
+class TestFailedTaskRemainsVisible:
+    """Regression guard: a task with at least one FAILED or UNREACHABLE host
+    must remain visible in the tree after all hosts reach terminal status.
+
+    The user's complaint: "I still don't see anything also no changes and
+    failures" — after the last runner event for a task arrives, _classify
+    returns "completed" because no host is RUNNING anymore, and the entire
+    task row (with its failure detail) is dropped from the tree. Combined
+    with ``--hide-state ok``, the streaming log also omits the ok: line, so
+    the user sees nothing for the task at all.
+
+    A task with failures should be visible long enough for the user to see
+    the failure — at minimum, until the NEXT task starts.
+    """
+
+    def test_failed_task_with_mixed_terminal_hosts_remains_in_tree(self) -> None:
+        """TC-329: A task whose hosts all reached terminal status (1 failed,
+        1 ok) must still appear in the tree with its failure count visible
+        while no further task has started."""
+        from datetime import datetime, timezone
+
+        defs = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy webservers",
+                hosts="all",
+                resolved_hosts=["web1", "web2"],
+                tasks=[
+                    TaskDefinition(
+                        name="Install nginx",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="Configure nginx",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=1,
+                    ),
+                ],
+            ),
+        ]
+        state = RunState(playbook="test.yml", definitions=defs)
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy webservers"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "p1"},
+            }
+        )
+        # First host fails.
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_failed",
+                "_timestamp": "2026-05-22T10:00:05Z",
+                "task": {"id": "t1"},
+                "hosts": {"web1": {"msg": "SSH failed", "failed": True}},
+            }
+        )
+        # Second host ok — both hosts now terminal, but t1 had a failure.
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-22T10:00:06Z",
+                "task": {"id": "t1"},
+                "hosts": {"web2": {"ok": True, "changed": False}},
+            }
+        )
+        # Do NOT start t2 yet — no next task to anchor on.
+        p = TreeProjection.from_run_state(state)
+        now = datetime(2026, 5, 22, 10, 0, 6, tzinfo=timezone.utc)
+        lines = p.tree_lines(budget=25, now=now)
+        task_labels = [ln.label for ln in lines if ln.kind == "task"]
+        assert any("Install nginx" in lbl for lbl in task_labels), (
+            f"Install nginx (with failed web1) must remain in tree while no "
+            f"next task has started; got task labels: {task_labels}"
+        )
+
+    def test_unreachable_task_with_mixed_terminal_hosts_remains_in_tree(self) -> None:
+        """TC-330: A task whose hosts all reached terminal status (1
+        unreachable, 1 ok) must still appear in the tree."""
+        from datetime import datetime, timezone
+
+        defs = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy webservers",
+                hosts="all",
+                resolved_hosts=["web1", "web2"],
+                tasks=[
+                    TaskDefinition(
+                        name="Install nginx",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="Configure nginx",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=1,
+                    ),
+                ],
+            ),
+        ]
+        state = RunState(playbook="test.yml", definitions=defs)
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy webservers"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_unreachable",
+                "_timestamp": "2026-05-22T10:00:05Z",
+                "task": {"id": "t1"},
+                "hosts": {"web1": {"msg": "host down", "unreachable": True}},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-22T10:00:06Z",
+                "task": {"id": "t1"},
+                "hosts": {"web2": {"ok": True, "changed": False}},
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        now = datetime(2026, 5, 22, 10, 0, 6, tzinfo=timezone.utc)
+        lines = p.tree_lines(budget=25, now=now)
+        task_labels = [ln.label for ln in lines if ln.kind == "task"]
+        assert any("Install nginx" in lbl for lbl in task_labels), (
+            f"Install nginx (with unreachable web1) must remain in tree; "
+            f"got task labels: {task_labels}"
+        )

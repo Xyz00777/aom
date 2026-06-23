@@ -545,6 +545,92 @@ class TestTreeLinesBasic:
         p = TreeProjection.from_run_state(state)
         assert p.tree_lines(budget=20) == []
 
+    def test_completed_play_with_no_runtime_tasks_is_hidden(self):
+        # Regression: a play whose ``status`` is COMPLETED but whose
+        # ``runtime.tasks`` is empty (no task events arrived before it
+        # was force-finalized) must NOT render its preflight tasks as
+        # pending. The playbook has moved past this play — its preflight
+        # tasks should not pollute the tree.
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Play 1",
+                hosts="all",
+                resolved_hosts=["h1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Task 1.0",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    )
+                ],
+            ),
+            PlayDefinition(
+                id="p2",
+                name="Play 2",
+                hosts="all",
+                resolved_hosts=["h1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Task 2.0",
+                        role=None,
+                        tags=[],
+                        play_id="p2",
+                        play_order=0,
+                        task_order=0,
+                    )
+                ],
+            ),
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-06-22T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-06-22T10:00:01Z",
+                "play": {"id": "p1", "name": "Play 1"},
+            }
+        )
+        # Play 2 starts. Under linear strategy this force-finalizes
+        # play 1; under free strategy play 1's status may stay RUNNING
+        # (out of scope here). Either way, play 1 has no runtime tasks
+        # and the playbook has moved past it.
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-06-22T10:00:02Z",
+                "play": {"id": "p2", "name": "Play 2"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-06-22T10:00:03Z",
+                "task": {"id": "t2_0", "name": "Task 2.0"},
+                "play": {"id": "p2"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-06-22T10:00:03Z",
+                "task": {"id": "t2_0", "name": "Task 2.0"},
+                "host": "h1",
+            }
+        )
+
+        p = TreeProjection.from_run_state(state)
+        play_lines = [ln for ln in p.tree_lines(budget=20) if ln.kind == "play"]
+        play_names = [ln.label.removeprefix("play: ") for ln in play_lines]
+        assert play_names == ["Play 2"], (
+            "Only the active play should appear; Play 1 should be hidden "
+            "because the playbook has moved past it. "
+            f"Got: {play_names}"
+        )
+
 
 class TestTreeLinesRolesAndFanOut:
     def _role_aware_definitions(self) -> list[PlayDefinition]:
@@ -2028,3 +2114,117 @@ class TestTaskCompletionLifecycle:
             f"completed task should not appear in tree, got {names!r}"
         )
         assert "Configure firewall" in names
+
+    def test_tree_shows_pending_tasks_in_partially_completed_play(self):
+        """Regression: a play with some completed tasks AND some still-pending
+        tasks must NOT be skipped, even when no task is currently RUNNING.
+
+        The pre-fix code at ``_tree_lines_unbounded`` used
+        ``not any(k == "running" ...) and runtime.tasks`` to skip "completed"
+        plays, but that condition also skipped plays whose preflight tasks
+        had not yet started. The user saw only the active play's running
+        task and lost all upcoming pending work in the prior play.
+
+        Setup: Play A has T1 (completed in runtime) and T2 (pending in
+        preflight only). Play B has T3 currently running. Both plays
+        should appear; T2 should appear as a pending task under Play A.
+        """
+        from ansible_aom.core.models import PlayDefinition, TaskDefinition
+
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="pA",
+                name="Play A",
+                hosts="webservers",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(name="T1", role=None, tags=[], play_id="pA", play_order=0, task_order=0),
+                    TaskDefinition(name="T2", role=None, tags=[], play_id="pA", play_order=0, task_order=1),
+                ],
+            ),
+            PlayDefinition(
+                id="pB",
+                name="Play B",
+                hosts="dbservers",
+                resolved_hosts=["db1"],
+                tasks=[
+                    TaskDefinition(name="T3", role=None, tags=[], play_id="pB", play_order=1, task_order=0),
+                ],
+            ),
+        ]
+        # Play A starts, T1 runs and completes, then Play B starts and T3 runs.
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-06-22T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-06-22T10:00:01Z",
+                "play": {"id": "pA", "name": "Play A"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-06-22T10:00:02Z",
+                "task": {"id": "ta1", "name": "T1"},
+                "play": {"id": "pA"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-06-22T10:00:03Z",
+                "task": {"id": "ta1", "name": "T1"},
+                "host": "web1",
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-06-22T10:00:04Z",
+                "task": {"id": "ta1", "name": "T1"},
+                "hosts": {"web1": {"changed": False}},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-06-22T10:00:05Z",
+                "play": {"id": "pB", "name": "Play B"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-06-22T10:00:06Z",
+                "task": {"id": "tb3", "name": "T3"},
+                "play": {"id": "pB"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-06-22T10:00:07Z",
+                "task": {"id": "tb3", "name": "T3"},
+                "host": "db1",
+            }
+        )
+
+        p = TreeProjection.from_run_state(state)
+        play_lines = [ln for ln in p.tree_lines(budget=25) if ln.kind == "play"]
+        play_names = [ln.label.removeprefix("play: ") for ln in play_lines]
+        assert play_names == ["Play A", "Play B"], (
+            f"both plays should appear; got {play_names!r}"
+        )
+
+        task_lines = [ln for ln in p.tree_lines(budget=25) if ln.kind == "task"]
+        task_names = [ln.label.split("  ")[0] for ln in task_lines]
+        # T1 is completed and should NOT appear.
+        # T2 is pending and MUST appear (this was the bug).
+        # T3 is running and should appear.
+        assert "T1" not in task_names, f"completed task T1 should not appear, got {task_names!r}"
+        assert "T2" in task_names, (
+            f"pending task T2 should appear (regression: it was being skipped "
+            f"because Play A had T1 completed and no running tasks), got {task_names!r}"
+        )
+        assert "T3" in task_names, f"running task T3 should appear, got {task_names!r}"
