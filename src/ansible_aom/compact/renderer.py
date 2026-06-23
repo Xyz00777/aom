@@ -58,6 +58,11 @@ from ansible_aom.core.estimate import (
 )
 from ansible_aom.core.heartbeat import HeartbeatTracker, LivenessState  # noqa: F401
 from ansible_aom.core.icons import is_unicode_terminal
+from ansible_aom.core.log_filter import (
+    normalize_hide_states,
+    should_hide_event,
+    should_hide_host_result,
+)
 from ansible_aom.core.models import RunState, Status
 from ansible_aom.core.tree import TreeProjection
 
@@ -88,14 +93,19 @@ class CompactRenderer:
         _start_time: Timestamp when rendering started.
     """
 
-    def __init__(self, is_tty: bool = True) -> None:
+    def __init__(self, is_tty: bool = True, hide_states: list[str] | None = None) -> None:
         """Initialize the compact renderer.
 
         Args:
             is_tty: Whether stdout is a TTY. Non-TTY mode disables ANSI
                 cursor control and prints log lines as plain text.
+            hide_states: List of host states to suppress from the live
+                compact log (e.g. ``["ok", "skipped"]``). The status
+                panel, event recording, and aom inspect are unaffected.
         """
         self._display = Display(is_tty=is_tty)
+        valid, _unknown = normalize_hide_states(hide_states or [])
+        self._hide_states: frozenset[str] = valid
         self._state: RunState | None = None
         self._playbook: str = ""
         self._args: list[str] = []
@@ -994,17 +1004,15 @@ class CompactRenderer:
         header so the user sees the duration of *the previous task*
         directly under that task's output. Format:
 
-            [HH:MM:SS] <task name> — N.Ns (H:MM:SS)
+            [HH:MM:SS] <task name> — N.Ns (H:MM:SS)  (1 failed, 2 ok)
 
         Where the timestamp is the wall-clock at the moment the new
         task started (which is also when the old task ended in
         linear strategy), ``N.Ns`` is the previous task's duration,
-        and the parenthesized value is the cumulative playbook
-        elapsed time.
-
-        Cumulative is dimmed so the per-task duration is the
-        eye-catching figure; the timestamp prefix is dimmed for the
-        same reason.
+        the parenthesized value is the cumulative playbook elapsed
+        time, and the trailing status counts summarise how many
+        hosts ended in each terminal state.  ``--hide-state`` is
+        honoured: hidden states are omitted from the counts.
         """
         if self._last_task_start_time is None or self._last_task_name is None:
             return
@@ -1018,14 +1026,75 @@ class CompactRenderer:
         wall = datetime.fromtimestamp(now).strftime("%H:%M:%S")
         prefix = _wrap(f"[{wall}]", _DIM, self._colorize)
         cum_str = _wrap(f"({self._format_duration(cum)})", _DIM, self._colorize)
+
+        summary_suffix = self._build_status_suffix()
+
         # Drop the per-task duration when exactly one host already
         # displayed it on its inline result line — keeping the cleaner
         # ``— (cum)`` shape for single-host runs and run_once tasks.
         if len(self._current_task_inline_duration_hosts) == 1:
-            self._display.print_log(f"{prefix} {self._last_task_name} — {cum_str}")
+            line = f"{prefix} {self._last_task_name} — {cum_str}{summary_suffix}"
         else:
             duration_str = _wrap(self._format_duration(duration), _CYAN, self._colorize)
-            self._display.print_log(f"{prefix} {self._last_task_name} — {duration_str} {cum_str}")
+            line = f"{prefix} {self._last_task_name} — {duration_str} {cum_str}{summary_suffix}"
+        self._display.print_log(line)
+
+    def _build_status_suffix(self) -> str:
+        """Build the trailing ``(N failed, M ok)`` status summary.
+
+        Walks the most recent task's host states, tallies per-status
+        counts, respects ``--hide-state``, and returns a coloured
+        string like ``"  (1 failed, 2 ok)"`` or an empty string when
+        no counts are available or all are hidden.
+        """
+        if self._last_task_uuid is None or self._state is None:
+            return ""
+        task = None
+        for play in self._state.plays.values():
+            if self._last_task_uuid in play.tasks:
+                task = play.tasks[self._last_task_uuid]
+                break
+        if task is None:
+            return ""
+
+        # OK+changed → CHANGED (same rule as tree projection).
+        counts: dict[Status, int] = {}
+        for hs in task.hosts.values():
+            effective = (
+                Status.CHANGED if hs.status == Status.OK and hs.changed else hs.status
+            )
+            if effective in (Status.FAILED, Status.UNREACHABLE, Status.CHANGED,
+                            Status.OK, Status.SKIPPED):
+                counts[effective] = counts.get(effective, 0) + 1
+
+        has_errors = any(
+            counts.get(s, 0) > 0 for s in (Status.FAILED, Status.UNREACHABLE)
+        )
+        # (Status, display label, ANSI colour, always_show)
+        # FAILED/UNREACHABLE always appear even with --hide-state.
+        # fmt: off
+        entries: list[tuple[Status, str, str, bool]] = [
+            (Status.FAILED,      "failed",      _RED,     True),
+            (Status.UNREACHABLE, "unreachable", _MAGENTA, True),
+            (Status.CHANGED,     "changed",     _YELLOW,  False),
+            (Status.OK,          "ok",          _GREEN,   False),
+            (Status.SKIPPED,     "skipped",     _CYAN,    False),
+        ]
+        # fmt: on
+        parts: list[str] = []
+        for status, label, colour, always_show in entries:
+            n = counts.get(status, 0)
+            if n == 0:
+                continue
+            if not always_show and status.value in self._hide_states:
+                continue
+            if has_errors and status not in (Status.FAILED, Status.UNREACHABLE):
+                colour = _DIM
+            parts.append(f"{n} {_wrap(label, colour, self._colorize)}")
+
+        if not parts:
+            return ""
+        return f"  ({', '.join(parts)})"
 
     def _flush_pending_skips(self, *, force_individual: bool) -> None:
         """Drain the per-task skipped-host buffer.
@@ -1060,6 +1129,25 @@ class CompactRenderer:
         # leading with ``…`` so the user can tell at a glance it's an
         # aggregate, not an individual host record.
         self._display.print_log(_wrap(line, _CYAN, self._colorize))
+
+    def _enter_terminal_event(self, event_name: str) -> bool:
+        """Bookkeeping for a non-skipped terminal result event.
+
+        Flushes any buffered skipping lines (force_individual=True
+        because a non-skipped result just arrived — mixed-result task
+        detail wins), marks the current task as having produced a real
+        result (so the per-task summary treats it as non-skipped),
+        and checks whether the event should be hidden per
+        ``--hide-state``.
+
+        Returns:
+            ``True`` if the caller should ``return`` immediately
+            (event suppressed); ``False`` to proceed with normal
+            rendering.
+        """
+        self._flush_pending_skips(force_individual=True)
+        self._current_task_had_nonskipped_result = True
+        return should_hide_event(event_name, self._hide_states)
 
     def _announce_task(
         self,
@@ -1174,11 +1262,10 @@ class CompactRenderer:
                     task_meta=task,
                 )
         elif name == "v2_runner_on_ok":
-            # A non-skipped result arrived: any buffered skipping lines
-            # for this task should print individually (mixed-result
-            # task — user wants the detail). Mark the task as having
-            # produced a real result so the eventual flush at task
-            # transition stays in individual-line mode.
+            # Flush skips and flag task as having a real result, but do NOT
+            # early-return on the event-level hide check. The ok/changed
+            # distinction is per-host (result.changed), so we filter inside
+            # the host loop instead.
             self._flush_pending_skips(force_individual=True)
             self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
@@ -1188,6 +1275,10 @@ class CompactRenderer:
                 # Items already streamed live from v2_runner_item_on_* —
                 # the aggregate adds nothing per-item, so skip it entirely.
                 if (host, task_id) in self._streamed_loop_items:
+                    continue
+                # Per-host hide filter: ok vs changed is determined by
+                # result.changed, not by the event type alone.
+                if should_hide_host_result(result, name, self._hide_states):
                     continue
                 # Looped task (plain jsonl fallback): expand the per-item
                 # ``results`` array into one line per item (matching
@@ -1207,8 +1298,8 @@ class CompactRenderer:
             if lines:
                 self._display.print_log("\n".join(lines))
         elif name == "v2_runner_on_failed":
-            self._flush_pending_skips(force_individual=True)
-            self._current_task_had_nonskipped_result = True
+            if self._enter_terminal_event(name):
+                return
             suffix = self._inline_duration_suffix(event, event_time)
             task_id = self._task_dict(event).get("id", "")
             lines = []
@@ -1237,8 +1328,8 @@ class CompactRenderer:
             if lines:
                 self._display.print_log("\n".join(lines))
         elif name == "v2_runner_on_unreachable":
-            self._flush_pending_skips(force_individual=True)
-            self._current_task_had_nonskipped_result = True
+            if self._enter_terminal_event(name):
+                return
             suffix = self._inline_duration_suffix(event, event_time)
             lines = []
             for host, result in self._hosts_dict(event).items():
@@ -1255,6 +1346,8 @@ class CompactRenderer:
             if lines:
                 self._display.print_log("\n".join(lines))
         elif name == "v2_runner_on_skipped":
+            if should_hide_event(name, self._hide_states):
+                return
             # Hold individual skipping lines until we know whether
             # they're worth printing one-by-one (mixed-result task)
             # or worth collapsing (all-skipped task). The flush
@@ -1265,27 +1358,43 @@ class CompactRenderer:
             "v2_runner_item_on_failed",
             "v2_runner_item_on_skipped",
         ):
-            # Live per-item loop streaming: render this one item's line the
-            # moment it completes (the bundled ``aom_jsonl`` callback emits
-            # one such event per iteration). Mark ``(host, task_id)`` as
-            # streamed so the eventual aggregate ``v2_runner_on_ok``/
-            # ``on_failed`` suppresses its own ``results[]`` expansion and
-            # we don't render the item twice.
-            task_id = self._task_dict(event).get("id", "")
-            streamed_lines: list[str] = []
-            for host, raw in self._hosts_dict(event).items():
-                if not isinstance(raw, dict):
-                    continue
-                self._streamed_loop_items.add((host, task_id))
-                streamed_lines.append(self._format_loop_item_line(host, raw))
-            if streamed_lines:
-                # A real (non-skipped) item means the task produced output,
-                # so buffered skip lines should print individually — same
-                # rule the aggregate result handlers apply.
-                if name != "v2_runner_item_on_skipped":
-                    self._flush_pending_skips(force_individual=True)
-                    self._current_task_had_nonskipped_result = True
-                self._display.print_log("\n".join(streamed_lines))
+            if name == "v2_runner_item_on_ok":
+                # Per-host filter: ok vs changed is per-item, not per-event.
+                # Still flush skips and flag the task if any non-skipped item
+                # is visible (not hidden).
+                self._flush_pending_skips(force_individual=True)
+                self._current_task_had_nonskipped_result = True
+                task_id = self._task_dict(event).get("id", "")
+                streamed_lines: list[str] = []
+                for host, raw in self._hosts_dict(event).items():
+                    if not isinstance(raw, dict):
+                        continue
+                    if should_hide_host_result(raw, name, self._hide_states):
+                        continue
+                    self._streamed_loop_items.add((host, task_id))
+                    streamed_lines.append(self._format_loop_item_line(host, raw))
+                if streamed_lines:
+                    self._display.print_log("\n".join(streamed_lines))
+            else:
+                # v2_runner_item_on_failed and v2_runner_item_on_skipped have
+                # unambiguous states — event-level hide is correct.
+                if should_hide_event(name, self._hide_states):
+                    if name != "v2_runner_item_on_skipped":
+                        self._flush_pending_skips(force_individual=True)
+                        self._current_task_had_nonskipped_result = True
+                    return
+                task_id = self._task_dict(event).get("id", "")
+                streamed_lines_alt: list[str] = []
+                for host, raw in self._hosts_dict(event).items():
+                    if not isinstance(raw, dict):
+                        continue
+                    self._streamed_loop_items.add((host, task_id))
+                    streamed_lines_alt.append(self._format_loop_item_line(host, raw))
+                if streamed_lines_alt:
+                    if name != "v2_runner_item_on_skipped":
+                        self._flush_pending_skips(force_individual=True)
+                        self._current_task_had_nonskipped_result = True
+                    self._display.print_log("\n".join(streamed_lines_alt))
         elif name == "v2_playbook_on_stats":
             # Drain the final task's skipped buffer with the same
             # mixed-vs-all-skipped rule we use at task transitions.
