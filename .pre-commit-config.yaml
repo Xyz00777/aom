@@ -32,6 +32,14 @@ repos:
         always_run: true
         stages: [pre-push]
 
+      - id: graphify-refresh
+        name: "graphify: refresh graph + tree + wiki (AST-only)"
+        entry: bash .agent/hooks/graphify-refresh.sh
+        language: system
+        pass_filenames: false
+        files: ^(src/.*\.py|tests/.*\.py|docs/.*\.md|ARCHITECTURE\.md|SPECIFICATION\.md|pyproject\.toml)$
+        stages: [pre-commit]
+
       # NOTE: the version bumper is intentionally NOT registered here.
       # pre-commit framework stashes-then-restores unstaged files
       # around hook execution, which silently un-stages any
