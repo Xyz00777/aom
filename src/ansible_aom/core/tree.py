@@ -282,7 +282,7 @@ def _more_footer(depth: int, count: int) -> TreeLine:
     deepest visible task's depth for the inner footer (active-role
     summary). ``status=Status.PENDING`` matches the existing single-cut
     footer so the colour stays consistent. ``count`` is the number of
-    hidden task-domain entities (tasks, roles, plays) represented by
+    hidden task lines represented by
     this footer.
     """
     return TreeLine(
@@ -296,12 +296,8 @@ def _more_footer(depth: int, count: int) -> TreeLine:
 
 
 def _count_domain_entities(lines: list[TreeLine]) -> int:
-    """Count task-domain entities in a tree slice.
-
-    Counts only play, role, and task lines. Host leaves, the playbook
-    header, and footer lines are excluded.
-    """
-    return sum(1 for ln in lines if ln.kind in ("play", "role", "task"))
+    """Count hidden task lines for the "X more tasks" footer."""
+    return sum(1 for ln in lines if ln.kind == "task")
 
 
 def _truncate_two_level(unbounded: list[TreeLine], budget: int) -> list[TreeLine]:
@@ -763,7 +759,11 @@ class TreeProjection:
            task under ``("podman", "angie_ssl_terminator")`` credits
            both ``podman`` and ``angie_ssl_terminator``). Tasks with
            empty role paths are skipped (they live directly under a
-           play, no role header).
+           play, no role header). Parent stub entries (those with
+           non-empty ``TaskDefinition.children``) are skipped — they
+           are ``include_tasks`` containers, not leaves; the credit
+           must land on their children instead to avoid double
+           counting.
 
         2. Runtime tasks not in preflight. ``include_role`` and dynamic
            ``include_tasks`` appear at runtime but not in ``--list-tasks``
@@ -789,9 +789,15 @@ class TreeProjection:
         # Preflight pass: credit each task to every role in its
         # (aggressively collapsed) role path. Tasks with empty role
         # paths are skipped (no role ancestor — they live directly
-        # under a play).
+        # under a play). Parent stubs (TaskDefinition with non-empty
+        # ``children``) are also skipped: they are ``include_tasks``
+        # containers, not leaves, so counting them would double-count
+        # the leaves in their subtree (the same fix already applied
+        # to ``_count_tasks`` in ``format.py``).
         for play_def in self._state.definitions:
-            for _entry, role_path in iter_preflight_task_defs(play_def.tasks):
+            for entry, role_path in iter_preflight_task_defs(play_def.tasks):
+                if entry.children:
+                    continue
                 collapsed_path = _collapse_role_path_aggressive(role_path)
                 if not collapsed_path:
                     continue
@@ -873,11 +879,22 @@ class TreeProjection:
         """
         role_visible_tasks: dict[str, int] = {}
         current_role_stack: list[str] = []
+        current_depth_stack: list[int] = []
         for ln in lines:
             if ln.kind == "role" and ln.identity is not None:
+                # Pop siblings (same depth) and out-of-scope ancestors
+                # (lesser depth) so the stack reflects the correct
+                # ancestor chain. Without this, sibling roles at the
+                # same depth accumulate and tasks under the second role
+                # are incorrectly credited to the first.
+                while current_depth_stack and current_depth_stack[-1] >= ln.depth:
+                    current_depth_stack.pop()
+                    current_role_stack.pop()
                 current_role_stack.append(ln.identity)
+                current_depth_stack.append(ln.depth)
             elif ln.kind in ("play", "playbook"):
                 current_role_stack.clear()
+                current_depth_stack.clear()
             elif ln.kind == "task":
                 for role in current_role_stack:
                     role_visible_tasks[role] = role_visible_tasks.get(role, 0) + 1
@@ -967,6 +984,13 @@ class TreeProjection:
         last_task_in_stack_role: dict[str, int] = {}
         for j, ln in enumerate(lines):
             if ln.kind == "role" and ln.identity is not None:
+                # Pop siblings at the same depth so tasks under the new
+                # sibling role don't get credited to the previous sibling
+                # in ``last_task_in_stack_role`` (Bug A: sibling roles
+                # at the same depth must close out the previous sibling's
+                # contribution to footer placement).
+                while role_stack and role_stack[-1][0] >= ln.depth:
+                    role_stack.pop()
                 role_stack.append((ln.depth, ln.identity))
             elif ln.kind in ("play", "playbook"):
                 role_stack.clear()
@@ -1060,13 +1084,23 @@ class TreeProjection:
                 assert role_depth is not None
                 replacements.append(_more_footer(depth=role_depth + 1, count=remaining))
             if replacements:
-                cur_inner_idx: int | None = None
-                for j, ln in enumerate(result):
-                    if ln.kind == "more" and ln.depth > 0:
-                        cur_inner_idx = j
-                        break
-                if cur_inner_idx is not None:
-                    result = result[:cur_inner_idx] + replacements + result[cur_inner_idx + 1 :]
+                # The inner footer was at ``inner_idx`` in the
+                # original ``lines``. Head footers inserted before
+                # that position shift it right, so compute the
+                # adjusted index rather than searching for the
+                # first ``more`` line with ``depth > 0`` (which
+                # would incorrectly match a head footer instead of
+                # the inner footer).
+                shift = 0
+                local_offsets: dict[int, int] = {}
+                for insert_after, _ in head_footers:
+                    off = local_offsets.get(insert_after, 0)
+                    insert_pos = insert_after + 1 + off
+                    if insert_pos <= inner_idx + shift:
+                        shift += 1
+                    local_offsets[insert_after] = off + 1
+                cur_inner_idx = inner_idx + shift
+                result = result[:cur_inner_idx] + replacements + result[cur_inner_idx + 1 :]
 
         outer_idx: int | None = None
         for j, ln in enumerate(result):
@@ -1074,8 +1108,14 @@ class TreeProjection:
                 outer_idx = j
                 break
         if outer_idx is not None:
+            # ``iter_preflight_task_defs`` yields parent stubs as well as
+            # their children. Parent stubs are ``include_tasks`` containers,
+            # not leaves — counting them would double-count the leaves in
+            # their subtree. Skip them so the outer footer's drop count
+            # matches the visible/inner math (same rule as
+            # ``_count_tasks`` in ``format.py``).
             total_unique_tasks = sum(
-                sum(1 for _ in iter_preflight_task_defs(play_def.tasks))
+                sum(1 for tdef, _ in iter_preflight_task_defs(play_def.tasks) if not tdef.children)
                 for play_def in self._state.definitions
             )
             outer_remaining = max(0, total_unique_tasks - visible_task_count)
@@ -1265,7 +1305,6 @@ class TreeProjection:
                         # signal of progress.
                         if not items and runtime.tasks:
                             continue
-                idx_before = len(lines)
                 self._emit_runtime_play(lines, runtime, now)
             elif play_def is not None:
                 self._emit_pending_play(lines, play_def, now)

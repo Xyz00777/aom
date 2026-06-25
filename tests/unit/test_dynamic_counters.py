@@ -61,7 +61,7 @@ def test_total_tasks_counts_dynamic_children() -> None:
             tasks=[parent],
         )
     ]
-    assert count_total_tasks(defs) == 6  # 1 parent + 5 dynamic children
+    assert count_total_tasks(defs) == 5  # parent stub skipped, only 5 dynamic children count
 
 
 # ---------------------------------------------------------------------------
@@ -335,8 +335,8 @@ def test_total_tasks_with_role_group_and_dynamic_children() -> None:
         )
     ]
 
-    # Role group: 3 tasks.  Parent: 1 + 2 dynamic children = 3.  Total = 6.
-    assert count_total_tasks(defs) == 6
+    # Role group: 3 leaf tasks.  Parent stub skipped, 2 dynamic children.  Total = 5.
+    assert count_total_tasks(defs) == 5
 
 
 # ---------------------------------------------------------------------------
@@ -420,5 +420,5 @@ def test_total_tasks_multi_play_with_dynamic_children() -> None:
         ),
     ]
 
-    # Play 1: 1 + 1 = 2.  Play 2: 1 + 2 = 3.  Total = 5.
-    assert count_total_tasks(defs) == 5
+    # Play 1: parent stub skipped, 1 dynamic child = 1.  Play 2: parent stub skipped, 2 children = 2.  Total = 3.
+    assert count_total_tasks(defs) == 3

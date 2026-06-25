@@ -1086,7 +1086,12 @@ class TestTreeLinesGroupedRoleNestedChildren:
         assert play_labels == ["play: Deploy Foreman"]
 
         role_line = next(ln for ln in lines if ln.kind == "role")
-        assert "(3 tasks)" in role_line.label
+        # `install_parent` is a parent stub (1 dynamic child), so it is
+        # skipped; only `polling_child` (the grafted leaf) and
+        # `configure_task` count under the role → 2 leaves.
+        assert "(2 tasks)" in role_line.label, (
+            f"installer role must show 2 leaf tasks after parent-stub skip; got {role_line.label!r}"
+        )
 
         task_lines = [ln for ln in lines if ln.kind == "task"]
         task_labels = [ln.label.split("  ")[0] for ln in task_lines]

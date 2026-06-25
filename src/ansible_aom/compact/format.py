@@ -674,22 +674,52 @@ def format_tree_block(
     return out
 
 
+def _count_role_group_tasks(group: RoleGroupDefinition) -> int:
+    """Recursively count leaf tasks inside a ``RoleGroupDefinition``.
+
+    ``RoleGroupDefinition.tasks`` may contain nested ``RoleGroupDefinition``
+    entries (for nested roles), so this helper recurses into them.  It
+    also applies the same parent-stub-skipping rule used at the play
+    level: a ``TaskDefinition`` with non-empty ``.children`` is an
+    ``include_tasks`` placeholder, not a leaf — only its children count.
+    Plain leaf ``TaskDefinition`` entries count as 1.
+    """
+    total = 0
+    for entry in group.tasks:
+        if isinstance(entry, RoleGroupDefinition):
+            total += _count_role_group_tasks(entry)
+        elif isinstance(entry, TaskDefinition):
+            if entry.children:
+                total += len(entry.children)
+            else:
+                total += 1
+        else:
+            total += 1
+    return total
+
+
 def _count_tasks(play: PlayDefinition) -> int:
     """Count leaf TaskDefinitions in a play, expanding any RoleGroupDefinition.
 
     Dynamic ``include_tasks`` children are grafted onto their parent
-    ``TaskDefinition`` at runtime via ``TaskDefinition.children``.  This
-    counter walks those children so the status-bar denominator reflects
+    ``TaskDefinition`` at runtime via ``TaskDefinition.children``.  Such a
+    parent stub is a placeholder, not a leaf — only its children count.
+    Regular leaf ``TaskDefinition`` entries count as 1.  Nested
+    ``RoleGroupDefinition`` entries are expanded recursively via
+    ``_count_role_group_tasks`` so the status-bar denominator reflects
     the true total once dynamic tasks have expanded.
     """
     total = 0
     for entry in play.tasks:
         if isinstance(entry, RoleGroupDefinition):
-            total += len(entry.tasks)
+            total += _count_role_group_tasks(entry)
+        elif isinstance(entry, TaskDefinition):
+            if entry.children:
+                total += len(entry.children)
+            else:
+                total += 1
         else:
             total += 1
-            if isinstance(entry, TaskDefinition) and entry.children:
-                total += len(entry.children)
     return total
 
 
