@@ -80,6 +80,10 @@ def _iter_failed_tasks(
         for child in node.children:
             if child.kind == "host" and (child.stats.failed or child.stats.unreachable):
                 yield node, child
+            elif child.kind == "task":
+                # Nested include_tasks children: recurse so failures inside
+                # an included file still surface.
+                yield from _iter_failed_tasks(child)
     else:
         for child in node.children:
             yield from _iter_failed_tasks(child)
