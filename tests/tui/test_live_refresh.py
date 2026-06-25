@@ -269,6 +269,232 @@ class TestMainScreenTreeIntegration:
             tree = screen.query_one(TaskTree)
             assert len(list(tree.root.children)) == 1
 
+    @pytest.mark.asyncio
+    async def test_update_from_state_drops_completed_tasks(self) -> None:
+        """All-completed tasks must NOT remain visible in the tree.
+
+        Regression for: ``apply_state_icons`` only mutated labels in
+        place, so completed tasks built from the preflight skeleton
+        stayed in the tree forever. The fix wires
+        ``populate_from_projection`` into the refresh path, which
+        rebuilds the tree from ``TreeProjection.tree_lines`` — that
+        path drops completed tasks via ``_play_running_and_pending``.
+        """
+        from ansible_aom.core.models import (
+            HostRunState,
+            PlayDefinition,
+            PlayRunState,
+            RunState,
+            Status,
+            TaskDefinition,
+            TaskRunState,
+        )
+        from ansible_aom.tui.app import AOMApp
+        from ansible_aom.tui.screens.main import MainScreen
+        from ansible_aom.tui.widgets.task_tree import TaskTree
+
+        app = AOMApp()
+        async with app.run_test() as pilot:
+            await pilot.pause(0.05)
+            screen = app.screen
+            assert isinstance(screen, MainScreen)
+
+            app.run_state.definitions = [
+                PlayDefinition(
+                    id="p1",
+                    name="Setup",
+                    hosts="all",
+                    resolved_hosts=["web1"],
+                    tasks=[
+                        TaskDefinition(
+                            name=f"Task {i}",
+                            role=None,
+                            tags=[],
+                            play_id="p1",
+                            play_order=0,
+                            task_order=i,
+                        )
+                        for i in range(3)
+                    ],
+                )
+            ]
+            play = PlayRunState(play_id="p1", name="Setup")
+            for i, name in enumerate(["Task 0", "Task 1", "Task 2"]):
+                task = TaskRunState(task_id=f"t{i}", name=name, status=Status.COMPLETED)
+                task.hosts["web1"] = HostRunState(hostname="web1", status=Status.OK)
+                play.tasks[f"t{i}"] = task
+            app.run_state.plays["p1"] = play
+
+            screen.update_from_state(app.run_state)
+            await pilot.pause(0.05)
+
+            tree = screen.query_one(TaskTree)
+            play_nodes = list(tree.root.children)
+            assert play_nodes == [], (
+                f"all-completed play must not appear in the tree; "
+                f"got {[p.label.plain for p in play_nodes]}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_update_from_state_keeps_running_task_visible(self) -> None:
+        """Mixed scenario: completed tasks drop, running task remains.
+
+        Regression for the projection-based refresh: a play with both
+        completed and running tasks must show ONLY the running task's
+        subtree plus any pending preflight tasks — not the completed
+        history.
+        """
+        from datetime import datetime, timezone
+
+        from ansible_aom.core.models import (
+            HostRunState,
+            PlayDefinition,
+            PlayRunState,
+            RunState,
+            Status,
+            TaskDefinition,
+            TaskRunState,
+        )
+        from ansible_aom.tui.app import AOMApp
+        from ansible_aom.tui.screens.main import MainScreen
+        from ansible_aom.tui.widgets.task_tree import TaskTree
+
+        app = AOMApp()
+        async with app.run_test() as pilot:
+            await pilot.pause(0.05)
+            screen = app.screen
+            assert isinstance(screen, MainScreen)
+
+            app.run_state.definitions = [
+                PlayDefinition(
+                    id="p1",
+                    name="Setup",
+                    hosts="all",
+                    resolved_hosts=["web1", "web2"],
+                    tasks=[
+                        TaskDefinition(
+                            name="Install nginx",
+                            role=None,
+                            tags=[],
+                            play_id="p1",
+                            play_order=0,
+                            task_order=0,
+                        ),
+                        TaskDefinition(
+                            name="Configure nginx",
+                            role=None,
+                            tags=[],
+                            play_id="p1",
+                            play_order=0,
+                            task_order=1,
+                        ),
+                    ],
+                )
+            ]
+            play = PlayRunState(play_id="p1", name="Setup")
+            completed = TaskRunState(task_id="t0", name="Install nginx", status=Status.COMPLETED)
+            completed.hosts["web1"] = HostRunState(hostname="web1", status=Status.OK)
+            completed.hosts["web2"] = HostRunState(hostname="web2", status=Status.OK)
+            play.tasks["t0"] = completed
+
+            running = TaskRunState(
+                task_id="t1",
+                name="Configure nginx",
+                status=Status.RUNNING,
+                start_time=datetime.now(timezone.utc),
+            )
+            running.hosts["web1"] = HostRunState(hostname="web1", status=Status.RUNNING)
+            running.hosts["web2"] = HostRunState(hostname="web2", status=Status.RUNNING)
+            play.tasks["t1"] = running
+
+            app.run_state.plays["p1"] = play
+
+            screen.update_from_state(app.run_state)
+            await pilot.pause(0.05)
+
+            tree = screen.query_one(TaskTree)
+            play_nodes = list(tree.root.children)
+            assert len(play_nodes) == 1, "active play must stay visible"
+            task_labels = [t.label.plain for t in play_nodes[0].children]
+            assert "Install nginx" not in " ".join(task_labels), (
+                f"completed task must not appear; got {task_labels!r}"
+            )
+            assert any("Configure nginx" in lbl for lbl in task_labels), (
+                f"running task must appear; got {task_labels!r}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_update_from_state_shows_ok_icon_after_completion(self) -> None:
+        """After playbook completion, tasks must show their final status icon.
+
+        Regression for: the projection-based rebuild path skipped
+        ``apply_state_icons`` when ``is_tree_visible()`` returned False
+        (because ``end_time`` is set). This caused the tree to fall back
+        to ``populate_from_definitions`` which resets all icons to PENDING.
+        The fix restores the two-step behaviour in the non-visible branch:
+        skeleton built once, icons mutated every call.
+        """
+        from datetime import datetime, timezone
+
+        from ansible_aom.core.icons import STATUS_ICONS
+        from ansible_aom.core.models import (
+            HostRunState,
+            PlayDefinition,
+            PlayRunState,
+            RunState,
+            Status,
+            TaskDefinition,
+            TaskRunState,
+        )
+        from ansible_aom.tui.app import AOMApp
+        from ansible_aom.tui.screens.main import MainScreen
+        from ansible_aom.tui.widgets.task_tree import TaskTree
+
+        app = AOMApp()
+        async with app.run_test() as pilot:
+            await pilot.pause(0.05)
+            screen = app.screen
+            assert isinstance(screen, MainScreen)
+
+            app.run_state.definitions = [
+                PlayDefinition(
+                    id="p1",
+                    name="Setup",
+                    hosts="all",
+                    resolved_hosts=["web1"],
+                    tasks=[
+                        TaskDefinition(
+                            name="Install nginx",
+                            role=None,
+                            tags=[],
+                            play_id="p1",
+                            play_order=0,
+                            task_order=0,
+                        ),
+                    ],
+                )
+            ]
+            play = PlayRunState(play_id="p1", name="Setup")
+            task = TaskRunState(task_id="t0", name="Install nginx", status=Status.OK)
+            task.hosts["web1"] = HostRunState(hostname="web1", status=Status.OK)
+            play.tasks["t0"] = task
+            app.run_state.plays["p1"] = play
+            app.run_state.end_time = datetime.now(timezone.utc)
+
+            screen.update_from_state(app.run_state)
+            await pilot.pause(0.05)
+
+            tree = screen.query_one(TaskTree)
+            play_nodes = list(tree.root.children)
+            assert len(play_nodes) == 1, "play must be visible after completion"
+            task_nodes = list(play_nodes[0].children)
+            assert len(task_nodes) == 1, "task must be visible after completion"
+            ok_icon = STATUS_ICONS[Status.OK]
+            task_label = task_nodes[0].label.plain
+            assert ok_icon in task_label, (
+                f"task must show OK icon after completion; got {task_label!r}, expected {ok_icon!r}"
+            )
+
 
 class TestPeriodicRefresh:
     """A 0.2s tick refreshes widgets when _dirty has advanced."""
@@ -491,7 +717,12 @@ class TestCompletionTitleUpdate:
 
 
 class TestEndToEndThreeTasks:
-    """Spec headline: three task_starts → three task nodes after one tick."""
+    """Projection-based refresh: only the currently running task is visible.
+
+    Under linear strategy, each new task_start auto-completes the previous
+    one. After three task_starts, only the last task (Task 2) remains
+    RUNNING — the projection drops the two completed tasks from the tree.
+    """
 
     @pytest.mark.asyncio
     async def test_three_task_starts_appear_in_tree(
@@ -569,4 +800,13 @@ class TestEndToEndThreeTasks:
             play_nodes = list(tree.root.children)
             assert len(play_nodes) == 1, "expected one play node"
             task_nodes = list(play_nodes[0].children)
-            assert len(task_nodes) == 3, f"expected 3 task nodes, got {len(task_nodes)}"
+            # Under linear strategy, Task 0 and Task 1 are auto-completed
+            # when Task 2 starts. The projection drops completed tasks, so
+            # only the running task (Task 2) remains visible.
+            assert len(task_nodes) == 1, (
+                f"expected 1 running task node, got {len(task_nodes)}: "
+                f"{[n.label.plain for n in task_nodes]}"
+            )
+            assert "Task 2" in task_nodes[0].label.plain, (
+                f"expected Task 2 label, got {task_nodes[0].label.plain}"
+            )
