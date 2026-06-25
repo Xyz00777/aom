@@ -109,7 +109,8 @@ def build_run_summary(session: dict) -> RunSummary:
         ):
             continue
         hosts = event.get("hosts") or {}
-        task_id = (event.get("task") or {}).get("id", "")
+        task_data = event.get("task")
+        task_id = task_data.get("id", "") if isinstance(task_data, dict) else ""
         for host, result in hosts.items():
             changed = bool(result.get("changed", False)) if isinstance(result, dict) else False
             current = host_counts.get(host, StatusCounts())
@@ -234,7 +235,8 @@ def build_task_tree(session: dict) -> TaskTreeNode:
             continue
 
         if et == "v2_playbook_on_task_start":
-            tid = str((event.get("task") or {}).get("id", ""))
+            task_data = event.get("task")
+            tid = str(task_data.get("id", "")) if isinstance(task_data, dict) else ""
             if tid:
                 task_starts[tid] = event
             continue
@@ -243,7 +245,9 @@ def build_task_tree(session: dict) -> TaskTreeNode:
         if not runner_et:
             continue
 
-        task = event.get("task") or {}
+        task = event.get("task")
+        if not isinstance(task, dict):
+            continue
         tid = str(task.get("id", ""))
         if not tid:
             continue

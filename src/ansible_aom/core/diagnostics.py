@@ -183,6 +183,19 @@ def is_debug() -> bool:
     return _debug
 
 
+def set_debug(enable: bool = True) -> None:
+    """Enable/disable debug mode programmatically.
+
+    Called by cli.py when the --verbose flag is passed.
+    Can also be called from tests to avoid env-var coupling.
+    Idempotent — safe to call even after install_from_env().
+    """
+    global _debug
+    _debug = enable
+    if enable:
+        logging.getLogger(_LOGGER_NAME).setLevel(logging.DEBUG)
+
+
 def watchdog_seconds() -> int | None:
     return _watchdog_seconds
 
@@ -374,7 +387,8 @@ def psutil_disabled_reason() -> str | None:
 def print_summary_if_debug(file: IO[str] | None = None) -> None:
     """Emit a single-line ``[aom-debug] …`` post-run digest to ``file``.
 
-    Silent unless ``AOM_DEBUG=1``. Reads from the in-process
+    Silent unless ``AOM_DEBUG=1`` or the ``--verbose`` CLI flag is passed.
+    Reads from the in-process
     accumulators (``get_last_run_diagnostics`` / ``get_last_renderer_stats``)
     plus the top-N event histogram entries, so the user doesn't have
     to chase ``aom inspect --debug`` to see the post-run signal that

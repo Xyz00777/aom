@@ -379,6 +379,9 @@ def _run_compact(
         print("Cancelled by user", file=sys.stderr)
         return 130
     except Exception as e:
+        import traceback
+
+        traceback.print_exc(file=sys.stderr)
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
@@ -477,6 +480,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.verbose:
+        diagnostics.set_debug()
         aom_logger = logging.getLogger("ansible_aom")
         aom_logger.setLevel(logging.DEBUG)
         console_handler = logging.StreamHandler()
