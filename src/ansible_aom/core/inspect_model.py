@@ -186,6 +186,96 @@ def _group_key(task: dict) -> str:
     return "_root"
 
 
+def _path_file(path: str | None) -> str | None:
+    """Return the file part of a ``task.path`` (``"file.yml:42"`` → ``"file.yml"``)."""
+    if not path:
+        return None
+    return path.rsplit(":", 1)[0]
+
+
+def _nest_includes(tasks: list[TaskTreeNode]) -> list[TaskTreeNode]:
+    """Reconstruct ``include_tasks`` nesting from task ``path`` transitions.
+
+    Ansible's ``posix.jsonl`` does not emit a usable include payload, but
+    every task carries a ``task.path`` rooted in the file it lives in. Tasks
+    execute depth-first, so a task whose file differs from the current file
+    means we either descended into a freshly-included file (nest the new
+    tasks under the directive that preceded them) or returned to an ancestor
+    file (pop back to it). This rebuilds that hierarchy.
+
+    *tasks* is the play's flat, execution-ordered task list. The returned
+    list contains only the top-level (playbook-file) tasks; included tasks
+    are attached as ``task``-kind children of the directive that pulled them
+    in, after the directive's own ``host`` children. A directive's ``stats``
+    / ``per_host`` are rolled up to include its nested descendants so
+    failures deep in an include still surface on the collapsed directive row.
+
+    Tasks with no path are treated as siblings at the current level.
+    """
+    if not tasks:
+        return tasks
+
+    # Each frame: file it represents, the directive node that opened it
+    # (None for the root playbook frame), and the children accumulated so
+    # far (already-finalised nodes for any sub-includes that have closed).
+    @dataclass
+    class _Frame:
+        file: str | None
+        directive: TaskTreeNode | None
+        children: list[TaskTreeNode]
+
+    def _finalise(frame: _Frame) -> TaskTreeNode:
+        """Fold a closed include frame back into its directive node."""
+        directive = frame.directive
+        assert directive is not None  # root frame is never finalised
+        stats = directive.stats
+        per_host: dict[str, StatusCounts] = dict(directive.per_host)
+        for child in frame.children:
+            stats = stats.merge(child.stats)
+            for host, counts in child.per_host.items():
+                per_host[host] = per_host.get(host, StatusCounts()).merge(counts)
+        return replace(
+            directive,
+            children=directive.children + tuple(frame.children),
+            stats=stats,
+            per_host=per_host,
+        )
+
+    root = _Frame(file=_path_file(tasks[0].path), directive=None, children=[])
+    stack: list[_Frame] = [root]
+
+    for task in tasks:
+        file = _path_file(task.path)
+        if file is None or file == stack[-1].file:
+            stack[-1].children.append(task)
+            continue
+
+        ancestor_idx = next(
+            (i for i in range(len(stack) - 1, -1, -1) if stack[i].file == file), None
+        )
+        if ancestor_idx is not None:
+            # Returning to a file already open further up the stack: close
+            # every frame below it, folding each into its parent's children.
+            while len(stack) - 1 > ancestor_idx:
+                closed = stack.pop()
+                stack[-1].children[-1] = _finalise(closed)
+            stack[-1].children.append(task)
+            continue
+
+        # Descending into a newly-included file. The directive that opened
+        # it is the last task appended at the current level.
+        if not stack[-1].children:
+            stack[-1].children.append(task)  # no directive to nest under
+            continue
+        directive = stack[-1].children[-1]
+        stack.append(_Frame(file=file, directive=directive, children=[task]))
+
+    while len(stack) > 1:
+        closed = stack.pop()
+        stack[-1].children[-1] = _finalise(closed)
+    return root.children
+
+
 def _runner_event_type(event: dict) -> str | None:
     et = str(event.get("_event", ""))
     if et in (
@@ -372,7 +462,9 @@ def build_task_tree(session: dict) -> TaskTreeNode:
             for host, counts in grp_per_host.items():
                 play_per_host[host] = play_per_host.get(host, StatusCounts()).merge(counts)
             if gkey == "_root":
-                group_nodes.extend(tasks)
+                # Top-level (non-role) tasks may include dynamic
+                # ``include_tasks``; reconstruct that nesting from paths.
+                group_nodes.extend(_nest_includes(tasks))
             else:
                 group_nodes.append(
                     TaskTreeNode(

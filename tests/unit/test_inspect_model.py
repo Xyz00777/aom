@@ -203,6 +203,84 @@ def test_task_tree_real_event_shape():
     assert role_task_labels == {"Update brew", "Install brew casks"}
 
 
+def _runner_ok(tid: str, name: str, path: str, host: str = "localhost") -> dict:
+    return {
+        "_event": "v2_runner_on_ok",
+        "task": {"id": tid, "name": name, "path": path},
+        "hosts": {host: {"changed": False}},
+    }
+
+
+def _nested_include_session() -> dict:
+    """A play with two levels of dynamic ``include_tasks``.
+
+    Mirrors the real ``ansible.posix.jsonl`` shape: the include directive
+    itself emits a ``v2_runner_on_ok``, and tasks pulled in from the
+    included file carry a ``task.path`` rooted in that file. Nesting is
+    therefore recoverable purely from the ``task.path`` transitions.
+    """
+    pb = "/pb/site.yml"
+    l1 = "/pb/level1.yml"
+    l2 = "/pb/level2.yml"
+    events = [
+        {"_event": "v2_playbook_on_play_start", "play": {"id": "p1", "name": "nested"}},
+        _runner_ok("t1", "Direct task", f"{pb}:6"),
+        _runner_ok("t2", "Level 1 include", f"{pb}:9"),
+        _runner_ok("t3", "Level 1 task", f"{l1}:2"),
+        _runner_ok("t4", "Level 2 include", f"{l1}:5"),
+        _runner_ok("t5", "Level 2 task A", f"{l2}:2"),
+        _runner_ok("t6", "Level 2 task B", f"{l2}:5"),
+        {"_event": "v2_playbook_on_stats"},
+    ]
+    return {"playbook": "site.yml", "events": events, "session_id": "nested-1"}
+
+
+def test_task_tree_nests_dynamic_include_tasks_under_directive():
+    """Tasks pulled in by include_tasks nest under the directive that ran them."""
+    root = build_task_tree(_nested_include_session())
+    play = root.children[0]
+    top_labels = [c.label for c in play.children]
+    assert top_labels == ["Direct task", "Level 1 include"]
+
+    l1_include = play.children[1]
+    nested_l1 = [c for c in l1_include.children if c.kind == "task"]
+    assert [c.label for c in nested_l1] == ["Level 1 task", "Level 2 include"]
+    # The directive itself still carries its own host result.
+    assert any(c.kind == "host" for c in l1_include.children)
+
+    l2_include = next(c for c in nested_l1 if c.label == "Level 2 include")
+    nested_l2 = [c.label for c in l2_include.children if c.kind == "task"]
+    assert nested_l2 == ["Level 2 task A", "Level 2 task B"]
+
+
+def test_task_tree_rolls_up_nested_include_stats_to_directive():
+    """A failure inside an included file is reflected in the directive's stats.
+
+    This is what lets the TUI auto-expand a collapsed include row when one
+    of its nested tasks failed, and the failure walkers descend into it.
+    """
+    pb = "/pb/site.yml"
+    inc = "/pb/included.yml"
+    events = [
+        {"_event": "v2_playbook_on_play_start", "play": {"id": "p1", "name": "nested"}},
+        _runner_ok("t1", "Include things", f"{pb}:3"),
+        _runner_ok("t2", "Inner ok", f"{inc}:2"),
+        {
+            "_event": "v2_runner_on_failed",
+            "task": {"id": "t3", "name": "Inner boom", "path": f"{inc}:5"},
+            "hosts": {"localhost": {"msg": "kaboom"}},
+        },
+        {"_event": "v2_playbook_on_stats"},
+    ]
+    session = {"playbook": "site.yml", "events": events, "session_id": "n2"}
+    root = build_task_tree(session)
+    play = root.children[0]
+    directive = play.children[0]
+    assert directive.label == "Include things"
+    # 2 ok (directive + inner ok) and 1 failed (inner boom) roll up.
+    assert directive.stats == StatusCounts(ok=2, failed=1)
+
+
 def test_task_tree_multi_host_per_host_breakdown():
     session = _load_fixture("multi_host")
     root = build_task_tree(session)

@@ -739,6 +739,10 @@ class InspectApp(App):
             for child in node.children:
                 if child.kind == "host" and (child.stats.failed or child.stats.unreachable):
                     yield node, child
+                elif child.kind == "task":
+                    # Nested include_tasks children: recurse so failures
+                    # inside an included file still surface.
+                    yield from self._iter_failures(child)
         else:
             for child in node.children:
                 yield from self._iter_failures(child)
@@ -756,7 +760,9 @@ class InspectApp(App):
                 self._focused_task = parent_widget.data
         elif data.kind == "task":
             self._focused_task = data
-            self._focused_host = data.children[0] if data.children else None
+            # A task's children may now include nested include_tasks rows,
+            # so pick the first *host* child rather than children[0].
+            self._focused_host = next((c for c in data.children if c.kind == "host"), None)
         else:
             self._focused_task = None
             self._focused_host = None
