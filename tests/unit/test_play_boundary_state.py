@@ -15,8 +15,10 @@ from ansible_aom.core.models import (
 
 
 def _ts(minute: int, second: int) -> str:
-    return datetime(2026, 5, 23, 10, minute, second, tzinfo=timezone.utc).isoformat().replace(
-        "+00:00", "Z"
+    return (
+        datetime(2026, 5, 23, 10, minute, second, tzinfo=timezone.utc)
+        .isoformat()
+        .replace("+00:00", "Z")
     )
 
 
@@ -66,7 +68,9 @@ def _start_play(state: RunState, play_id: str, name: str, minute: int, second: i
     )
 
 
-def _start_task(state: RunState, play_id: str, task_id: str, name: str, minute: int, second: int) -> None:
+def _start_task(
+    state: RunState, play_id: str, task_id: str, name: str, minute: int, second: int
+) -> None:
     state.handle_event(
         {
             "_event": "v2_playbook_on_task_start",
@@ -77,7 +81,9 @@ def _start_task(state: RunState, play_id: str, task_id: str, name: str, minute: 
     )
 
 
-def _runner_ok(state: RunState, play_id: str, task_id: str, name: str, minute: int, second: int) -> None:
+def _runner_ok(
+    state: RunState, play_id: str, task_id: str, name: str, minute: int, second: int
+) -> None:
     state.handle_event(
         {
             "_event": "v2_runner_on_ok",

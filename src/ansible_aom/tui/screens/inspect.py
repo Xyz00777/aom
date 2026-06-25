@@ -804,9 +804,8 @@ class InspectApp(App):
 
         if block.failed_items:
             total = len(block.failed_items) + len(block.ok_items)
-            lines.append(
-                f"[{_STATUS_COLOR['failed']}]Failed items[/] ({len(block.failed_items)} of {total}):"
-            )
+            failed_color = _STATUS_COLOR["failed"]
+            lines.append(f"[{failed_color}]Failed items[/] ({len(block.failed_items)} of {total}):")
             for item in block.failed_items:
                 lines.append(f"  [{_STATUS_COLOR['failed']}]✖[/] {item.label}")
                 if item.msg:

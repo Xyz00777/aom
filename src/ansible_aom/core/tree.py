@@ -681,7 +681,6 @@ class TreeProjection:
                         items = self._play_running_and_pending(runtime, include_cross_play=False)
                         if not any(k == "running" for k, _, _, _ in items) and runtime.tasks:
                             continue  # completed play (had tasks, now all done)
-                idx_before = len(lines)
                 self._emit_runtime_play(lines, runtime, now)
             elif play_def is not None:
                 self._emit_pending_play(lines, play_def, now)

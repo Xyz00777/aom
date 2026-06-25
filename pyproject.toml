@@ -135,6 +135,11 @@ module = "yaml"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+# pexpect ships no type stubs; we only use a thin slice of its API.
+module = "pexpect.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 module = "ansible_aom.core.config"
 disallow_untyped_defs = false
 
