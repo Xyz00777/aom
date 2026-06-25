@@ -14,6 +14,7 @@ from ansible_aom.core.icons import STATUS_COLORS, STATUS_ICONS
 
 if TYPE_CHECKING:
     from ansible_aom.core.models import RunState
+    from ansible_aom.core.tree import TreeProjection
 # Tree node icons
 TREE_COLLAPSED_ICON = "▶"  # Right triangle for collapsed node (U+25B6)
 TREE_EXPANDED_ICON = "▼"  # Down triangle for expanded node (U+25BC)
@@ -178,16 +179,18 @@ class TaskTree(Tree[str]):
         # Index existing task nodes by their data key for O(1) lookup.
         task_index: dict[str, TreeNode[str]] = {}
         host_index: dict[tuple[str, str], TreeNode[str]] = {}
+
+        def _walk(node: TreeNode[str]) -> None:
+            data = node.data or ""
+            if isinstance(data, str) and data.startswith("task:"):
+                self._index_task_node(node, task_index, host_index)
+            if node.children:
+                for child in node.children:
+                    _walk(child)
+
         for play_node in self.root.children:
             for child in play_node.children:
-                # child may be a role node or a task node; walk one
-                # level deeper for role children.
-                data = child.data or ""
-                if isinstance(data, str) and data.startswith("role:"):
-                    for task_node in child.children:
-                        self._index_task_node(task_node, task_index, host_index)
-                else:
-                    self._index_task_node(child, task_index, host_index)
+                _walk(child)
 
         for play in run_state.plays.values():
             for task in play.tasks.values():
@@ -221,3 +224,106 @@ class TaskTree(Tree[str]):
             if isinstance(host_data, str) and host_data.startswith("host:"):
                 hostname = host_data[len("host:") :]
                 host_index[(task_name, hostname)] = host_node
+
+    def populate_from_projection(self, projection: "TreeProjection", budget: int) -> None:
+        """Build the tree from a ``TreeProjection``'s already-truncated lines.
+
+        Consumes the result of ``TreeProjection.tree_lines(budget)`` — which
+        already includes the inner + outer footers from T2 and the
+        ``(M remaining)`` role labels from T3. Maps each ``TreeLine`` to a
+        Textual ``TreeNode`` with the right icon, color, and parent.
+
+        Mapping:
+
+        - ``kind="playbook"`` → the root; skipped (the widget's own root).
+        - ``kind="play"`` → ``play_node = root.add(label)`` at depth 1.
+        - ``kind="role"`` → ``role_node = parent.add(label)`` (parent is
+          the enclosing play or, for nested roles, the enclosing role).
+          Label carries the T3 ``(N tasks)`` or ``(M remaining)`` suffix.
+        - ``kind="task"`` → ``task_node = parent.add(Text(icon + name))``
+          with the status icon + colour from ``STATUS_ICONS`` /
+          ``STATUS_COLORS``.
+        - ``kind="host"`` → ``host_node = task_node.add(Text(icon + hostname))``
+          (parent is the enclosing task).
+        - ``kind="more"`` → ``parent.add_leaf(Text(label, style="dim italic"))``
+          with ``allow_expand=False``. The inner + outer footers from T2
+          hang off the spine as unexpandable leaves with dim-italic
+          styling so they read as metadata, not as real tasks/roles.
+
+        Parent-stack walk: a line at depth D is added under the most
+        recent line at depth D-1. The outer footer (depth=0) goes under
+        the root; the inner footer (depth = deepest visible task's depth)
+        goes under the matching role/task. The depth-based parent
+        selection handles nested roles automatically — a role at depth 3
+        ends up under a role at depth 2, not directly under a play.
+
+        The widget is rebuilt from scratch on every call (the TUI tree
+        is short-lived per render so this is cheap).
+        """
+        self.root.remove_children()
+
+        lines = projection.tree_lines(budget=budget)
+        if not lines:
+            return
+
+        # parent_stack[i] is the most recent node at depth=i, where i=0
+        # is the widget's root (depth 0 = playbook). Lines are pushed
+        # onto the stack as they're added; the stack is popped when a
+        # line's depth <= the stack top's logical depth.
+        #
+        # We track depth alongside the node so we can detect "go up"
+        # transitions without relying on TreeNode.depth (which Textual
+        # tracks by visual position, not the TreeLine semantic depth).
+        parent_stack: list[tuple[int, TreeNode[str]]] = [(0, self.root)]
+
+        for ln in lines:
+            # Pop until the stack top is the parent at depth (ln.depth - 1).
+            # If ln.depth == 0 the footer hangs off the root (depth 0).
+            while len(parent_stack) > 1 and parent_stack[-1][0] >= ln.depth:
+                parent_stack.pop()
+            parent = parent_stack[-1][1]
+
+            if ln.kind == "playbook":
+                # The playbook is the root; already handled by __init__.
+                continue
+            if ln.kind == "play":
+                # Play nodes always sit at depth 1 directly under the root.
+                # Reset the stack so any leftover role/task ancestors from a
+                # previous (closed) play don't bleed into this one.
+                parent_stack = [(0, self.root)]
+                node = self.root.add(ln.label, data=f"play:{ln.label}")
+                parent_stack.append((1, node))
+                continue
+            if ln.kind == "role":
+                label = Text(ln.label, style="cyan")
+                role_key = ln.identity or ln.label
+                node = parent.add(label, data=f"role:{role_key}")
+                # Role identity is the depth anchor — push at ln.depth.
+                parent_stack.append((ln.depth, node))
+                continue
+            if ln.kind == "task":
+                icon = STATUS_ICONS.get(ln.status, "?") if ln.status is not None else "?"
+                color = STATUS_COLORS.get(ln.status, "white") if ln.status is not None else "white"
+                label = Text(f"{icon} {ln.label}", style=color)
+                node = parent.add(label, data=f"task:{ln.label}")
+                parent_stack.append((ln.depth, node))
+                continue
+            if ln.kind == "host":
+                icon = STATUS_ICONS.get(ln.status, "?") if ln.status is not None else "?"
+                color = STATUS_COLORS.get(ln.status, "white") if ln.status is not None else "white"
+                label = Text(f"{icon} {ln.label}", style=color)
+                parent.add(label, data=f"host:{ln.label}")
+                # Hosts are leaves — do NOT push onto parent_stack.
+                continue
+            if ln.kind == "more":
+                # Footer: dim-italic style so it reads as metadata, not a
+                # real task. add_leaf = allow_expand=False, the right
+                # semantic for an unexpandable "… and N more" indicator.
+                label = Text(ln.label, style="dim italic")
+                # Differentiate the inner vs outer footer in the data key
+                # so tests can tell them apart. The outer footer is the
+                # one at depth 0; everything else is "inner".
+                footer_kind = "outer" if ln.depth == 0 else "inner"
+                parent.add_leaf(label, data=f"more:{footer_kind}")
+                # Footers are leaves — do NOT push onto parent_stack.
+                continue
