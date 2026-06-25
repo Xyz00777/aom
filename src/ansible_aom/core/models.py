@@ -32,6 +32,23 @@ def strip_role_prefix(name: str) -> str:
     return name
 
 
+def runtime_role_from_task_name(task_name: str) -> str | None:
+    """Infer an ``include_role``-style runtime role from a task name.
+
+    Accepts simple ``role : task`` prefixes where the role token has no
+    whitespace. Intentionally rejects literal task names like
+    ``Install foo : bar`` (whitespace inside the prefix disqualifies them).
+    Returns ``None`` when the name has no ``" : "`` separator at all or
+    the prefix is empty / contains whitespace.
+    """
+    if " : " not in task_name:
+        return None
+    prefix = task_name.split(" : ", 1)[0].strip()
+    if not prefix or any(ch.isspace() for ch in prefix):
+        return None
+    return prefix
+
+
 class Status(Enum):
     """Task/host execution status."""
 
@@ -76,14 +93,30 @@ class TaskDefinition:
     uuid: str | None = None
     path: str | None = None
     children: list["TaskDefinition"] = field(default_factory=list)
+    # The parent role name when this task is nested inside another role
+    # (e.g. an ``include_role`` inside a role's ``tasks/main.yml``).
+    # ``None`` for top-level play tasks and for tasks whose enclosing role
+    # is the play itself. Carried on the definition so the preflight
+    # iterator can propagate a full role path. T5 sets this on dynamically
+    # grafted tasks.
+    parent_role: str | None = None
 
 
 @dataclass
 class RoleGroupDefinition:
-    """Grouped role tasks when 5+ consecutive tasks share same role."""
+    """Grouped role tasks when 5+ consecutive tasks share same role.
+
+    ``parent`` carries the enclosing role's name for nested roles (e.g.
+    ``angie_ssl_terminator`` nested under ``podman``) or ``None`` for
+    top-level role groups under a play. Populated by ``group_roles`` via
+    its ``parent_role`` argument; carried here so downstream walkers
+    (``iter_preflight_task_defs``, ``TreeProjection``) can reconstruct
+    the full role path without re-parsing the structure.
+    """
 
     role: str
-    tasks: list[TaskDefinition]
+    tasks: list["TaskDefinition | RoleGroupDefinition"]
+    parent: str | None = None
 
     @property
     def name(self) -> str:
@@ -98,22 +131,40 @@ def _iter_task_def_tree(task_def: TaskDefinition) -> Iterator[TaskDefinition]:
 
 
 def iter_preflight_task_defs(
-    entries: Sequence[TaskDefinition | RoleGroupDefinition], inherited_role: str | None = None
-) -> Iterator[tuple[TaskDefinition, str | None]]:
-    """Yield preflight task definitions in display order with effective role context.
+    entries: Sequence[TaskDefinition | RoleGroupDefinition],
+    inherited_role_path: tuple[str, ...] = (),
+) -> Iterator[tuple[TaskDefinition, tuple[str, ...]]]:
+    """Yield preflight task definitions in display order with effective role path.
 
-    Walks ``RoleGroupDefinition.tasks`` and nested ``TaskDefinition.children`` recursively,
-    preserving the pre-order tree traversal used by indexing and rendering.
+    The second element of each yielded tuple is the *full* role path from
+    outermost to innermost — e.g. ``("podman", "angie_ssl_terminator")``
+    for a task inside ``angie_ssl_terminator`` which itself was included
+    from ``podman``. An empty tuple means "no role active" (the task sits
+    directly under a play).
+
+    Walks ``RoleGroupDefinition.tasks`` (including any nested
+    ``RoleGroupDefinition`` for role-in-role) and nested
+    ``TaskDefinition.children`` recursively, preserving the pre-order
+    tree traversal used by indexing and rendering.
     """
     for entry in entries:
         if isinstance(entry, RoleGroupDefinition):
-            yield from iter_preflight_task_defs(entry.tasks, inherited_role=entry.role)
+            child_path = inherited_role_path + (entry.role,)
+            yield from iter_preflight_task_defs(entry.tasks, inherited_role_path=child_path)
             continue
 
-        role = entry.role if entry.role is not None else inherited_role
-        yield entry, role
+        if entry.role is not None:
+            role_path: tuple[str, ...] = inherited_role_path + (entry.role,)
+        else:
+            role_path = inherited_role_path
+        yield entry, role_path
         if entry.children:
-            yield from iter_preflight_task_defs(entry.children, inherited_role=role)
+            yield from iter_preflight_task_defs(entry.children, inherited_role_path=role_path)
+
+
+def role_path_str(role_path: tuple[str, ...]) -> str:
+    """Return ``'podman > angie_ssl_terminator'`` for display. ``''`` for empty."""
+    return " > ".join(role_path)
 
 
 @dataclass
@@ -155,6 +206,12 @@ class TaskRunState:
     start_time: datetime | None = None
     end_time: datetime | None = None
     path: str | None = None
+    # The parent role name for nested roles (e.g. ``angie_ssl_terminator``
+    # included from ``podman``). ``None`` for top-level play tasks.
+    # T5 sets this when the runtime ``"role : "`` prefix differs from
+    # the preflight role assignment, so the projection can render a
+    # sub-branch under the right role.
+    parent_role: str | None = None
 
 
 @dataclass
@@ -197,16 +254,33 @@ def _iter_leaf_task_defs(plays: list["PlayDefinition"]) -> "list[TaskDefinition]
 
     ``RoleGroupDefinition`` is unwrapped so its inner tasks are reachable; nested
     ``TaskDefinition.children`` are also traversed so recursive include/import
-    expansions are visible to the grafting logic.
+    expansions are visible to the grafting logic. A nested
+    ``RoleGroupDefinition`` inside a role group's ``tasks`` is recursed into
+    too — this is the role-in-role data shape that the recursive-nesting plan
+    introduced.
     """
     leaves: list[TaskDefinition] = []
     for play in plays:
         for entry in play.tasks:
             if isinstance(entry, RoleGroupDefinition):
-                for task_def in entry.tasks:
-                    leaves.extend(_iter_task_def_tree(task_def))
+                for inner in entry.tasks:
+                    if isinstance(inner, RoleGroupDefinition):
+                        leaves.extend(_leaves_of_role_group(inner))
+                    else:
+                        leaves.extend(_iter_task_def_tree(inner))
             else:
                 leaves.extend(_iter_task_def_tree(entry))
+    return leaves
+
+
+def _leaves_of_role_group(group: RoleGroupDefinition) -> list[TaskDefinition]:
+    """Return leaf TaskDefinitions reachable from a possibly-nested role group."""
+    leaves: list[TaskDefinition] = []
+    for entry in group.tasks:
+        if isinstance(entry, RoleGroupDefinition):
+            leaves.extend(_leaves_of_role_group(entry))
+        else:
+            leaves.extend(_iter_task_def_tree(entry))
     return leaves
 
 
@@ -251,10 +325,18 @@ class RoleCacheEntry:
     tasks are not known from preflight ``--list-tasks``. This entry
     records the tasks observed at runtime so they can be re-used if the
     same role is included again.
+
+    ``parent_role`` carries the name of the *enclosing* role when this
+    role is nested inside another role's ``tasks/main.yml`` (e.g.
+    ``angie_ssl_terminator`` discovered inside ``podman``'s tasks). It
+    is ``None`` for top-level roles included directly from a play. T4
+    populates it during role discovery; T5 reads it to set
+    ``TaskRunState.parent_role`` and ``TaskDefinition.parent_role``.
     """
 
     role_name: str
     task_names: list[str]
+    parent_role: str | None = None
 
     @property
     def task_count(self) -> int:
@@ -518,6 +600,29 @@ class RunState:
                 return owner
         return self._current_play_id or ""
 
+    def _parent_role_from_cache(self, task_name: str) -> str | None:
+        """Return the parent role recorded in ``_role_cache`` for a runtime task.
+
+        Used by ``_handle_v2_playbook_on_task_start`` /
+        ``_handle_v2_runner_on_start`` to populate ``TaskRunState.parent_role``
+        when a runtime task carries the ``"role : "`` prefix of a role that
+        ``includes.py`` discovered as nested in another role. Returns
+        ``None`` when the task has no ``" : "`` prefix, or when the role
+        cache has no entry (or the entry's ``parent_role`` is unset).
+
+        The cache key uses the lowercase-stripped role name (matches
+        ``_discover_role``'s normalisation), so we normalise the runtime
+        prefix the same way before lookup.
+        """
+        runtime_role = runtime_role_from_task_name(task_name)
+        if runtime_role is None:
+            return None
+        cache_key = runtime_role.lower().strip()
+        entry = self._role_cache.get(cache_key)
+        if entry is None:
+            return None
+        return entry.parent_role
+
     def _graft_or_match_task(
         self, task_id: str, task_name: str, task_path: str | None = None
     ) -> None:
@@ -583,10 +688,28 @@ class RunState:
             # an orphan rather than grafting it onto an arbitrary node.
             return
 
+        # Grafted task: detect role-in-role via the runtime prefix. When the
+        # runtime name carries ``"role : "`` with a different role than the
+        # preflight parent, the grafted TaskDefinition lives under the *inner*
+        # role. ``parent_role`` carries the outer role so the projection can
+        # render the inner role as a sub-branch. Plain dynamic includes
+        # (``include_tasks`` with no role prefix) inherit the parent role
+        # and propagate the existing ``parent_role`` chain.
+        runtime_role = runtime_role_from_task_name(task_name)
+        graft_role: str | None
+        graft_parent_role: str | None
+        if runtime_role is not None and parent.role is not None and runtime_role != parent.role:
+            graft_role = runtime_role
+            graft_parent_role = parent.role
+        else:
+            graft_role = parent.role
+            graft_parent_role = parent.parent_role
+
         parent.children.append(
             TaskDefinition(
                 name=task_name,
-                role=parent.role,
+                role=graft_role,
+                parent_role=graft_parent_role,
                 tags=[],
                 play_id=parent.play_id,
                 play_order=parent.play_order,
@@ -601,12 +724,18 @@ class RunState:
 
     def _handle_v2_playbook_on_task_start(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_playbook_on_task_start event."""
+        from ansible_aom.core.includes import discover_include_with_runtime_path
+
         task_data = self._task_dict(event)
         play_id = self._resolve_play_id(event)
         task_id = task_data.get("id", "")
         task_name = task_data.get("name", "")
         task_path = task_data.get("path")
         play_missing = play_id not in self.plays
+
+        if task_path and ":" in task_path:
+            parent_role = self._parent_role_from_cache(task_name)
+            discover_include_with_runtime_path(self, task_path, parent_role)
 
         self._graft_or_match_task(task_id, task_name, task_path)
 
@@ -629,6 +758,7 @@ class RunState:
                 status=Status.RUNNING,
                 start_time=ts,
                 path=task_path,
+                parent_role=self._parent_role_from_cache(task_name),
             )
         else:
             play.tasks[task_id].status = Status.RUNNING
@@ -716,12 +846,18 @@ class RunState:
 
     def _handle_v2_runner_on_start(self, event: dict[str, Any], ts: datetime) -> None:
         """Handle v2_runner_on_start event."""
+        from ansible_aom.core.includes import discover_include_with_runtime_path
+
         task_data = self._task_dict(event)
         hostname = event.get("host", "")
         task_id = task_data.get("id", "")
         task_name = task_data.get("name", "")
         task_path = task_data.get("path")
         play_id = self._resolve_play_id(event)
+
+        if task_path and ":" in task_path:
+            parent_role = self._parent_role_from_cache(task_name)
+            discover_include_with_runtime_path(self, task_path, parent_role)
 
         self._graft_or_match_task(task_id, task_name, task_path)
 
@@ -751,6 +887,7 @@ class RunState:
                 status=Status.RUNNING,
                 start_time=ts,
                 path=task_path,
+                parent_role=self._parent_role_from_cache(task_name),
             )
         else:
             play.tasks[task_id].status = Status.RUNNING

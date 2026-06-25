@@ -19,6 +19,7 @@ from typing import Callable
 import orjson
 
 from ansible_aom.core.models import (
+    IncludeCacheEntry,
     PlayDefinition,
     RoleGroupDefinition,
     WarningEntry,
@@ -339,6 +340,7 @@ class PreParseResult:
     play_hosts: list[dict]
     definitions: list[PlayDefinition] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    include_cache: dict[str, IncludeCacheEntry] = field(default_factory=dict)
 
 
 def parse_list_hosts_output(output: str) -> list[dict]:
@@ -457,14 +459,24 @@ def parse_list_tasks_output(output: str) -> list[dict]:
     return result
 
 
-def group_roles(tasks: list) -> list:
+def group_roles(tasks: list, parent_role: str | None = None) -> list:
     """Group consecutive same-role tasks (5 or more) into RoleGroupDefinition.
 
     Args:
         tasks: List of TaskDefinition objects
+        parent_role: Name of the enclosing role, or None for top-level
+            grouping under a play. Populated onto every produced
+            ``RoleGroupDefinition`` so downstream walkers can reconstruct
+            the full role path.
 
     Returns:
-        List of TaskDefinition or RoleGroupDefinition objects
+        List of TaskDefinition or RoleGroupDefinition objects. If the
+        input already contains a nested ``RoleGroupDefinition`` (e.g. a
+        parent's preflight that was itself recursively grouped), the
+        nested group is passed through unchanged — only the *direct*
+        ``TaskDefinition`` children at this level are re-grouped. This is
+        a pure data-shape operation: no I/O, no recursion into role
+        ``tasks/main.yml`` files.
     """
     if not tasks:
         return []
@@ -474,12 +486,29 @@ def group_roles(tasks: list) -> list:
     current_group: list = []
 
     for task in tasks:
+        # Pass-through: an already-grouped child role keeps its existing
+        # grouping and the parent role that was set when it was built.
+        if isinstance(task, RoleGroupDefinition):
+            if len(current_group) >= 5:
+                assert current_role is not None, "role should not be None for grouped tasks"
+                result.append(
+                    RoleGroupDefinition(role=current_role, tasks=current_group, parent=parent_role)
+                )
+            else:
+                result.extend(current_group)
+            current_group = []
+            current_role = None
+            result.append(task)
+            continue
+
         task_role = getattr(task, "role", None)
 
         if task_role is None:
             if len(current_group) >= 5:
                 assert current_role is not None, "role should not be None for grouped tasks"
-                result.append(RoleGroupDefinition(role=current_role, tasks=current_group))
+                result.append(
+                    RoleGroupDefinition(role=current_role, tasks=current_group, parent=parent_role)
+                )
             else:
                 result.extend(current_group)
             current_group = []
@@ -490,7 +519,9 @@ def group_roles(tasks: list) -> list:
         else:
             if len(current_group) >= 5:
                 assert current_role is not None, "role should not be None for grouped tasks"
-                result.append(RoleGroupDefinition(role=current_role, tasks=current_group))
+                result.append(
+                    RoleGroupDefinition(role=current_role, tasks=current_group, parent=parent_role)
+                )
             else:
                 result.extend(current_group)
             current_group = [task]
@@ -498,7 +529,9 @@ def group_roles(tasks: list) -> list:
 
     if len(current_group) >= 5:
         assert current_role is not None, "role should not be None for grouped tasks"
-        result.append(RoleGroupDefinition(role=current_role, tasks=current_group))
+        result.append(
+            RoleGroupDefinition(role=current_role, tasks=current_group, parent=parent_role)
+        )
     else:
         result.extend(current_group)
 
