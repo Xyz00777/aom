@@ -19,8 +19,14 @@ import os
 import re
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
-from ansible_aom.core.models import PlayDefinition, TaskDefinition
+from ansible_aom.core.includes import (
+    graft_include_children,
+    resolve_includes_from_playbook,
+    resolve_role_relative_includes,
+)
+from ansible_aom.core.models import IncludeCacheEntry, PlayDefinition, TaskDefinition
 from ansible_aom.core.parser import (
     PreParseResult,
     group_roles,
@@ -193,9 +199,24 @@ def run_preflight(
     play_hosts = parse_list_hosts_output(hosts_stdout) if hosts_rc == 0 else []
     definitions = assemble_definitions(plays=plays, play_hosts=play_hosts)
 
+    include_cache: dict[str, IncludeCacheEntry] = {}
+    if tasks_rc == 0:
+        referenced_roles = resolve_includes_from_playbook(playbook, definitions, include_cache)
+        resolve_role_relative_includes(
+            referenced_roles,
+            Path(playbook).parent.resolve(),
+            include_cache,
+        )
+        graft_include_children(
+            playbook_path=playbook,
+            definitions=definitions,
+            cache=include_cache,
+        )
+
     return PreParseResult(
         plays=plays,
         play_hosts=play_hosts,
         definitions=definitions,
         errors=errors,
+        include_cache=include_cache,
     )
