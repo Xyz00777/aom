@@ -1415,7 +1415,7 @@ class CompactRenderer:
                     if should_hide_host_result(raw, name, self._hide_states):
                         continue
                     self._streamed_loop_items.add((host, task_id))
-                    streamed_lines.append(self._format_loop_item_line(host, raw))
+                    streamed_lines.append(self._format_loop_item_line(host, raw, name))
                 if streamed_lines:
                     self._display.print_log("\n".join(streamed_lines))
             else:
@@ -1432,7 +1432,7 @@ class CompactRenderer:
                     if not isinstance(raw, dict):
                         continue
                     self._streamed_loop_items.add((host, task_id))
-                    streamed_lines_alt.append(self._format_loop_item_line(host, raw))
+                    streamed_lines_alt.append(self._format_loop_item_line(host, raw, name))
                 if streamed_lines_alt:
                     if name != "v2_runner_item_on_skipped":
                         self._flush_pending_skips(force_individual=True)
@@ -1472,7 +1472,7 @@ class CompactRenderer:
             return []
         return [self._format_loop_item_line(host, raw) for raw in results if isinstance(raw, dict)]
 
-    def _format_loop_item_line(self, host: str, raw: dict) -> str:
+    def _format_loop_item_line(self, host: str, raw: dict, event_type: str | None = None) -> str:
         """Format one loop item's result as a coloured log line.
 
         Returns ``ok``/``changed``/``failed``/``skipping: [host] =>
@@ -1481,15 +1481,22 @@ class CompactRenderer:
         and the live ``v2_runner_item_on_*`` streaming path so both render
         identically. The label mirrors ``core.inspect_model._make_loop_item``:
         ``_ansible_item_label`` when ansible computed one, else ``item``.
+
+        ``event_type`` is the JSONL event name (e.g.
+        ``v2_runner_item_on_failed``).  When supplied, it takes precedence
+        over ``raw.get("failed")``/``raw.get("skipped")`` because the real
+        ``aom_jsonl`` callback omits those flags on per-item payloads.
+        The aggregate path (``_loop_item_lines``) passes ``event_type=None``
+        since the aggregate ``results[]`` entries carry the flags correctly.
         """
         label = str(raw.get("_ansible_item_label") or raw.get("item") or "")
-        if raw.get("failed"):
+        if event_type == "v2_runner_item_on_failed" or raw.get("failed"):
             msg = _truncate_msg(raw.get("msg", "") or "")
             text = f"failed: [{host}] => (item={label})"
             if msg:
                 text += f" => {msg}"
             return _wrap(text, _RED, self._colorize)
-        if raw.get("skipped"):
+        if event_type == "v2_runner_item_on_skipped" or raw.get("skipped"):
             return _wrap(f"skipping: [{host}] => (item={label})", _CYAN, self._colorize)
         if raw.get("changed"):
             return _wrap(f"changed: [{host}] => (item={label})", _YELLOW, self._colorize)

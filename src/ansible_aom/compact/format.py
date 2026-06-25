@@ -587,6 +587,14 @@ def format_tree_block(
     # depth == D. We compute a parallel `is_last` list.
     is_last: list[bool] = []
     for i, ln in enumerate(lines):
+        if ln.has_tail_after:
+            # A "more tasks" footer follows this line at the same or
+            # deeper depth. The renderer demotes this line's branch
+            # glyph from └─ to ├─ and keeps the parent spine running,
+            # so the cut is visually traceable from the top of the
+            # window down to the footer.
+            is_last.append(False)
+            continue
         last = True
         for j in range(i + 1, len(lines)):
             if lines[j].depth < ln.depth:
@@ -629,17 +637,18 @@ def format_tree_block(
         # Branch glyph: depth 0 has none; depth>0 normally has ├─ / └─ EXCEPT
         # host leaves under a task, which render as plain-indented children
         # (spec section "Tree leaf shape" — the user-approved preview shows
-        # `   web1 ◐ 12s`, not `├─ web1 ◐ 12s`).
+        # `   web1 ◐ 12s`, not `├─ web1 ◐ 12s`), and the "more tasks"
+        # footers (inner + outer) which hang off the spine as leaves too.
         if ln.depth == 0:
             branch = ""
-        elif ln.kind == "host":
+        elif ln.kind in ("host", "more"):
             branch = ""
         else:
             branch = last_glyph if last else mid_glyph
 
-        # Per-line glyph (status icon for task/host; none for play/role).
+        # Per-line glyph (status icon for task/host/more footer; none for play/role).
         glyph_seg = ""
-        if ln.kind in ("task", "host") and ln.status is not None:
+        if ln.kind in ("task", "host", "more") and ln.status is not None:
             if ln.status == Status.RUNNING and not ascii_mode:
                 # get_running_frame returns a Unicode quadrant glyph; only
                 # safe outside ASCII mode. ASCII mode falls through to the
@@ -743,17 +752,25 @@ def collect_tags(definitions: list[PlayDefinition]) -> list[str]:
     """Unique tags across every leaf TaskDefinition, alphabetically sorted.
 
     Used for the startup tag preview line. Expands ``RoleGroupDefinition``
-    entries so tags inside role groups still surface.
+    entries (including nested ones from role-in-role data) so tags inside
+    role groups still surface.
     """
     seen: set[str] = set()
     for play in definitions:
         for entry in play.tasks:
             if isinstance(entry, RoleGroupDefinition):
-                for task in entry.tasks:
-                    seen.update(task.tags)
+                _collect_role_group_tags(entry, seen)
             else:
                 seen.update(entry.tags)
     return sorted(seen)
+
+
+def _collect_role_group_tags(group: RoleGroupDefinition, seen: set[str]) -> None:
+    for inner in group.tasks:
+        if isinstance(inner, RoleGroupDefinition):
+            _collect_role_group_tags(inner, seen)
+        else:
+            seen.update(inner.tags)
 
 
 def format_preflight_summary(
