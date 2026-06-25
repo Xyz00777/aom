@@ -59,3 +59,24 @@ def test_print_summary_if_debug_handles_no_run_data() -> None:
     diagnostics.print_summary_if_debug(file=buf)
     # Empty or a single "no data" line; never raises.
     assert isinstance(buf.getvalue(), str)
+
+
+def test_set_debug_enables_summary() -> None:
+    """set_debug(True) should have same effect as AOM_DEBUG=1 env var."""
+    diagnostics.set_debug(True)
+    _populate()
+    buf = StringIO()
+    diagnostics.print_summary_if_debug(file=buf)
+    out = buf.getvalue()
+    assert "[aom-debug]" in out
+    assert "events=4" in out
+
+
+def test_set_debug_disables_summary() -> None:
+    """set_debug(False) should suppress the summary."""
+    diagnostics.set_debug(True)
+    diagnostics.set_debug(False)
+    _populate()
+    buf = StringIO()
+    diagnostics.print_summary_if_debug(file=buf)
+    assert buf.getvalue() == ""

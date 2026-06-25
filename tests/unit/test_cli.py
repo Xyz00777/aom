@@ -771,6 +771,20 @@ class TestVerboseDebugLogging:
         if aom_logger.level != logging.NOTSET:
             assert aom_logger.level != logging.DEBUG or original_level == logging.DEBUG
 
+    def test_verbose_sets_diagnostics_debug_flag(self):
+        """--verbose should set diagnostics._debug to True."""
+        from ansible_aom.cli import main
+        from ansible_aom.core import diagnostics
+
+        with (
+            patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
+            patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
+            patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
+        ):
+            main()
+        assert diagnostics.is_debug() is True
+
 
 class TestExitCode1:
     """Tests for TC-025: Exit code 1 — playbook with failed task."""

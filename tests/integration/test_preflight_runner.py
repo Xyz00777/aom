@@ -181,3 +181,100 @@ def test_run_preflight_passes_ansible_args(tmp_path: Path) -> None:
         assert "site.yml" in parts
         assert "-i" in parts and "inv.ini" in parts
         assert "-c" in parts and "local" in parts
+
+
+def test_run_preflight_populates_include_cache(tmp_path: Path) -> None:
+    """TC-094f: run_preflight populates include_cache for literal include_tasks."""
+    import shutil
+
+    if shutil.which("ansible-playbook") is None:
+        import pytest
+
+        pytest.skip("ansible-playbook not on PATH")
+
+    from ansible_aom.ansible.preflight import run_preflight
+
+    fixtures = Path(__file__).resolve().parent.parent.parent / ".sisyphus" / "test-fixtures"
+    playbook = fixtures / "with_include.yml"
+
+    result = run_preflight(
+        playbook=str(playbook),
+        ansible_args=[],
+        executable="ansible-playbook",
+    )
+
+    assert result.errors == []
+    assert result.include_cache is not None
+    included_abs = (fixtures / "included_tasks.yml").resolve()
+    assert str(included_abs) in result.include_cache
+    assert result.include_cache[str(included_abs)].task_names == [
+        "Included task 1",
+        "Included task 2",
+    ]
+
+
+def test_run_preflight_grafts_include_children_into_definitions(tmp_path: Path) -> None:
+    """TC-094g: grafted children appear on include_tasks stubs in definitions."""
+    import shutil
+
+    if shutil.which("ansible-playbook") is None:
+        import pytest
+
+        pytest.skip("ansible-playbook not on PATH")
+
+    from ansible_aom.ansible.preflight import run_preflight
+    from ansible_aom.core.models import TaskDefinition
+
+    fixtures = Path(__file__).resolve().parent.parent.parent / ".sisyphus" / "test-fixtures"
+    playbook = fixtures / "with_include.yml"
+
+    result = run_preflight(
+        playbook=str(playbook),
+        ansible_args=[],
+        executable="ansible-playbook",
+    )
+
+    assert result.errors == []
+    assert len(result.definitions) == 1
+    play = result.definitions[0]
+
+    include_stubs = [
+        t
+        for t in play.tasks
+        if isinstance(t, TaskDefinition) and t.children and "Include" in t.name
+    ]
+    assert len(include_stubs) == 1
+    grafted_names = [c.name for c in include_stubs[0].children]
+    assert grafted_names == ["Included task 1", "Included task 2"]
+
+
+def test_run_preflight_role_relative_include_resolves_under_role(tmp_path: Path) -> None:
+    """TC-094b integration: include_tasks inside a role resolves relative to role dir."""
+    import shutil
+
+    if shutil.which("ansible-playbook") is None:
+        import pytest
+
+        pytest.skip("ansible-playbook not on PATH")
+
+    from ansible_aom.ansible.preflight import run_preflight
+
+    fixtures = Path(__file__).resolve().parent.parent.parent / ".sisyphus" / "test-fixtures"
+    playbook = fixtures / "with_role_rel_include.yml"
+
+    result = run_preflight(
+        playbook=str(playbook),
+        ansible_args=[],
+        executable="ansible-playbook",
+    )
+
+    assert result.errors == []
+    assert result.include_cache is not None
+    expected = (
+        fixtures / "roles" / "podman_role_rel" / "tasks" / "_includes" / "setup.yml"
+    ).resolve()
+    assert str(expected) in result.include_cache
+    assert result.include_cache[str(expected)].task_names == [
+        "Set up angie config from role-relative include",
+        "Enable and start angie-sidecar service",
+    ]
