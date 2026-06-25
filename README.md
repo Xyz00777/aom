@@ -91,7 +91,7 @@ aom inspect prune --days 30           # delete sessions older than N days
 | Flag | Effect |
 |------|--------|
 | `--tui` | Launch the full multi-panel TUI (default is compact). |
-| `--verbose` | Print AOM diagnostics (resolved `ansible-playbook` path, env, terminal size) and enable DEBUG logging. |
+| `--verbose` | Print AOM diagnostics (resolved `ansible-playbook` path, env, terminal size), enable DEBUG logging, enable pexpect/event traces, and print post-run `[aom-debug]` summary. Equivalent to `AOM_DEBUG=1`. |
 | `--version` | Print version and exit. |
 | `--help` | Show built-in help. |
 

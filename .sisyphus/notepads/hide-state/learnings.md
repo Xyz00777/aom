@@ -365,3 +365,35 @@ Extracted the suffix logic into `_build_status_suffix()` for testability. It:
 - `uv run mypy src/ansible_aom`: Success, no issues in 69 files
 - `uv run ruff check src/ansible_aom/cli.py tests/unit/test_cli.py`: All checks passed
 - Hands-on: `aom --hide-state OK --version` succeeds; `aom --hide-state skip site.yml` shows suggestion
+
+## 2026-06-23 — Fix: event_type overrides missing failed/skipped flags on streaming loop items
+
+### Bug
+
+`v2_runner_item_on_failed` and `v2_runner_item_on_skipped` per-item streaming events rendered as `ok:` instead of `failed:`/`skipping:` because the `aom_jsonl` callback's per-item payloads omit `failed: True` / `skipped: True` flags — those flags only appear on the aggregate `v2_runner_on_failed`/`v2_runner_on_skipped` event after the loop ends. `_format_loop_item_line` relied on `raw.get("failed")` / `raw.get("skipped")` which returned `None` (falsy) on streaming payloads, causing the fallthrough to `ok:`.
+
+### Root cause
+
+The renderer's `_format_loop_item_line(host, raw)` had no access to the event type that triggered it. The event type (e.g. `v2_runner_item_on_failed`) is the authoritative state signal for per-item events, but the function couldn't see it — it could only inspect the payload's `failed`/`skipped` flags, which are absent on streaming payloads.
+
+### Fix
+
+Added `event_type: str | None = None` optional parameter to `_format_loop_item_line`:
+- `event_type == "v2_runner_item_on_failed"` → forces `failed:` rendering (with msg) regardless of `raw.get("failed")`
+- `event_type == "v2_runner_item_on_skipped"` → forces `skipping:` rendering regardless of `raw.get("skipped")`
+- `event_type == "v2_runner_item_on_ok"` or `event_type is None` → existing logic (changed vs ok via `raw.get("changed")`)
+
+Streaming call sites in `_emit_event_log` now pass `name` (the event type) as the third argument. Aggregate call site in `_loop_item_lines` stays unchanged (no `event_type`) since aggregate `results[]` entries carry the flags correctly.
+
+### Test additions
+
+- `TestItemEventTypeIsAuthoritative` (6 tests) in `test_loop_item_streaming.py`: covers the core bug — `v2_runner_item_on_failed` without `failed` flag, `v2_runner_item_on_skipped` without `skipped` flag, and color correctness.
+- `TestHideStatePreservesFailedItemMessage` (4 tests) in `test_hide_state.py`: covers the user-facing scenario — `--hide-state ok,skipped` must not suppress the failed item's `failed:` line or msg.
+- New helper `_aom_jsonl_item_event()` in both test files: produces per-item payloads matching the real callback shape (no `failed`/`skipped` flags).
+
+### Verification
+
+- `uv run pytest tests/compact/test_loop_item_streaming.py tests/compact/test_hide_state.py -q`: 44 passed (10 new)
+- `uv run pytest tests/unit/ tests/compact/ -q`: 2228 passed (no regressions)
+- `uv run mypy src/ansible_aom`: Success, no issues in 69 files
+- `uv run ruff check --fix`: All checks passed

@@ -924,6 +924,94 @@ direction of dependencies.
 **Fixture/Setup:** Mixed static and dynamic tasks
 **Edge Cases:** All dynamic tasks (no static)
 
+### TC-094a: Static include_tasks graft populates children
+**Section:** 5.2
+**Category:** unit
+**Priority:** high
+**Description:** After resolve_includes_from_playbook + graft_include_children, include_tasks stubs have their included file's tasks as .children
+**Test:** parent.children contains one TaskDefinition per parsed name with parent.role == include_stub.role
+**Fixture/Setup:** tmp_path playbook with `include_tasks: setup.yml`, setup.yml in same dir
+
+### TC-094b: Role-relative include resolution
+**Section:** 5.2
+**Category:** unit
+**Priority:** high
+**Description:** `include_tasks: _includes/foo.yml` inside `roles/<name>/tasks/main.yml` resolves relative to role dir, not playbook dir
+**Test:** cache key == (role_dir / "tasks" / "_includes" / "foo.yml").resolve()
+**Fixture/Setup:** tmp_path roles/podman_role_rel/tasks/{main.yml, _includes/setup.yml}
+
+### TC-094c: Jinja-templated include path is skipped
+**Section:** 5.2
+**Category:** unit
+**Priority:** medium
+**Description:** include_tasks: "{{ var }}.yml" leaves the stub ungrafted
+**Test:** cache empty for that path; stub .children unchanged
+**Fixture/Setup:** Jinja-templated include in tmp_path playbook
+
+### TC-094d: Nested includes graft transitively
+**Section:** 5.2
+**Category:** unit
+**Priority:** high
+**Description:** include A includes B includes C → A.children include B's tasks, B's include C's
+**Test:** Walk children at depth 2 and 3; assert names match
+**Fixture/Setup:** Three-level include chain in tmp_path
+
+### TC-094e: block/rescue/always preserves include location
+**Section:** 5.2
+**Category:** unit
+**Priority:** medium
+**Description:** `block: [include_tasks: foo.yml, ...]` grafts foo's tasks under the block task, not the play root
+**Test:** The block TaskDefinition.children contains the grafted tasks
+**Fixture/Setup:** Playbook with `block:` containing include_tasks
+
+### TC-094f: run_preflight populates include_cache
+**Section:** 5.2
+**Category:** integration
+**Priority:** high
+**Description:** run_preflight calls resolve_includes_from_playbook and returns include_cache in PreParseResult
+**Test:** result.include_cache contains resolved paths for literal include_tasks directives
+**Fixture/Setup:** fake ansible-playbook executable; tmp_path playbook
+
+### TC-094g: run_preflight passes include_cache through to definitions
+**Section:** 5.2
+**Category:** integration
+**Priority:** high
+**Description:** Definitions returned by run_preflight include grafted children on include_tasks stubs
+**Test:** For each include_tasks stub in result.definitions, assert children count > 0
+**Fixture/Setup:** As TC-094f
+
+### TC-094h: Runtime graft populates cache from task.path
+**Section:** 5.2
+**Category:** unit
+**Priority:** high
+**Description:** When JSONL event has task.path pointing to a not-yet-cached include file, the cache is populated before graft
+**Test:** Cache contains the path after the handler runs
+**Fixture/Setup:** Build event with task.path = "site.yml:5"; site.yml in tmp_path
+
+### TC-094i: Runtime graft reuses preflight cache
+**Section:** 5.2
+**Category:** unit
+**Priority:** medium
+**Description:** Same path seen twice → cache populated once
+**Test:** Mock parse_include_tasks_file; assert called once
+**Fixture/Setup:** Pre-populate cache; fire event twice
+
+### TC-094j: Include stub with children is hidden
+**Section:** 5.2
+**Category:** unit
+**Priority:** high
+**Description:** Tree projection skips include_tasks stubs whose runtime task has reached COMPLETED status; children render as task rows
+**Test:** Stub name not in rendered output; children names are
+**Fixture/Setup:** Build PlayDefinition with grafted include; fire task_start events for stub and one child
+
+### TC-094k: Include stub without children stays visible
+**Section:** 5.2
+**Category:** unit
+**Priority:** medium
+**Description:** Defensive: include_tasks with Jinja path (no graft) still renders so the user sees *something*
+**Test:** Stub name in rendered output
+**Fixture/Setup:** Build PlayDefinition with bare include stub; no runtime task matching it
+
 ---
 
 ## Section 5.2.1: --list-hosts Output Parsing
@@ -2567,6 +2655,103 @@ direction of dependencies.
 **Fixture/Setup:** PlayDefinition with task sequences of varying role repetition
 **Edge Cases:** Exactly 5 tasks, tasks with no role mixed in breaking the sequence
 
+### TC-513: Tree Two-Level Truncation Inner Footer
+**Section:** 7.1
+**Category:** unit
+**Priority:** critical
+**Description:** Verify that when the budget cut lands inside a role's
+task list, the rendered tree includes both an inner footer
+(at the role's task depth, label "… and N more tasks") and an
+outer footer (at depth 0).
+**Test:** Build a 1-play + 1-role + 20-task state, render with
+budget=6. Assert the last line is the outer footer
+(kind="more", depth=0). Assert the second-to-last line is the
+inner footer (kind="more", depth matching the deepest visible
+non-footer line). Both footers carry the PENDING icon and have
+no branch glyph.
+**Fixture/Setup:** Synthetic RunState; no real ansible-playbook run.
+**Edge Cases:** Cut between plays (no inner footer); cut
+degenerate (head alone overflows, fall back to single-footer).
+
+### TC-514: Tree Two-Level Truncation Role Label Remaining
+**Section:** 7.1
+**Category:** unit
+**Priority:** critical
+**Description:** Verify that a role whose task list is partially
+visible carries a "(M remaining)" label instead of "(N tasks)".
+**Test:** Build a 1-play + 1-role + N-task state, render with a
+budget that forces the cut inside the role. Find the role
+TreeLine. Assert the label matches "role: X (M remaining)" where
+M = total - visible. Assert the M=0 edge case uses "(N tasks)"
+not "(0 remaining)".
+**Fixture/Setup:** Synthetic RunState; no real ansible-playbook run.
+**Edge Cases:** Role with 1 task (singular "(1 task remaining)");
+role with all tasks visible after cut ("(N tasks)" not
+"(0 remaining)").
+
+### TC-515: Tree Two-Level Truncation Spur Visual Continuity
+**Section:** 7.1
+**Category:** unit
+**Priority:** high
+**Description:** Verify that every ancestor of a "more tasks" footer
+renders with ├─ (mid) instead of └─ (last), and the parent spine
+continues downward via │  segments.
+**Test:** Build the two-level truncation fixture (1-play +
+1-role + 20-task, budget=6). Render with format_tree_block. Walk
+every line above the inner footer that has a parent (i.e. all
+non-leaf, non-root lines). Assert each such line starts with
+├─ (or |  +- in ASCII mode). The host leaves are exempt — they
+get no branch glyph.
+**Fixture/Setup:** Synthetic RunState; no real ansible-playbook run.
+**Edge Cases:** When the budget is enormous and no cut happens,
+the spur logic is dormant (no footers, no ├─ on the last child).
+
+### TC-516: Tree Two-Level Truncation ASCII Parity
+**Section:** 7.1
+**Category:** unit
+**Priority:** medium
+**Description:** Verify that ASCII mode produces the two-footer
+layout with +- / \- / |  glyphs and . (PENDING fallback) icons.
+**Test:** Same fixture as TC-513, render with ascii_mode=True.
+Assert: outer footer is at depth 0 with no branch glyph; inner
+footer is at the deepest depth with no branch glyph; ancestors
+above the cut use +- (not \-); the spine uses |  segments; the
+footers carry the ASCII PENDING icon (.); no Unicode box-drawing
+characters (├, └, │) appear anywhere in the rendered block.
+**Fixture/Setup:** Synthetic RunState; no real ansible-playbook run.
+**Edge Cases:** Same as TC-513.
+
+### TC-517: TUI Tree Two-Level Truncation Footers
+**Section:** 7.1
+**Category:** unit
+**Priority:** critical
+**Description:** Verify that the TUI TaskTree widget (via
+populate_from_projection) renders the inner and outer "more"
+footers as Textual TreeNodes with the right data key, unexpandable
+semantics, and dim-italic styling.
+**Test:** Build the two-level fixture, call
+TaskTree.populate_from_projection(projection, budget=15). Walk
+all nodes. Assert exactly 2 nodes have data starting with
+"more:" (one for inner, one for outer). Assert each has
+allow_expand=False and no children. Assert the label style
+contains both "dim" and "italic".
+**Fixture/Setup:** TaskTree widget; synthetic RunState.
+**Edge Cases:** Same as TC-513.
+
+### TC-518: TUI Tree Two-Level Truncation Role Label Remaining
+**Section:** 7.1
+**Category:** unit
+**Priority:** high
+**Description:** Verify that the TUI tree's role node label carries
+"(M remaining)" when the cut lands inside the role, matching
+the compact mode's behavior.
+**Test:** Build a state where the budget cut is inside a role.
+Call populate_from_projection. Find the role node (data starts
+with "role:"). Assert the label text contains "remaining" and
+the count parens.
+**Fixture/Setup:** TaskTree widget; synthetic RunState.
+**Edge Cases:** Same as TC-514.
+
 ### TC-274: Log Panel Max Lines Bound
 **Section:** 7.2
 **Category:** unit
@@ -3025,14 +3210,17 @@ direction of dependencies.
 **Fixture/Setup:** Session artifact with multi-host execution
 **Edge Cases:** Host not in session (display "No tasks for host 'unknown'")
 
-### TC-324: Session Inspect Tree View
-**Section:** 9.1
-**Category:** integration
+### TC-324: Recursive role nesting renders as sub-branches
+**Section:** 7.1
+**Category:** unit
 **Priority:** high
-**Description:** Verify 'aom inspect <session-id> --tree' shows ASCII tree of plays/tasks with status icons
-**Test:** Run '--tree' flag. Assert output shows hierarchical tree structure: Play > Task > Host. Assert status icons (●, ◆, ✖, etc.) displayed
-**Fixture/Setup:** Session artifact with play/task hierarchy
-**Edge Cases:** Deeply nested roles (ensure tree renders correctly)
+**Description:** A play containing ``role: outer (5+ tasks)`` where the outer role's ``tasks/main.yml`` includes another role via ``include_role: inner``, the inner role's tasks (≥5) must appear under a dedicated ``role: inner`` sub-branch under the ``role: outer`` branch, not as a flat list of tasks under the outer role.
+**Test:** Drive a ``RunState`` whose preflight definitions have ``RoleGroupDefinition(role="outer", tasks=[...5+ TaskDefinitions, one with role="inner" and parent_role="outer"...])``. Fire runtime events for the inner role's tasks. Assert ``tree_lines()`` produces:
+- depth=2, kind="role", label="role: outer (N tasks)"
+- depth=3, kind="role", label="role: inner (M tasks)"
+- depth=4, kind="task", label="inner : task-name"
+**Fixture/Setup:** Synthetic ``RunState`` constructed in unit test, no real ansible-playbook run required. Equivalent integration fixture: ``.sisyphus/test-fixtures/with_nested_role.yml`` plus ``roles/podman`` (6 tasks, one ``include_role: angie_ssl_terminator``) and ``roles/angie_ssl_terminator`` (6 tasks).
+**Edge Cases:** Outer role with 4 tasks (no grouping, tasks flat at depth=2). Inner role with 4 tasks (no grouping, tasks flat at depth=3). Three-level nesting (A → B → C, with C grouping at depth 4).
 
 ### TC-325: Session Diff Command
 **Section:** 9.3

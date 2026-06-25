@@ -428,6 +428,37 @@ affected by `--hide-state`. This is a compact-only flag in v1.
 **Default**: No states are hidden — all per-host lines print as usual, matching
 pre-`--hide-state` behaviour.
 
+#### Two-Level Truncation Footers
+
+When the tree exceeds the display budget, the renderer applies
+**two-cut truncation** to keep the deepest, most informative portion
+of the tree visible while indicating how much was cut.
+
+**Inner footer (per-role summary)**: emitted when the budget cut
+lands inside a role's task list. The footer reports the count of
+*task-domain* entities (tasks, roles, plays) hidden inside the
+active role. The footer carries the PENDING icon `□` and a label
+of the form `… and N more tasks`. The role's own label switches
+from `(N tasks)` to `(M remaining)` where `M = N - visible_tasks`
+in the kept window. Singular/plural form: `task` (singular) for
+M=1, `tasks` (plural) otherwise.
+
+**Outer footer (full-tree summary)**: emitted at depth 0 when
+*any* budget cut happened. The footer reports the total count of
+hidden task/role/play entities across the whole tree. The footer
+carries the PENDING icon `□` and the label `… and N more tasks`.
+
+**Spur continuity (visual connection between cut and footer)**:
+every ancestor of an inner or outer footer renders with the
+`├─` branch glyph (instead of `└─`) and the parent spine
+continues downward via `│  ` segments. This makes the vertical
+trace from the top of the window down to the outer footer
+unbroken — the user can see at a glance which branch was cut
+and how much.
+
+**ASCII parity**: the same logic produces `+-` (mid), `\-` (last),
+`|` (pipe), and `.` (PENDING fallback) in ASCII mode.
+
 ### 4.2 Full TUI (--tui mode)
 
 Multi-panel interactive interface:
@@ -1889,7 +1920,7 @@ VALID_TRANSITIONS = {
 
 ### 7.1 Tree View (Full TUI)
 
-**Structure:**
+**Structure (recursive role grouping):**
 ```
 Root
 └── Play
@@ -1897,6 +1928,12 @@ Root
         └── Task
             └── Host
 ```
+
+RoleGroup nodes MAY nest arbitrarily deep. A role that includes
+another role via ``include_role`` or ``import_role`` renders the
+inner role as a sub-branch under the outer role's branch. The tree
+has no fixed depth cap — each level of role nesting adds exactly one
+tree depth.
 
 **Navigation:**
 - `↑/↓`: Move selection
