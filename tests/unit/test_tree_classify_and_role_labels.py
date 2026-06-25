@@ -197,15 +197,30 @@ class TestRuntimeRoleLabelTaskCountFromDefinitions:
 
     def test_role_label_shows_total_task_count_not_running_count(self):
         """When a role has 2 tasks and 1 is completed, the runtime role
-        label should still show '(2 tasks)', not '(1 task)'."""
+        label shows the total task count from definitions, NOT just the
+        currently-running subset (visible=1, total=2).
+
+        Under T3's post-truncation role-label pass, the format switches
+        between ``(N tasks)`` and ``(M remaining)`` based on whether the
+        visible count equals the total. Here visible=1 (the completed
+        task is dropped from the kept lines) and total=2, so the label
+        is ``(1 task remaining)``. The total is still surfaced via the
+        math (2 total - 1 visible = 1 remaining); only the format
+        changes from the pre-T3 ``(2 tasks)``. See
+        ``.sisyphus/plans/two-level-truncation.md`` T3 for the contract."""
         state = self._multi_task_role_with_completed_task()
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
         role_lines = [ln for ln in lines if ln.kind == "role"]
         assert len(role_lines) >= 1, f"expected a role line, got {lines}"
         role_label = role_lines[0].label
-        assert "(2 tasks)" in role_label, (
-            f"role label should show total task count from definitions, got: {role_label}"
+        # T3 contract: visible=1, total=2 → "(1 task remaining)". The
+        # test's original intent — that the count reflects TOTAL tasks,
+        # not just the running subset — is preserved by the math
+        # (2 - 1 = 1 remaining), but the format changes from "(2 tasks)".
+        assert "(1 task remaining)" in role_label, (
+            f"role label should show (1 task remaining) under T3 "
+            f"(visible=1, total=2), got: {role_label}"
         )
 
     def test_role_label_count_with_all_tasks_completed(self):
@@ -267,7 +282,7 @@ class TestDynamicChildrenTaskRole:
         ]
         state = RunState(playbook="test.yml", definitions=defs)
         p = TreeProjection.from_run_state(state)
-        assert p._task_role("Dynamic task") == "nginx"
+        assert p._task_role("Dynamic task") == ("nginx",)
 
     def test_dynamic_child_stripped_prefix_also_finds_role(self) -> None:
         """Runtime task names with 'role : ' prefix should still match
@@ -298,7 +313,7 @@ class TestDynamicChildrenTaskRole:
         ]
         state = RunState(playbook="test.yml", definitions=defs)
         p = TreeProjection.from_run_state(state)
-        assert p._task_role("nginx : Dynamic task") == "nginx"
+        assert p._task_role("nginx : Dynamic task") == ("nginx",)
 
 
 class TestDynamicChildrenRoleTotalTasks:

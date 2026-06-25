@@ -116,7 +116,17 @@ class TestRuntimeRoleTaskCount:
 
     def test_dynamic_role_shows_task_count_in_label(self):
         """A role loaded via include_role must show its runtime task count
-        in the role header label, not 0 or no count."""
+        in the role header label, not 0 or no count.
+
+        Note: under linear strategy, the previously-running t3 gets
+        auto-marked COMPLETED when t4 starts, so only t4 is visible in
+        the kept lines (visible=1, total=2). T3's post-truncation
+        role-label pass rewrites the role header to ``(M remaining)``
+        when visible > 0 and total > visible — see
+        ``.sisyphus/plans/two-level-truncation.md`` T3. So the label
+        here is ``(1 task remaining)``, not the pre-T3 ``(2 tasks)``.
+        The total is still surfaced (via the "2 total - 1 visible = 1
+        remaining" math); only the format changes."""
         state = self._state_with_dynamic_role()
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
@@ -126,8 +136,12 @@ class TestRuntimeRoleTaskCount:
         )
         podman_role = [ln for ln in role_lines if "podman" in ln.label]
         assert len(podman_role) >= 1, f"expected podman role, got {[ln.label for ln in role_lines]}"
-        assert "(2 tasks)" in podman_role[0].label, (
-            f"podman role should show (2 tasks) from runtime, got: {podman_role[0].label}"
+        # T3 contract: visible=1, total=2 → "(1 task remaining)".
+        # The role_total_tasks count of 2 is preserved via the math
+        # (2 - 1 = 1 remaining), not lost.
+        assert "(1 task remaining)" in podman_role[0].label, (
+            f"podman role should show (1 task remaining) under T3 (visible=1, "
+            f"total=2), got: {podman_role[0].label}"
         )
 
     def test_dynamic_role_task_appears_under_role_header(self):
@@ -256,7 +270,16 @@ class TestRuntimeRoleTaskCount:
 
     def test_dynamic_role_with_no_preflight_shows_runtime_count(self):
         """Pure runtime role (no preflight tasks at all) must still show
-        the correct task count from only runtime tasks."""
+        the correct task count from only runtime tasks.
+
+        Note: under linear strategy, the previously-running t1 and t2
+        get auto-marked COMPLETED when t3 starts, so only t3 is visible
+        in the kept lines (visible=1, total=3). T3's post-truncation
+        role-label pass rewrites the role header to ``(M remaining)``
+        when visible > 0 and total > visible — see
+        ``.sisyphus/plans/two-level-truncation.md`` T3. So the label
+        here is ``(2 tasks remaining)``, not the pre-T3 ``(3 tasks)``.
+        The total of 3 is preserved via the math (3 - 1 = 2 remaining)."""
         state = RunState(playbook="site.yml")
         state.definitions = [
             PlayDefinition(
@@ -299,6 +322,8 @@ class TestRuntimeRoleTaskCount:
         lines = p.tree_lines(budget=25)
         role_lines = [ln for ln in lines if ln.kind == "role" and "podman" in ln.label]
         assert len(role_lines) >= 1, f"expected podman role, got {[ln.label for ln in lines]}"
-        assert "(3 tasks)" in role_lines[0].label, (
-            f"pure runtime role should show (3 tasks), got: {role_lines[0].label}"
+        # T3 contract: visible=1, total=3 → "(2 tasks remaining)".
+        assert "(2 tasks remaining)" in role_lines[0].label, (
+            f"pure runtime role should show (2 tasks remaining) under T3 "
+            f"(visible=1, total=3), got: {role_lines[0].label}"
         )

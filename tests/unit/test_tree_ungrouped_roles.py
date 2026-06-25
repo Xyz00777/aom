@@ -205,7 +205,7 @@ class TestUngroupedRoleTasksInTree:
         ]
         p = TreeProjection.from_run_state(state)
         result = p._task_role("Deploy container")
-        assert result == "podman", (
+        assert result == ("podman",), (
             f"_task_role must find role for ungrouped TaskDefinition, got: {result!r}"
         )
 
@@ -419,8 +419,8 @@ class TestRolePrefixStripping:
             ),
         ]
         p = TreeProjection.from_run_state(state)
-        assert p._task_role("podman : Install Podman") == "podman"
-        assert p._task_role("Install Podman") == "podman"
+        assert p._task_role("podman : Install Podman") == ("podman",)
+        assert p._task_role("Install Podman") == ("podman",)
 
     def test_runtime_prefixed_task_under_role_header(self):
         """A runtime task named 'podman : Install Podman' must be
