@@ -18,15 +18,18 @@ from ansible_aom.core.includes import (
     _discover_include,
     _discover_role,
     discover_include_with_runtime_path,
+    graft_include_children,
     parse_include_tasks_file,
     parse_role_tasks,
     resolve_includes_from_playbook,
+    resolve_role_relative_includes,
 )
 from ansible_aom.core.models import (
     IncludeCacheEntry,
     PlayDefinition,
     RoleCacheEntry,
     RunState,
+    TaskDefinition,
 )
 
 # ---------------------------------------------------------------------------
@@ -614,3 +617,343 @@ class TestCacheEntryProperties:
         """Empty task_names yields task_count of 0."""
         entry = RoleCacheEntry(role_name="empty_role", task_names=[])
         assert entry.task_count == 0
+
+
+def _make_play(tasks: list[TaskDefinition]) -> PlayDefinition:
+    """Build a single-play PlayDefinition wrapping *tasks*."""
+    return PlayDefinition(
+        id="1",
+        name="Test play",
+        hosts="localhost",
+        resolved_hosts=["localhost"],
+        tasks=tasks,
+    )
+
+
+def _include_stub(name: str, role: str | None = "podman") -> TaskDefinition:
+    """Build an include_tasks stub TaskDefinition like --list-tasks produces.
+
+    Real --list-tasks output renders ``include_tasks: setup.yml`` as the
+    task name ``Include setup`` (filename without extension).
+    """
+    return TaskDefinition(
+        name=name,
+        role=role,
+        tags=[],
+        play_id="1",
+        play_order=1,
+        task_order=0,
+    )
+
+
+class TestGraftIncludeChildren:
+    """Unit tests for graft_include_children() — TC-094a through TC-094e."""
+
+    def _write_playbook(self, tmp_path: Path, *, include_target: str) -> Path:
+        """Write a one-task playbook that includes *include_target* and return its path."""
+        playbook = tmp_path / "play.yml"
+        playbook.write_text(
+            f"---\n- hosts: localhost\n  tasks:\n    - name: Direct task\n      debug:\n        msg: x\n"
+            f"    - name: Include setup\n      include_tasks: {include_target}\n"
+        )
+        return playbook
+
+    def test_static_include_grafts_children_into_stub(self, tmp_path: Path) -> None:
+        """TC-094a: A literal include_tasks stub gains children from cache."""
+        included = tmp_path / "setup.yml"
+        included.write_text(
+            "- name: Install packages\n  debug:\n    msg: x\n"
+            "- name: Start service\n  debug:\n    msg: y\n"
+        )
+        cache_key = str(included.resolve())
+        cache: dict[str, IncludeCacheEntry] = {
+            cache_key: IncludeCacheEntry(
+                path=cache_key,
+                task_names=["Install packages", "Start service"],
+                role=None,
+                parsed_at=datetime.now(timezone.utc),
+            )
+        }
+        playbook = self._write_playbook(tmp_path, include_target="setup.yml")
+        stub = _include_stub("Include setup", role="podman")
+        play = _make_play([stub])
+
+        graft_include_children(
+            playbook_path=str(playbook),
+            definitions=[play],
+            cache=cache,
+        )
+
+        assert len(stub.children) == 2
+        assert [c.name for c in stub.children] == ["Install packages", "Start service"]
+        assert all(c.role == "podman" for c in stub.children)
+        assert all(c.parent_role == "podman" for c in stub.children)
+        assert all(c.is_dynamic is False for c in stub.children)
+        assert all(c.play_id == "1" for c in stub.children)
+
+    def test_role_relative_include_resolution(self, tmp_path: Path) -> None:
+        """TC-094b: include_tasks inside a role resolves relative to the role dir."""
+        role_dir = tmp_path / "roles" / "podman"
+        (role_dir / "tasks" / "_includes").mkdir(parents=True)
+        setup = role_dir / "tasks" / "_includes" / "setup.yml"
+        setup.write_text(
+            "- name: Set up angie\n  debug:\n    msg: a\n"
+            "- name: Start sidecar\n  debug:\n    msg: b\n"
+        )
+        (role_dir / "tasks" / "main.yml").write_text(
+            "- name: Stop podman socket\n  debug:\n    msg: x\n"
+            "- name: Install Podman\n  debug:\n    msg: y\n"
+            "- name: Role-relative include\n  include_tasks: _includes/setup.yml\n"
+        )
+
+        cache: dict[str, IncludeCacheEntry] = {}
+        resolve_role_relative_includes(
+            role_names={"podman"},
+            playbook_dir=tmp_path,
+            cache=cache,
+        )
+
+        resolved_key = str(setup.resolve())
+        assert resolved_key in cache
+        assert cache[resolved_key].task_names == ["Set up angie", "Start sidecar"]
+
+    def test_jinja_templated_include_path_is_skipped(self, tmp_path: Path) -> None:
+        """TC-094c: include_tasks: '{{ var }}.yml' does not populate cache."""
+        (tmp_path / "roles" / "podman" / "tasks").mkdir(parents=True)
+        (tmp_path / "roles" / "podman" / "tasks" / "main.yml").write_text(
+            '- name: Dynamic include\n  include_tasks: "{{ task_file }}.yml"\n'
+        )
+
+        cache: dict[str, IncludeCacheEntry] = {}
+        resolve_role_relative_includes(
+            role_names={"podman"},
+            playbook_dir=tmp_path,
+            cache=cache,
+        )
+        assert cache == {}
+
+    def test_role_scan_only_named_roles(self, tmp_path: Path) -> None:
+        """Only roles listed in role_names are scanned — unreferenced roles are skipped."""
+        wanted_dir = tmp_path / "roles" / "wanted" / "tasks"
+        wanted_dir.mkdir(parents=True)
+        (wanted_dir / "_inc.yml").write_text("- name: In wanted\n  debug:\n    msg: w\n")
+        (wanted_dir / "main.yml").write_text("- name: W include\n  include_tasks: _inc.yml\n")
+
+        ignored_dir = tmp_path / "roles" / "ignored" / "tasks"
+        ignored_dir.mkdir(parents=True)
+        (ignored_dir / "_inc.yml").write_text("- name: In ignored\n  debug:\n    msg: i\n")
+        (ignored_dir / "main.yml").write_text("- name: I include\n  include_tasks: _inc.yml\n")
+
+        cache: dict[str, IncludeCacheEntry] = {}
+        resolve_role_relative_includes(
+            role_names={"wanted"},
+            playbook_dir=tmp_path,
+            cache=cache,
+        )
+
+        wanted_inc = (wanted_dir / "_inc.yml").resolve()
+        ignored_inc = (ignored_dir / "_inc.yml").resolve()
+        assert str(wanted_inc) in cache
+        assert str(ignored_inc) not in cache
+
+    def test_role_scan_missing_role_is_silent(self, tmp_path: Path) -> None:
+        """A role listed in role_names but absent on disk does not log at WARNING/DEBUG."""
+        cache: dict[str, IncludeCacheEntry] = {}
+        resolve_role_relative_includes(
+            role_names={"ghost"},
+            playbook_dir=tmp_path,
+            cache=cache,
+        )
+        assert cache == {}
+
+    def test_role_scan_unparseable_role_logs_warning_once(self, tmp_path: Path, caplog) -> None:
+        """A role with YAML PyYAML can't parse logs one WARNING, no exception."""
+        import logging
+
+        role_dir = tmp_path / "roles" / "broken"
+        role_dir.mkdir(parents=True)
+        # quadlet_options-like content that PyYAML cannot parse but ansible can.
+        (role_dir / "tasks" / "main.yml").parent.mkdir(parents=True, exist_ok=True)
+        (role_dir / "tasks" / "main.yml").write_text(
+            "- name: Task\n  module:\n    quadlet_options:\n"
+            "        [Service]\n        Restart=always\n"
+            "    become: true\n"
+        )
+
+        cache: dict[str, IncludeCacheEntry] = {}
+        with caplog.at_level(logging.WARNING, logger="ansible_aom.core.includes"):
+            resolve_role_relative_includes(
+                role_names={"broken"},
+                playbook_dir=tmp_path,
+                cache=cache,
+            )
+        # No exception, no cache entry, at most one warning.
+        assert cache == {}
+        warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
+        assert len(warnings) <= 1
+
+    def test_nested_includes_graft_transitively(self, tmp_path: Path) -> None:
+        """TC-094d: include A includes B includes C → children at depth 2 and 3."""
+        level1 = tmp_path / "level1.yml"
+        level1.write_text(
+            "- name: Level 1 task\n  debug:\n    msg: 1\n"
+            "- name: Include level2\n  include_tasks: level2.yml\n"
+        )
+        level2 = tmp_path / "level2.yml"
+        level2.write_text(
+            "- name: Level 2 task A\n  debug:\n    msg: 2a\n"
+            "- name: Level 2 task B\n  debug:\n    msg: 2b\n"
+        )
+        playbook = tmp_path / "play.yml"
+        playbook.write_text(
+            "- hosts: localhost\n  tasks:\n"
+            "    - name: Direct\n      debug:\n        msg: d\n"
+            "    - name: Include level1\n      include_tasks: level1.yml\n"
+        )
+        cache: dict[str, IncludeCacheEntry] = {
+            str(level1.resolve()): IncludeCacheEntry(
+                path=str(level1.resolve()),
+                task_names=["Level 1 task", "Include level2"],
+                role=None,
+                parsed_at=datetime.now(timezone.utc),
+            ),
+            str(level2.resolve()): IncludeCacheEntry(
+                path=str(level2.resolve()),
+                task_names=["Level 2 task A", "Level 2 task B"],
+                role=None,
+                parsed_at=datetime.now(timezone.utc),
+            ),
+        }
+        outer_stub = _include_stub("Include level1", role=None)
+        play = _make_play([outer_stub])
+
+        graft_include_children(
+            playbook_path=str(playbook),
+            definitions=[play],
+            cache=cache,
+        )
+
+        assert len(outer_stub.children) == 2
+        level2_stub = outer_stub.children[1]
+        assert level2_stub.name == "Include level2"
+        assert len(level2_stub.children) == 2
+        assert [c.name for c in level2_stub.children] == ["Level 2 task A", "Level 2 task B"]
+
+    def test_block_with_include_preserves_location(self, tmp_path: Path) -> None:
+        """TC-094e: block: [include_tasks: foo.yml, ...] grafts under block task."""
+        setup = tmp_path / "foo.yml"
+        setup.write_text(
+            "- name: Inner A\n  debug:\n    msg: a\n- name: Inner B\n  debug:\n    msg: b\n"
+        )
+        playbook = tmp_path / "play.yml"
+        playbook.write_text(
+            "- hosts: localhost\n  tasks:\n"
+            "    - name: Group of setup\n      block:\n"
+            "        - name: Include foo\n          include_tasks: foo.yml\n"
+            "        - name: After\n          debug:\n            msg: z\n"
+        )
+        cache_key = str(setup.resolve())
+        cache: dict[str, IncludeCacheEntry] = {
+            cache_key: IncludeCacheEntry(
+                path=cache_key,
+                task_names=["Inner A", "Inner B"],
+                role=None,
+                parsed_at=datetime.now(timezone.utc),
+            )
+        }
+        include_stub = _include_stub("Include foo", role="web")
+        block_task = TaskDefinition(
+            name="Group of setup",
+            role="web",
+            tags=[],
+            play_id="1",
+            play_order=1,
+            task_order=0,
+            children=[include_stub],
+        )
+        play = _make_play([block_task])
+
+        graft_include_children(
+            playbook_path=str(playbook),
+            definitions=[play],
+            cache=cache,
+        )
+
+        assert len(block_task.children) == 1
+        grafted = block_task.children[0]
+        assert grafted.name == "Include foo"
+        assert len(grafted.children) == 2
+
+    def test_graft_preserves_existing_children(self, tmp_path: Path) -> None:
+        """If a stub already has children (e.g. from runtime graft), graft appends."""
+        setup = tmp_path / "x.yml"
+        setup.write_text("- name: New\n  debug:\n    msg: n\n")
+        playbook = self._write_playbook(tmp_path, include_target="x.yml")
+        cache_key = str(setup.resolve())
+        cache: dict[str, IncludeCacheEntry] = {
+            cache_key: IncludeCacheEntry(
+                path=cache_key,
+                task_names=["New"],
+                role=None,
+                parsed_at=datetime.now(timezone.utc),
+            )
+        }
+        existing = TaskDefinition(
+            name="Pre-existing",
+            role="podman",
+            tags=[],
+            play_id="1",
+            play_order=1,
+            task_order=-1,
+            is_dynamic=True,
+        )
+        stub = _include_stub("Include setup", role="podman")
+        stub.children.append(existing)
+        play = _make_play([stub])
+
+        graft_include_children(
+            playbook_path=str(playbook),
+            definitions=[play],
+            cache=cache,
+        )
+
+        names = [c.name for c in stub.children]
+        assert "Pre-existing" in names
+        assert "New" in names
+
+    def test_graft_unknown_path_leaves_stub_alone(self, tmp_path: Path) -> None:
+        """If cache has no entry for an include, the stub stays empty."""
+        playbook = self._write_playbook(tmp_path, include_target="missing.yml")
+        cache: dict[str, IncludeCacheEntry] = {}
+        stub = _include_stub("Include setup", role="podman")
+        play = _make_play([stub])
+
+        graft_include_children(
+            playbook_path=str(playbook),
+            definitions=[play],
+            cache=cache,
+        )
+
+        assert stub.children == []
+
+    def test_graft_only_targets_include_stubs(self, tmp_path: Path) -> None:
+        """A regular task whose name happens to start with 'Include ' is NOT touched."""
+        playbook = self._write_playbook(tmp_path, include_target="missing.yml")
+        cache: dict[str, IncludeCacheEntry] = {}
+        normal = TaskDefinition(
+            name="Include user documentation",
+            role="podman",
+            tags=[],
+            play_id="1",
+            play_order=1,
+            task_order=0,
+        )
+        play = _make_play([normal])
+
+        graft_include_children(
+            playbook_path=str(playbook),
+            definitions=[play],
+            cache=cache,
+        )
+
+        assert normal.children == []

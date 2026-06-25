@@ -16,6 +16,8 @@ Each grafted definition carries:
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from ansible_aom.core.models import (
@@ -48,6 +50,20 @@ def _play_start(play_id: str = "play-uuid-1", name: str = "Test play") -> dict:
         "_event": "v2_playbook_on_play_start",
         "_timestamp": "2026-04-20T10:00:00Z",
         "play": {"id": play_id, "name": name},
+    }
+
+
+def _task_start_with_path(
+    task_id: str,
+    task_name: str,
+    task_path: str,
+    play_id: str = "play-uuid-1",
+) -> dict:
+    return {
+        "_event": "v2_playbook_on_task_start",
+        "_timestamp": "2026-04-20T10:00:00Z",
+        "task": {"id": task_id, "name": task_name, "path": task_path},
+        "play": {"id": play_id},
     }
 
 
@@ -260,3 +276,94 @@ class TestDynamicExpansion:
         state.handle_event(_task_start("uuid-b", "Task B"))
 
         assert state.definitions == []
+
+
+class TestRuntimeIncludeDiscovery:
+    """TC-094h / TC-094i: runtime include cache discovery from task.path."""
+
+    def test_task_path_populates_include_cache(self, tmp_path: Path) -> None:
+        """TC-094h: An unknown task.path triggers include cache population."""
+        from ansible_aom.core.models import TaskDefinition
+
+        include_file = tmp_path / "site.yml"
+        include_file.write_text(
+            "- name: Alpha\n  debug:\n    msg: a\n- name: Beta\n  debug:\n    msg: b\n"
+        )
+        parent = TaskDefinition(
+            name="Include site",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        defs = [
+            PlayDefinition(
+                id="1",
+                name="Test",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[parent],
+            )
+        ]
+        playbook_path = str(tmp_path / "play.yml")
+        state = RunState(playbook=playbook_path, definitions=defs)
+        state.handle_event(_play_start())
+        state.handle_event(
+            _task_start_with_path(
+                "uuid-include",
+                "Include site",
+                f"{include_file.name}:2",
+            )
+        )
+
+        cache_key = str(include_file.resolve())
+        assert cache_key in state._include_cache
+        assert state._include_cache[cache_key].task_names == ["Alpha", "Beta"]
+
+    def test_runtime_cache_reuses_preflight_entry(self, tmp_path: Path) -> None:
+        """TC-094i: A second task hitting the same path reuses the cache."""
+        from datetime import datetime, timezone
+
+        from ansible_aom.core.models import IncludeCacheEntry, TaskDefinition
+
+        include_file = tmp_path / "site.yml"
+        include_file.write_text("- name: Beta\n  debug:\n    msg: b\n")
+        cache_key = str(include_file.resolve())
+        preflight_entry = IncludeCacheEntry(
+            path=cache_key,
+            task_names=["Beta"],
+            role=None,
+            parsed_at=datetime.now(timezone.utc),
+        )
+        parent = TaskDefinition(
+            name="Include site",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        defs = [
+            PlayDefinition(
+                id="1",
+                name="Test",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[parent],
+            )
+        ]
+        playbook_path = str(tmp_path / "play.yml")
+        state = RunState(playbook=playbook_path, definitions=defs)
+        state._include_cache[cache_key] = preflight_entry
+
+        state.handle_event(_play_start())
+        state.handle_event(
+            _task_start_with_path(
+                "uuid-include",
+                "Include site",
+                f"{include_file.name}:2",
+            )
+        )
+
+        assert state._include_cache[cache_key] is preflight_entry

@@ -263,3 +263,110 @@ def test_detail_block_ok_task_no_failure_items():
     assert block.status == "ok"
     assert block.failed_items == ()
     assert block.ok_items == ()
+
+
+# ── String task field (bugfix) ────────────────────────────────────────────────
+
+
+def test_run_summary_string_task_field():
+    """build_run_summary must not crash when event['task'] is a string."""
+    session = {
+        "session_id": "test-0000-0000-string-task",
+        "playbook": "test.yml",
+        "start_time": "2026-01-01T00:00:00Z",
+        "end_time": "2026-01-01T00:00:10Z",
+        "duration_seconds": 10.0,
+        "version": "1.2",
+        "status": "completed",
+        "events": [
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-01-01T00:00:00Z"},
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-01-01T00:00:01Z",
+                "play": {"id": "p1", "name": "test play"},
+            },
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-01-01T00:00:02Z",
+                "task": {"id": "t1", "name": "Task 1", "path": "test.yml:1"},
+                "play": {"id": "p1"},
+            },
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-01-01T00:00:03Z",
+                "task": {"id": "t1", "name": "Task 1", "path": "test.yml:1"},
+                "play": {"id": "p1"},
+                "hosts": {"web1": {"changed": False}},
+            },
+            # This event has task as a STRING — the bug
+            {
+                "_event": "v2_runner_on_unreachable",
+                "_timestamp": "2026-01-01T00:00:04Z",
+                "task": "t2",
+                "play": {"id": "p1"},
+                "hosts": {"foreman": {"changed": False}},
+            },
+        ],
+        "stderr": [],
+        "malformed_lines": 0,
+    }
+    summary = build_run_summary(session)
+    assert summary.session_id == "test-0000-0000-string-task"
+    # The string-task event's hosts are still counted (the fix only guards
+    # task_id extraction, not host iteration).
+    assert summary.host_counts == {
+        "web1": StatusCounts(ok=1),
+        "foreman": StatusCounts(unreachable=1),
+    }
+
+
+def test_task_tree_string_task_field():
+    """build_task_tree must not crash when event['task'] is a string."""
+    session = {
+        "session_id": "test-0000-0000-string-task",
+        "playbook": "test.yml",
+        "start_time": "2026-01-01T00:00:00Z",
+        "end_time": "2026-01-01T00:00:10Z",
+        "duration_seconds": 10.0,
+        "version": "1.2",
+        "status": "completed",
+        "events": [
+            {"_event": "v2_playbook_on_start", "_timestamp": "2026-01-01T00:00:00Z"},
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-01-01T00:00:01Z",
+                "play": {"id": "p1", "name": "test play"},
+            },
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-01-01T00:00:02Z",
+                "task": {"id": "t1", "name": "Task 1", "path": "test.yml:1"},
+                "play": {"id": "p1"},
+            },
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-01-01T00:00:03Z",
+                "task": {"id": "t1", "name": "Task 1", "path": "test.yml:1"},
+                "play": {"id": "p1"},
+                "hosts": {"web1": {"changed": False}},
+            },
+            # This event has task as a STRING — the bug
+            {
+                "_event": "v2_runner_on_unreachable",
+                "_timestamp": "2026-01-01T00:00:04Z",
+                "task": "t2",
+                "play": {"id": "p1"},
+                "hosts": {"foreman": {"changed": False}},
+            },
+        ],
+        "stderr": [],
+        "malformed_lines": 0,
+    }
+    root = build_task_tree(session)
+    assert root.kind == "run"
+    assert len(root.children) == 1
+    play = root.children[0]
+    assert play.label == "test play"
+    task_labels = [c.label for c in play.children]
+    assert task_labels == ["Task 1"]
+    assert play.stats == StatusCounts(ok=1)
