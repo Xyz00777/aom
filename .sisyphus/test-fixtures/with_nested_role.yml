@@ -1,0 +1,8 @@
+---
+- name: Playbook with nested roles
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Outer podman role
+      include_role:
+        name: podman

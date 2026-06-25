@@ -1,0 +1,31 @@
+---
+- name: Copy certificates to target user directory
+  copy:
+    src: cert.pem
+    dest: /etc/ssl/
+
+- name: Mark SSL terminator setup complete
+  file:
+    path: /var/run/ssl-terminator.ready
+    state: touch
+
+- name: Ensure firewalld is running
+  service:
+    name: firewalld
+    state: started
+
+- name: Open HTTPS port in firewalld (TCP)
+  firewalld:
+    port: 443/tcp
+    permanent: true
+    state: enabled
+
+- name: Deploy Angie Sidecar Quadlet (host network)
+  copy:
+    src: angie-quadlet-host.network
+    dest: /etc/containers/systemd/
+
+- name: Deploy Angie Sidecar Quadlet (bridge network)
+  copy:
+    src: angie-quadlet-bridge.network
+    dest: /etc/containers/systemd/
