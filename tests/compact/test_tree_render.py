@@ -8,8 +8,14 @@ formatting, not when you accidentally do.
 from __future__ import annotations
 
 from ansible_aom.compact.renderer import format_host_rows, format_tree_block
-from ansible_aom.core.models import RunState, Status
-from ansible_aom.core.tree import TreeProjection
+from ansible_aom.core.models import (
+    HostRunState,
+    PlayRunState,
+    RunState,
+    Status,
+    TaskRunState,
+)
+from ansible_aom.core.tree import TreeLine, TreeProjection
 
 
 def _state(*events: dict) -> RunState:
@@ -581,3 +587,353 @@ def test_post_recap_panel_drops_tree_and_suffix():
     # Pin the observed shape: header row + two host rows with "(idle)".
     assert panel.count("(idle)") == 2
     assert len(panel.splitlines()) == 3
+
+
+# =============================================================================
+# Task 4 (two-level truncation renderer): the data layer (T1+T2+T3) emits
+# `kind="more"` footers and `has_tail_after=True` markers. The renderer must
+# honour both: footers hang off the spine without their own `├─`/`└─` glyph,
+# and `has_tail_after=True` lines demote their branch glyph from `└─` to `├─`
+# so the parent spine (`│  `) extends all the way down to the outer footer.
+#
+# These tests pin the renderer's contract about the *shape* of the input
+# `TreeLine[]` it receives, so we monkeypatch `TreeProjection.tree_lines` to
+# return hand-built lines rather than going through `_tree_lines_unbounded` /
+# `_truncate_two_level`. That keeps the renderer tests focused on what T4
+# actually owns: glyph emission for `kind="more"` and `has_tail_after`.
+# =============================================================================
+
+
+def _visible_projection(monkeypatch) -> TreeProjection:
+    """Build a ``TreeProjection`` whose ``is_tree_visible()`` returns True
+    and whose ``tree_lines()`` is monkeypatched to a callable the test can
+    replace per-call. Minimal ``RunState`` so the visibility check passes.
+    """
+    state = RunState(playbook="site.yml")
+    play = PlayRunState(play_id="p1", name="deploy")
+    task = TaskRunState(task_id="t1", name="Install nginx")
+    task.hosts["web1"] = HostRunState(hostname="web1", status=Status.RUNNING)
+    play.tasks["t1"] = task
+    state.plays["p1"] = play
+    projection = TreeProjection.from_run_state(state)
+
+    lines_holder: list[TreeLine] = []
+
+    def _stub(budget: int) -> list[TreeLine]:
+        return lines_holder
+
+    monkeypatch.setattr(projection, "tree_lines", _stub)
+    # Stash the holder on the projection so individual tests can replace it.
+    projection._t4_lines_holder = lines_holder  # type: ignore[attr-defined]
+    return projection
+
+
+def test_more_kind_suppresses_branch_glyph(monkeypatch) -> None:
+    """A ``kind="more"`` line renders with an empty branch glyph — no
+    ``├─`` or ``└─``. The footer hangs off the spine as a leaf.
+
+    Constructed by hand: a normal task at depth 2 followed by a
+    ``kind="more"`` footer at the same depth. Pre-T4 the renderer's
+    branch-glyph selection treats ``"more"`` as an unknown kind, so it
+    falls into the ``else`` branch and renders ``├─``/``└─`` like any
+    other leaf. T4 adds ``"more"`` to the no-glyph special-case set.
+    """
+    projection = _visible_projection(monkeypatch)
+    projection._t4_lines_holder.extend(  # type: ignore[attr-defined]
+        [
+            TreeLine(
+                depth=0,
+                kind="playbook",
+                label="site.yml",
+                glyph=None,
+                status=None,
+                elapsed_s=None,
+            ),
+            TreeLine(
+                depth=1,
+                kind="play",
+                label="play: deploy",
+                glyph=None,
+                status=Status.RUNNING,
+                elapsed_s=None,
+            ),
+            TreeLine(
+                depth=2,
+                kind="task",
+                label="Install nginx",
+                glyph=None,
+                status=Status.PENDING,
+                elapsed_s=None,
+            ),
+            TreeLine(
+                depth=2,
+                kind="more",
+                label="… and 5 more tasks",
+                glyph=None,
+                status=Status.PENDING,
+                elapsed_s=None,
+            ),
+        ]
+    )
+    block = format_tree_block(projection, budget=10, width=80, ascii_mode=False, colorize=False)
+    # The "more" line must not start with ├─ or └─. Its branch slot is empty,
+    # so the line begins with indent + glyph ("□ ") + label.
+    more_line = next(ln for ln in block if "more tasks" in ln)
+    assert "├─" not in more_line, f"more footer must not have ├─ prefix; got {more_line!r}"
+    assert "└─" not in more_line, f"more footer must not have └─ prefix; got {more_line!r}"
+    # The PENDING icon □ renders so the footer reads as metadata-shaped.
+    assert "□" in more_line, f"expected PENDING icon □ on more footer; got {more_line!r}"
+
+
+def test_has_tail_after_demotes_last_to_mid(monkeypatch) -> None:
+    """A line with ``has_tail_after=True`` draws ``├─`` instead of ``└─``.
+
+    Without T4's look-ahead, a true last child renders ``└─``; with
+    ``has_tail_after=True`` the renderer treats the line as having a
+    sibling/descendant below, so the branch flips to ``├─`` and the
+    parent spine continues.
+    """
+    projection = _visible_projection(monkeypatch)
+    projection._t4_lines_holder.extend(  # type: ignore[attr-defined]
+        [
+            TreeLine(
+                depth=0,
+                kind="playbook",
+                label="site.yml",
+                glyph=None,
+                status=None,
+                elapsed_s=None,
+            ),
+            TreeLine(
+                depth=1,
+                kind="play",
+                label="play: deploy",
+                glyph=None,
+                status=Status.RUNNING,
+                elapsed_s=None,
+            ),
+            TreeLine(
+                depth=2,
+                kind="task",
+                label="First task",
+                glyph=None,
+                status=Status.PENDING,
+                elapsed_s=None,
+                has_tail_after=True,
+            ),
+            TreeLine(
+                depth=2,
+                kind="task",
+                label="Second task",
+                glyph=None,
+                status=Status.PENDING,
+                elapsed_s=None,
+            ),
+        ]
+    )
+    block = format_tree_block(projection, budget=10, width=80, ascii_mode=False, colorize=False)
+    first_task = next(ln for ln in block if "First task" in ln)
+    # The first task is NOT the last child (a footer / sibling follows),
+    # so its branch is ├─, not └─.
+    assert "├─" in first_task, f"expected ├─ prefix on has_tail_after=True line; got {first_task!r}"
+    assert "└─" not in first_task, f"└─ would indicate last-child; got {first_task!r}"
+
+
+def test_ancestor_spine_continues_under_tail_after(monkeypatch) -> None:
+    """The ancestor of a ``has_tail_after=True`` line draws ``│  `` in
+    its indent chain — proving the spine continues through the cut.
+
+    Four-level tree: playbook (d0) → play (d1, has_tail_after=True) →
+    task (d2). The play is marked ``has_tail_after=True`` because it
+    is the last visible line of the head (T2's truncation logic sets
+    the same flag on the line just before the cut). With T4's
+    ``is_last`` override, the play's branch flips from ``└─`` to
+    ``├─``, and its descendant at depth 2 picks up ``│  `` from
+    ``_ancestor_chain_indent`` instead of ``   `` — the spine
+    extends from the playbook root down to the cut line.
+    """
+    projection = _visible_projection(monkeypatch)
+    projection._t4_lines_holder.extend(  # type: ignore[attr-defined]
+        [
+            TreeLine(
+                depth=0,
+                kind="playbook",
+                label="site.yml",
+                glyph=None,
+                status=None,
+                elapsed_s=None,
+            ),
+            TreeLine(
+                depth=1,
+                kind="play",
+                label="play: deploy",
+                glyph=None,
+                status=Status.RUNNING,
+                elapsed_s=None,
+                has_tail_after=True,
+            ),
+            TreeLine(
+                depth=2,
+                kind="task",
+                label="Final visible task",
+                glyph=None,
+                status=Status.PENDING,
+                elapsed_s=None,
+            ),
+            TreeLine(
+                depth=0,
+                kind="more",
+                label="… and 5 more tasks",
+                glyph=None,
+                status=Status.PENDING,
+                elapsed_s=None,
+            ),
+        ]
+    )
+    block = format_tree_block(projection, budget=10, width=80, ascii_mode=False, colorize=False)
+    play_line = next(ln for ln in block if "play: deploy" in ln)
+    task_line = next(ln for ln in block if "Final visible task" in ln)
+    # The play has has_tail_after=True, so its branch flips to ├─.
+    assert play_line.startswith("├─"), f"expected play to start with ├─; got {play_line!r}"
+    # The task line at depth 2 has the play as its only ancestor. The
+    # play is non-last (has_tail_after=True), so its ancestor segment
+    # must be the vertical pipe `│  `.
+    assert task_line.startswith("│  "), (
+        f"ancestor spine must continue under has_tail_after=True; "
+        f"expected `│  ├─` prefix on task; got {task_line!r}"
+    )
+
+
+def test_format_tree_block_renders_two_level_truncation(monkeypatch) -> None:
+    """End-to-end snapshot of the user's sketch shape. Two plays,
+    second with a ``podman`` role containing 33 tasks. With
+    ``budget=10`` the truncation algorithm (T2) emits an inner footer
+    at the role's task depth AND an outer footer at depth 0. Both
+    footers must render with the PENDING icon and no branch glyph,
+    and the line immediately above each footer must render with
+    ``├─`` (the spur that keeps the spine connected to the footer).
+    """
+    from ansible_aom.core.models import PlayDefinition, RoleGroupDefinition, TaskDefinition
+
+    # Build the state DIRECTLY (rather than replaying events) so both
+    # plays are visible to the active-play logic in
+    # ``_tree_lines_unbounded``. Event replay's force-finalisation
+    # rules hide the previous play once a later play starts — we
+    # want both visible for the multi-play shape the user's sketch
+    # describes.
+    state = RunState(playbook="smfc-and-scrutiny.yml")
+    state.definitions = [
+        PlayDefinition(
+            id="p1",
+            name="Supermicro Fan Control (smfc) Install and Config",
+            hosts="localhost",
+            resolved_hosts=["host1"],
+            tasks=[
+                RoleGroupDefinition(
+                    role="smfc",
+                    tasks=[
+                        TaskDefinition(
+                            name=f"smfc : step {i}",
+                            role="smfc",
+                            tags=[],
+                            play_id="p1",
+                            play_order=0,
+                            task_order=i,
+                        )
+                        for i in range(3)
+                    ],
+                )
+            ],
+        ),
+        PlayDefinition(
+            id="p2",
+            name="Setup rootless Podman for Scrutiny web server",
+            hosts="localhost",
+            resolved_hosts=["host1"],
+            tasks=[
+                RoleGroupDefinition(
+                    role="podman",
+                    tasks=[
+                        TaskDefinition(
+                            name=f"podman : Podman task {i}",
+                            role="podman",
+                            tags=[],
+                            play_id="p2",
+                            play_order=1,
+                            task_order=i,
+                        )
+                        for i in range(33)
+                    ],
+                )
+            ],
+        ),
+    ]
+    # Runtime: one task per play running. Play 1 has 1 RUNNING, play 2
+    # has 1 RUNNING on host1. Both plays therefore contribute to the
+    # active-play filter, and the unbounded tree holds both plays.
+    from ansible_aom.core.models import HostRunState, PlayRunState, TaskRunState
+
+    p1 = PlayRunState(play_id="p1", name="Supermicro Fan Control (smfc) Install and Config")
+    t_p1 = TaskRunState(task_id="smfc_t0", name="smfc : step 0", status=Status.RUNNING)
+    t_p1.hosts["host1"] = HostRunState(hostname="host1", status=Status.RUNNING)
+    p1.tasks["smfc_t0"] = t_p1
+    state.plays["p1"] = p1
+
+    p2 = PlayRunState(play_id="p2", name="Setup rootless Podman for Scrutiny web server")
+    t_p2 = TaskRunState(task_id="podman_t0", name="podman : Podman task 0", status=Status.RUNNING)
+    t_p2.hosts["host1"] = HostRunState(hostname="host1", status=Status.RUNNING)
+    p2.tasks["podman_t0"] = t_p2
+    state.plays["p2"] = p2
+
+    projection = TreeProjection.from_run_state(state)
+    # Sanity: the unbounded tree must exceed budget so T2 kicks in.
+    unbounded = projection.tree_lines(budget=200)
+    assert len(unbounded) > 10, (
+        f"test fixture must overflow budget=10 for T2 to engage; got {len(unbounded)} lines"
+    )
+
+    block = format_tree_block(projection, budget=15, width=120, ascii_mode=False, colorize=False)
+    joined = "\n".join(block)
+
+    # Both footers must render.
+    more_lines = [ln for ln in block if "more tasks" in ln]
+    assert len(more_lines) == 2, (
+        f"expected exactly 2 'more tasks' footers (inner + outer); got {len(more_lines)} in:\n{joined}"
+    )
+    # Both footers carry the PENDING icon □ (T4 Edit 3) and have no
+    # branch glyph (T4 Edit 1).
+    for footer in more_lines:
+        assert "□" in footer, f"every 'more' footer must carry the PENDING icon; got {footer!r}"
+        assert "├─" not in footer and "└─" not in footer, (
+            f"footers must have no branch glyph; got {footer!r}"
+        )
+
+    # The role label switches to "(M remaining)" inside the cut (T3).
+    role_line = next(ln for ln in block if "podman" in ln and "role" in ln.lower())
+    assert "remaining" in role_line, (
+        f"role label must say '(M remaining)' inside the cut; got {role_line!r}"
+    )
+
+    # Every non-host, non-root line in the inner section (the cut
+    # starts at the second play: "Setup rootless Podman...") must draw
+    # ├─ (the has_tail_after spur) so the spine extends from the top
+    # of the cut window down to the inner footer. Host leaves and
+    # the playbook root are excluded (no branch glyph of their own).
+    #
+    # Pre-fix this fails on the second play, the podman role, and the
+    # visible tasks — they all rendered as └─ because T2 only marked
+    # the last line of the inner section. Post-fix (marking every line
+    # in the inner section) every non-leaf line in the cut carries ├─.
+    inner_footer_idx = next(i for i, ln in enumerate(block) if "and 30 more tasks" in ln)
+    # Find the cut start: the second play line "Setup rootless Podman".
+    cut_start_idx = next(i for i, ln in enumerate(block) if "Setup rootless Podman" in ln)
+    for i in range(cut_start_idx, inner_footer_idx):
+        line = block[i]
+        if "host1 ◐" in line or "h1 ◐" in line:
+            # Host leaves: no own branch glyph, but the indent prefix
+            # carries the running spine.
+            continue
+        # Every non-host line in the inner section must draw ├─.
+        assert "├─" in line, (
+            f"line {i} in the inner section must draw ├─ (has_tail_after spur); got {line!r}"
+        )

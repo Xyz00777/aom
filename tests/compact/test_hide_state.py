@@ -406,3 +406,97 @@ class TestHideChangedPerHost:
         assert any("ok: [web1]" in line for line in logged), (
             f"'ok:' line for web1 should print, got: {logged}"
         )
+
+
+def _aom_jsonl_item_event(
+    event: str,
+    host: str,
+    label: str,
+    *,
+    changed: bool = False,
+    msg: str | None = None,
+    uuid: str = "u1",
+    ts: str = "2026-05-11T10:00:01Z",
+) -> dict:
+    """Build a per-item event matching the real aom_jsonl callback payload shape.
+
+    The real callback does NOT set ``failed``/``skipped`` flags on per-item
+    payloads — those flags only appear on the aggregate host result. This
+    helper omits them so tests match production behaviour.
+    """
+    raw: dict = {"_ansible_item_label": label, "item": label, "changed": changed}
+    if msg is not None:
+        raw["msg"] = msg
+    return {
+        "_event": event,
+        "_timestamp": ts,
+        "task": {"id": uuid},
+        "hosts": {host: raw},
+    }
+
+
+class TestHideStatePreservesFailedItemMessage:
+    """When --hide-state ok,skipped hides ok/skipped items, the failed item
+    from a loop must still render as 'failed:' with its msg — not silently
+    dropped or rendered as 'ok:'.
+
+    The real aom_jsonl callback emits v2_runner_item_on_failed WITHOUT a
+    ``failed: True`` flag in the per-item payload, so the renderer must use
+    the event type to determine the display state.
+    """
+
+    def test_failed_item_visible_with_hide_state_ok_skipped(self):
+        r = _renderer(hide_states=["ok", "skipped"])
+        r._emit_event_log(_task_start("Copy files", "u1"))
+        r._emit_event_log(
+            _aom_jsonl_item_event(
+                "v2_runner_item_on_failed",
+                "localhost",
+                "/opt/firefly/missing",
+                msg="Destination directory /opt/firefly/missing does not exist",
+            )
+        )
+        r._emit_event_log(_task_start("Next", "u2"))
+        logged = _logged(r)
+        failed_lines = [line for line in logged if "failed:" in line]
+        assert len(failed_lines) >= 1, f"Expected at least one 'failed:' line, got: {logged}"
+        assert any("item=/opt/firefly/missing" in line for line in logged), (
+            f"Expected item label in output, got: {logged}"
+        )
+        assert any("does not exist" in line for line in logged), (
+            f"Expected error msg in output, got: {logged}"
+        )
+
+    def test_ok_item_hidden_with_hide_state_ok_skipped(self):
+        r = _renderer(hide_states=["ok", "skipped"])
+        r._emit_event_log(_task_start("Copy files", "u1"))
+        r._emit_event_log(_aom_jsonl_item_event("v2_runner_item_on_ok", "localhost", "apple"))
+        r._emit_event_log(_task_start("Next", "u2"))
+        logged = _logged(r)
+        assert not any("ok: [localhost]" in line for line in logged), (
+            f"ok: line should be hidden, got: {logged}"
+        )
+
+    def test_changed_item_visible_with_hide_state_ok_skipped(self):
+        r = _renderer(hide_states=["ok", "skipped"])
+        r._emit_event_log(_task_start("Copy files", "u1"))
+        r._emit_event_log(
+            _aom_jsonl_item_event("v2_runner_item_on_ok", "localhost", "banana", changed=True)
+        )
+        r._emit_event_log(_task_start("Next", "u2"))
+        logged = _logged(r)
+        assert any("changed: [localhost]" in line for line in logged), (
+            f"changed: line should print, got: {logged}"
+        )
+
+    def test_skipped_item_hidden_with_hide_state_ok_skipped(self):
+        r = _renderer(hide_states=["ok", "skipped"])
+        r._emit_event_log(_task_start("Copy files", "u1"))
+        r._emit_event_log(
+            _aom_jsonl_item_event("v2_runner_item_on_skipped", "localhost", "skip_me")
+        )
+        r._emit_event_log(_task_start("Next", "u2"))
+        logged = _logged(r)
+        assert not any("skipping: [localhost]" in line for line in logged), (
+            f"skipping: line should be hidden, got: {logged}"
+        )

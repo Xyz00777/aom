@@ -193,3 +193,92 @@ class TestItemEventsAreKnown:
         assert "v2_runner_item_on_ok" not in r._state.unknown_events
         assert "v2_runner_item_on_failed" not in r._state.unknown_events
         assert "v2_runner_item_on_skipped" not in r._state.unknown_events
+
+
+def _aom_jsonl_item_event(
+    event: str,
+    host: str,
+    label: str,
+    *,
+    changed: bool = False,
+    msg: str | None = None,
+    uuid: str = "u1",
+    ts: str = "2026-05-11T10:00:01Z",
+) -> dict:
+    """Build a per-item event matching the real aom_jsonl callback payload shape.
+
+    The real callback does NOT set ``failed``/``skipped`` flags on per-item
+    payloads — those flags only appear on the aggregate host result. This
+    helper omits them so tests match production behaviour.
+    """
+    raw: dict = {"_ansible_item_label": label, "item": label, "changed": changed}
+    if msg is not None:
+        raw["msg"] = msg
+    return {
+        "_event": event,
+        "_timestamp": ts,
+        "task": {"id": uuid},
+        "hosts": {host: raw},
+    }
+
+
+class TestItemEventTypeIsAuthoritative:
+    """Per-item events carry their state in the event type, not in the payload.
+
+    The ``aom_jsonl`` callback emits ``v2_runner_item_on_failed`` / ``v2_runner_item_on_skipped``
+    WITHOUT setting ``failed``/``skipped`` flags on the per-item payload. The renderer
+    must use the event type to determine the display state when the payload flags
+    are absent.
+    """
+
+    def test_failed_item_without_failed_flag_renders_failed(self):
+        r = _renderer()
+        r._emit_event_log(_task_start("Echo", "u1"))
+        r._emit_event_log(
+            _aom_jsonl_item_event(
+                "v2_runner_item_on_failed", "localhost", "bad_item", msg="Destination missing"
+            )
+        )
+        text = _all_text(r)
+        assert "failed: [localhost] => (item=bad_item)" in text
+        assert "Destination missing" in text
+
+    def test_skipped_item_without_skipped_flag_renders_skipping(self):
+        r = _renderer()
+        r._emit_event_log(_task_start("Echo", "u1"))
+        r._emit_event_log(
+            _aom_jsonl_item_event("v2_runner_item_on_skipped", "localhost", "skip_item")
+        )
+        text = _all_text(r)
+        assert "skipping: [localhost] => (item=skip_item)" in text
+
+    def test_ok_item_still_uses_changed_flag(self):
+        """v2_runner_item_on_ok still uses the payload's changed flag."""
+        r = _renderer()
+        r._emit_event_log(_task_start("Echo", "u1"))
+        r._emit_event_log(
+            _aom_jsonl_item_event("v2_runner_item_on_ok", "localhost", "apple", changed=True)
+        )
+        assert "changed: [localhost] => (item=apple)" in _all_text(r)
+
+    def test_ok_item_unchanged(self):
+        r = _renderer()
+        r._emit_event_log(_task_start("Echo", "u1"))
+        r._emit_event_log(_aom_jsonl_item_event("v2_runner_item_on_ok", "localhost", "apple"))
+        assert "ok: [localhost] => (item=apple)" in _all_text(r)
+
+    def test_failed_item_colors_red(self):
+        r = _renderer(colorize=True)
+        r._emit_event_log(_task_start("T", "u1"))
+        r._emit_event_log(
+            _aom_jsonl_item_event("v2_runner_item_on_failed", "localhost", "x", msg="err")
+        )
+        logged = _logged(r)
+        assert any(_RED in ln and "item=x" in ln for ln in logged)
+
+    def test_skipped_item_colors_cyan(self):
+        r = _renderer(colorize=True)
+        r._emit_event_log(_task_start("T", "u1"))
+        r._emit_event_log(_aom_jsonl_item_event("v2_runner_item_on_skipped", "localhost", "y"))
+        logged = _logged(r)
+        assert any(_CYAN in ln and "item=y" in ln for ln in logged)

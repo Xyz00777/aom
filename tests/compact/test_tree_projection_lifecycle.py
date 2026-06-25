@@ -148,7 +148,7 @@ class TestProjectionLifecycle:
         r.update_state(_task_start(uuid="u1", name="Install nginx"))
         first = r._projection
         assert isinstance(first, TreeProjection)
-        assert first._task_role("Install nginx") == "webserver"
+        assert first._task_role("Install nginx") == ("webserver",)
 
         # The unknown task is grafted dynamically under the matched
         # parent. The same projection instance must survive, and its
@@ -158,7 +158,7 @@ class TestProjectionLifecycle:
 
         post_event = r._projection
         assert post_event is first
-        assert post_event._task_role("Poll async status") == "webserver"
+        assert post_event._task_role("Poll async status") == ("webserver",)
 
     def test_perf_021_consecutive_ticks_reuse_projection(self) -> None:
         """Two ticks with no intervening state mutation reuse the same instance."""
