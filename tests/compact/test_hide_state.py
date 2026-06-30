@@ -23,7 +23,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from ansible_aom.compact.renderer import CompactRenderer
-from ansible_aom.core.models import RunState
+from ansible_aom.core.run_state import RunState
 
 
 def _task_start(name: str = "T", uuid: str = "u", ts: str = "2026-05-11T10:00:00Z") -> dict:

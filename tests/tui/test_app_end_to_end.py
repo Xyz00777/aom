@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from ansible_aom.core.models import RunState
+from ansible_aom.core.run_state import RunState
 from ansible_aom.tui.app import AOMApp
 
 

@@ -795,10 +795,10 @@ class TestExitCode1:
         from ansible_aom.core.models import (
             HostRunState,
             PlayRunState,
-            RunState,
             Status,
             TaskRunState,
         )
+        from ansible_aom.core.run_state import RunState
 
         state = RunState(playbook="fail.yml")
         play = PlayRunState(play_id="play-1", name="test play")
@@ -815,10 +815,10 @@ class TestExitCode1:
         from ansible_aom.core.models import (
             HostRunState,
             PlayRunState,
-            RunState,
             Status,
             TaskRunState,
         )
+        from ansible_aom.core.run_state import RunState
 
         state = RunState(playbook="mixed.yml")
         play = PlayRunState(play_id="play-1", name="mixed play")
@@ -864,10 +864,10 @@ class TestExitCode2:
         from ansible_aom.core.models import (
             HostRunState,
             PlayRunState,
-            RunState,
             Status,
             TaskRunState,
         )
+        from ansible_aom.core.run_state import RunState
 
         state = RunState(playbook="unreach.yml")
         play = PlayRunState(play_id="play-1", name="unreach play")
@@ -885,10 +885,10 @@ class TestExitCode2:
         from ansible_aom.core.models import (
             HostRunState,
             PlayRunState,
-            RunState,
             Status,
             TaskRunState,
         )
+        from ansible_aom.core.run_state import RunState
 
         state = RunState(playbook="ok.yml")
         play = PlayRunState(play_id="play-1", name="ok play")
@@ -903,7 +903,7 @@ class TestExitCode2:
     def test_determine_exit_code_returns_0_on_empty_state(self):
         """TC-026: determine_exit_code returns 0 on empty RunState (no plays/tasks)."""
         from ansible_aom.compact.renderer import determine_exit_code
-        from ansible_aom.core.models import RunState
+        from ansible_aom.core.run_state import RunState
 
         state = RunState(playbook="empty.yml")
         assert determine_exit_code(state) == 0
@@ -914,10 +914,10 @@ class TestExitCode2:
         from ansible_aom.core.models import (
             HostRunState,
             PlayRunState,
-            RunState,
             Status,
             TaskRunState,
         )
+        from ansible_aom.core.run_state import RunState
 
         state = RunState(playbook="unreach.yml")
         play = PlayRunState(play_id="play-1", name="mixed")

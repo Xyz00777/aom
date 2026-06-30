@@ -1,3 +1,14 @@
+## 2026-06-26 L3: Tightened test file ruff ignores
+
+Replaced the blanket `"tests/**" = ["F401", "F811", "F841", "E501"]` with 36 precise per-file entries. Every rule still has real violations — none could be fully removed. But new test files no longer inherit these suppressions automatically.
+
+- F401: 83 violations across 29 files
+- F811: 24 violations across 3 files (test_compact_renderer.py, test_playbook_parser.py, test_config.py)
+- F841: 26 violations across 13 files
+- E501: 19 violations across 12 files
+
+Also added entries for 3 untracked test files (test_r6_encoding_roundtrip.py, test_help_screen.py, test_runner_eof_watchdog.py) that were never covered by the wildcard.
+
 ## 2026-04-24 Exploration Results
 
 ### Stub Status
@@ -1956,3 +1967,568 @@ Both fixed in the same function:
 ### Lesson
 
 The `_last_matched_task_def` cursor is the same pattern as a stack-pointer in a recursive-descent parser: it must be pushed/popped on every grammar boundary. Play boundaries are the natural pop point — anything else is a bug.
+
+## Session: Split RunState out of models.py
+
+**Goal**: Move `RunState` + its private helpers (`_parse_timestamp`, `_parse_play_window_start`, `_iter_leaf_task_defs`, `_leaves_of_role_group`, `count_leaf_tasks`) from `core/models.py` (1110 lines) into a new `core/run_state.py`. Keep `models.py` re-exporting them for the migration phase. Update every consumer's import.
+
+### What landed
+
+- New module: `src/ansible_aom/core/run_state.py` (~890 lines) — owns `RunState`, the preflight flatteners, timestamp/window parsers, and the lazy `from ansible_aom.core.includes import discover_include_with_runtime_path` inside the two task-start handlers.
+- `models.py` shrunk from 1110 → 297 lines. Still owns the dataclasses that `RunState` references (`HostRunState`, `TaskRunState`, `PlayRunState`, `TaskDefinition`, `PlayDefinition`, `RoleGroupDefinition`, `IncludeCacheEntry`, `RoleCacheEntry`) and the leaf-finder helper `_iter_task_def_tree`.
+- Source imports updated in 14 files (tree, includes, parity, exit_code, replay, compact/format, compact/renderer, tui/app, tui/screens/main, tui/widgets/task_tree, formats/json, ansible/runner).
+- Test imports updated in 14 files (compact, integration, tui, unit) — used `ast` parsing to rewrite `ImportFrom` nodes targeting `ansible_aom.core.models`, splitting out `RunState`/`count_leaf_tasks`/`_parse_timestamp` into a new import from `ansible_aom.core.run_state`.
+
+### The circular-import trap and how I solved it
+
+`run_state.py` needs the dataclasses from `models.py` (`HostRunState`, `PlayRunState`, etc.) to type `RunState`'s fields. `models.py` needs to re-export `RunState` for backward compat. That's a cycle.
+
+Three solutions I considered:
+
+1. **Bottom-of-file re-export**: place `from ansible_aom.core.run_state import RunState` at the end of `models.py`. Works only when `models.py` is imported first. Fails with `ImportError: cannot import name 'RunState' from partially initialized module` if anything imports `run_state` directly (which tests do).
+
+2. **`TYPE_CHECKING` block**: doesn't work because `RunState` uses `field(default_factory=...)` calls referencing real types at class-definition time, not just annotations.
+
+3. **Module-level `__getattr__` + frozenset allowlist**: `models.py` declares `__getattr__(name)` which lazily imports `ansible_aom.core.run_state` only when one of the legacy names is accessed. `__dir__` is overridden so `from … import *` works. This breaks the cycle because the import only happens on first access (after both modules have fully loaded).
+
+I picked option 3 — it works regardless of import order and is the standard Python pattern for backward-compat re-exports across a circular split.
+
+```python
+_LEGACY_RUN_STATE_EXPORTS = frozenset({"RunState", "_iter_leaf_task_defs", "count_leaf_tasks"})
+
+def __getattr__(name: str) -> Any:
+    if name in _LEGACY_RUN_STATE_EXPORTS:
+        from ansible_aom.core import run_state
+        value = getattr(run_state, name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+```
+
+### Tooling lesson: ast-based refactor over regex
+
+First attempt used a regex over `^from ansible_aom.core.models import …` lines. It broke multi-line paren imports because the script tried to keep parsing "the next line" from a list it had already partially consumed, producing garbled output. Restored from git, rewrote with `ast.parse` + `node.lineno`/`node.end_lineno` to compute exact source spans, then rebuilt the lines. The ast approach correctly handled both single-line and paren-wrapped multi-line imports in one pass.
+
+Key insight: for refactors that touch every import statement, use `ast` to identify ImportFrom nodes and rewrite by line range, never by string substitution.
+
+### Verification
+
+- `uv run ruff check src/ansible_aom/ tests/` — All checks passed.
+- `uv run mypy src/ansible_aom` — Success: no issues found in 73 source files.
+- `uv run pytest tests/ -q` — 2765 passed, 6 skipped, 1 xfailed (expected).
+- `lsp_diagnostics` on `models.py` and `run_state.py` — clean.
+
+### Migration phase notes
+
+The lazy re-export in `models.py` lets the rest of the codebase migrate file-by-file without breaking. Once every caller imports directly from `run_state`, the `__getattr__` shim can be deleted in a follow-up cleanup. Mark it with a TODO so a future session knows the shim is removable when `grep -rn 'from ansible_aom.core.models import.*RunState' src/ tests/` returns nothing.
+
+
+## Session: Split tree.py into tree_projection.py
+
+**Goal**: Move `TreeProjection` + helpers out of `core/tree.py` (2048 lines) into a new `core/tree_projection.py`. Keep `core/tree.py` as a thin re-export shim so the 24 existing import sites keep working without edits.
+
+### What landed
+
+- New module: `src/ansible_aom/core/tree_projection.py` (2048 lines, verbatim copy of the old `tree.py`).
+- `tree.py` is now a 64-line re-export shim that pulls every public and private symbol through `from ansible_aom.core.tree_projection import (...)` and re-exports them via `__all__`. Identity check: `tree.TreeProjection is tree_projection.TreeProjection` — same class object, so `isinstance` checks, `__class__` introspection, and subclass relations are all preserved.
+- Zero behavior change. Zero test changes. Zero consumer import changes.
+
+### Why a direct re-export (no `__getattr__`) instead of the lazy trick
+
+The RunState split used `__getattr__` + frozenset allowlist because `run_state.py` and `models.py` form a circular dependency (`run_state` imports dataclasses from `models`, `models` re-exports `RunState`). That cycle can only be broken by deferring the re-export until first attribute access.
+
+`tree_projection.py` has no such cycle: it imports from `models` and `run_state` only, both of which are leaf modules. `tree.py` can do a plain top-level `from ansible_aom.core.tree_projection import (...)` and Python resolves it eagerly at module-load time without ever needing lazy attribute lookup. Direct re-export is simpler, more discoverable (`dir(tree)` lists every symbol), and easier for type checkers and IDEs to follow.
+
+Rule of thumb: reach for `__getattr__` only when the import graph has a cycle. If a cycle doesn't exist, prefer direct re-export.
+
+### Migration phase notes
+
+Same as the RunState split: the shim lets the rest of the codebase migrate file-by-file without breaking. Delete `tree.py` once the grep recipe in its docstring returns zero matches.
+
+### Verification
+
+- `uv run ruff format src/ tests/` — 239 files left unchanged.
+- `uv run ruff check src/ tests/` — All checks passed. Note: ruff's import-sorter put `_ROW_LEASE_LIMIT`/`_ROW_LEASE_TTL`/`_TEMPLATE_RE` (uppercase-with-underscore) BEFORE `HostRow` (mixed-case) in the import block, even though they appear alphabetically after `TreeProjection`. That's ruff's case-insensitive sort (uppercase < lowercase in ASCII), not a bug. `__all__` keeps the canonical public ordering for `dir()` and `from … import *`.
+- `uv run mypy src/ansible_aom` — Success: no issues found in 74 source files (was 73; tree_projection.py added one).
+- `uv run pytest tests/ -q -x` — 2765 passed, 6 skipped, 1 xfailed. Identical to the pre-split baseline.
+- `lsp_diagnostics` on `tree.py` and `tree_projection.py` — clean.
+
+### Tooling lesson: raw string for shim docstrings
+
+First draft of the shim docstring contained `ansible_aom\.core\.tree\b` inside a triple-quoted string. Python 3.12+ flags `\.` inside a regular (non-raw) triple-quoted string as an invalid escape sequence (`SyntaxWarning`), which CI linting upgrades to an error. Switched to `r"""..."""` to silence it. Rule of thumb: any shim docstring that contains shell-style grep regex with `\.` or `\b` should be a raw string.
+
+## R2: Long output capping — pre-existing implementation, gap-audit-only
+
+When the orchestrator assigned R2, both fixes and most of the tests were
+already in place from a prior robustness pass. Only gap-fill tests were
+added.
+
+### What was already implemented
+
+- `compact/format.py::114-125`: `_MSG_DISPLAY_CAP = 4096` and
+  `_truncate_msg(msg)` returning `msg[:cap] + "…(truncated, N bytes)"`
+  for messages longer than 4096 bytes.
+- `compact/renderer.py`: `_truncate_msg` applied at all three `msg`
+  sites — `v2_runner_on_failed` (1376), `v2_runner_on_unreachable`
+  (1394), and the per-item `v2_runner_item_on_failed` path inside
+  `_format_loop_item_line` (1507). Re-exported from `format` so
+  tests can import via the renderer namespace.
+- `core/parser.py::245-251`: `_plaintext_lines` is capped at
+  `MAX_LOG_LINES` (50000, from `core/state_machine.py`) by deleting
+  the overflow head — drop-oldest semantics, recent-tail retained.
+- `tests/compact/test_long_output_cap.py`: 3 tests covering failed,
+  unreachable, and short-msg pass-through.
+- `tests/unit/test_parser.py::TestPtyStreamParserPlaintextCap`: 1 test
+  pushing `MAX_LOG_LINES + 100` lines and asserting tail-retained.
+
+### What was added
+
+- `test_one_megabyte_failed_msg_truncated`: pins the R2 plan's literal
+  "1 MB msg" scenario (existing tests used `2 * cap` = 8 KB). Acts as
+  a guard against future regressions where someone lowers the cap to
+  something silly or removes the truncate call entirely — a 1 MB
+  payload that survived verbatim would blow up Rich's render thread.
+- `test_item_failed_msg_truncated_above_cap`: covers the
+  `v2_runner_item_on_failed` path (renderer.py:1507). Loop-task
+  failures weren't exercised by the original tests; a `with_items`
+  over a large file list could otherwise print one huge msg per
+  failing item.
+- `test_plaintext_lines_60000_input_retains_exactly_50000`: pins the
+  R2 plan's literal "60 000 → exactly 50 000 retained" requirement
+  with explicit first/last entry assertions (line 10000 / line 59999).
+  Also pins `MAX_LOG_LINES == 50000` so an accidental constant rename
+  fails loudly instead of silently shifting the cap.
+
+### Audit takeaways for future robustness slices
+
+Before touching code, grep for the R-tagged comments (`# R2:`, `# R3:`)
+across `src/` — they often mark work that's already landed. Check both
+the source under change and the test files for the slice. The robustness
+notepad at `.sisyphus/notepads/plans/robustness.md` is the plan of
+record; the implementation state lives in `implementation/learnings.md`.
+The two diverge — plan says "do X", learnings says "X is done since
+session N". Always cross-reference both.
+
+### Verification
+
+- `uv run pytest tests/ -q -n auto` — 2768 passed, 6 skipped, 1 xfailed.
+- `uv run ruff format` — 240 files left unchanged.
+- `uv run ruff check --fix` — All checks passed.
+- `uv run mypy src/ansible_aom` — Success: no issues found in 74 files.
+- `lsp_diagnostics` flagged "missing imports" on test files — false
+  positive from Pyright not finding the venv. mypy and the test runner
+  both resolve the same imports cleanly.
+
+### R4 (terminal smaller than 80x24) — verification only
+
+Audited R4 on `feat/nom-compact-renderer`. Already shipped across 5 atomic
+commits by Felix Karg on 2026-05-12:
+
+- `58c798a` — MINIMUM_SIZE constant + force_size kwarg on Display.start
+- `7c18059` — degrade Display.start to log-only mode below 80x24
+- `8d31029` — route update/print_log/stop/clear through plain print in degraded mode
+- `d3eba4e` — re-check terminal size on every update() to flip degraded mode
+- `a34187d` — ruff format pass
+
+Implementation notes that match the plan:
+- `Display.start(force_size=None)` reads `shutil.get_terminal_size()`.
+  Below `(80, 24)` prints warning OUTSIDE any DEC 2026 frame, sets
+  `_degraded = True`, leaves `_is_running = False`. The Rich-era
+  `_live` attribute does not exist in the nom-style rewrite; the
+  plan's `_live is None` assertion was adapted to `_degraded is True`
+  + `_is_running is False` in `test_small_terminal.py` — same
+  observable contract.
+- No SIGWINCH handler installed. `Display.update()` re-queries the
+  size on every call (TIOCGWINSZ is kernel-current) and flips
+  degraded <-> live as appropriate. Growing past MINIMUM_SIZE
+  re-enables the panel; the warning is only printed once per run
+  via the `_degraded_warning_printed` latch.
+- `print_log()` falls through to plain `print(message)` in degraded
+  mode (and non-TTY mode). `stop()` and `clear()` are no-ops in
+  degraded mode.
+
+Verification:
+- `uv run pytest tests/compact/test_small_terminal.py -v` — 17 passed
+- `uv run pytest tests/compact/ tests/unit/ -q` — 2164 passed
+- `uv run pytest tests/integration/ -q` — 351 passed, 6 skipped, 1 xfailed
+- `uv run ruff check src/ansible_aom/compact/display.py tests/compact/test_small_terminal.py` — All checks passed
+- `uv run ruff format --check ...` — 2 files already formatted
+- `uv run mypy src/ansible_aom/compact/display.py` — Success, no issues
+
+Pre-existing mypy noise on `tests/compact/test_small_terminal.py:261`
+(`monkeypatch` param untyped, plus `import-untyped` on the editable
+install). Tests don't require strict typing per AGENTS.md.
+
+## L2 TUI screen stub expansion (help.py + rerun.py)
+
+Replaced the 80-line help.py stub and the 85-line rerun.py stub with
+real, testable implementations.
+
+### help.py — multi-section reference card
+- Sections: keyboard shortcuts (grouped by KeyContext), navigation
+  (panel focus / toggles / layout), command reference (run / inspect /
+  replay / rerun / misc), status icons legend.
+- Layout: `VerticalScroll` + Static-with-Rich-`Group(of Panels)`,
+  matching the inspect screen's `_HelpScreen` pattern so long content
+  scales on small terminals without truncation.
+- All keybindings pulled live from `tui/keybindings.py` so the
+  shortcuts section can never drift from the binding table.
+
+### rerun.py — real rerun dialog
+- `RerunDialog(state_dir, session_id, host_filter)` builds the plan
+  eagerly at __init__ from the same `session/store.py` and
+  `session/summary.py` machinery the CLI uses, plus the `_build_rerun_command`
+  / `_resolve_session_id` / `_compose_host_set` helpers from
+  `rerun/cli.py`. The dialog cannot drift from `aom rerun` behaviour.
+- Sections: session header (id / playbook / status / args),
+  failed/unreachable/changed host breakdown, planned command with
+  warning, plus the post-init diff of added flags vs original args.
+- Error states (no sessions / no hosts / schema<1.1) render a red
+  Panel instead of the planned command — the user always sees a
+  useful screen, even when nothing is rerunnable.
+- Returns `bool`: True on y/Enter/r (confirm), False on n/Esc (cancel).
+  The dialog itself does NOT spawn a process — keeps side effects
+  out of the UI layer (caller-driven spawning matches the inspect
+  screen's confirm pattern).
+
+### Wiring in app.py
+- Added `action_show_help`, `action_show_settings`,
+  `action_rerun_with_same_args`, `action_rerun_with_modified_args`.
+- `action_show_help` and `action_show_settings` push the modal
+  directly; the rerun actions push `RerunDialog` with the
+  `state_dir` resolved from `self._session_dir` (falling back to
+  `~/.local/state/aom/sessions`).
+- The "modified args" rerun variant falls back to the same dialog
+  for now; a future arg-editor screen can be layered on top of the
+  `RerunDialog` result without changing the binding.
+
+### Test discovery gotchas
+- Calling `screen.compose()` directly outside `app.run_test()` raises
+  `NoActiveAppError` because `VerticalScroll`'s context manager
+  needs `active_app.get()` to resolve. Tests must mount the screen
+  via `app.push_screen()` inside a `pilot` context.
+- After `push_screen`, the new screen lives at `app.screen`, NOT
+  `app` itself. `app.query_one("#help-content")` searches from the
+  default screen and returns `NoMatches`. Query on `app.screen`.
+- Static stores its content as the mangled `_Static__content`
+  attribute (not `renderable`). Reach into it to get the Rich
+  renderable for off-screen assertions via `Console.print`.
+- `Binding(key="question", …)` works the same as
+  `Binding(key="question_mark", …)`; both forms are accepted by
+  Textual's parser. Tests should accept either form.
+
+### Verification
+- `uv run pytest tests/tui/ -q --no-cov` — 280 passed
+- `uv run pytest tests/unit tests/tui -q --no-cov` — 2021 passed
+- `uv run pytest tests/ -q --no-cov` — 2832 passed, 1 pre-existing
+  flaky integration test (`test_no_eof_hang.py::test_runner_returns_within_bounded_time_when_child_hangs_after_stats[30]`)
+  fails under parallel load, passes in isolation; unrelated to UI changes.
+- `uv run ruff check` — All checks passed (after auto-formatting)
+- `uv run ruff format` — applied
+- `uv run mypy src/ansible_aom` — Success, no issues found in 74 source files
+- Tests intentionally don't pass strict mypy (no override exists
+  for `tests/`) but lint cleanly per AGENTS.md.
+
+## 2026-06-26 C3 R6: Encoding surrogateescape for byte round-trip
+
+Switched `pexpect.spawn` from `codec_errors="replace"` to `"surrogateescape"`
+so invalid UTF-8 bytes from the PTY stream round-trip losslessly into
+`events.jsonl`. The on-disk form uses `\uXXXX` escapes for surrogate
+codepoints (Python's `json.dumps` default), and `str.encode("utf-8",
+"surrogateescape")` re-loads them back to the original bytes for
+`aom inspect show`.
+
+### Surprising coupling: orjson rejects surrogate codepoints
+
+`orjson.loads` raises `"str is not valid UTF-8: surrogates not allowed"`
+on ANY surrogate codepoint — paired (emoji) or unpaired. The whole
+parser was wired through `orjson` for performance. The fix: introduce a
+`_safe_loads(line)` shim that detects surrogates via an O(N) char scan
+and routes them through stdlib `json.loads`. The orjson fast path stays
+for the 99.9% no-surrogate case. No exception type change needed at the
+call sites — both `orjson.JSONDecodeError` and `json.JSONDecodeError`
+subclass `ValueError`.
+
+### Display-side normalisation
+
+`_truncate_msg` in `compact/format.py` now runs every msg field through
+`.encode("utf-8", "replace").decode("utf-8", "replace")` so the terminal
+sees `?` instead of an unpaired surrogate. The original bytes survive
+in `events.jsonl`; this only affects display strings. Use a `try/except
+UnicodeEncodeError` to detect surrogates without scanning the string —
+the encode attempt raises only when surrogates are present.
+
+### Test fixture for raw-byte PTY emission
+
+The fake-ansible fixture in `tests/integration/test_r6_encoding_roundtrip.py`
+builds a JSONL line with surrogate-escaped msg bytes, then encodes the
+whole line back to bytes via `str.encode("utf-8", errors="surrogateescape")`
+so the PTY carries the wire-shape bytes. Re-loading the JSONL +
+`.encode("utf-8", "surrogateescape")` recovers the original bytes —
+this is the byte-exact round-trip closure.
+
+### Pre-existing test that flipped xfail → fail
+
+`tests/integration/test_no_eof_hang.py::test_runner_returns_within_bounded_time_when_child_hangs_after_stats`
+was xfail(strict=False) on HEAD. Concurrent in-progress R8 work in the
+working copy removed the xfail marker and expects the EOF watchdog to
+fire — which it now does, but the test budget is only 5s past the 30s
+watchdog and the assertion expects a specific warning text. R6 changes
+do not affect this test; it is unrelated.
+
+## 2026-06-26 R8: EOF watchdog after playbook_on_stats
+
+Implemented in `src/ansible_aom/ansible/runner.py:_drive`. Approach:
+pexpect's built-in per-read timeout (`timeout` kwarg) instead of a
+separate thread. Once the parser's phase flips to
+`StreamPhase.POST_RUN_RECAP` (canonical signal that
+`v2_playbook_on_stats` has been consumed), the per-read timeout
+grows from `_DEFAULT_TIMEOUT_S` (0.5s) to `_EOF_WATCHDOG_S` (30s).
+The next post-stats TIMEOUT breaks out of the loop as a synthetic
+EOF + warning instead of waiting forever on a hung child.
+
+Key design choices:
+- Use parser.phase as the "stats seen" signal — no need to re-parse
+  the line or maintain a separate flag. The parser already tracks
+  this internally.
+- Watchdog surfaces via two channels: `logger.warning(...)` (for the
+  persistent log + `--verbose`) AND `renderer.print_log(f"[aom] ...")`
+  (for the user's live screen above the panel).
+- Pre-stats silence is unchanged — liveness tick + stall heuristics
+  keep their normal cadence until stats is seen.
+- Synthetic EOF goes through `_flush_pending` first so any final
+  bytes in the pexpect buffer still reach the parser/renderer before
+  we exit the loop.
+
+Test gotcha: `child.exitstatus` after `_drive` returns is whatever
+pexpect observed. With force-killed child, signalstatus is set; with
+clean EOF, exitstatus is 0. The runner falls back to 1 via
+`signalstatus or 1` when neither is set — but in practice one of
+them is. Tests should not assert specific exit_code values, only
+that the runner returns at all.
+
+Tests added:
+- `tests/unit/test_runner_eof_watchdog.py` — 7 unit tests using a
+  `_SequenceChild` stub that drives `_drive` with canned responses.
+  Covers: watchdog config sanity, watchdog fires after stats, clean
+  EOF unchanged, pre-stats silence unaffected, post-stats bounded.
+- `tests/integration/test_no_eof_hang.py` — the pre-existing xfail
+  test is now a real test (`sleep_seconds=120` so the child can't
+  exit before the watchdog). Pairs with the existing
+  `test_runner_finishes_promptly_on_clean_eof` for clean-EOF contrast.
+
+CRITICAL test fixture bug: when using `_fake_ansible_hangs_after_stats`
+with `sleep_seconds` close to `_EOF_WATCHDOG_S`, the child may exit
+NORMALLY (its `time.sleep` finishes) at almost the same moment the
+watchdog would fire. Result: race where exit_code=0 (clean EOF) and
+no watchdog warning — flaky test. Use `sleep_seconds >> _EOF_WATCHDOG_S`
+(e.g. 120s) so the child CAN'T exit before the watchdog.
+
+LSP/test gotcha: `_SequenceChild.pid = 0` is required. The runner's
+`_sample_subprocess_active(child.pid)` is called every ~2s in the
+TIMEOUT branch — a stub without `pid` raises AttributeError before
+the watchdog can fire.
+
+## 2026-06-27 Async-poll dict leak fix in `_format_loop_item_line`
+
+### Bug
+User reported `(item={'ansible_job_id': '6c1b0ac27534a522', ...})` leaking
+the full async-poll bookkeeping dict into the item label slot. Root cause:
+`_format_loop_item_line` fell through to `str(raw)` when neither
+`_ansible_item_label` nor `item` was present.
+
+### Detection criterion
+A payload is async-poll bookkeeping when:
+- `ansible_job_id` is present in the dict, AND
+- `_ansible_item_label` is absent, AND
+- `item` is absent
+
+### Fix (two parts)
+
+1. **`_is_async_poll_payload(raw)`** — new module-level helper in
+   `src/ansible_aom/compact/renderer.py`. Returns `True` for the
+   async-poll shape.
+
+2. **`_format_loop_item_line`** — early-return before the normal
+   label logic when `_is_async_poll_payload` is true:
+   - `v2_runner_item_on_failed` → `failed: [host] => (async, job_id=XXX) => <msg>`
+     in `_RED`.
+   - `v2_runner_item_on_ok` (fallback, should be suppressed by caller)
+     → `changed: [host] => (async, job_id=XXX)` in `_YELLOW`.
+
+3. **Streaming path suppression** — in `_emit_event_log`, the
+   `v2_runner_item_on_ok` branch now skips async-poll payloads with
+   `finished=False` (in-flight). A real item event follows when the
+   job finishes; emitting `ok: [host] => (async, ...)` mid-poll is
+   noise.
+
+### Test contract
+- `TestAsyncPollDoesNotLeakDictIntoItemLabel` in
+  `tests/compact/test_loop_item_streaming.py`:
+  - `test_async_poll_failed_does_not_leak_dict_into_item_label` —
+    asserts `(async, job_id=...)` appears and raw dict substring does not.
+  - `test_async_poll_failed_stays_compact_one_line` — exactly one
+    host-result line.
+  - `test_async_poll_in_flight_does_not_render_as_item` — `ds5` not
+    in output for `finished=False` on `v2_runner_item_on_ok`.
+  - `test_async_poll_failed_label_is_red` — colour assertion.
+- Helper `_async_poll_payload()` added to test file.
+
+### Files changed
+- `src/ansible_aom/compact/renderer.py` — added `_is_async_poll_payload`,
+  modified `_format_loop_item_line`, added suppression in `_emit_event_log`.
+- `tests/compact/test_loop_item_streaming.py` — added
+  `_async_poll_payload` helper and `TestAsyncPollDoesNotLeakDictIntoItemLabel`
+  class (4 tests).
+
+### Verification
+- 4 new tests pass.
+- 27 existing tests in `test_loop_item_streaming.py` + `test_loop_item_lines.py` pass.
+- Full suite: 2874 passed, 6 skipped.
+- `ruff format`, `ruff check --fix`, `mypy src/ansible_aom` all clean.
+
+### Free-strategy per-host task transition (meta: reset_connection fix)
+
+**Bug**: Under strategy: free, meta tasks (`meta: reset_connection`,
+`meta: flush_handlers`) never emit `v2_runner_on_ok` — they only emit
+`v2_runner_on_start`. Without per-host task transition tracking, the host
+stays `RUNNING` on the meta task forever in the live tree.
+
+**Fix**: `RunState._handle_v2_runner_on_start` now tracks
+`_host_current_task: dict[str, str]` (host → most-recent task_id). When a
+new `runner_on_start` arrives for a host with a different `task_id`,
+the prior task's host entry (if RUNNING) is transitioned to OK. If no
+host remains RUNNING on the prior task, the task itself is flipped to
+COMPLETED. Linear strategy is unaffected because
+`v2_runner_on_start` is only emitted under free (the JSONL callback
+guards it with `if self._is_lockstep: return`).
+
+**Cascading changes** (necessary consequences, NOT optional):
+1. `compact/renderer.py._bump_task_counters`: added
+   `_reconcile_completed_tasks()` call on `v2_runner_on_start` so the
+   incremental `_tasks_completed` counter matches the oracle at every
+   step (HS-2 invariant).
+2. `core/tree_projection.py._relabel_role_lines`: added a new helper
+   `_count_completed_tasks_per_role` that counts COMPLETED runtime tasks
+   per role identity. Without it, role labels showed "(M tasks
+   remaining)" because the live tree emission drops COMPLETED tasks.
+
+**Open question (for next session)**: 14 tests in `test_tree_projection.py`
+still fail because they assume tasks DON'T complete mid-run under free
+strategy. The projection's `_play_running_and_pending` explicitly drops
+completed tasks from the live tree (line 1770-1771). The budget-cut tests
+rely on all tasks being emitted so a tight budget triggers a cut. With
+the fix, fewer tasks are emitted (completed ones dropped), so budget cuts
+don't trigger. Two paths forward:
+1. Change the projection to emit COMPLETED tasks in the live tree (with
+   a "done" glyph).
+2. Update the 14 tests to match the new behavior.
+
+**Architecture insight**: The free-strategy per-host transition is the
+mirror image of the linear-strategy force-completion in
+`_handle_v2_playbook_on_task_start`. Linear uses whole-task boundaries;
+free uses per-host boundaries. The two paths converge at the
+every-host-OOK check inside `_finalize_play` (linear's final word) and
+the no-host-RUNNING check inside the new free-strategy transition code.
+
+### Revert scope creep (renderer.py / tree_projection.py)
+
+Removed `_reconcile_completed_tasks` call from renderer.py's
+`v2_runner_on_start` branch (kept the existing
+`v2_playbook_on_play_start` / `v2_playbook_on_stats` calls — those
+were pre-existing, not added by this work). Removed the entire
+`_count_completed_tasks_per_role` helper and its call site in
+`_relabel_role_lines`. The core meta-task fix in run_state.py is
+unchanged.
+
+### Test impact after revert
+
+- `tests/unit/test_models.py::TestFreeStrategyHostTransition`: 3/3
+  passing (TC-META-FREE-1, -2, -3).
+- `tests/unit/test_models.py`: 113/113 passing.
+- `tests/unit/test_tree_projection.py`: 68 passed, 12 failed.
+  These 12 failures pre-date the scope-creep revert — they fail with
+  only the run_state.py fix in place because the tests fire
+  `runner_on_start` for multiple sequential tasks on the same host,
+  which is exactly the scenario the fix targets. With the fix,
+  earlier tasks transition to COMPLETED mid-run and are filtered
+  out of the live tree by `_play_running_and_pending`, so the
+  projection emits fewer task lines than the test fixtures
+  expected. Tests like
+  `test_role_label_shows_total_when_no_truncation`,
+  `test_delegated_twin_tasks_follow_path_order_not_arrival_order`,
+  and the role-label / budget-cut family in `test_tree_projection.py`
+  all rely on tasks staying RUNNING during the visible period,
+  which is the pre-fix assumption. They need to be updated to
+  match the new "tasks can COMPLETE mid-run under free strategy"
+  reality — that follow-up is a separate task.
+- `mypy src/ansible_aom`: 0 errors.
+
+### Discrepancy with task description
+
+The task description claimed the run_state.py fix alone should not
+break tree_projection tests (12 failures were attributed to scope
+creep). Empirically, 12 tree_projection tests still fail with only
+the run_state.py fix in place because they exercise the same
+code path the fix targets. The "80 passed baseline" cannot be
+restored while keeping the fix's correctness invariants; it was
+a misattribution.
+
+### Reverted: per-host task transition in runner_on_start (2026-06-27)
+
+Initial investigation suggested a free-strategy fix for meta-task vanishing:
+track per-host current task_id and force-complete the prior task when a new
+runner_on_start arrives. Implementation in run_state.py broke 15 tests in
+test_tree_projection.py, test_tree_nested_roles.py, and
+test_invariants_runstate_renderer.py — all passing at HEAD 9c71941.
+
+Root cause of revert: the fix solves a scenario that doesn't exist in real
+ansible output. Under linear strategy, the existing d981444 force-completion
+in _handle_v2_playbook_on_task_start correctly handles meta tasks. Under
+free strategy, ansible.posix.jsonl filters meta tasks entirely — no
+task_start, no runner_on_start, no runner_on_ok — so the projection has
+nothing to render for them. The artificial test fixtures in
+test_tree_projection.py simulate concurrent execution without runner_on_ok
+between task transitions, which doesn't reflect real ansible output.
+
+User-reported "meta tasks not vanishing" may be a UX/display issue, a
+regression in d981444's path, or a scenario with handler/async tasks.
+Follow-up needed: verify the actual user scenario (likely linear strategy,
+multi-host) works correctly with the existing linear force-completion;
+investigate handler/async paths separately if user reproduces.
+
+### Task-status promotion in terminal-event handlers (2026-06-27)
+
+Added a 4-line check to each of the four terminal-event handlers
+(`_handle_v2_runner_on_ok`, `_handle_v2_runner_on_failed`,
+`_handle_v2_runner_on_skipped`, `_handle_v2_runner_on_unreachable`)
+in `core/run_state.py`: after the host-update loop, if no host is
+RUNNING, FAILED, or UNREACHABLE, set `task.status = Status.COMPLETED`.
+The FAILED/UNREACHABLE exclusion preserves the projection's
+"failed task remains visible in tree" invariant
+(`tests/unit/test_tree_classify_and_role_labels.py::TestFailedTaskRemainsVisible`).
+
+This makes `task.status` self-consistent with the per-host entries,
+which is what status counters, replay's `meta.json`, and the inspect
+model read directly. The projection's `_classify` had been
+paper-overing the inconsistency; now the model is correct on its
+own.
+
+Added `tests/unit/test_models.py::TestRunnerTaskCompletionPromotion`
+with three tests pinning the new behavior (single host OK promotes,
+multi-host partial stays RUNNING, multi-host all terminal promotes).
+
+Pre-existing test
+`tests/unit/test_event_processing.py::TestRunnerOnStartTaskCreation::test_runner_start_creates_task_run_state`
+asserts `task.status == RUNNING` after `runner_on_ok` — it encodes
+the bug the fix corrects. The task's MUST NOT DO forbids modifying
+that file, so the test remains failing. Its docstring "TC-204: status
+RUNNING" is about the post-`runner_on_start` state; the trailing
+`runner_on_ok` is incidental in the fixture, not part of the
+assertion's intent. That test should be updated to match the new
+self-consistent model in a follow-up — out of scope for this fix.
+
+Verification: `uv run mypy src/ansible_aom` clean; `uv run pytest
+tests/unit/test_models.py -q` 114 passed (111 prior + 3 new);
+`uv run pytest tests/unit/` 1758 passed + 1 pre-existing bug-pinning
+test failing.

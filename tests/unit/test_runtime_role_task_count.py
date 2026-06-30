@@ -118,15 +118,12 @@ class TestRuntimeRoleTaskCount:
         """A role loaded via include_role must show its runtime task count
         in the role header label, not 0 or no count.
 
-        Note: under linear strategy, the previously-running t3 gets
-        auto-marked COMPLETED when t4 starts, so only t4 is visible in
-        the kept lines (visible=1, total=2). T3's post-truncation
-        role-label pass rewrites the role header to ``(M remaining)``
-        when visible > 0 and total > visible — see
-        ``.sisyphus/plans/two-level-truncation.md`` T3. So the label
-        here is ``(1 task remaining)``, not the pre-T3 ``(2 tasks)``.
-        The total is still surfaced (via the "2 total - 1 visible = 1
-        remaining" math); only the format changes."""
+        The role label always carries the role's full task count
+        ``(N tasks)`` — never a ``(M remaining)`` suffix (which would
+        have grown as completed tasks dropped out of the visible
+        tree). The ``… and N more tasks`` inner/outer footers surface
+        the truncated work. See
+        ``.sisyphus/plans/two-level-truncation.md`` T3."""
         state = self._state_with_dynamic_role()
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
@@ -136,12 +133,11 @@ class TestRuntimeRoleTaskCount:
         )
         podman_role = [ln for ln in role_lines if "podman" in ln.label]
         assert len(podman_role) >= 1, f"expected podman role, got {[ln.label for ln in role_lines]}"
-        # T3 contract: visible=1, total=2 → "(1 task remaining)".
-        # The role_total_tasks count of 2 is preserved via the math
-        # (2 - 1 = 1 remaining), not lost.
-        assert "(1 task remaining)" in podman_role[0].label, (
-            f"podman role should show (1 task remaining) under T3 (visible=1, "
-            f"total=2), got: {podman_role[0].label}"
+        assert "(2 tasks)" in podman_role[0].label, (
+            f"podman role should show total count (2 tasks); got: {podman_role[0].label}"
+        )
+        assert "remaining" not in podman_role[0].label, (
+            f"podman role must NOT carry 'remaining' suffix; got: {podman_role[0].label}"
         )
 
     def test_dynamic_role_task_appears_under_role_header(self):
@@ -272,14 +268,14 @@ class TestRuntimeRoleTaskCount:
         """Pure runtime role (no preflight tasks at all) must still show
         the correct task count from only runtime tasks.
 
-        Note: under linear strategy, the previously-running t1 and t2
-        get auto-marked COMPLETED when t3 starts, so only t3 is visible
-        in the kept lines (visible=1, total=3). T3's post-truncation
-        role-label pass rewrites the role header to ``(M remaining)``
-        when visible > 0 and total > visible — see
-        ``.sisyphus/plans/two-level-truncation.md`` T3. So the label
-        here is ``(2 tasks remaining)``, not the pre-T3 ``(3 tasks)``.
-        The total of 3 is preserved via the math (3 - 1 = 2 remaining)."""
+        The role label always carries the role's full task count
+        ``(N tasks)`` — never a ``(M remaining)`` suffix. With linear
+        strategy and 3 runtime tasks, only 1 is visible in the kept
+        lines (the other 2 auto-complete when the next task starts),
+        but the label still reads ``(3 tasks)`` because the suffix
+        that would have surfaced the visible/total delta was dropped
+        (it counted completed tasks and grew as the run progressed).
+        See ``.sisyphus/plans/two-level-truncation.md`` T3."""
         state = RunState(playbook="site.yml")
         state.definitions = [
             PlayDefinition(
@@ -322,8 +318,9 @@ class TestRuntimeRoleTaskCount:
         lines = p.tree_lines(budget=25)
         role_lines = [ln for ln in lines if ln.kind == "role" and "podman" in ln.label]
         assert len(role_lines) >= 1, f"expected podman role, got {[ln.label for ln in lines]}"
-        # T3 contract: visible=1, total=3 → "(2 tasks remaining)".
-        assert "(2 tasks remaining)" in role_lines[0].label, (
-            f"pure runtime role should show (2 tasks remaining) under T3 "
-            f"(visible=1, total=3), got: {role_lines[0].label}"
+        assert "(3 tasks)" in role_lines[0].label, (
+            f"pure runtime role should show total count (3 tasks); got: {role_lines[0].label}"
+        )
+        assert "remaining" not in role_lines[0].label, (
+            f"pure runtime role must NOT carry 'remaining' suffix; got: {role_lines[0].label}"
         )

@@ -314,75 +314,123 @@ viewer. It calls `session/store.load_session()` and renders via
 Concrete refactor punch list. Each item is independently shippable; ordering is
 suggested for low-risk landing.
 
-### 7.1 Introduce the missing port (`EventSource`)
+Legend: **[done]** = shipped, **[in progress]** = partially landed,
+**[open]** = not yet started.
 
-- Add `drivers/protocol.py` with `EventSource` Protocol.
-- Extract `run_playbook` driving loop in `runner.py` behind a `LiveDriver`
-  class that satisfies `EventSource`.
-- Extract `replay_session` body behind a `ReplayDriver` class.
-- `cli.py`, `tui/app.py`, and `replay.py` all reduce to: construct driver,
-  construct renderer, call `driver.drive(renderer)`.
+### 7.1 Introduce the missing port (`EventSource`) — **[done]**
 
-### 7.2 Move infrastructure out of the top level
+- [done] `drivers/protocol.py` with `EventSource` Protocol.
+- [done] `LiveDriver` class in `drivers/` satisfies `EventSource`; the
+  pexpect pump is encapsulated behind `drive(renderer)`.
+- [done] `ReplayDriver` class extracted; replay flows through the same
+  `driver.drive(renderer)` seam as the live run.
+- [done] `cli.py` reduces to: construct driver, construct renderer,
+  call `driver.drive(renderer)`.
 
-- `runner.py`        → `ansible/runner.py`
-- `replay.py`        → `drivers/replay.py`  (entry point relocates to `cli.py`)
-- `json_renderer.py` → `formats/json.py`
-- `core/preflight.py` → `ansible/preflight.py` (uses subprocess — not pure)
-- `core/session.py`  → `session/store.py` + `session/summary.py` (file I/O leaves `core/`)
+### 7.2 Move infrastructure out of the top level — **[done]**
 
-### 7.3 Split the `compact/` god module
+- [done] `runner.py`        → `ansible/runner.py`
+- [done] `replay.py`        → `drivers/replay.py`  (entry point relocates to `cli.py`)
+- [done] `json_renderer.py` → `formats/json.py`
+- [done] `core/preflight.py` → `ansible/preflight.py` (uses subprocess — not pure)
+- [done] `core/session.py`  → `session/store.py` + `session/summary.py` (file I/O leaves `core/`)
 
-`compact/renderer.py` is currently ~1.5k lines. Split into:
+### 7.3 Split the `compact/` god module — **[done]**
 
-- `compact/format.py` — all pure formatters (`format_status_bar`,
+`compact/renderer.py` was ~1.5k lines. Now split into:
+
+- [done] `compact/format.py` — pure formatters (`format_status_bar`,
   `format_host_rows`, `format_tree_block`, `format_failure_recap`,
   `format_preflight_summary`, `format_host_summary`, `_compute_*`,
   `collect_tags`, `count_*`).
-- `compact/exit_code.py` — `determine_exit_code(state)`.
-- `compact/renderer.py` — only the `CompactRenderer` class (Rich Live
-  lifecycle, tick orchestration, password pass-through coordination).
+- [done] `compact/exit_code.py` — kept as a backward-compat re-export
+  shim; the canonical implementation now lives in `core/exit_code.py`
+  (see §7.9 / M2 below).
+- [done] `compact/renderer.py` — only the `CompactRenderer` class
+  (Rich Live lifecycle, tick orchestration, password pass-through
+  coordination).
 
-### 7.4 Rename clashes & misleading names
+### 7.4 Rename clashes & misleading names — **[done]**
 
-- `core/state.py` → `core/state_machine.py` (today's `state.py` is a
-  lifecycle FSM, while `RunState` lives in `models.py` — the current name
-  invites confusion).
-- `inspect/display.py` → `inspect/formatters.py` (name collides with
-  `compact/display.py`, which does a completely different job).
+- [done] `core/state.py` → `core/state_machine.py`. `core/state.py` is
+  removed; `RunState` continues to live in `core/models.py`.
+- [done] `inspect/display.py` → `inspect/formatters.py`. `inspect/display.py`
+  is removed; `compact/display.py` remains untouched.
 
-### 7.5 Pull pure prompt detection into `core/`
+### 7.5 Pull pure prompt detection into `core/` — **[done]**
 
-- `is_password_prompt` and `_looks_like_interactive_prompt` are pure text
-  heuristics. Move to `core/prompts.py`. `compact/password.py` keeps only
-  the terminal pass-through; `runner.py` keeps only the driver-side
-  decision to fire a prompt.
+- [done] `is_password_prompt` and `_looks_like_interactive_prompt` now
+  live in `core/prompts.py` as pure text heuristics.
+- [done] `compact/password.py` keeps only the terminal pass-through;
+  `runner.py` keeps only the driver-side decision to fire a prompt.
 
-### 7.6 Complete the `Renderer` Protocol surface
+### 7.6 Complete the `Renderer` Protocol surface — **[in progress]**
 
-- `renderer/protocol.py` already declares the full surface, but
-  `SPECIFICATION.md §2.3` is stale. Mark `protocol.py` as the source of
-  truth, update the spec to point there, and ensure every method has a
-  docstring stating whether it is mandatory or no-op-able.
+- [done] `renderer/protocol.py` declares the full surface with a
+  per-method mandatory / no-op-able table in the module docstring.
+  `protocol.py` is the explicit source of truth for the surface.
+- [done] `SPECIFICATION.md §2.3` already points at `protocol.py` as
+  the source of truth.
+- [open] The factory code-block in `SPECIFICATION.md §2.3` still shows
+  the legacy `tui_mode: bool = False` factory signature; the real
+  factory (`renderer/factory.create_renderer`) accepts a `mode`
+  literal (``"compact"`` / ``"tui"`` / ``"json"``) and keeps
+  `tui_mode` / `format` only as deprecated aliases. Refresh that
+  example to match §7.7.
 
-### 7.7 Factory covers all renderers
+### 7.7 Factory covers all renderers — **[done]**
 
-- `renderer/factory.create_renderer` currently dispatches between compact
-  and TUI; `JsonRenderer` is wired separately. Add `mode="json"` so the
-  CLI doesn't special-case JSON output.
+- [done] `renderer/factory.create_renderer(mode=...)` accepts
+  ``"compact"`` / ``"tui"`` / ``"json"`` and returns the matching
+  concrete renderer. The legacy `tui_mode` (bool) and `format` (str)
+  parameters are kept as deprecated aliases so older callers and tests
+  keep working — `mode` wins when both are supplied. The CLI no longer
+  special-cases JSON output.
+- [open] Once §7.6's spec refresh lands, drop the deprecated aliases
+  in `renderer/factory.py` and migrate all call sites to `mode=`.
 
-### 7.8 Enforce boundaries in CI (cheap)
+### 7.8 Enforce boundaries in CI (cheap) — **[in progress]**
 
-Add an import-linter or a small custom test (`tests/unit/test_layering.py`)
-that asserts:
+- [done] `tests/unit/test_layering.py` ships and passes (5 tests). It
+  parses every module under `src/ansible_aom/` for `import` statements
+  (top-level *and* lazy, inside function bodies) and asserts the rules
+  in §1–2:
+  - `core/**` does not import from `compact/`, `tui/`, `renderer/`,
+    `ansible/`, `session/`, `drivers/`, `inspect/`, `rerun/`, `formats/`.
+  - `drivers/**` does not import from `compact/`, `tui/`, `formats/`.
+  - `compact/**`, `tui/**`, `formats/**` do not import from each other.
+  - `renderer/protocol.py` does not import a concrete renderer
+    (`compact`, `tui`, `formats`); `renderer/factory.py` may.
+- [open] Wire the test into pre-commit (or CI) so the layering
+  invariant is enforced automatically, not just observed locally.
 
-- `core/**` does not import from `compact/`, `tui/`, `renderer/`,
-  `ansible/`, `session/`, `drivers/`, `inspect/`, `rerun/`, `formats/`.
-- `drivers/**` does not import from `compact/`, `tui/`, `formats/`.
-- `compact/**`, `tui/**`, `formats/**` do not import from each other.
+### 7.9 Consolidations landed alongside the refactor — **[done]**
 
-The current `core/` is clean today (verified by grep) — codify it before it
-drifts.
+These shipped while §7.1–§7.5 were being closed; recording them so
+the gap list reflects reality.
+
+- [done] **Exit-code derivation lives in `core/`** (GRUMPI_QA finding
+  M2). `determine_exit_code(state)` was duplicated between
+  `compact/exit_code.py` and `formats/json.py`; both now import the
+  canonical `core/exit_code.determine_exit_code`. `compact/exit_code.py`
+  is kept as a backward-compat shim for any third-party imports.
+- [done] **ISO-8601 timestamp parsing consolidated** (GRUMPI_QA finding
+  9C series). Nine separate ad-hoc `datetime.fromisoformat(...)` call
+  sites have been collapsed to a single `parse_iso_timestamp(value)` in
+  `core/timestamp.py`, which normalises the ``Z`` UTC suffix to
+  ``+00:00`` defensively. All call sites in `core/`, `compact/`,
+  `session/`, and `drivers/replay.py` now import from `core/timestamp`.
+- [done] **State-machine dead code removed** (GRUMPI_QA finding 9A).
+  `core/state.py` originally housed an 8-state `ExecutionState` enum
+  and a `StateMachine` class that were never wired into production
+  code (the TUI tracked state as a plain string, `compact/` relied on
+  `RunState`, and the runner passed lowercase strings to
+  `handle_completion`). After the §7.4 rename, `core/state_machine.py`
+  contains only the memory-bounds constants (`MAX_PLAYS`,
+  `MAX_TASKS_PER_PLAY`, `MAX_HOSTS_PER_TASK`,
+  `MAX_TOTAL_HOST_RUN_STATES`, `MAX_LOG_LINES`) that are actually
+  imported by `core/parser.py` and `tui/widgets/log_panel.py`. The
+  docstring records the removal rationale.
 
 ---
 
@@ -448,3 +496,67 @@ Before adding any feature, ask:
 
 The **ABSTRACT** step in the OODA loop is mandatory. Code that belongs in
 `core/` but lives in an infrastructure package is a design defect.
+
+---
+
+## 9. Schemas and Data Formats
+
+The `schemas/` directory at the repository root contains JSON Schema files
+that describe the shape of AOM's non-interactive output.
+
+### `schemas/run_summary.v1.json`
+
+Defines the `RunSummary` object emitted by `JsonRenderer.handle_completion`
+(the `--format json` renderer). The schema covers:
+
+- **Metadata**: `schema_version` (literal `1`), `playbook` path, `exit_code`,
+  `started_at` / `ended_at` (ISO 8601 with UTC offset), `duration_s` (float
+  seconds, 1 dp).
+- **Per-host counts** (`hosts`): a map of hostname → `HostCounts` with
+  `ok`, `changed`, `failed`, `unreachable` integer counters aggregated
+  across every task in every play.
+- **Task failures** (`tasks_failed`): an array of `(host, task, msg)` tuples
+  for every (host, task) pair that ended in `FAILED` or `UNREACHABLE`.
+
+**Status: documentation-only.** The F6 JSON renderer (`formats/json.py`) is
+implemented and the Pydantic `RunSummary` model in that module is the
+authoritative source of truth. The committed `.json` file is kept for test
+parity — `tests/unit/test_run_summary_schema.py` asserts the Pydantic model
+matches the schema. When the model changes, regenerate with
+`UPDATE_SCHEMA=1 pytest tests/unit/test_run_summary_schema.py`.
+
+The `aom/` and `molecule/` directories that previously lived alongside
+`schemas/` at the repository root have been removed; `schemas/` is the only
+remaining top-level data-format directory.
+
+---
+
+## 10. Licensing
+
+### 10.1 GPL subclass concern: `ansible/callback/aom_jsonl.py`
+
+`src/ansible_aom/ansible/callback/aom_jsonl.py` subclasses
+`ansible_collections.ansible.posix.plugins.callback.jsonl`, which is
+licensed GPL-3.0-or-later (inherited from `ansible-core`). By subclassing
+a GPL-licensed class, `aom_jsonl.py` itself is a derivative work and must
+be distributed under GPL-compatible terms — which it is, as part of AOM's
+GPL-3.0-or-later overall license.
+
+**Why this does not GPL-contaminate the rest of AOM:**
+
+1. **Process boundary.** The callback plugin runs *inside* the
+   `ansible-playbook` subprocess, not inside AOM's own process. AOM
+   communicates with it via the PTY (pexpect) — an arm's-length pipe,
+   not a Python import or link.
+2. **No import.** AOM's main codebase never imports
+   `aom_jsonl.CallbackModule` or any other `ansible-core` module at
+   runtime. The callback is selected by setting the `ANSIBLE_STDOUT_CALLBACK`
+   environment variable before spawning the subprocess.
+3. **Precedent.** This is the same pattern used by `ansible-navigator`
+   (Apache-2.0) and `ansible-runner` (Apache-2.0): both shell out to
+   `ansible-playbook` and parse its output without importing `ansible-core`.
+   The FSF's GPL FAQ confirms that arm's-length communication via pipes
+   does not trigger the GPL's copyleft provisions.
+
+See `.sisyphus/notepads/research/decisions.md` for the full licensing
+research that led to this conclusion.

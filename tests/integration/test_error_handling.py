@@ -14,165 +14,23 @@ Test Isolation Rules (CRITICAL):
 2. Use tmp_path for file system tests
 3. Function-scoped fixtures ONLY
 4. Mock pexpect - do NOT actually run ansible-playbook
+
+Note: Earlier revisions of this file contained tests that drove
+``core.state_machine.StateMachine`` (an 8-state execution machine).
+GRUMPI_QA finding 9A flagged that machine as dead code — production
+never imported it. Those state-machine-only tests have been removed
+alongside the dead production code; the rest of the section-14
+coverage (parsers, password patterns, watchdog, logging, exit codes,
+stderr, cancellation timing) is preserved unchanged.
 """
 
 import logging
 import shutil
 import time
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock
 
 import pytest
-
-from ansible_aom.core.state_machine import VALID_TRANSITIONS, ExecutionState, StateMachine
-
-# =============================================================================
-# Section 14.1: Crash Recovery (TC-441 to TC-444)
-# =============================================================================
-
-
-class TestCrashRecoveryStayOpen:
-    """TC-441: Crash Recovery - Stay Open After Exit."""
-
-    def test_stays_open_after_successful_completion(self):
-        """TC-441: AOM stays open after playbook completes successfully."""
-        # Test that state transitions to COMPLETED (stay-open state)
-        sm = StateMachine()
-        sm.transition(ExecutionState.STARTING)
-        sm.transition(ExecutionState.LOADING_TASKS)
-        sm.transition(ExecutionState.READY)
-        sm.transition(ExecutionState.RUNNING)
-        sm.transition(ExecutionState.COMPLETED)
-
-        # COMPLETED is a terminal state that stays open
-        assert sm.state == ExecutionState.COMPLETED
-        # Can only transition to IDLE (user exit)
-        assert sm.can_transition(ExecutionState.IDLE)
-        # Cannot transition to running states
-        assert not sm.can_transition(ExecutionState.RUNNING)
-        assert not sm.can_transition(ExecutionState.STARTING)
-
-    def test_stays_open_after_failure(self):
-        """TC-441: AOM stays open after task failure."""
-        sm = StateMachine()
-        sm.transition(ExecutionState.STARTING)
-        sm.transition(ExecutionState.LOADING_TASKS)
-        sm.transition(ExecutionState.READY)
-        sm.transition(ExecutionState.RUNNING)
-        sm.transition(ExecutionState.FAILED)
-
-        # FAILED is also a stay-open state
-        assert sm.state == ExecutionState.FAILED
-        assert sm.can_transition(ExecutionState.IDLE)
-
-    def test_stays_open_after_crash(self):
-        """TC-441: AOM stays open after subprocess crash."""
-        sm = StateMachine()
-        sm.transition(ExecutionState.STARTING)
-        sm.transition(ExecutionState.CRASHED)
-
-        # CRASHED is also a stay-open state for debugging
-        assert sm.state == ExecutionState.CRASHED
-        assert sm.can_transition(ExecutionState.IDLE)
-
-
-class TestCrashRecoveryPanelsInteractive:
-    """TC-442: Crash Recovery - Panels Interactive."""
-
-    def test_run_state_still_accessible_after_completion(self):
-        """TC-442: After completion, run state data is still available."""
-        # This tests that state is preserved, not cleaned up
-        sm = StateMachine()
-        sm.transition(ExecutionState.STARTING)
-        sm.transition(ExecutionState.LOADING_TASKS)
-        sm.transition(ExecutionState.READY)
-        sm.transition(ExecutionState.RUNNING)
-        sm.transition(ExecutionState.COMPLETED)
-
-        # State machine still tracks state properly
-        assert sm.state == ExecutionState.COMPLETED
-
-        # User can review (state remains in COMPLETED)
-        # Only way out is explicit reset to IDLE
-        sm.transition(ExecutionState.IDLE)
-        assert sm.state == ExecutionState.IDLE
-
-    def test_run_state_preserved_after_failure(self):
-        """TC-442: After failure, state data preserved for inspection."""
-        sm = StateMachine()
-        sm.transition(ExecutionState.STARTING)
-        sm.transition(ExecutionState.LOADING_TASKS)
-        sm.transition(ExecutionState.READY)
-        sm.transition(ExecutionState.RUNNING)
-        sm.transition(ExecutionState.FAILED)
-
-        # State preserved in FAILED for review
-        assert sm.state == ExecutionState.FAILED
-
-
-class TestCrashRecoveryNotification:
-    """TC-443: Crash Recovery - Graceful Degradation Notification."""
-
-    def test_crashed_state_is_terminal(self):
-        """TC-443: CRASHED state stays open for notification."""
-        sm = StateMachine()
-        sm._state = ExecutionState.CRASHED
-
-        # CRASHED is terminal until user action
-        assert sm.state == ExecutionState.CRASHED
-        # Can only go to IDLE
-        assert VALID_TRANSITIONS[ExecutionState.CRASHED] == {ExecutionState.IDLE}
-
-    def test_graceful_degradation_state_machine_integrity(self):
-        """TC-443: State machine remains intact during crash recovery."""
-        sm = StateMachine()
-
-        # Even after multiple transitions, state machine works
-        sm.transition(ExecutionState.STARTING)
-        sm.transition(ExecutionState.LOADING_TASKS)
-        sm.transition(ExecutionState.CRASHED)
-        sm.transition(ExecutionState.IDLE)
-        sm.transition(ExecutionState.STARTING)
-        sm.transition(ExecutionState.LOADING_TASKS)
-        sm.transition(ExecutionState.READY)
-        sm.transition(ExecutionState.RUNNING)
-        sm.transition(ExecutionState.COMPLETED)
-
-        # Final state should be COMPLETED
-        assert sm.state == ExecutionState.COMPLETED
-
-
-class TestCrashRecoveryAutoSavePartialSession:
-    """TC-444: Crash Recovery - Auto Save Partial Session."""
-
-    def test_loads_tasks_state_preserved_on_crash(self):
-        """TC-444: LOADING_TASKS crash preserves partial state."""
-        sm = StateMachine()
-        sm.transition(ExecutionState.STARTING)
-        sm.transition(ExecutionState.LOADING_TASKS)
-
-        # During LOADING_TASKS, crash happens
-        sm.transition(ExecutionState.CRASHED)
-
-        # State should be CRASHED
-        assert sm.state == ExecutionState.CRASHED
-
-    def test_running_state_preserved_on_crash(self):
-        """TC-444: RUNNING crash preserves execution state."""
-        sm = StateMachine()
-        sm.transition(ExecutionState.STARTING)
-        sm.transition(ExecutionState.LOADING_TASKS)
-        sm.transition(ExecutionState.READY)
-        sm.transition(ExecutionState.RUNNING)
-
-        # Mid-execution crash
-        sm.transition(ExecutionState.CRASHED)
-
-        # State is CRASHED, data can be inspected
-        assert sm.state == ExecutionState.CRASHED
-
 
 # =============================================================================
 # Section 14.2: Graceful Degradation (TC-445 to TC-448)
@@ -217,98 +75,9 @@ class TestGracefulDegradationJSONLParseFailure:
         assert len(result) >= 1
 
 
-class TestGracefulDegradationTreeUpdates:
-    """TC-446: Graceful Degradation - Tree Updates Continue."""
-
-    def test_state_machine_accepts_valid_events_after_invalid(self):
-        """TC-446: Tree continues updating after parse failure."""
-        sm = StateMachine()
-
-        # Normal progression
-        sm.transition(ExecutionState.STARTING)
-        sm.transition(ExecutionState.LOADING_TASKS)
-        sm.transition(ExecutionState.READY)
-        sm.transition(ExecutionState.RUNNING)
-
-        # State machine continues to work
-        sm.transition(ExecutionState.RUNNING)  # Running can self-loop
-        sm.transition(ExecutionState.RUNNING)  # Multiple updates
-        sm.transition(ExecutionState.COMPLETED)
-
-        assert sm.state == ExecutionState.COMPLETED
-
-
-class TestGracefulDegradationListTasksFailure:
-    """TC-447: Graceful Degradation - list-tasks Failure."""
-
-    def test_list_tasks_failure_state_transition(self):
-        """TC-447: --list-tasks failure transitions to CRASHED."""
-        sm = StateMachine()
-        sm.transition(ExecutionState.STARTING)
-        sm.transition(ExecutionState.LOADING_TASKS)
-
-        # --list-tasks failure
-        sm.transition(ExecutionState.CRASHED)
-
-        # Should be in CRASHED state
-        assert sm.state == ExecutionState.CRASHED
-
-    def test_can_retry_after_list_tasks_failure(self):
-        """TC-447: User can retry after --list-tasks failure."""
-        sm = StateMachine()
-        sm.transition(ExecutionState.STARTING)
-        sm.transition(ExecutionState.LOADING_TASKS)
-        sm.transition(ExecutionState.CRASHED)
-
-        # User can reset and try again
-        sm.transition(ExecutionState.IDLE)
-        sm.transition(ExecutionState.STARTING)
-
-        assert sm.state == ExecutionState.STARTING
-
-
-class TestGracefulDegradationWarningMessage:
-    """TC-448: Graceful Degradation - Warning Message."""
-
-    def test_warning_logged_on_list_tasks_failure(self):
-        """TC-448: Warning message for --list-tasks failure."""
-        # This test would verify a warning is logged
-        # For now, test that the state transition exists
-        sm = StateMachine()
-        sm._state = ExecutionState.LOADING_TASKS
-
-        # Transition to CRASHED is valid from LOADING_TASKS
-        assert sm.can_transition(ExecutionState.CRASHED)
-
-
 # =============================================================================
 # Section 14.3: Cancellation (TC-449 to TC-451)
 # =============================================================================
-
-
-class TestCancellationFirstCtrlC:
-    """TC-449: Cancellation - First Ctrl+C Forward to Subprocess."""
-
-    def test_first_sigint_valid_transition_from_running(self):
-        """TC-449: First Ctrl+C from RUNNING stays in RUNNING (cleanup mode)."""
-        sm = StateMachine()
-        sm._state = ExecutionState.RUNNING
-
-        # First Ctrl+C - subprocess receives signal, AOM stays in RUNNING
-        # RUNNING can self-loop (stays in RUNNING)
-        sm.transition(ExecutionState.RUNNING)
-
-        assert sm.state == ExecutionState.RUNNING
-
-    def test_running_state_allows_cleanup_continuation(self):
-        """TC-449: RUNNING state allows continued operation during cleanup."""
-        sm = StateMachine()
-        sm._state = ExecutionState.RUNNING
-
-        # RUNNING has self-loop for continued operation
-        valid_targets = VALID_TRANSITIONS[ExecutionState.RUNNING]
-
-        assert ExecutionState.RUNNING in valid_targets
 
 
 class TestCancellationSecondCtrlC:
@@ -333,28 +102,6 @@ class TestCancellationSecondCtrlC:
 
         # Over 2 seconds = first Ctrl+C again (reset)
         assert time_diff >= 2.0
-
-
-class TestCancellationSavePartialSession:
-    """TC-451: Cancellation - Save Partial Session on Kill."""
-
-    def test_interrupt_preserves_state_before_exit(self):
-        """TC-451: State preserved before forced exit."""
-        sm = StateMachine()
-
-        sm.transition(ExecutionState.STARTING)
-        sm.transition(ExecutionState.LOADING_TASKS)
-        sm.transition(ExecutionState.READY)
-        sm.transition(ExecutionState.RUNNING)
-
-        assert sm.state == ExecutionState.RUNNING
-
-        sm.transition(ExecutionState.CRASHED)
-
-        assert sm.state == ExecutionState.CRASHED
-
-        sm.transition(ExecutionState.IDLE)
-        assert sm.state == ExecutionState.IDLE
 
 
 # =============================================================================
@@ -586,104 +333,6 @@ Install with:
 # =============================================================================
 
 
-class TestSubprocessExitCodes:
-    """TC-469 to TC-476: Subprocess exit code interpretation."""
-
-    def test_exit_code_0_marks_completed(self):
-        """TC-469: Exit code 0 marks COMPLETED state."""
-        # Exit code to state mapping
-        exit_code = 0
-        expected_state = ExecutionState.COMPLETED
-
-        # Would transition to COMPLETED state
-        sm = StateMachine()
-        sm._state = ExecutionState.RUNNING
-        sm.transition(expected_state)
-
-        assert sm.state == ExecutionState.COMPLETED
-
-    def test_exit_code_1_marks_failed(self):
-        """TC-470: Exit code 1 marks FAILED state."""
-        exit_code = 1
-        expected_state = ExecutionState.FAILED
-
-        sm = StateMachine()
-        sm._state = ExecutionState.RUNNING
-        sm.transition(ExecutionState.FAILED)
-
-        assert sm.state == ExecutionState.FAILED
-
-    def test_exit_code_2_marks_failed_unreachable(self):
-        """TC-471: Exit code 2 marks FAILED with unreachable hosts."""
-        exit_code = 2
-        # Exit code 2 means unreachable hosts, but we still use FAILED state
-        # The distinction is in the host status, not the state machine
-
-        sm = StateMachine()
-        sm._state = ExecutionState.RUNNING
-        sm.transition(ExecutionState.FAILED)
-
-        assert sm.state == ExecutionState.FAILED
-
-    def test_exit_code_4_marks_crashed(self):
-        """TC-472: Exit code 4 marks CRASHED state."""
-        exit_code = 4  # Playbook error (syntax, missing file)
-        expected_state = ExecutionState.CRASHED
-
-        sm = StateMachine()
-        sm._state = ExecutionState.RUNNING
-        sm.transition(ExecutionState.CRASHED)
-
-        assert sm.state == ExecutionState.CRASHED
-
-    def test_exit_code_127_marks_crashed_not_found(self):
-        """TC-473: Exit code 127 marks CRASHED with not found message."""
-        exit_code = 127
-        expected_state = ExecutionState.CRASHED
-
-        sm = StateMachine()
-        sm._state = ExecutionState.RUNNING
-        sm.transition(ExecutionState.CRASHED)
-
-        assert sm.state == ExecutionState.CRASHED
-
-    def test_exit_code_130_marks_cancelled(self):
-        """TC-474: Exit code 130 marks IDLE (user-initiated cancel)."""
-        # Exit code 130 = 128 + 2 (SIGINT)
-        exit_code = 130
-
-        # User cancel doesn't go through normal state transitions
-        # But state should reset to IDLE
-        sm = StateMachine()
-        sm.reset()
-
-        assert sm.state == ExecutionState.IDLE
-
-    def test_exit_code_137_marks_crashed_killed(self):
-        """TC-475: Exit code 137 marks CRASHED with 'killed' message."""
-        # Exit code 137 = 128 + 9 (SIGKILL)
-        exit_code = 137
-        expected_state = ExecutionState.CRASHED
-
-        sm = StateMachine()
-        sm._state = ExecutionState.RUNNING
-        sm.transition(ExecutionState.CRASHED)
-
-        assert sm.state == ExecutionState.CRASHED
-
-    def test_negative_exit_code_marks_crashed_with_signal(self):
-        """TC-476: Negative exit code marks CRASHED with signal info."""
-        # Negative exit codes indicate signal
-        exit_code = -9  # SIGKILL
-
-        # Would log signal information and transition to CRASHED
-        sm = StateMachine()
-        sm._state = ExecutionState.RUNNING
-        sm.transition(ExecutionState.CRASHED)
-
-        assert sm.state == ExecutionState.CRASHED
-
-
 class TestStderrCapture:
     """TC-477 to TC-479: Stderr capture and handling."""
 
@@ -730,31 +379,6 @@ class TestProcessStateMonitoring:
         """TC-480: Process state checked every 0.5 seconds."""
         monitor_interval = 0.5  # seconds
         assert monitor_interval == 0.5
-
-    def test_orphan_detection_during_loading_tasks(self):
-        """TC-482: Early termination during LOADING_TASKS causes CRASHED."""
-        sm = StateMachine()
-        sm.transition(ExecutionState.STARTING)
-        sm.transition(ExecutionState.LOADING_TASKS)
-
-        # Process dies during --list-tasks
-        sm.transition(ExecutionState.CRASHED)
-
-        assert sm.state == ExecutionState.CRASHED
-
-    def test_orphan_detection_during_execution(self):
-        """TC-483: Process termination during EXECUTION parses remaining buffer."""
-        sm = StateMachine()
-        sm.transition(ExecutionState.STARTING)
-        sm.transition(ExecutionState.LOADING_TASKS)
-        sm.transition(ExecutionState.READY)
-        sm.transition(ExecutionState.RUNNING)
-
-        # Process dies during execution
-        # Remaining buffer would be parsed before state change
-        sm.transition(ExecutionState.CRASHED)
-
-        assert sm.state == ExecutionState.CRASHED
 
 
 class TestWatchdogTimer:
@@ -826,36 +450,6 @@ class TestExitCodeConstants:
         assert exit_sigint == 130
         assert exit_sigkill == 137
         assert exit_sigterm == 143
-
-
-class TestStateTransitionsForAllExitCodes:
-    """Integration test for state transitions based on exit codes."""
-
-    @pytest.mark.parametrize(
-        "exit_code,expected_state",
-        [
-            (0, ExecutionState.COMPLETED),
-            (1, ExecutionState.FAILED),
-            (2, ExecutionState.FAILED),  # Unreachable hosts
-            (4, ExecutionState.CRASHED),  # Syntax error
-            (127, ExecutionState.CRASHED),  # Command not found
-            (130, None),  # SIGINT - user cancelled, goes to IDLE
-            (137, ExecutionState.CRASHED),  # SIGKILL
-            (-9, ExecutionState.CRASHED),  # Signal = negative exit code
-        ],
-    )
-    def test_exit_code_to_state_mapping(self, exit_code, expected_state):
-        """Test exit code to state machine state mapping."""
-        sm = StateMachine()
-        sm._state = ExecutionState.RUNNING
-
-        if exit_code == 130:
-            # User cancelled - reset to IDLE
-            sm.reset()
-            assert sm.state == ExecutionState.IDLE
-        elif expected_state:
-            sm.transition(expected_state)
-            assert sm.state == expected_state
 
 
 class TestCancellationTimerLogic:

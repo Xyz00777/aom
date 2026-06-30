@@ -9,15 +9,17 @@ Phases:
 3. POST_RUN_RECAP: Final PLAY RECAP output
 """
 
+import json as stdlib_json
 import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
-from typing import Callable
+from typing import Any, Callable, cast
 
 import orjson
 
+from ansible_aom.core.event_types import JsonlEvent
 from ansible_aom.core.models import (
     IncludeCacheEntry,
     PlayDefinition,
@@ -34,6 +36,35 @@ logger = logging.getLogger(__name__)
 # lines so warnings whose [WARNING]: prefix is wrapped in colour escapes
 # still anchor against the WARNING_PATTERNS regexes.
 _ANSI_SGR_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _has_surrogate_codepoint(s: str) -> bool:
+    """True if ``s`` contains any surrogate codepoint (U+D800..U+DFFF).
+
+    R6: pexpect's ``codec_errors="surrogateescape"`` decodes invalid UTF-8
+    bytes into lone-surrogate codepoints so the original bytes round-trip
+    through ``str`` losslessly. ``orjson`` rejects those strings as
+    "surrogates not allowed", so the parser falls back to stdlib
+    ``json.loads`` (which preserves them) only when needed.
+    """
+    for ch in s:
+        if 0xD800 <= ord(ch) <= 0xDFFF:
+            return True
+    return False
+
+
+def _safe_loads(line: str) -> Any:
+    """Parse one JSONL line, picking orjson or stdlib json by content.
+
+    R6: orjson is faster but rejects any string containing surrogate
+    codepoints — which now happens whenever pexpect surfaces invalid
+    UTF-8 from the PTY stream. stdlib ``json.loads`` accepts surrogates
+    natively and round-trips them via ``\\uXXXX`` escapes, so the
+    original byte sequence is preserved through ``record_event``.
+    """
+    if _has_surrogate_codepoint(line):
+        return stdlib_json.loads(line)
+    return orjson.loads(line)
 
 
 class StreamPhase(Enum):
@@ -63,7 +94,7 @@ class JsonLineStream:
         self._non_json_handler: Callable[[str], None] | None = None
         self._carry: str = ""
 
-    def feed_line(self, line: str) -> list[dict]:
+    def feed_line(self, line: str) -> list[JsonlEvent]:
         """Parse a line and return zero or more JSON events.
 
         Returns empty list for:
@@ -91,8 +122,8 @@ class JsonLineStream:
             return []
 
         try:
-            data = orjson.loads(line)
-        except orjson.JSONDecodeError:
+            data = _safe_loads(line)
+        except ValueError:
             # The carry-prepended view failed. If the bare new chunk
             # parses cleanly on its own as a JSON object, the carry
             # was garbage masquerading as a split-event head — drop
@@ -100,14 +131,14 @@ class JsonLineStream:
             raw_stripped = raw.strip()
             if raw_stripped != line and raw_stripped.startswith("{"):
                 try:
-                    data = orjson.loads(raw_stripped)
-                except orjson.JSONDecodeError:
+                    data = _safe_loads(raw_stripped)
+                except ValueError:
                     data = None
                 if isinstance(data, dict):
                     if "_event" not in data:
                         logger.warning("JSON missing _event field: %s", raw_stripped[:100])
                         return []
-                    return [data]
+                    return [cast(JsonlEvent, data)]
             # Stash as carry if there's room, otherwise drop. Without
             # the cap a runaway/garbage stream would grow ``_carry``
             # without bound.
@@ -119,11 +150,11 @@ class JsonLineStream:
                 self._non_json_handler(line)
             return []
 
-        if "_event" not in data:
+        if not isinstance(data, dict) or "_event" not in data:
             logger.warning("JSON missing _event field: %s", line[:100])
             return []
 
-        return [data]
+        return [cast(JsonlEvent, data)]
 
     def set_non_json_handler(self, handler: Callable[[str], None]) -> None:
         """Set handler for non-JSON lines."""
@@ -163,7 +194,7 @@ class PtyStreamParser:
         self._plaintext_lines: list[str] = []
         self._current_timestamp: datetime | None = None
 
-    def feed_line(self, line: str) -> list[dict]:
+    def feed_line(self, line: str) -> list[JsonlEvent]:
         """Parse a line and return zero or more events."""
         line_stripped = line.rstrip("\n\r")
 
@@ -200,17 +231,25 @@ class PtyStreamParser:
 
         if self.phase == StreamPhase.POST_RUN_RECAP:
             self._recap_lines.append(line_stripped)
+            # R13: cap _recap_lines at MAX_LOG_LINES so a verbose
+            # ``PLAY RECAP`` (e.g. -v with hundreds of host stats per
+            # line × thousands of hosts) can't grow the list without
+            # bound. Mirror the R2 plaintext_lines pattern — drop
+            # oldest first so the most-recent recap tail stays
+            # available for completion-time display.
+            if len(self._recap_lines) > MAX_LOG_LINES:
+                del self._recap_lines[: len(self._recap_lines) - MAX_LOG_LINES]
             return []
 
         return []
 
-    def _parse_and_return(self, line: str) -> list[dict]:
+    def _parse_and_return(self, line: str) -> list[JsonlEvent]:
         """Parse JSON line and return events."""
         try:
-            data = orjson.loads(line)
-            if "_event" in data:
-                return [data]
-        except orjson.JSONDecodeError:
+            data = _safe_loads(line)
+            if isinstance(data, dict) and "_event" in data:
+                return [cast(JsonlEvent, data)]
+        except ValueError:
             pass
         return []
 
@@ -259,7 +298,7 @@ class PtyStreamParser:
         if not line.startswith("{"):
             return False
         try:
-            data = orjson.loads(line)
+            data = _safe_loads(line)
             return bool(
                 data.get("_event")
                 in (
@@ -267,7 +306,7 @@ class PtyStreamParser:
                     "v2_playbook_on_play_start",
                 )
             )
-        except orjson.JSONDecodeError:
+        except ValueError:
             return False
 
     def _is_jsonl_stats_event(self, line: str) -> bool:
@@ -275,9 +314,9 @@ class PtyStreamParser:
         if not line.startswith("{"):
             return False
         try:
-            data = orjson.loads(line)
+            data = _safe_loads(line)
             return bool(data.get("_event") == "v2_playbook_on_stats")
-        except orjson.JSONDecodeError:
+        except ValueError:
             return False
 
     def _is_json(self, line: str) -> bool:
@@ -285,14 +324,14 @@ class PtyStreamParser:
         if not line.startswith("{"):
             return False
         try:
-            orjson.loads(line)
+            _safe_loads(line)
             return True
-        except orjson.JSONDecodeError:
+        except ValueError:
             return False
 
     def _parse_json(self, line: str) -> dict:
         """Parse a JSON line into a dict."""
-        result = orjson.loads(line)
+        result = _safe_loads(line)
         assert isinstance(result, dict), "Expected JSON object"
         return result
 

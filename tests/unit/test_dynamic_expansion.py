@@ -367,3 +367,320 @@ class TestRuntimeIncludeDiscovery:
         )
 
         assert state._include_cache[cache_key] is preflight_entry
+
+
+class TestIncludeRoleRuntimeGraft:
+    """TC-096: ``include_role`` discovery at runtime.
+
+    ``--list-tasks`` does not expand ``include_role`` directives — the
+    preflight tree only sees the ``include_role:`` stub itself. When a
+    role is included at runtime, its first task arrives with the
+    ``"role : "`` prefix (e.g. ``"podman : Install podman"``). The
+    grafting logic must use that prefix to discover the role's
+    ``tasks/main.yml`` and graft every other role task as siblings
+    under the same parent so the projection can show them all as
+    pending instead of revealing them one at a time as each fires its
+    own ``task_start`` event.
+    """
+
+    def test_first_role_task_reveals_all_role_tasks_as_pending_siblings(
+        self, tmp_path: Path
+    ) -> None:
+        """The first runtime task from an ``include_role`` reveals the
+        role's full task list as grafted siblings under the same
+        parent. Without this, only the running task would be visible
+        until each subsequent task fires its own ``task_start``.
+        """
+        role_dir = tmp_path / "roles" / "podman" / "tasks"
+        role_dir.mkdir(parents=True)
+        (role_dir / "main.yml").write_text(
+            "- name: Install podman\n  debug: msg=1\n"
+            "- name: Configure podman\n  debug: msg=2\n"
+            "- name: Start podman\n  debug: msg=3\n"
+        )
+        parent = TaskDefinition(
+            name="Apply podman role",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        defs = [
+            PlayDefinition(
+                id="1",
+                name="Setup rootless Podman",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[parent],
+            )
+        ]
+        playbook_path = str(tmp_path / "site.yml")
+        state = RunState(playbook=playbook_path, definitions=defs)
+        state.handle_event(_play_start())
+        state.handle_event(_task_start("uuid-stub", "Apply podman role"))
+        state.handle_event(_task_start("uuid-1", "podman : Install podman"))
+
+        child_names = sorted(c.name for c in parent.children)
+        assert child_names == [
+            "podman : Configure podman",
+            "podman : Install podman",
+            "podman : Start podman",
+        ], (
+            "All three role tasks must appear as siblings under the "
+            "include_role stub after the first runtime task reveals "
+            "the role; got "
+            f"{child_names}"
+        )
+        assert all(c.is_dynamic for c in parent.children), (
+            "All grafted siblings must be marked dynamic so the projection "
+            "treats them as runtime-discovered rather than preflight-known."
+        )
+
+    def test_grafted_sibling_carries_role_field_for_total_count(self, tmp_path: Path) -> None:
+        """Grafted siblings under an include_role stub get the role
+        field set so ``role_total_tasks`` counts them under the
+        role header. The role-less parent branch in
+        ``_graft_or_match_task`` sets ``role=<runtime role>`` instead
+        of leaving it ``None`` (the pre-existing role-in-role branch
+        only fires when the parent already has a role).
+        """
+        role_dir = tmp_path / "roles" / "podman" / "tasks"
+        role_dir.mkdir(parents=True)
+        (role_dir / "main.yml").write_text(
+            "- name: Install podman\n  debug: msg=1\n- name: Configure podman\n  debug: msg=2\n"
+        )
+        parent = TaskDefinition(
+            name="Apply podman role",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        defs = [
+            PlayDefinition(
+                id="1",
+                name="Setup rootless Podman",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[parent],
+            )
+        ]
+        playbook_path = str(tmp_path / "site.yml")
+        state = RunState(playbook=playbook_path, definitions=defs)
+        state.handle_event(_play_start())
+        state.handle_event(_task_start("uuid-stub", "Apply podman role"))
+        state.handle_event(_task_start("uuid-1", "podman : Install podman"))
+
+        for child in parent.children:
+            assert child.role == "podman", (
+                f"Grafted child must carry role='podman' so the "
+                f"projection's role_total_tasks counter keys on the "
+                f"innermost role; got role={child.role!r} on {child.name!r}"
+            )
+
+    def test_subsequent_role_tasks_do_not_duplicate_siblings(self, tmp_path: Path) -> None:
+        """When the second and third tasks of the role fire
+        ``task_start`` events, the per-(parent, role) dedupe key in
+        ``_grafted_role_names`` keeps the sibling list from growing
+        past the role's real task count.
+        """
+        role_dir = tmp_path / "roles" / "podman" / "tasks"
+        role_dir.mkdir(parents=True)
+        (role_dir / "main.yml").write_text(
+            "- name: Install podman\n  debug: msg=1\n"
+            "- name: Configure podman\n  debug: msg=2\n"
+            "- name: Start podman\n  debug: msg=3\n"
+        )
+        parent = TaskDefinition(
+            name="Apply podman role",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        defs = [
+            PlayDefinition(
+                id="1",
+                name="Setup rootless Podman",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[parent],
+            )
+        ]
+        playbook_path = str(tmp_path / "site.yml")
+        state = RunState(playbook=playbook_path, definitions=defs)
+        state.handle_event(_play_start())
+        state.handle_event(_task_start("uuid-stub", "Apply podman role"))
+        state.handle_event(_task_start("uuid-1", "podman : Install podman"))
+        state.handle_event(_task_start("uuid-2", "podman : Configure podman"))
+        state.handle_event(_task_start("uuid-3", "podman : Start podman"))
+
+        assert len(parent.children) == 3, (
+            "Sibling graft must run exactly once per (parent, role); "
+            f"later task_starts must not duplicate siblings. Got "
+            f"{[c.name for c in parent.children]}"
+        )
+
+    def test_tree_projection_shows_pending_role_tasks(self, tmp_path: Path) -> None:
+        """End-to-end: the tree projection emits all role tasks as
+        pending rows under the role header, with the role total
+        reflecting the full task count.
+        """
+        from ansible_aom.core.tree_projection import TreeProjection
+
+        role_dir = tmp_path / "roles" / "podman" / "tasks"
+        role_dir.mkdir(parents=True)
+        (role_dir / "main.yml").write_text(
+            "- name: Install podman\n  debug: msg=1\n"
+            "- name: Configure podman\n  debug: msg=2\n"
+            "- name: Start podman\n  debug: msg=3\n"
+            "- name: Verify podman\n  debug: msg=4\n"
+        )
+        parent = TaskDefinition(
+            name="Apply podman role",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        defs = [
+            PlayDefinition(
+                id="1",
+                name="Setup rootless Podman",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[parent],
+            )
+        ]
+        playbook_path = str(tmp_path / "site.yml")
+        state = RunState(playbook=playbook_path, definitions=defs)
+        state.handle_event(_play_start(play_id="1", name="Setup rootless Podman"))
+        state.handle_event(_task_start("uuid-stub", "Apply podman role", play_id="1"))
+        state.handle_event(_task_start("uuid-1", "podman : Install podman", play_id="1"))
+        state.handle_event(_runner_start("uuid-1", "podman : Install podman"))
+
+        projection = TreeProjection.from_run_state(state)
+        lines = projection.tree_lines(budget=40)
+
+        role_lines = [ln for ln in lines if ln.kind == "role"]
+        assert role_lines, "role header must be emitted"
+        assert role_lines[0].label == "role: podman (4 tasks)", (
+            f"role total must reflect all 4 role tasks, not just the "
+            f"currently running one; got {role_lines[0].label!r}"
+        )
+
+        task_lines = [ln for ln in lines if ln.kind == "task"]
+        # The include_role stub itself ("Apply podman role") also renders
+        # as a task row; we only care about the four role tasks here.
+        task_labels = sorted(
+            ln.label.split("  ")[0] for ln in task_lines if ln.label != "Apply podman role"
+        )
+        assert task_labels == sorted(
+            ["Install podman", "Configure podman", "Start podman", "Verify podman"]
+        ), f"All 4 role tasks must appear in the tree; got {task_labels}"
+
+
+class TestIncludeRoleStubInsideOuterRole:
+    """An ``include_role:`` stub that lives inside another role (e.g.
+    ``angie_ssl_terminator : include_role: podman``) must graft the
+    inner role's tasks as children of the stub itself, with ``role``
+    set to the inner role name.
+
+    Without the override in ``_graft_or_match_task`` the runtime
+    prefix ``"angie_ssl_terminator : podman : Install podman"`` makes
+    ``runtime_role_from_task_name`` return ``"angie_ssl_terminator"``
+    (the outermost prefix), which equals ``parent.role``. The
+    grafting branch then takes the ``else`` path, sets
+    ``graft_role = parent.role = "angie_ssl_terminator"``, and
+    passes ``"angie_ssl_terminator"`` to
+    ``_graft_role_pending_siblings``. That call tries to discover
+    the ``angie_ssl_terminator`` role instead of ``podman`` — and
+    since the role prefix differs from the parent role, no
+    siblings are grafted at all.
+
+    The fix detects the include_role stub on the parent and uses
+    the stub's target role name (``"podman"``) as
+    ``runtime_role`` instead of the outermost runtime prefix.
+    """
+
+    def test_nested_include_role_grafts_inner_role_as_children(self, tmp_path: Path) -> None:
+        role_dir = tmp_path / "roles" / "podman" / "tasks"
+        role_dir.mkdir(parents=True)
+        (role_dir / "main.yml").write_text(
+            "- name: Install podman\n  debug: msg=1\n"
+            "- name: Configure podman\n  debug: msg=2\n"
+            "- name: Start podman\n  debug: msg=3\n"
+        )
+        # Preflight parent: an ``include_role: podman`` stub nested
+        # inside the ``angie_ssl_terminator`` role. The runtime prefix
+        # on incoming tasks carries ``"angie_ssl_terminator : "`` first,
+        # so without the override the grafting would attach children
+        # to the wrong role.
+        parent = TaskDefinition(
+            name="angie_ssl_terminator : include_role: podman",
+            role="angie_ssl_terminator",
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        defs = [
+            PlayDefinition(
+                id="1",
+                name="Setup rootless Podman",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[parent],
+            )
+        ]
+        playbook_path = str(tmp_path / "site.yml")
+        state = RunState(playbook=playbook_path, definitions=defs)
+        state.handle_event(_play_start())
+        # First, the include_role stub itself fires — matches preflight
+        # and sets the cursor to ``parent``.
+        state.handle_event(_task_start("uuid-stub", "angie_ssl_terminator : include_role: podman"))
+        # Then the first runtime task of the inner role fires.
+        state.handle_event(_task_start("uuid-1", "angie_ssl_terminator : podman : Install podman"))
+        state.handle_event(
+            _runner_start("uuid-1", "angie_ssl_terminator : podman : Install podman")
+        )
+
+        # The buggy code (without the override) calls
+        # ``_graft_role_pending_siblings(role_name="angie_ssl_terminator", ...)``
+        # which then tries to discover an ``angie_ssl_terminator`` role
+        # directory. That call may either fail to find it (returning
+        # ``None``, leaving the children list empty) or graft
+        # angie_ssl_terminator's tasks (the wrong role entirely). The
+        # fixed code passes ``role_name="podman"`` and discovers the
+        # podman role's tasks. Either way, the children list must
+        # contain the three podman tasks in some form — never zero
+        # children, and never angie_ssl_terminator's tasks.
+        child_names = sorted(c.name for c in parent.children)
+        assert len(parent.children) == 3, (
+            "All three podman role tasks must be grafted as children "
+            "of the include_role stub; the buggy code discovers the "
+            f"wrong role and either skips the graft or grafts "
+            f"angie_ssl_terminator's tasks. Got {len(parent.children)} "
+            f"children: {child_names}"
+        )
+
+        # Every grafted child must carry role="podman" (the include_role
+        # target), NOT role="angie_ssl_terminator" (which is what the
+        # buggy code sets). The parent_role must be the outer role
+        # so the projection renders podman as a sub-branch under
+        # angie_ssl_terminator.
+        for child in parent.children:
+            assert child.role == "podman", (
+                f"Grafted child must carry role='podman' (the "
+                f"include_role target), got role={child.role!r} on "
+                f"{child.name!r}"
+            )
+            assert child.parent_role == "angie_ssl_terminator", (
+                f"Grafted child must carry parent_role='angie_ssl_terminator' "
+                f"so the projection nests the inner role under the outer "
+                f"role; got parent_role={child.parent_role!r} on {child.name!r}"
+            )

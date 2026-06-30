@@ -22,6 +22,7 @@ from unittest.mock import MagicMock
 
 from ansible_aom.ansible.runner import _feed, _sample_subprocess_active
 from ansible_aom.core.parser import PtyStreamParser, StreamPhase
+from ansible_aom.core.run_state import RunState
 
 
 def _parser_in_execution_phase() -> PtyStreamParser:
@@ -56,15 +57,17 @@ class TestFeedNotesBytes:
     def test_plaintext_line_notes_pty_bytes(self) -> None:
         renderer = MagicMock()
         parser = PtyStreamParser()
+        state = RunState(playbook="x")
         sink = _FakeSink()
 
-        _feed("PLAY [test] *** \n", parser, renderer, sink)
+        _feed("PLAY [test] *** \n", parser, state, renderer, sink)
 
         assert renderer.note_pty_bytes.called
 
     def test_jsonl_event_line_notes_pty_bytes(self) -> None:
         renderer = MagicMock()
         parser = _parser_in_execution_phase()
+        state = RunState(playbook="x")
         sink = _FakeSink()
         # Minimal JSONL event line.
         event_line = (
@@ -72,7 +75,7 @@ class TestFeedNotesBytes:
             ' "task": {"id": "t1"}, "hosts": {"web1": {"ok": true}}}\n'
         )
 
-        _feed(event_line, parser, renderer, sink)
+        _feed(event_line, parser, state, renderer, sink)
 
         assert renderer.note_pty_bytes.called
         assert renderer.update_state.called
@@ -91,6 +94,7 @@ class TestTaskStartCountsAsHeartbeat:
         observation window."""
         renderer = MagicMock()
         parser = _parser_in_execution_phase()
+        state = RunState(playbook="x")
         sink = _FakeSink()
         event_line = (
             '{"_event": "v2_playbook_on_task_start",'
@@ -98,7 +102,7 @@ class TestTaskStartCountsAsHeartbeat:
             ' "task": {"id": "t2", "name": "Install brew formulae"}}\n'
         )
 
-        _feed(event_line, parser, renderer, sink)
+        _feed(event_line, parser, state, renderer, sink)
 
         assert not renderer.reset_heartbeat.called
         # ``note_pty_bytes`` must still fire — it is what gives the new

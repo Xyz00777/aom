@@ -13,7 +13,7 @@ from textual.widgets.tree import TreeNode
 from ansible_aom.core.icons import STATUS_COLORS, STATUS_ICONS
 
 if TYPE_CHECKING:
-    from ansible_aom.core.models import RunState
+    from ansible_aom.core.run_state import RunState
     from ansible_aom.core.tree import TreeProjection
 # Tree node icons
 TREE_COLLAPSED_ICON = "▶"  # Right triangle for collapsed node (U+25B6)

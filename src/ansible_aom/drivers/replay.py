@@ -37,6 +37,7 @@ from typing import Callable
 
 import argcomplete
 
+from ansible_aom.core.timestamp import parse_iso_timestamp
 from ansible_aom.renderer.factory import create_renderer
 from ansible_aom.renderer.protocol import Renderer
 from ansible_aom.session.store import load_session
@@ -47,9 +48,7 @@ def _parse_timestamp(value: object) -> datetime | None:
     if not isinstance(value, str) or not value:
         return None
     try:
-        # Replace trailing Z with +00:00 because fromisoformat (pre-3.11
-        # was strict; 3.11+ accepts Z but be explicit anyway).
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parse_iso_timestamp(value)
     except ValueError:
         return None
 

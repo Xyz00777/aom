@@ -908,10 +908,16 @@ def test_format_tree_block_renders_two_level_truncation(monkeypatch) -> None:
             f"footers must have no branch glyph; got {footer!r}"
         )
 
-    # The role label switches to "(M remaining)" inside the cut (T3).
+    # The role label reads "(N tasks)" (the role's total) inside the
+    # cut — never "(M remaining)" (T3 suffix-drop contract).
     role_line = next(ln for ln in block if "podman" in ln and "role" in ln.lower())
-    assert "remaining" in role_line, (
-        f"role label must say '(M remaining)' inside the cut; got {role_line!r}"
+    assert "remaining" not in role_line, (
+        f"role label must NOT carry '(M remaining)' suffix; got {role_line!r}"
+    )
+    # And it must carry the "(N tasks)" count form. The podman role in
+    # this fixture has 33 subtree tasks.
+    assert "(33 tasks)" in role_line, (
+        f"role label must carry '(N tasks)' count form; got {role_line!r}"
     )
 
     # Every non-host, non-root line in the inner section (the cut

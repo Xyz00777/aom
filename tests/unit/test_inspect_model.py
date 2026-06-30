@@ -10,6 +10,7 @@ from ansible_aom.core.inspect_model import (
     RunSummary,
     StatusCounts,
     TaskTreeNode,  # noqa: F401
+    _make_loop_item,
     build_detail_block,
     build_run_summaries,
     build_run_summary,
@@ -448,3 +449,58 @@ def test_task_tree_string_task_field():
     task_labels = [c.label for c in play.children]
     assert task_labels == ["Task 1"]
     assert play.stats == StatusCounts(ok=1)
+
+
+# ── Async-poll dict-leak guard ────────────────────────────────────────────────
+
+
+class TestAsyncPollDoesNotLeakDictIntoLoopItem:
+    """Async-poll bookkeeping payloads must not leak the raw dict into LoopItem.label.
+
+    When ansible-core delivers an async-poll result via v2_runner_item_on_failed
+    (e.g. connection drops during polling), the payload has ``ansible_job_id``/
+    ``started``/``attempts``/``finished`` but no ``_ansible_item_label`` and no
+    ``item`` field. ``_make_loop_item`` must detect this shape and produce a
+    recognisable label instead of falling through to ``str(raw)``.
+    """
+
+    def test_make_loop_item_async_poll_does_not_leak_dict(self):
+        raw: dict = {
+            "ansible_job_id": "6c1b0ac27534a522",
+            "attempts": 1,
+            "changed": True,
+            "failed": False,
+            "finished": False,
+            "started": 1,
+            "warnings": ["Value for result key 'finished' of type int was converted to bool."],
+        }
+        item = _make_loop_item(raw)
+        assert item.label == "(async, job_id=6c1b0ac27534a522)"
+        # The raw dict must NOT appear in the label
+        assert "ansible_job_id" not in item.label
+        assert "{" not in item.label
+
+    def test_make_loop_item_async_poll_failed_flag_set_correctly(self):
+        raw: dict = {
+            "ansible_job_id": "6c1b0ac27534a522",
+            "attempts": 1,
+            "changed": True,
+            "failed": True,
+            "finished": True,
+            "started": 1,
+        }
+        item = _make_loop_item(raw)
+        assert item.failed is True
+        assert item.changed is True
+
+    def test_make_loop_item_normal_loop_item_unaffected(self):
+        raw: dict = {
+            "_ansible_item_label": "apple",
+            "item": "apple",
+            "changed": True,
+            "failed": False,
+        }
+        item = _make_loop_item(raw)
+        assert item.label == "apple"
+        assert item.changed is True
+        assert item.failed is False

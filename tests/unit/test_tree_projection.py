@@ -2099,15 +2099,16 @@ class TestTwoLevelTruncation:
 
     def test_inner_count_uses_role_remaining_count(self) -> None:
         """The inner footer's count must equal the number of tasks remaining
-        in the *active role's branch* — the same number that appears in the
-        role label's "(M tasks remaining)" suffix. The old contract counted
-        all task-domain entities (tasks + roles + plays) in the entire tail
-        below the cut, which incorrectly included upcoming plays' tasks.
+        in the *active role's branch* — derived from
+        ``role_total - role_visible`` (the same formula the inner
+        footer uses). The role label no longer carries a ``(M remaining)``
+        suffix (it duplicates completed count and grew as the run
+        progressed); the inner footer is the source of truth for the
+        hidden-work signal.
 
-        With 1 play, 1 role, 20 tasks, and budget=6, the cut lands inside
-        the role's task list. The inner footer count must equal
-        (role_total_tasks - role_visible_tasks), i.e. the same formula
-        used by ``_relabel_role_lines``.
+        With 1 play, 1 role, 20 tasks, and budget=6, the cut lands
+        inside the role's task list. The inner footer count must
+        equal ``role_total_tasks - role_visible_tasks``.
         """
         import re
 
@@ -2118,31 +2119,36 @@ class TestTwoLevelTruncation:
         inner = lines[-2]
         assert inner.kind == "more"
 
-        # Find the role line and extract its "remaining" count.
+        # Find the role line and extract its (N tasks) count.
         role_line = next(ln for ln in lines if ln.kind == "role")
-        m_role = re.search(r"\((\d+) (?:task|tasks) remaining\)", role_line.label)
-        assert m_role, f"role label must contain '(N tasks remaining)'; got {role_line.label!r}"
-        role_remaining = int(m_role.group(1))
+        m_role = re.search(r"\((\d+) tasks?\)", role_line.label)
+        assert m_role, f"role label must contain '(N tasks)'; got {role_line.label!r}"
+        role_total = int(m_role.group(1))
+        assert "remaining" not in role_line.label, (
+            f"role label must NOT carry 'remaining' suffix; got {role_line.label!r}"
+        )
 
         # Extract the inner footer count.
         m_inner = re.match(r"… and (\d+) more tasks", inner.label)
         assert m_inner, f"inner footer label must match '… and N more tasks'; got {inner.label!r}"
         inner_count = int(m_inner.group(1))
 
-        assert inner_count == role_remaining, (
-            f"inner footer count ({inner_count}) must equal the role's "
-            f"remaining task count ({role_remaining}), not the total "
-            f"task-domain entities in the dropped tail."
+        # Inner footer count must equal role_total - visible, i.e.
+        # total kept-role-tasks minus inner footer count = role_total.
+        assert inner_count == role_total - 1, (
+            f"inner footer count ({inner_count}) must equal role_total - visible "
+            f"({role_total} - 1 = {role_total - 1}); visible=1 task under r1 "
+            f"with budget=6."
         )
 
     def test_inner_footer_does_not_count_upcoming_plays_tasks(self) -> None:
         """The inner footer must NOT count tasks from upcoming plays.
 
         State: 2 plays, each with 1 role and tasks. The first play has
-        20 tasks, the second has 30. A small budget forces the cut inside
-        the first play's role. The inner footer count must equal
-        (first play's role total - visible tasks under that role) and must
-        NOT include any of the second play's 30 tasks.
+        20 tasks, the second has 30. A small budget forces the cut
+        inside the first play's role. The inner footer count must
+        equal ``first_play_role_total - visible_tasks_under_r1`` and
+        must NOT include any of the second play's 30 tasks.
         """
         import re
 
@@ -2240,17 +2246,19 @@ class TestTwoLevelTruncation:
 
         # Count visible tasks under the first play's role (r1).
         role_line = next(ln for ln in lines if ln.kind == "role" and ln.identity == "r1")
-        m_role = re.search(r"\((\d+) (?:task|tasks) remaining\)", role_line.label)
-        assert m_role, (
-            f"role label for r1 must contain '(N tasks remaining)'; got {role_line.label!r}"
+        m_role = re.search(r"\((\d+) tasks?\)", role_line.label)
+        assert m_role, f"role label for r1 must contain '(N tasks)'; got {role_line.label!r}"
+        assert "remaining" not in role_line.label, (
+            f"role label must NOT carry 'remaining' suffix; got {role_line.label!r}"
         )
-        role_remaining = int(m_role.group(1))
+        role_total = int(m_role.group(1))
 
-        # The inner footer count must equal the role's remaining count.
-        assert inner_count == role_remaining, (
-            f"inner footer count ({inner_count}) must equal r1's remaining "
-            f"task count ({role_remaining}); the second play's 30 tasks "
-            f"must NOT contribute."
+        # The inner footer count must equal role_total - visible. With
+        # 1 visible task under r1, that's 20 - 1 = 19.
+        assert inner_count == role_total - 1, (
+            f"inner footer count ({inner_count}) must equal r1's total "
+            f"minus visible ({role_total} - 1 = {role_total - 1}); the "
+            f"second play's 30 tasks must NOT contribute."
         )
 
         # Also verify the count is strictly less than 20+30=50 (the total
@@ -2266,36 +2274,6 @@ class TestTwoLevelTruncation:
         assert inner_count < 20, (
             f"inner footer count ({inner_count}) must be less than r1's "
             f"total task count (20) because some tasks are visible."
-        )
-
-    def test_inner_footer_count_matches_role_label_remaining(self) -> None:
-        """Cross-check: the inner footer count and the role label's
-        "(M tasks remaining)" suffix must agree exactly.
-
-        This is the lock-step test: both numbers are derived from the
-        same formula (role_total - role_visible), so they must match.
-        """
-        import re
-
-        state = self._single_play_single_role_state(n_tasks=20)
-        p = TreeProjection.from_run_state(state)
-        lines = p.tree_lines(budget=6)
-
-        inner = lines[-2]
-        assert inner.kind == "more"
-
-        role_line = next(ln for ln in lines if ln.kind == "role")
-        m_inner = re.search(r"(\d+)", inner.label)
-        m_role = re.search(r"\((\d+) (?:task|tasks) remaining\)", role_line.label)
-        assert m_inner, f"inner footer must contain a digit; got {inner.label!r}"
-        assert m_role, f"role label must contain '(N tasks remaining)'; got {role_line.label!r}"
-
-        inner_count = int(m_inner.group(1))
-        role_remaining = int(m_role.group(1))
-
-        assert inner_count == role_remaining, (
-            f"inner footer count ({inner_count}) must exactly match the "
-            f"role label remaining count ({role_remaining})."
         )
 
     def test_outer_count_uses_task_domain_count(self) -> None:
@@ -2392,17 +2370,21 @@ class TestRoleLabelsAfterTruncation:
     After `_truncate_two_level` runs, every role line's label is rewritten
     so the count semantic matches the user's question:
 
-    - ``role: X (N tasks)`` when no tasks under the role are visible in the
-      kept lines (the role itself is visible, all its tasks are below the
-      cut).
-    - ``role: X (M remaining)`` when some tasks are visible and M = total -
-      visible > 0.
-    - ``role: X (N tasks)`` (not "(0 remaining)") when all tasks under the
-      role are visible — the role label carries the role's full count and
-      no "remaining" suffix.
+    - ``role: X (N tasks)`` — always carries the role's full task count
+      from preflight + runtime definitions. ``N`` is the role's total,
+      regardless of how many tasks are visible in the kept lines.
+    - ``role: X`` — when the role has zero tasks (no count emitted).
+
+    The ``(M remaining)`` suffix that earlier revisions of this pass
+    emitted was dropped because it counted completed tasks (which are
+    dropped from the kept lines) and grew as the run progressed. The
+    ``… and N more tasks`` inner/outer footers already surface the
+    hidden-work signal in the truncated case, so the role label no
+    longer needs to mirror them.
 
     This pass is purely a label-rewrite; the TreeLine's other fields are
-    untouched. The renderer doesn't need to change for T3.
+    untouched. The renderer doesn't pattern-match the suffix, so no
+    renderer change was required.
     """
 
     def _many_tasks_state(self, n_roles: int, tasks_per_role: int, hosts_per_task: int) -> RunState:
@@ -2497,13 +2479,18 @@ class TestRoleLabelsAfterTruncation:
             f"role label must be '(3 tasks)' when all tasks are visible; got {role_line.label!r}"
         )
 
-    def test_role_label_shows_remaining_when_inside(self) -> None:
+    def test_role_label_shows_total_when_inside_cut(self) -> None:
         """Cut inside the role's task list: 1 role + 3 tasks (each with
         1 host leaf), budget=6. Layout: playbook(0), play(1), role(2),
         task0(3), host0(4), task1(5), host1(6), task2(7), host2(8) — 9
         lines total. ``inner_budget = 6 - 1 - 2 = 3`` keeps
-        ``inner_section = [play, role, task0]``: visible=1, total=3,
-        M=2. Role label must read ``(2 tasks remaining)``."""
+        ``inner_section = [play, role, task0]``: visible=1, total=3.
+
+        Role label always reads ``(N tasks)`` (the role's total). The
+        ``… and N more tasks`` inner footer carries the hidden-work
+        signal — role labels never carry a ``remaining`` suffix (that
+        variant counted completed tasks and grew as the run progressed).
+        """
 
         state = self._many_tasks_state(n_roles=1, tasks_per_role=3, hosts_per_task=1)
         lines = TreeProjection.from_run_state(state).tree_lines(budget=6)
@@ -2518,15 +2505,18 @@ class TestRoleLabelsAfterTruncation:
         )
 
         role_line = next(ln for ln in lines if ln.kind == "role")
-        assert role_line.label == "role: role0 (2 tasks remaining)", (
-            f"role label must be '(2 tasks remaining)' when visible=1, "
-            f"total=3, M=2; got {role_line.label!r}"
+        assert role_line.label == "role: role0 (3 tasks)", (
+            f"role label must be '(3 tasks)' (the total) when visible=1 "
+            f"and total=3 — no 'remaining' suffix; got {role_line.label!r}"
+        )
+        assert "remaining" not in role_line.label, (
+            f"role label must NOT carry 'remaining' suffix; got {role_line.label!r}"
         )
 
     def test_role_label_shows_total_when_all_tasks_visible_after_cut(self) -> None:
-        """Edge case: visible == total (M=0). The role label must read
-        ``(N tasks)``, NOT ``(0 remaining)``. The 'remaining' suffix only
-        appears when there's actually something remaining below the cut."""
+        """Edge case: visible == total. The role label reads ``(N tasks)``
+        — no ``remaining`` suffix (the suffix was dropped because it
+        counted completed tasks and grew as the run progressed)."""
 
         state = self._many_tasks_state(n_roles=1, tasks_per_role=3, hosts_per_task=1)
         # budget=10 fits the whole 9-line tree (1 playbook + 1 play +
@@ -2538,21 +2528,24 @@ class TestRoleLabelsAfterTruncation:
 
         role_line = next(ln for ln in lines if ln.kind == "role")
         assert role_line.label == "role: role0 (3 tasks)", (
-            f"role label must be '(3 tasks)' (NOT '(0 remaining)') when "
-            f"all tasks are visible; got {role_line.label!r}"
+            f"role label must be '(3 tasks)' when all tasks are visible; got {role_line.label!r}"
+        )
+        assert "remaining" not in role_line.label, (
+            f"role label must NOT carry 'remaining' suffix; got {role_line.label!r}"
         )
 
-    def test_role_label_remaining_format(self) -> None:
+    def test_role_label_singular_plural_format(self) -> None:
         """Verify exact format strings across the singular/plural cases:
 
-        - ``(1 task)`` (singular, all visible)
-        - ``(2 tasks)`` (plural, all visible)
-        - ``(1 task remaining)`` (singular, M=1)
-        - ``(2 tasks remaining)`` (plural, M=2)
+        - ``(1 task)`` (singular, total=1)
+        - ``(2 tasks)`` (plural, total=2)
 
-        The implementation must use ``'task'`` (singular) for M=1 or N=1,
-        ``'tasks'`` (plural) otherwise — matching the existing convention
-        from ``_emit_pending_play``.
+        The role label always carries the role's total task count
+        ``(N tasks)`` — never a ``(M remaining)`` suffix. The
+        ``… and N more tasks`` inner/outer footers carry the
+        hidden-work signal. The implementation must use ``'task'``
+        (singular) for N=1, ``'tasks'`` (plural) otherwise — matching
+        the existing convention from ``_emit_pending_play``.
         """
 
         # Case 1: ``(1 task)`` — 1 role + 1 task + 1 host, within budget.
@@ -2571,10 +2564,10 @@ class TestRoleLabelsAfterTruncation:
         role2 = next(ln for ln in lines2 if ln.kind == "role")
         assert role2.label == "role: role0 (2 tasks)", f"plural '(2 tasks)': got {role2.label!r}"
 
-        # Case 3: ``(1 task remaining)`` — 1 role + 2 tasks + 2 hosts
-        #   per task (hosts_per_task=2). 9 lines total. budget=6 →
-        #   inner_budget = 6 - 1 - 2 = 3 → inner_section =
-        #   [play, role, task0]. visible=1, total=2, M=1.
+        # Case 3: cut inside 1 role + 2 tasks + 2 hosts per task.
+        #   9 lines total. budget=6 → inner_budget = 3 → inner_section
+        #   = [play, role, task0]. visible=1, total=2. Role label
+        #   still reads "(2 tasks)" — the total — no "remaining" suffix.
         state3 = self._many_tasks_state(n_roles=1, tasks_per_role=2, hosts_per_task=2)
         lines3 = TreeProjection.from_run_state(state3).tree_lines(budget=6)
         # Sanity: 1 visible task.
@@ -2583,14 +2576,18 @@ class TestRoleLabelsAfterTruncation:
             f"sanity: case 3 must have visible=1; got {len(task_lines3)} tasks"
         )
         role3 = next(ln for ln in lines3 if ln.kind == "role")
-        assert role3.label == "role: role0 (1 task remaining)", (
-            f"singular '(1 task remaining)': got {role3.label!r}"
+        assert role3.label == "role: role0 (2 tasks)", (
+            f"case 3 must read total '(2 tasks)' inside the cut — no "
+            f"'remaining' suffix; got {role3.label!r}"
+        )
+        assert "remaining" not in role3.label, (
+            f"case 3 must NOT carry 'remaining' suffix; got {role3.label!r}"
         )
 
-        # Case 4: ``(2 tasks remaining)`` — 1 role + 3 tasks + 1 host
-        #   per task (hosts_per_task=1). 9 lines total. budget=6 →
-        #   inner_budget = 6 - 1 - 2 = 3 → inner_section =
-        #   [play, role, task0]. visible=1, total=3, M=2.
+        # Case 4: cut inside 1 role + 3 tasks + 1 host per task. 9 lines
+        #   total. budget=6 → inner_budget = 3 → inner_section =
+        #   [play, role, task0]. visible=1, total=3. Role label still
+        #   reads "(3 tasks)" — the total.
         state4 = self._many_tasks_state(n_roles=1, tasks_per_role=3, hosts_per_task=1)
         lines4 = TreeProjection.from_run_state(state4).tree_lines(budget=6)
         task_lines4 = [ln for ln in lines4 if ln.kind == "task"]
@@ -2598,8 +2595,12 @@ class TestRoleLabelsAfterTruncation:
             f"sanity: case 4 must have visible=1; got {len(task_lines4)} tasks"
         )
         role4 = next(ln for ln in lines4 if ln.kind == "role")
-        assert role4.label == "role: role0 (2 tasks remaining)", (
-            f"plural '(2 tasks remaining)': got {role4.label!r}"
+        assert role4.label == "role: role0 (3 tasks)", (
+            f"case 4 must read total '(3 tasks)' inside the cut — no "
+            f"'remaining' suffix; got {role4.label!r}"
+        )
+        assert "remaining" not in role4.label, (
+            f"case 4 must NOT carry 'remaining' suffix; got {role4.label!r}"
         )
 
 
@@ -3266,9 +3267,9 @@ class TestSubtreeRoleCounting:
     under each role header — every task whose role path includes the
     role, transitively. Previously both helpers keyed on the innermost
     role only, which made an outer role's count miss everything below
-    a nested sub-role (the user's complaint: ``podman (401 tasks
-    remaining)`` didn't reflect the sub-tree, and the nested level's
-    count was missing).
+    a nested sub-role (the user's complaint about a podman role whose
+    count didn't reflect the subtree — and the nested level's count
+    was missing entirely).
 
     Single-role fixtures keep their existing totals unchanged because
     the subtree of a leaf role equals its direct children.
@@ -3537,18 +3538,17 @@ class TestSubtreeRoleCounting:
             f"single-role podman visible must be 3; got {visible.get('podman')}"
         )
 
-    def test_role_label_subtree_remaining_when_cut_inside_nested(self) -> None:
+    def test_role_label_subtree_total_when_cut_inside_nested(self) -> None:
         """With a small budget that truncates inside angie's task list,
-        both podman and angie labels report their subtree remaining:
-        podman = total - visible, angie = total - visible.
+        both podman and angie labels report their subtree TOTAL — never
+        a ``(M remaining)`` suffix. The role label always carries
+        ``(N tasks)`` where N is the role's full subtree total.
 
         With ``n_podman_direct=5, n_angie=30``, the 5 fired podman
         direct tasks are visible and the cut lands just past the
         angie role line (no angie tasks visible). So:
-        - podman: total=35, visible=5 → remaining=30, label
-          ``"(30 tasks remaining)"``
-        - angie: total=30, visible=0 → use the ``"(N tasks)"`` form
-          (visible==0 edge case at line ~704)
+        - podman: total=35 → label ``"(35 tasks)"``
+        - angie: total=30 → label ``"(30 tasks)"``
         """
 
         # Fire all 5 podman direct tasks + 1 angie task so the
@@ -3566,20 +3566,22 @@ class TestSubtreeRoleCounting:
         role_labels = {ln.identity: ln.label for ln in role_lines}
         assert "podman" in role_labels
         assert "angie_ssl_terminator" in role_labels
-        # Subtree counting: podman's total is 5 direct + 30 angie =
-        # 35. Visible is 5 (the 5 fired podman direct tasks).
-        # Remaining = 35 - 5 = 30, so the label uses the
-        # "(M tasks remaining)" form.
-        assert role_labels["podman"] == "role: podman (30 tasks remaining)", (
-            f"podman label must show subtree remaining of 30; got {role_labels['podman']!r}"
+        # Subtree counting: podman's total is 5 direct + 30 angie = 35.
+        # Role label always carries the role's full subtree total —
+        # never a "(M tasks remaining)" suffix.
+        assert role_labels["podman"] == "role: podman (35 tasks)", (
+            f"podman label must show subtree total of 35; got {role_labels['podman']!r}"
         )
-        # Angie has 0 visible tasks (cut lands before any angie task),
-        # so the relabel uses the "(N tasks)" form (the visible==0
-        # branch, NOT the "(0 remaining)" branch — see line ~704).
+        # Angie has 0 visible tasks; role label still reads the total.
         assert role_labels["angie_ssl_terminator"] == ("role: angie_ssl_terminator (30 tasks)"), (
-            f"angie label must show 30 (visible==0 → '(N tasks)' form); "
+            f"angie label must show 30 (the role's total); "
             f"got {role_labels['angie_ssl_terminator']!r}"
         )
+        # No role label may carry a "remaining" suffix.
+        for identity, label in role_labels.items():
+            assert "remaining" not in label, (
+                f"role label for {identity} must NOT carry 'remaining' suffix; got {label!r}"
+            )
 
 
 class TestMultiLevelInnerFooters:

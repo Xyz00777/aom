@@ -38,6 +38,41 @@ def format_duration_compact(seconds: float) -> str:
     return f"{h}h{m:02d}m"
 
 
+def format_duration_decimal(seconds: float) -> str:
+    """Render a duration keeping one decimal place under a minute ("0.4s", "12.3s").
+
+    Same minute/hour bucketing as :func:`format_duration_compact` but
+    preserves sub-second precision in the seconds bucket, which the
+    compact renderer's per-task timing lines need (e.g.
+    ``ok: [web1] (2.5s)``).
+    """
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    if seconds < 3600:
+        minutes = int(seconds // 60)
+        return f"{minutes}m{int(seconds % 60):02d}s"
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    return f"{hours}h{minutes:02d}m"
+
+
+def format_elapsed_hms(seconds: float) -> str:
+    """Render an elapsed time as ``M:SS`` (under an hour) or ``H:MM:SS``.
+
+    Used by TUI status widgets where the colon-separated form reads
+    more naturally than the ``1h05m`` compact form — e.g. a status bar
+    showing ``2:05`` vs ``2m05s``. Hours are not zero-padded so the
+    display remains compact for runs shorter than a day.
+    """
+    total = int(seconds)
+    hours = total // 3600
+    minutes = (total % 3600) // 60
+    secs = total % 60
+    if hours > 0:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
+
+
 def format_age(end_time: datetime) -> str:
     """Render an absolute UTC ``end_time`` as a relative ``"Xs/m/h/d ago"`` string.
 

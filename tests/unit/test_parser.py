@@ -332,6 +332,30 @@ class TestPtyStreamParserPlaintextCap:
         first_idx = int(parser.plaintext_lines[0].rsplit(" ", 1)[1])
         assert last_idx > first_idx
 
+    def test_plaintext_lines_60000_input_retains_exactly_50000(self):
+        """R2 spec literal: 60 000 lines in → exactly 50 000 retained.
+
+        A noisy run (verbose pexpect chatter, ansible banners, prompt
+        echoes) easily crosses 60 000 lines on a long playbook. The cap
+        must drop exactly 10 000 entries and keep the most-recent 50 000
+        — never the head (a stuck head defeats the stall-diagnostic
+        purpose of plaintext_lines in runner.py).
+        """
+        from ansible_aom.core.state_machine import MAX_LOG_LINES
+
+        assert MAX_LOG_LINES == 50000  # pin against accidental constant drift
+
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        # Feed the spec-literal input count: 60 000.
+        for i in range(60_000):
+            parser.feed_line(f"line {i}")
+        assert len(parser.plaintext_lines) == 50_000
+        # First retained entry is line 10 000 (the oldest survivor);
+        # last retained entry is line 59 999.
+        assert parser.plaintext_lines[0] == "line 10000"
+        assert parser.plaintext_lines[-1] == "line 59999"
+
 
 class TestPtyStreamParserPhases:
     """TC-128 to TC-142: PTY stream phase transitions."""

@@ -8,18 +8,11 @@ SIGINT can arrive at any of three windows during ``run_playbook``:
 
 2. **After** ``_drive`` has already returned the child's exit status but
    **before** ``run_playbook`` returns to the caller:
-   Vanishingly small window in practice. If SIGINT does land here, the
-   except branch catches it and returns 130 — overriding the run result.
+   R7 fix: the runner detects the child is no longer alive and reports
+   the real exit code (``child.exitstatus``) instead of 130.
 
 3. **After** ``run_playbook`` returns:
    Not our concern; the CLI's outer ``except KeyboardInterrupt`` handles it.
-
-These tests pin the **current** behavior (assertion-of-fact) rather than
-the spec-ideal. The spec gap: window #2 currently maps to 130 even when
-the underlying run had a clean exit code waiting. SPECIFICATION.md does
-not disambiguate. If the team decides the run result should win in
-window #2, the second test below becomes the failing-first test for that
-change.
 """
 
 from __future__ import annotations
@@ -80,31 +73,24 @@ class TestCtrlCDuringRun:
         renderer.stop.assert_called_once()
 
 
-class TestCtrlCAfterCompletionDocumentsCurrentBehavior:
+class TestCtrlCAfterCompletion:
     """Variant B: completion arrives first, then SIGINT.
 
-    Currently the runner's outer try/except still catches the signal and
-    returns 130 — but only if KeyboardInterrupt is raised inside the try
-    block. If ``_drive`` has already returned and ``handle_completion``
-    already ran, SIGINT raised at that exact moment is still inside the
-    try block. This test pins that behavior.
-
-    This is a known spec ambiguity. If the user wants "completion wins",
-    the runner needs to guard the post-``_drive`` cleanup against
-    interruption, and this test should flip to asserting the recorded
-    exit code (0 for the case below).
+    R7 spec: completion wins. If the child has already exited cleanly
+    when SIGINT fires during the post-``_drive`` cleanup, the runner
+    reports the real exit code instead of unconditionally returning 130.
     """
 
-    def test_signal_after_drive_still_maps_to_130(self) -> None:
+    def test_signal_after_drive_returns_real_exit_code(self) -> None:
         """The run completed cleanly (exit 0). SIGINT arrives during the
-        ``renderer.handle_completion`` call. Current behavior: 130 wins."""
+        ``renderer.handle_completion`` call. After the R7 fix, the
+        runner detects the dead child and reports its real exit code."""
         from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
-        # Run completes; SIGINT fires when the renderer renders the final
-        # completion frame. The except branch re-calls handle_completion
-        # (with 130, "crashed") — that second call must NOT re-raise, so
-        # set the side_effect to a one-shot via an iterator.
+        # First call (the legitimate completion) raises KeyboardInterrupt;
+        # subsequent calls (the runner's recovery call) must NOT re-raise,
+        # so feed a one-shot iterator.
         renderer.handle_completion.side_effect = [KeyboardInterrupt(), None]
 
         cmd, args = _fake_ansible_command(
@@ -118,12 +104,32 @@ class TestCtrlCAfterCompletionDocumentsCurrentBehavior:
         with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             exit_code = run_playbook("playbook.yml", [], renderer, timeout=0.5)
 
-        # SPEC GAP: ideally completion would win (exit 0). Today the
-        # outer KeyboardInterrupt handler always returns 130. Pin the
-        # current behavior; flip the assertion when the spec settles.
-        assert exit_code == 130, (
-            f"Current behavior: SIGINT during handle_completion returns 130, got {exit_code}"
+        # R7 fix: completion wins, NOT 130.
+        assert exit_code == 0, (
+            f"After R7 fix, SIGINT after clean exit should preserve exit code 0, got {exit_code}"
         )
+        renderer.handle_completion.assert_called_with(0, "completed")
+
+    def test_signal_after_drive_returns_non_zero_exit_code(self) -> None:
+        """Same as above but the child failed (exit 2). The real exit
+        code still wins — the fix preserves whatever the child returned."""
+        from ansible_aom.ansible.runner import run_playbook
+
+        renderer = MagicMock()
+        renderer.handle_completion.side_effect = [KeyboardInterrupt(), None]
+
+        cmd, args = _fake_ansible_command(
+            [
+                {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-08T10:00:00Z"},
+                {"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-08T10:00:01Z"},
+            ],
+            exit_code=2,
+        )
+
+        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
+            exit_code = run_playbook("playbook.yml", [], renderer, timeout=0.5)
+
+        assert exit_code == 2, f"Child's real exit code 2 should win over 130, got {exit_code}"
 
     def test_signal_after_drive_returns_run_result_when_handler_already_ran(
         self,

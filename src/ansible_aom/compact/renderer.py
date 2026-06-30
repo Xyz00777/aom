@@ -7,13 +7,25 @@ Both are re-exported here so historical
 imports keep working. See ARCHITECTURE.md §7.3.
 
 See SPECIFICATION.md Section 4.1 for compact view behaviour.
+
+Note on ``print()``: the ``print()`` calls in
+:meth:`CompactRenderer.handle_completion` (``_print_final_status`` block)
+write user-facing completion output — snapshot tree, host recap, final
+status, failure recap, unknown-events hint — that the test suite and the
+golden snapshot ``tests/compact/golden/unknown_event_type__80x24.txt``
+capture via ``capsys.readouterr().out``. Converting them to
+``logger.*`` calls would route the output through the logging handler
+configuration and silently break those assertions, so they stay as
+``print()``. Structured logging is still available via ``logger`` below
+for any future debug-only diagnostics.
 """
 
 from __future__ import annotations
 
+import logging
 import shutil
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from ansible_aom.compact.display import Display
 from ansible_aom.compact.exit_code import determine_exit_code  # noqa: F401 — re-export
@@ -49,6 +61,8 @@ from ansible_aom.compact.format import (
 )
 from ansible_aom.compact.password import handle_password_prompt as do_handle_password_prompt
 from ansible_aom.core import diagnostics
+from ansible_aom.core._async_poll import is_async_poll_payload
+from ansible_aom.core.duration import format_duration_decimal
 from ansible_aom.core.estimate import (
     RunEstimate,
     RunProgress,
@@ -56,6 +70,7 @@ from ansible_aom.core.estimate import (
     add_in_flight,
     project_remaining,
 )
+from ansible_aom.core.event_types import JsonlEvent, JsonlTask
 from ansible_aom.core.heartbeat import HeartbeatTracker, LivenessState  # noqa: F401
 from ansible_aom.core.icons import is_unicode_terminal
 from ansible_aom.core.log_filter import (
@@ -63,11 +78,63 @@ from ansible_aom.core.log_filter import (
     should_hide_event,
     should_hide_host_result,
 )
-from ansible_aom.core.models import RunState, Status
+from ansible_aom.core.models import Status
+from ansible_aom.core.run_state import RunState
 from ansible_aom.core.tree import TreeProjection
 
 if TYPE_CHECKING:
     from ansible_aom.session.history import PriorRun
+
+logger = logging.getLogger(__name__)
+
+
+class _BoundedSet(set):  # noqa: FURB189 — subclassing set is intentional
+    """A ``set`` that drops itself when it exceeds a cap on insert.
+
+    R14: the compact renderer carries several set-shaped dedupe
+    containers that grow monotonically with the event stream. A
+    pathological loop fan-out or warning storm can fill them past any
+    reasonable cap in seconds. ``_BoundedSet`` enforces a soft ceiling:
+
+    - When the cap is exceeded on ``add()``, the entire set is cleared.
+      A clear is simpler than per-element FIFO eviction (which would
+      require an ``OrderedDict`` or deque to track insertion order) and
+      is correct for the renderer's use cases: the containers are
+      dedupe helpers, so losing the older entries just means future
+      repeats of those values are "seen" again, which the renderer
+      handles gracefully (no crash, slightly louder output).
+    - Membership tests (``in``) and iteration behave like a plain
+      ``set``.
+
+    The cap is fixed at construction time; nothing in the renderer
+    mutates it post-init. Pick the cap based on the *upper bound on
+    useful dedupe* for each container — anything beyond that is the
+    runaway case the cap is meant to suppress.
+    """
+
+    __slots__ = ("_cap",)
+
+    def __init__(self, cap: int) -> None:
+        super().__init__()
+        self._cap = cap
+
+    def add(self, value: object) -> None:  # type: ignore[override]
+        # Drop everything when we cross the cap *before* inserting the
+        # new value. This keeps the post-cap set size bounded by
+        # ``_cap`` (the cap means "remember at most this many recent
+        # entries"; insert at cap + 1 resets to just the new entry).
+        if len(self) >= self._cap:
+            self.clear()
+        super().add(value)
+
+
+# R14: per-container cap values. Picked to be generous enough that no
+# realistic run trips them, but small enough that a misbehaving host
+# can't OOM the renderer.
+_STREAMED_LOOP_ITEMS_CAP = 10_000
+_ANNOUNCED_TASK_UUIDS_CAP = 10_000
+_COMPLETED_TASK_IDS_CAP = 10_000
+_SEEN_WARNING_MESSAGES_CAP = 5_000
 
 
 # HS-1/HS-8: status-panel compute throttle. Aligned with Display.update's
@@ -85,6 +152,40 @@ _PANEL_TICK_REFRESH_S = 0.25
 # five runner_on_ok within microseconds) without burning CPU, but lets
 # the next render proceed as soon as the burst settles.
 _PANEL_DIRTY_COALESCE_S = 0.05
+
+
+def _extract_error_msg(result: dict) -> str:
+    """Extract the most informative error string from a runner result.
+
+    Ansible modules surface error details in different fields depending
+    on the failure mode (``msg`` for normal exceptions, ``module_stderr``
+    / ``stderr`` for shell command failures, ``module_stdout`` /
+    ``stdout`` for raw output).  This helper walks the fields in priority
+    order and returns the first one that has non-whitespace content,
+    passed through :func:`_truncate_msg` so the result respects the
+    display cap and surrogate normalisation.
+
+    When ``_ansible_no_log`` is ``True`` and none of the standard error
+    fields have content, returns the project's canonical redacted marker
+    ``(no_log)`` so the user sees ``FAILED! => (no_log)`` instead of a
+    bare ``FAILED!`` with no explanation.
+
+    When ``_ansible_no_log`` is not set but a ``censored`` field exists
+    (an edge case), falls back to the raw ``censored`` value.
+
+    Returns an empty string when no field yields content, so callers
+    can render ``FAILED!`` / ``UNREACHABLE!`` without a trailing ``=>``.
+    """
+    for key in ("msg", "module_stderr", "stderr", "module_stdout", "stdout"):
+        value = result.get(key, "")
+        if isinstance(value, str) and value.strip():
+            return _truncate_msg(value)
+    if result.get("_ansible_no_log") is True:
+        return "(no_log)"
+    censored = result.get("censored", "")
+    if isinstance(censored, str) and censored.strip():
+        return _truncate_msg(censored)
+    return ""
 
 
 class CompactRenderer:
@@ -121,7 +222,7 @@ class CompactRenderer:
         self._warnings_count: int = 0
         self._deprecations_count: int = 0
         self._definitions: list = []
-        self._seen_warning_messages: set[str] = set()
+        self._seen_warning_messages: set[str] = _BoundedSet(_SEEN_WARNING_MESSAGES_CAP)
         self._ascii_mode: bool = not is_unicode_terminal()
         self._colorize: bool = _color_enabled(is_tty)
         self._heartbeat = HeartbeatTracker()
@@ -158,7 +259,7 @@ class CompactRenderer:
         # rendered twice. Empty under the plain ``ansible.posix.jsonl``
         # fallback (no item events), where the aggregate expansion stays
         # the only source of per-item lines.
-        self._streamed_loop_items: set[tuple[str, str]] = set()
+        self._streamed_loop_items: set[tuple[str, str]] = _BoundedSet(_STREAMED_LOOP_ITEMS_CAP)
         # Optional prior-run stats for the preflight "Last run" hint.
         # Must be set via :meth:`set_prior_run` BEFORE
         # :meth:`set_definitions` so the hint is included in the
@@ -186,7 +287,7 @@ class CompactRenderer:
         # (e.g. host-by-host events under the free strategy).
         self._tasks_seen: int = 0
         self._tasks_completed: int = 0
-        self._completed_task_ids: set[str] = set()
+        self._completed_task_ids: set[str] = _BoundedSet(_COMPLETED_TASK_IDS_CAP)
         # Live run-duration estimate. ``_estimate`` is the matching prior
         # run's result-segmented per-task wall profile (built in
         # ``set_prior_run``); ``_progress`` accumulates covered prior work as
@@ -208,7 +309,7 @@ class CompactRenderer:
         # per host instead of one v2_playbook_on_task_start up front, so
         # the header is emitted from either event — whichever arrives
         # first. This set keeps us from printing it twice when both fire.
-        self._announced_task_uuids: set[str] = set()
+        self._announced_task_uuids: set[str] = _BoundedSet(_ANNOUNCED_TASK_UUIDS_CAP)
         # HS-1/HS-8: dirty-flag + compute throttle on the status panel.
         # The flag turns on when state changes; the panel computation
         # is throttled to the same 0.25 s window Display.update uses
@@ -246,8 +347,8 @@ class CompactRenderer:
         # starts at zero rather than carrying state over.
         self._tasks_seen = 0
         self._tasks_completed = 0
-        self._completed_task_ids = set()
-        self._announced_task_uuids = set()
+        self._completed_task_ids = _BoundedSet(_COMPLETED_TASK_IDS_CAP)
+        self._announced_task_uuids = _BoundedSet(_ANNOUNCED_TASK_UUIDS_CAP)
         # ``_estimate`` is set by ``set_prior_run`` and not reset here, the
         # same way ``_prior_run`` isn't — only the per-run accumulators are.
         self._progress = RunProgress()
@@ -327,7 +428,7 @@ class CompactRenderer:
         self._last_state_change_monotonic = time.monotonic()
         self._render_status_panel()
 
-    def update_state(self, event: dict) -> None:
+    def update_state(self, event: JsonlEvent) -> None:
         """Handle a new JSONL event.
 
         Processes the event to update RunState, then refreshes the display.
@@ -363,7 +464,7 @@ class CompactRenderer:
         # Refresh the status panel with current state + elapsed time.
         self._render_status_panel()
 
-    def _bump_task_counters(self, event: dict) -> None:
+    def _bump_task_counters(self, event: JsonlEvent) -> None:
         """Update ``_tasks_seen`` / ``_tasks_completed`` from a single event.
 
         Tracks the same ground truth as ``count_completed_tasks`` but at
@@ -463,7 +564,7 @@ class CompactRenderer:
             actual_wall = (time.time() - start[1]) if start is not None else (prior_wall or 0.0)
             add_completed(self._estimate, self._progress, path, actual_wall)
 
-    def _record_running_start(self, event: dict) -> None:
+    def _record_running_start(self, event: JsonlEvent) -> None:
         """Note when a task entered flight, for the live ETA's in-flight credit.
 
         Records ``task_id -> (task.path, wall_now)`` on the task's first
@@ -923,6 +1024,19 @@ class CompactRenderer:
             total = sum(self._state.unknown_events.values())
             print(f"  ({total} unknown events: {parts})")
 
+        # R12: surface any memory-cap hits so the user knows the run
+        # was clipped. Same one-line footer shape as the unknown-events
+        # hint — easy to skim for "did the run finish normally?".
+        if self._state is not None and self._state.truncated_events:
+            parts = ", ".join(
+                f"{name}={count}"
+                for name, count in sorted(
+                    self._state.truncated_events.items(),
+                    key=lambda kv: (-kv[1], kv[0]),
+                )
+            )
+            print(f"  (truncated: {parts})")
+
     def _capture_panel_snapshot(self) -> tuple[list[str], list[str]]:
         """Render the current tree and host overview as static lines.
 
@@ -986,7 +1100,7 @@ class CompactRenderer:
         self._display.stop()
         self._state = None
 
-    def _maybe_emit_pause_seconds_hint(self, task: dict) -> None:
+    def _maybe_emit_pause_seconds_hint(self, task: JsonlTask) -> None:
         """Surface a one-line hint when a pause-with-seconds task starts.
 
         ``ansible.builtin.pause`` with ``seconds:`` doesn't read stdin
@@ -1010,7 +1124,7 @@ class CompactRenderer:
             return
         self._display.print_log(f"[pause] sleeping {seconds_num}s…")
 
-    def _event_time(self, event: dict) -> float | None:
+    def _event_time(self, event: JsonlEvent) -> float | None:
         """Parse ``_timestamp`` from a JSONL event into a Unix float.
 
         Returns ``None`` when the timestamp is missing or malformed —
@@ -1020,24 +1134,20 @@ class CompactRenderer:
         if not ts:
             return None
         try:
-            from datetime import datetime
+            from ansible_aom.core.timestamp import parse_iso_timestamp
 
-            if ts.endswith("Z"):
-                ts = ts[:-1] + "+00:00"
-            return datetime.fromisoformat(ts).timestamp()
+            return parse_iso_timestamp(ts).timestamp()
         except ValueError, TypeError, AttributeError:
             return None
 
     def _format_duration(self, seconds: float) -> str:
-        """Compact human duration: ``0.4s`` / ``12.3s`` / ``1m23s`` / ``1h02m``."""
-        if seconds < 60:
-            return f"{seconds:.1f}s"
-        if seconds < 3600:
-            minutes = int(seconds // 60)
-            return f"{minutes}m{int(seconds % 60):02d}s"
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        return f"{hours}h{minutes:02d}m"
+        """Compact human duration: ``0.4s`` / ``12.3s`` / ``1m23s`` / ``1h02m``.
+
+        Thin wrapper around :func:`ansible_aom.core.duration.format_duration_decimal`
+        — kept here so historical callers and tests that reach into the
+        renderer keep working.
+        """
+        return format_duration_decimal(seconds)
 
     def _emit_previous_task_summary(self, now: float) -> None:
         """Print a one-line summary of the task that just finished.
@@ -1198,7 +1308,7 @@ class CompactRenderer:
         task_uuid: str,
         task_name: str,
         event_time: float | None,
-        task_meta: dict,
+        task_meta: JsonlTask,
     ) -> None:
         """Emit the TASK [..] header and reset per-task bookkeeping.
 
@@ -1233,7 +1343,7 @@ class CompactRenderer:
         if task_uuid:
             self._announced_task_uuids.add(task_uuid)
 
-    def _task_dict(self, event: dict) -> dict:
+    def _task_dict(self, event: JsonlEvent) -> JsonlTask:
         """Extract the ``task`` field as a dict.
 
         ansible.posix.jsonl may emit ``task`` as a bare UUID string or
@@ -1241,9 +1351,9 @@ class CompactRenderer:
         empty dict in those cases so callers can safely call ``.get()``.
         """
         task = event.get("task")
-        return task if isinstance(task, dict) else {}
+        return cast(JsonlTask, task) if isinstance(task, dict) else cast(JsonlTask, {})
 
-    def _hosts_dict(self, event: dict) -> dict:
+    def _hosts_dict(self, event: JsonlEvent) -> dict:
         """Extract the ``hosts`` field as a dict.
 
         mitogen bulk-reconnect events can emit ``hosts`` as a list of
@@ -1254,7 +1364,7 @@ class CompactRenderer:
         hosts = event.get("hosts")
         return hosts if isinstance(hosts, dict) else {}
 
-    def _emit_event_log(self, event: dict) -> None:
+    def _emit_event_log(self, event: JsonlEvent) -> None:
         """Print one nom-style log line for a JSONL event.
 
         Stats events are intentionally silent — the live panel and the
@@ -1360,10 +1470,12 @@ class CompactRenderer:
                     continue
                 if suffix:
                     self._current_task_inline_duration_hosts.add(host)
-                msg = _truncate_msg(result.get("msg", "") or "")
+                msg = _extract_error_msg(result)
+                prefix = f"fatal: [{host}]{suffix}: FAILED!"
+                text = f"{prefix} => {msg}" if msg else prefix
                 lines.append(
                     _wrap(
-                        f"fatal: [{host}]{suffix}: FAILED! => {msg}",
+                        text,
                         _RED,
                         self._colorize,
                     )
@@ -1378,10 +1490,12 @@ class CompactRenderer:
             for host, result in self._hosts_dict(event).items():
                 if suffix:
                     self._current_task_inline_duration_hosts.add(host)
-                msg = _truncate_msg(result.get("msg", "") or "")
+                msg = _extract_error_msg(result)
+                prefix = f"fatal: [{host}]{suffix}: UNREACHABLE!"
+                text = f"{prefix} => {msg}" if msg else prefix
                 lines.append(
                     _wrap(
-                        f"fatal: [{host}]{suffix}: UNREACHABLE! => {msg}",
+                        text,
                         _MAGENTA,
                         self._colorize,
                     )
@@ -1413,6 +1527,12 @@ class CompactRenderer:
                     if not isinstance(raw, dict):
                         continue
                     if should_hide_host_result(raw, name, self._hide_states):
+                        continue
+                    # Suppress in-flight async-poll bookkeeping payloads
+                    # (finished=False) — they are not real loop items and
+                    # would render as noise. A real item event follows when
+                    # the job finishes.
+                    if is_async_poll_payload(raw) and not raw.get("finished", True):
                         continue
                     self._streamed_loop_items.add((host, task_id))
                     streamed_lines.append(self._format_loop_item_line(host, raw, name))
@@ -1488,10 +1608,31 @@ class CompactRenderer:
         ``aom_jsonl`` callback omits those flags on per-item payloads.
         The aggregate path (``_loop_item_lines``) passes ``event_type=None``
         since the aggregate ``results[]`` entries carry the flags correctly.
+
+        Async-poll bookkeeping payloads (``ansible_job_id`` present, no
+        ``_ansible_item_label``/``item``) are rendered with a recognisable
+        ``(async, job_id=XXX)`` label instead of leaking the raw dict.
         """
+        # Async-poll bookkeeping: ansible_job_id present, no item label.
+        if is_async_poll_payload(raw):
+            job_id = raw.get("ansible_job_id", "?")
+            if event_type == "v2_runner_item_on_failed" or raw.get("failed"):
+                msg = _extract_error_msg(raw)
+                text = f"failed: [{host}] => (async, job_id={job_id})"
+                if msg:
+                    text += f" => {msg}"
+                return _wrap(text, _RED, self._colorize)
+            # In-flight async poll (finished=False) on v2_runner_item_on_ok
+            # should be suppressed by the caller, but if it reaches here
+            # render it as changed (the poll is still running).
+            return _wrap(
+                f"changed: [{host}] => (async, job_id={job_id})",
+                _YELLOW,
+                self._colorize,
+            )
         label = str(raw.get("_ansible_item_label") or raw.get("item") or "")
         if event_type == "v2_runner_item_on_failed" or raw.get("failed"):
-            msg = _truncate_msg(raw.get("msg", "") or "")
+            msg = _extract_error_msg(raw)
             text = f"failed: [{host}] => (item={label})"
             if msg:
                 text += f" => {msg}"
@@ -1502,7 +1643,7 @@ class CompactRenderer:
             return _wrap(f"changed: [{host}] => (item={label})", _YELLOW, self._colorize)
         return _wrap(f"ok: [{host}] => (item={label})", _GREEN, self._colorize)
 
-    def _inline_duration_suffix(self, event: dict, event_time: float | None) -> str:
+    def _inline_duration_suffix(self, event: JsonlEvent, event_time: float | None) -> str:
         """Return `` (2.3s)`` for the per-host result line, or empty.
 
         Empty when timing data is unavailable (missing ``_timestamp``,

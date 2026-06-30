@@ -39,6 +39,7 @@ from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.css.query import NoMatches
 from textual.screen import ModalScreen
 from textual.widgets import Footer, Header, Label, ListItem, ListView, RichLog, Static, Tree
 
@@ -114,9 +115,22 @@ def _copy_to_clipboard(app: App, text: str) -> None:
     app.copy_to_clipboard(text)
     try:
         import pyperclip  # type: ignore[import-untyped]
+        from pyperclip import PyperclipException
 
         pyperclip.copy(text)
-    except Exception:
+    except ImportError:
+        # pyperclip isn't installed (optional extra). OSC52 above
+        # already pushed the text to the terminal.
+        pass
+    except PyperclipException:
+        # pyperclip is installed but no usable backend (no xclip/xsel/
+        # wl-copy on Linux, no pbcopy in macOS sandbox, etc.). Non-fatal
+        # because OSC52 above already pushed the text.
+        pass
+        # pyperclip is an optional extra; any backend failure (no
+        # xclip/xsel/wl-copy on Linux, no pbcopy on macOS sandbox, etc.)
+        # is non-fatal because Textual's OSC52 path already pushed the
+        # text to the terminal above.
         pass
 
 
@@ -581,7 +595,7 @@ class InspectApp(App):
             return
         try:
             widget = self.query_one(f"#{target}")
-        except Exception:
+        except NoMatches:
             return
         widget.focus()
         self._refresh_pane_focus_classes()
@@ -591,7 +605,7 @@ class InspectApp(App):
         for pid in self._PANE_ORDER:
             try:
                 pane = self.query_one(f"#{pid}")
-            except Exception:
+            except NoMatches:
                 continue
             if pid == current:
                 pane.add_class("--focused-pane")
@@ -611,7 +625,7 @@ class InspectApp(App):
         # entry to the pane.
         try:
             tree = self.query_one("#tasks-tree", _NavTree)
-        except Exception:
+        except NoMatches:
             tree = None
         if tree is not None and tree.cursor_line < 0 and tree.root.children:
             tree.cursor_line = 0
@@ -659,7 +673,12 @@ class InspectApp(App):
             if s.session_id == session_id:
                 try:
                     listview.index = idx
-                except Exception:
+                except ValueError, IndexError:
+                    # ValueError/IndexError: ListView.index assignment
+                    # validates against the current child count; a
+                    # concurrent reload between enumerate() and the
+                    # assignment can land out-of-range. Skip — the
+                    # follow-up _load_tasks_for still wires the data.
                     pass
                 self.selected_session_id = session_id
                 return

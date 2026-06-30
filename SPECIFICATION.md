@@ -1,7 +1,7 @@
 # AOM (Ansible Output Monitor) - Technical Specification
 
-**Version:** 1.8  
-**Last Updated:** 2026-04-20
+**Version:** 1.9  
+**Last Updated:** 2026-06-26
 
 ---
 
@@ -69,10 +69,12 @@ LiveDriver    ReplayDriver  compact   tui   formats/json
 │  ├────────────────────────────────────────┤  │
 │  │ parser.py — JSONL + --list-* parsing   │  │
 │  ├────────────────────────────────────────┤  │
-│  │ state_machine.py — ExecutionState FSM  │  │
+│  │ state_machine.py — MAX_* memory bounds  │  │
 │  ├────────────────────────────────────────┤  │
 │  │ tree, heartbeat, overhead, redaction,  │  │
-│  │ inspect_model, parity, prompts, icons  │  │
+│  │ inspect_model, parity, prompts, icons, │  │
+│  │ exit_code, timestamp, duration,        │  │
+│  │ includes, log_filter, replay, run_config│  │
 │  └────────────────────────────────────────┘  │
 └─────────────────────────────────────────────┘
                        ▲
@@ -113,11 +115,28 @@ externally observable behavior.
 **Domain core** (`core/`)
 - `models.py` — `RunState` aggregate, `PlayRunState`/`TaskRunState`/`HostRunState`
   entities, definition value objects, `Status` and `WarningType` enums.
-- `state_machine.py` — `ExecutionState` lifecycle FSM.
+- `state_machine.py` — memory-bounds constants only
+  (`MAX_PLAYS`, `MAX_TASKS_PER_PLAY`, `MAX_HOSTS_PER_TASK`,
+  `MAX_TOTAL_HOST_RUN_STATES`, `MAX_LOG_LINES`). The 8-state `ExecutionState`
+  FSM described in §6.4 was removed in v0.93; the TUI tracks state as a
+  plain string, the compact renderer relies on `RunState`, and the runner
+  passes lowercase strings to `handle_completion`. The module name is kept
+  so existing `MAX_LOG_LINES` imports don't churn.
 - `parser.py` — JSONL stream parsing, `--list-tasks` / `--list-hosts` parsing.
 - `tree.py`, `heartbeat.py`, `overhead.py`, `inspect_model.py` — pure
   projections of state into render-ready shapes.
 - `redaction.py`, `prompts.py`, `icons.py`, `config.py` — pure services.
+- `exit_code.py` — canonical `determine_exit_code(state)`; `compact/exit_code.py`
+  is a re-export shim kept for backward compat.
+- `timestamp.py` — canonical `parse_iso_timestamp(value)` for ISO 8601 `Z`-suffixed
+  timestamps. All call sites route through it.
+- `duration.py` — pure duration formatters (`format_duration_compact`,
+  `format_duration_decimal`, `format_elapsed_hms`).
+- `includes.py` — include_tasks pre-expansion helpers (see §5.2).
+- `log_filter.py` — `--hide-state` filter logic for compact logs (see §4.1).
+- `replay.py` — pure replay frame derivation.
+- `run_config.py` — runtime configuration derived from CLI args + config file.
+- `estimate.py`, `diagnostics.py` — pure timing/diagnostics helpers.
 
 **Compact renderer** (`compact/`)
 - ANSI output via Rich Console + ANSI cursor manipulation.
@@ -159,14 +178,29 @@ that produces the events fed into the renderer — see ARCHITECTURE.md §4.2.
 **Factory Function:**
 
 ```python
-def create_renderer(tui_mode: bool = False, **kwargs) -> Renderer:
-    """Create the appropriate renderer based on CLI flags."""
-    if tui_mode:
+from typing import Literal
+
+RenderMode = Literal["compact", "tui", "json"]
+
+def create_renderer(
+    mode: RenderMode | None = None,
+    is_tty: bool = True,
+    hide_states: list[str] | None = None,
+) -> Renderer:
+    """Create the renderer selected by ``mode``.
+
+    ``mode="compact"`` (default streaming nom-style ANSI view),
+    ``mode="tui"`` (multi-panel Textual TUI), or ``mode="json"`` (silent
+    during the run; emits one JSON object on completion).
+    """
+    if mode == "tui":
         from ansible_aom.tui.app import AOMApp
-        return AOMApp(**kwargs)
-    else:
-        from ansible_aom.compact.renderer import CompactRenderer
-        return CompactRenderer(**kwargs)
+        return AOMApp()
+    if mode == "json":
+        from ansible_aom.formats.json import JsonRenderer
+        return JsonRenderer()
+    from ansible_aom.compact.renderer import CompactRenderer
+    return CompactRenderer(is_tty=is_tty, hide_states=hide_states or [])
 ```
 
 This Protocol-based architecture allows:
@@ -458,6 +492,30 @@ and how much.
 
 **ASCII parity**: the same logic produces `+-` (mid), `\-` (last),
 `|` (pipe), and `.` (PENDING fallback) in ASCII mode.
+
+#### fix-task-counting (v0.93)
+
+The role label and footer counts in compact mode were corrected in v0.93
+(GRUMPI_QA batch `fix-task-counting`) so that:
+
+- Sibling roles no longer leak visible-task credit into each other's
+  subtree. `_count_visible_tasks_per_role` and `_recompute_inner_footer_count`
+  in `core/tree.py` now maintain a parallel depth stack and pop-while
+  `top_depth >= ln.depth` so the previous sibling role closes out
+  before the next sibling role opens.
+- The `… and N more tasks` inner/outer footer label counts only
+  `kind == "task"` lines, not plays or roles in the hidden tail.
+- Parent-stub `include_tasks` definitions are skipped by
+  `_build_role_total_tasks` and `_recompute_inner_footer_count` so a
+  parent stub plus its dynamic child is counted once, not twice.
+- The TUI `TaskTree` widget switched to a `TreeProjection`-based rebuild
+  via `populate_from_projection` (drops completed task nodes) plus the
+  legacy `apply_state_icons` fallback after `end_time` is set (preserves
+  the final OK/FAILED/CHANGED icons in the post-run tree).
+
+Visible effect: role labels read `(N tasks)` consistently with the
+footer math, and the TUI tree drops completed tasks during the run but
+retains their final icons after completion.
 
 ### 4.2 Full TUI (--tui mode)
 
@@ -792,7 +850,9 @@ Final event with per-host aggregate statistics. Matches PLAY RECAP output.
 **Timestamp Convention:**
 - All `_timestamp` values from JSONL events are ISO 8601 UTC (e.g., `"2025-11-09T15:00:00.100000Z"`)
 - AOM stores timestamps as-is (UTC) in session artifacts
-- Display converts to local timezone using `datetime.fromisoformat(ts).astimezone()`
+- Parsing routes through the canonical `core/timestamp.parse_iso_timestamp(value)`
+  helper (handles the `Z` suffix uniformly across all 8 call sites). Display
+  converts to local timezone via `datetime.fromisoformat(ts).astimezone()`.
 - Elapsed time is calculated as `now - start_time` in UTC, displayed as `HH:MM:SS`
 
 ### 5.2 Pre-Parse Phase
@@ -1673,7 +1733,7 @@ class RunState:
 class RunState:
     def handle_event(self, event: dict) -> None:
         event_type = event.get("_event", "")
-        timestamp = datetime.fromisoformat(event.get("_timestamp", ""))
+        timestamp = parse_iso_timestamp(event.get("_timestamp", ""))
         
         handler = getattr(self, f"_handle_{event_type}", None)
         if handler:
@@ -1809,15 +1869,30 @@ A single JSONL file with metadata header:
 - If a .jsonl artifact is truncated or contains malformed JSON, AOM skips the malformed line and logs a WARNING
 - The inspect command shows a note: "(N malformed lines skipped)"
 
-### 6.4 Execution State Machine
+### 6.4 Execution Lifecycle (Historical 8-State FSM — Removed in v0.93)
 
-AOM manages playbook execution through an 8-state machine:
+> **Status:** The 8-state FSM described below is **no longer implemented**.
+> It was removed in v0.93 (GRUMPI_QA finding 9A) because the production code
+> never wired it in: the TUI tracked lifecycle as a plain string, the compact
+> renderer relied on the `RunState` data model, and the runner passed lowercase
+> strings (`"completed"` / `"failed"` / `"crashed"`) to
+> `handle_completion`. The `ExecutionState` enum, `VALID_TRANSITIONS` table, and
+> `StateMachine` class were deleted; `core/state_machine.py` now contains only
+> the 5 `MAX_*` memory-bound constants (see §6.5) and exists under that module
+> name purely to avoid churning the `MAX_LOG_LINES` import sites.
+>
+> This section is preserved as **historical context** so anyone reading the
+> spec understands where the IDLE / STARTING / LOADING_TASKS / READY / RUNNING /
+> COMPLETED / FAILED / CRASHED labels come from. The labels themselves are
+> still passed as lowercase strings by the runner and accepted by the
+> renderers; only the explicit state machine that enforced valid transitions
+> is gone.
 
 ```
 States: IDLE, STARTING, LOADING_TASKS, READY, RUNNING, COMPLETED, FAILED, CRASHED
 ```
 
-**State Diagram:**
+**State Diagram (historical reference):**
 ```
                                      ┌──────────┐
                                      │  IDLE    │
@@ -1863,7 +1938,7 @@ States: IDLE, STARTING, LOADING_TASKS, READY, RUNNING, COMPLETED, FAILED, CRASHE
                                     └──────────┘
 ```
 
-**Transition Table:**
+**Transition Table (historical reference):**
 
 | From | To | Trigger |
 |------|----|---------|
@@ -1877,32 +1952,9 @@ States: IDLE, STARTING, LOADING_TASKS, READY, RUNNING, COMPLETED, FAILED, CRASHE
 | RUNNING | CRASHED | Subprocess crash (signal, EOF unexpected, JSON parse error) |
 | COMPLETED/FAILED/CRASHED | IDLE | User exits AOM or re-runs |
 
-**State Implementation:**
-```python
-from enum import Enum, auto
-
-class RunState(Enum):
-    IDLE = auto()          # Initial state, no execution
-    STARTING = auto()      # Command invoked, initializing
-    LOADING_TASKS = auto() # Running --list-tasks discovery
-    READY = auto()         # Discovery complete, tasks loaded
-    RUNNING = auto()       # Live playbook execution
-    COMPLETED = auto()     # Successful completion
-    FAILED = auto()        # Task failure or unreachable
-    CRASHED = auto()       # Unexpected error
-
-VALID_TRANSITIONS = {
-    RunState.IDLE: {RunState.STARTING},
-    RunState.STARTING: {RunState.LOADING_TASKS, RunState.CRASHED},
-    RunState.LOADING_TASKS: {RunState.READY, RunState.CRASHED},
-    RunState.READY: {RunState.RUNNING, RunState.IDLE},
-    RunState.RUNNING: {RunState.RUNNING, RunState.COMPLETED,
-                      RunState.FAILED, RunState.CRASHED},
-    RunState.COMPLETED: {RunState.IDLE},
-    RunState.FAILED: {RunState.IDLE},
-    RunState.CRASHED: {RunState.IDLE},
-}
-```
+**State Implementation (removed):** the original `ExecutionState` enum and
+`VALID_TRANSITIONS` table lived in `core/state_machine.py` but are no longer
+present. Lifecycle labels are now plain strings passed by the runner.
 
 ### 6.5 Memory Bounds
 
@@ -2600,93 +2652,151 @@ def test_renderer_handles_jsonl_stream():
 ### 13.1 Project Structure
 
 ```
-new_ansible-aom/
+ansible-aom/
 ├── pyproject.toml
 ├── .python-version
 ├── uv.lock
 ├── README.md
 ├── LICENSE
+├── flake.nix
+├── schemas/
+│   ├── README.md
+│   └── run_summary.v1.json
 ├── src/
 │   └── ansible_aom/
 │       ├── __init__.py
 │       ├── __main__.py
 │       ├── cli.py
-│       ├── core/                  # Shared logic (NO UI dependencies)
+│       ├── completion.py       # argcomplete entry points (bash/zsh/fish)
+│       ├── core/               # Shared logic (NO UI dependencies)
 │       │   ├── __init__.py
-│       │   ├── state.py           # State machine
-│       │   ├── parser.py          # JSONL parser
-│       │   ├── models.py          # Data models
-│       │   ├── session.py         # Session manager + artifact writer
-│       │   └── config.py          # Configuration (Pydantic Settings)
-│       ├── renderer/              # Interface layer
+│       │   ├── state_machine.py # MAX_* memory-bound constants (ExecutionState removed v0.93)
+│       │   ├── parser.py       # JSONL stream parser + carry buffer
+│       │   ├── models.py       # RunState aggregate + plays/tasks/hosts entities
+│       │   ├── tree.py         # TreeProjection + two-level truncation
+│       │   ├── exit_code.py    # Canonical determine_exit_code(state)
+│       │   ├── timestamp.py    # Canonical parse_iso_timestamp(value)
+│       │   ├── duration.py     # Duration formatters (compact, decimal, hms)
+│       │   ├── heartbeat.py    # Subprocess stall watchdog timing
+│       │   ├── overhead.py     # Pre-execution overhead analysis
+│       │   ├── estimate.py     # Runtime task-count estimate
+│       │   ├── redaction.py    # 4-layer secret redaction
+│       │   ├── inspect_model.py # RunSummary builder for `aom inspect`
+│       │   ├── parity.py       # Compact/TUI renderer parity reducer
+│       │   ├── prompts.py      # Pure password-prompt heuristics
+│       │   ├── icons.py        # Status icon set + ASCII fallbacks
+│       │   ├── config.py       # Pydantic Settings
+│       │   ├── run_config.py   # CLI-args + file config runtime composition
+│       │   ├── replay.py       # Pure replay frame derivation
+│       │   ├── includes.py     # include_tasks pre-expansion helpers
+│       │   ├── log_filter.py   # --hide-state filter logic
+│       │   └── diagnostics.py  # Debug diagnostics snapshot builder
+│       ├── renderer/           # Interface layer
 │       │   ├── __init__.py
-│       │   ├── protocol.py        # Renderer Protocol (structural typing)
-│       │   └── factory.py         # create_renderer() factory function
-│       ├── compact/               # ANSI renderer (default mode)
+│       │   ├── protocol.py     # Renderer Protocol (structural typing)
+│       │   └── factory.py      # create_renderer(mode=...)
+│       ├── compact/            # ANSI renderer (default mode)
 │       │   ├── __init__.py
-│       │   ├── renderer.py        # CompactRenderer (satisfies Protocol)
-│       │   ├── display.py         # Rich Live + blessed display logic
-│       │   ├── password.py         # Password pass-through (getpass)
-│       │   └── logs.py           # Log streaming + non-TTY fallback
-│       ├── tui/                  # Textual renderer (--tui mode)
+│       │   ├── renderer.py     # CompactRenderer (satisfies Protocol)
+│       │   ├── display.py      # Rich Live + blessed display logic
+│       │   ├── password.py     # Password pass-through (getpass)
+│       │   ├── format.py       # Pure formatters (tree lines, host tables)
+│       │   └── exit_code.py    # Re-export shim → core.exit_code
+│       ├── tui/                # Textual renderer (--tui mode)
 │       │   ├── __init__.py
-│       │   ├── app.py            # AOMApp (satisfies Protocol)
+│       │   ├── app.py          # AOMApp (satisfies Protocol)
+│       │   ├── keybindings.py  # Key action → binding table
 │       │   ├── screens/
 │       │   │   ├── __init__.py
-│       │   │   ├── main.py       # Main TUI screen
-│       │   │   ├── help.py       # Help overlay (?)
-│       │   │   ├── settings.py   # Settings screen (S)
-│       │   │   ├── inspect.py    # Readonly inspect TUI
-│       │   │   └── rerun.py      # Re-run dialog (Shift+R)
+│       │   │   ├── main.py     # Main TUI screen
+│       │   │   ├── help.py     # Help overlay (?)
+│       │   │   ├── settings.py # Settings screen (S)
+│       │   │   ├── inspect.py  # Readonly inspect TUI
+│       │   │   ├── rerun.py    # Re-run dialog (Shift+R)
+│       │   │   └── quit_confirm.py # Quit confirmation dialog
 │       │   └── widgets/
 │       │       ├── __init__.py
-│       │       ├── task_tree.py  # Tree widget (Play/RoleGroup/Task/Host)
-│       │       ├── log_panel.py  # RichLog with search
+│       │       ├── task_tree.py    # Tree widget (Play/RoleGroup/Task/Host)
+│       │       ├── log_panel.py    # RichLog with search
 │       │       ├── summary_panel.py # Play-level overview
-│       │       ├── status_bar.py # Configurable status bar
-│       │       └── debug_panel.py # Full internal state
+│       │       ├── status_bar.py   # Configurable status bar
+│       │       └── debug_panel.py  # Full internal state
 │       ├── styles/
-│       │   └── app.tcss          # Textual CSS
-│       └── inspect/              # Inspect CLI (text mode)
+│       │   └── app.tcss            # Textual CSS
+│       ├── ansible/            # Subprocess + callback internals
+│       │   ├── __init__.py
+│       │   ├── runner.py       # pexpect-driven ansible-playbook runner
+│       │   ├── preflight.py    # Parallel --list-tasks / --list-hosts
+│       │   └── callback/
+│       │       └── aom_jsonl.py # Bundled JSONL callback (ansible.posix fallback)
+│       ├── drivers/            # EventSource port (live + replay)
+│       │   ├── __init__.py
+│       │   ├── protocol.py     # EventSource Protocol
+│       │   ├── live.py         # LiveDriver over LiveRunner
+│       │   └── replay.py       # ReplayDriver over session events
+│       ├── session/            # Session recording
+│       │   ├── __init__.py
+│       │   ├── store.py        # SessionManager + per-session events.jsonl/meta.json
+│       │   ├── history.py      # Prior-run lookup (cross-run lookup)
+│       │   └── summary.py      # Post-run summary computation
+│       ├── inspect/            # Inspect CLI (text mode)
+│       │   ├── __init__.py
+│       │   ├── cli.py          # argparse inspect subcommands
+│       │   ├── formatters.py   # Rich table formatting (renamed from display.py)
+│       │   └── text.py         # Plain-text fallback rendering
+│       ├── formats/            # Machine-readable renderers
+│       │   ├── __init__.py
+│       │   └── json.py         # JsonRenderer (--format json, RunSummary v1)
+│       └── rerun/              # `aom rerun` subcommand
 │           ├── __init__.py
-│           ├── cli.py            # Click/typer CLI commands
-│           ├── diff.py           # Session diff logic
-│           └── display.py        # Rich table formatting
+│           └── cli.py
 ├── tests/
 │   ├── conftest.py
-│   ├── fixtures/                 # JSONL event fixtures
+│   ├── _utils.py
+│   ├── fixtures/              # JSONL event fixtures + session dirs
 │   │   ├── single_task_ok.jsonl
 │   │   ├── multi_host_mixed.jsonl
 │   │   ├── playbook_failed.jsonl
-│   │   └── ...
-│   ├── unit/
+│   │   └── sessions/
+│   ├── playbooks/             # 20 numbered playbook fixtures (unit-test input)
+│   ├── unit/                  # ~80 unit-test files (no ansible-core needed)
 │   │   ├── test_parser.py
-│   │   ├── test_state.py
 │   │   ├── test_models.py
-│   │   └── test_config.py
-│   ├── compact/                  # Compact renderer tests
-│   │   ├── test_renderer.py
-│   │   ├── test_renderer_snapshots.py  # inline-snapshot
-│   │   └── test_password.py
-│   ├── tui/                     # Textual TUI tests
-│   │   ├── test_app.py
-│   │   ├── test_snapshots.py    # pytest-textual-snapshot
-│   │   └── test_widgets/
-│   ├── integration/
-│   │   ├── test_runner.py
-│   │   └── test_inspect.py
-│   └── diff/
-│       └── test_diff.py
+│   │   ├── test_config.py
+│   │   ├── test_layering.py   # AST-based core/ never-imports-infra check
+│   │   └── ...
+│   ├── compact/               # Compact renderer tests + inline-snapshot golden files
+│   │   ├── golden/
+│   │   ├── test_hide_state.py
+│   │   ├── test_tree_render.py
+│   │   └── ...
+│   ├── tui/                   # Textual TUI tests
+│   │   ├── test_app_end_to_end.py
+│   │   ├── test_panels.py
+│   │   └── ...
+│   └── integration/           # Needs ansible-core>=2.16 (auto-skipped otherwise)
+│       ├── test_real_ansible.py
+│       ├── test_runner.py
+│       └── ...
 └── flake.nix
 ```
 
+The project does NOT ship with `aom/` or `molecule/` directories (both removed
+during cleanup) and does NOT have a `tests/diff/` subdirectory (`aom inspect
+diff` is tested inside `tests/integration/test_rerun_roundtrip.py` and
+`tests/integration/test_history_roundtrip.py`).
+
 ### 13.2 pyproject.toml
+
+The authoritative `pyproject.toml` lives at the project root. The shape as
+of v0.93:
 
 ```toml
 [project]
 name = "ansible-aom"
-version = "0.1.0"
+version = "0.93.0"
 description = "Ansible Output Monitor - nom-style TUI for ansible-playbook"
+license = "GPL-3.0-or-later"
 requires-python = ">=3.14"
 dependencies = [
     "textual>=0.60",
@@ -2698,6 +2808,8 @@ dependencies = [
     "pexpect>=4.8",
     "psutil>=5.9",
     "blessed>=1.20",           # ANSI cursor positioning for compact mode
+    "argcomplete>=3.5",        # bash/zsh/fish tab-completion for the CLI
+    "orjson>=3.10",            # Fast JSON parser on the PTY event hot path
 ]
 
 [project.scripts]
@@ -2708,11 +2820,25 @@ dev = [
     "textual-dev>=0.86",
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
+    "pytest-xdist>=3.8.0",
     "pytest-textual-snapshot>=0.5",
     "pytest-cov",
     "ruff",
     "mypy",
     "inline-snapshot>=0.10",   # Compact mode snapshot testing
+    "pre-commit>=3.0",
+    "jsonschema>=4.20",        # schemas/run_summary.v1.json contract test
+    "hypothesis>=6",           # property-based tests (Batch C)
+]
+
+integration = [
+    "ansible-core>=2.16",      # Real ansible-playbook spawns in tests/integration/
+]
+
+lint = [
+    "ansible-lint>=24.0",
+    "molecule>=24.0",
+    "molecule-plugins>=23.0",
 ]
 
 [build-system]
@@ -2726,15 +2852,56 @@ packages = ["src/ansible_aom"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+markers = [
+    "needs_ansible: requires real ansible-playbook + ansible.posix collection (auto-skipped otherwise)",
+]
 
 [tool.ruff]
 line-length = 100
 target-version = "py314"
 
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["F401", "F811", "F841", "E501"]
+"**/__init__.py" = ["F401"]
+"src/ansible_aom/ansible/callback/*.py" = ["E402"]  # ansible callback convention
+
 [tool.mypy]
 python_version = "3.14"
-strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+# Per-module overrides: GUI modules relax strict typing (Textual/Rich metaclass
+# patterns don't type cleanly); vendored ansible code has no stubs.
+[[tool.mypy.overrides]]
+module = ["ansible_aom.compact.*", "ansible_aom.tui.*",
+          "ansible_aom.inspect.display", "ansible_aom.core.config"]
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+module = ["ansible_aom.ansible.callback.*", "ansible.*",
+          "ansible_module_utils.*", "ansible_collections.*",
+          "pexpect.*", "yaml", "psutil", "argcomplete.*"]
+ignore_missing_imports = true
 ```
+
+Key departures from the v1.8 snapshot:
+
+- **Version is `0.93.0`**, not `0.1.0`. The project started stamping
+  `0.93.0` once feature parity with `ansible-aomp` was reached.
+- **`argcomplete>=3.5`** added for `aom --install-completion {bash,zsh,fish}`
+  and live tab-completion of subcommands/flags/recorded session IDs.
+- **`orjson>=3.10`** added on the PTY event hot path; selected by
+  `core/parser.py` if importable, otherwise falls back to stdlib `json`.
+- **`pytest-xdist>=3.8.0`**, **`pre-commit>=3.0`**, **`jsonschema>=4.20`**
+  and **`hypothesis>=6`** added to `dev`; **`mypy` strict is relaxed**
+  for GUI modules (compact, tui, inspect.display, core.config).
+- **Three optional-dependency groups**: `dev`, `integration` (ansible-core),
+  `lint` (ansible-lint + molecule).
 
 ### 13.3 Nuitka Build
 
@@ -2773,7 +2940,7 @@ nuitka --standalone \
       in {
         packages.default = python.pkgs.buildPythonApplication {
           pname = "ansible-aom";
-          version = "0.1.0";
+          version = "0.93.0";
           src = ./.;
           format = "pyproject";
           
@@ -2958,13 +3125,14 @@ Install with:
 1. Project structure and dependencies
 2. CLI parsing and entry point
 3. JSONL stream parser (`core/parser.py`)
-4. State machine and models (`core/state_machine.py`, `core/models.py`)
+4. Models and event handling (`core/models.py`, `core/state_machine.py`
+   — memory bounds only since v0.93)
 5. Pre-parser for `--list-tasks` / `--list-hosts` (`ansible/preflight.py`)
 6. Basic pexpect runner (`ansible/runner.py`)
 7. Compact view rendering (`compact/`)
 8. Session recording (`session/store.py`)
 
-**Tests:** Unit tests for parser, state machine, models
+**Tests:** Unit tests for parser, models
 
 ### Phase 2: Password Handling
 
@@ -3087,6 +3255,7 @@ This section captures the key decisions from the 55 user questions.
 | 1.6 | 2026-04-20 | Gap fixes: Strategy detection from event patterns (not JSONL field), host name resolution (actual hostnames from runner events), PtyStreamParser._handle_plaintext classification, complete RunState event handlers, TaskDefinition uuid/path/children fields, PlayDefinition.id clarification, PlayRunState.detected_strategy, Section 14.7 Subprocess Error Handling (exit codes, stderr capture, watchdog), compact renderer refresh strategy, terminal compatibility (Unicode/color fallback), memory bounds, SIGQUIT handling, timestamp convention, task name truncation, TDD starter test names, session file permissions, corrupted session handling, minimum ansible-core >=2.14 requirement |
 | 1.7 | 2026-04-20 | Inventory-based host resolution via `--list-hosts` (parallel with `--list-tasks`); `PlayDefinition.resolved_hosts` field; `--list-hosts` parser with fallback; defense-in-depth password/secret redaction (4 layers: _ansible_no_log, PASSWORD_MATCH regex + whitelist, command string sanitization, verbose invocation redaction); redaction always-on (no opt-out); redaction config schema; Section 5.2.1 --list-hosts parsing |
 | 1.8 | 2026-04-20 | Deprecation warning filtering: WARNING_PATTERNS regex updated to match both `[DEPRECATION WARNING]:` and `[DEPRECATED]:` formats; `WarningType` enum and `WarningEntry` dataclass for classified warning storage; Filter Panel (7.6) updated with Warning/Deprecation checkboxes; compact mode status line shows warning ⚠ and deprecation ✱ counts; config schema updated with warnings section; research confirmed deprecations are plaintext on stderr (not JSONL events) |
+| 1.9 | 2026-06-26 | **Spec sync with v0.93 source tree (GRUMPI_QA H2):** §2.1 / §2.2 / §13.1 project structure rewritten to match reality (`state_machine.py` is now MAX_* constants only; new modules `exit_code.py`, `timestamp.py`, `duration.py`, `includes.py`, `log_filter.py`, `replay.py`, `run_config.py`, `estimate.py`, `diagnostics.py` in `core/`; new packages `drivers/`, `session/`, `formats/`, `rerun/`; `inspect/display.py` → `formatters.py`; `compact/exit_code.py` is now a re-export shim). §2.3 factory function uses `mode="compact"|"tui"|"json"` instead of legacy `tui_mode: bool`. §6.4 Execution Lifecycle marked as historical — `ExecutionState` / `VALID_TRANSITIONS` / `StateMachine` were removed in v0.93 (finding 9A); lifecycle labels are now plain strings. §13.2 pyproject.toml refreshed (`version = "0.93.0"`, `argcomplete>=3.5`, `orjson>=3.10`, `pytest-xdist`, `pre-commit`, `jsonschema`, `hypothesis`, `integration` extra group for `ansible-core>=2.16`, mypy relaxed per-module for GUI). §5.1/§6.2 timestamp references mention canonical `core/timestamp.parse_iso_timestamp`. New §4.1 `fix-task-counting` subsection documents the v0.93 role-label / footer-count / parent-stub double-counting fixes and the TUI `TreeProjection`-based refresh. Cross-references to existing §4.1 State Filtering (hide-state) and §4.1 Two-Level Truncation Footers, both shipped between v1.8 and v1.9.
 
 ---
 

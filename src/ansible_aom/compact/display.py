@@ -6,14 +6,25 @@ a true nom-style "logs scroll above, status fixed at bottom" experience
 without flicker. See SPECIFICATION.md Section 4.1 and
 .sisyphus/notepads/new-spec/open-questions.md "Summary of nom-Style Compact
 View Research".
+
+Note on ``print()``: every ``print()`` in this module writes user-facing
+output that downstream tests capture via ``redirect_stdout`` / ``capsys``
+(see ``tests/compact/test_small_terminal.py``). Converting them to
+``logger.*`` calls would route the output through the logging handler
+configuration and silently break the contract — so they stay as
+``print()``. Structured logging is still available via ``logger`` below
+for any future debug-only diagnostics.
 """
 
 from __future__ import annotations
 
+import logging
 import re
 import shutil
 import sys
 import time
+
+logger = logging.getLogger(__name__)
 
 # ANSI escape sequences (SGR, cursor moves, mode-set, etc.) take zero
 # visible columns. ``_row_count`` must strip them before measuring or
@@ -79,7 +90,10 @@ def check_terminal_size(lines: int | None = None, columns: int | None = None) ->
                 lines = detected_lines
             if columns is None:
                 columns = detected_columns
-        except Exception:
+        except OSError, AttributeError:
+            # OSError: no controlling terminal (CI, pipes).
+            # AttributeError: shutil.get_terminal_size's fallback arg has
+            # been observed to raise on exotic platforms without a TTY.
             if lines is None:
                 lines = 24
             if columns is None:

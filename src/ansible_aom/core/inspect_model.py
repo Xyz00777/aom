@@ -18,6 +18,9 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Mapping
 
+from ansible_aom.core._async_poll import is_async_poll_payload
+from ansible_aom.core.timestamp import parse_iso_timestamp
+
 
 @dataclass(frozen=True)
 class StatusCounts:
@@ -84,7 +87,7 @@ class RunSummary:
 def _parse_iso(value: str | None) -> datetime | None:
     if not value:
         return None
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return parse_iso_timestamp(value)
 
 
 def build_run_summary(session: dict) -> RunSummary:
@@ -554,7 +557,11 @@ def _status_from_event_type(event_type: str, changed: bool) -> str:
 
 
 def _make_loop_item(raw: dict) -> LoopItem:
-    label = str(raw.get("_ansible_item_label") or raw.get("item") or "")
+    if is_async_poll_payload(raw):
+        job_id = raw.get("ansible_job_id", "?")
+        label = f"(async, job_id={job_id})"
+    else:
+        label = str(raw.get("_ansible_item_label") or raw.get("item") or "")
     return LoopItem(
         label=label,
         failed=bool(raw.get("failed", False)),

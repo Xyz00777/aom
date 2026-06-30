@@ -6,7 +6,7 @@ See SPECIFICATION.md Section 8 for configuration schema.
 
 from typing import ClassVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -109,6 +109,10 @@ def load_config(config_path: str | None = None) -> AppConfig:
             session_keep_count=session_data.get("keep_sessions", 100),
             session_keep_days=session_data.get("keep_days", 30),
         )
-    except Exception as e:
+    except (ValidationError, TypeError, ValueError) as e:
+        # ValidationError: malformed field shape (wrong type, missing
+        # required, out of range).
+        # TypeError: Pydantic raised on incompatible type coercion.
+        # ValueError: Pydantic raised on value parse failures.
         logger.warning("Failed to parse config from %s: %s", config_path, e)
         return AppConfig()

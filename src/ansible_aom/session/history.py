@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from ansible_aom.core.run_config import RunConfigKey, build_run_config_key
+from ansible_aom.core.timestamp import parse_iso_timestamp
 
 
 @dataclass(frozen=True)
@@ -178,7 +179,7 @@ def _parse_iso(value: str | None) -> datetime | None:
     if not value:
         return None
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parse_iso_timestamp(value)
     except ValueError:
         return None
 

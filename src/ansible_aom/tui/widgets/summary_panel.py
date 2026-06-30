@@ -7,6 +7,7 @@ See SPECIFICATION.md Section 7.3 for summary panel details.
 from rich.text import Text
 from textual.widget import Widget
 
+from ansible_aom.core.duration import format_elapsed_hms
 from ansible_aom.core.icons import STATUS_ICONS
 from ansible_aom.core.models import Status
 
@@ -83,19 +84,15 @@ class SummaryPanel(Widget):
         self._elapsed_seconds = seconds
 
     def _format_elapsed_time(self) -> str:
-        """Format elapsed time.
+        """Format elapsed time as ``H:MM:SS`` or ``M:SS``.
+
+        Thin wrapper around
+        :func:`ansible_aom.core.duration.format_elapsed_hms`.
 
         Returns:
-            Formatted time string (H:MM:SS or M:SS)
+            Formatted time string
         """
-        total_seconds = self._elapsed_seconds
-        hours = total_seconds // 3600
-        minutes = (total_seconds % 3600) // 60
-        seconds = total_seconds % 60
-
-        if hours > 0:
-            return f"{hours}:{minutes:02d}:{seconds:02d}"
-        return f"{minutes}:{seconds:02d}"
+        return format_elapsed_hms(self._elapsed_seconds)
 
     def format_host_status_line(
         self,

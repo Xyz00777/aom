@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from ansible_aom.compact.renderer import CompactRenderer
-from ansible_aom.core.models import RunState
+from ansible_aom.core.run_state import RunState
 
 
 def _empty_state() -> RunState:

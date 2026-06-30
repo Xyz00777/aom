@@ -200,27 +200,26 @@ class TestRuntimeRoleLabelTaskCountFromDefinitions:
         label shows the total task count from definitions, NOT just the
         currently-running subset (visible=1, total=2).
 
-        Under T3's post-truncation role-label pass, the format switches
-        between ``(N tasks)`` and ``(M remaining)`` based on whether the
-        visible count equals the total. Here visible=1 (the completed
-        task is dropped from the kept lines) and total=2, so the label
-        is ``(1 task remaining)``. The total is still surfaced via the
-        math (2 total - 1 visible = 1 remaining); only the format
-        changes from the pre-T3 ``(2 tasks)``. See
-        ``.sisyphus/plans/two-level-truncation.md`` T3 for the contract."""
+        The role label always carries the role's full task count
+        ``(N tasks)`` — never a ``(M remaining)`` suffix. The
+        ``… and N more tasks`` inner/outer footers already surface the
+        hidden-work signal in the truncated case. See
+        ``.sisyphus/plans/two-level-truncation.md`` T3 for the
+        contract."""
         state = self._multi_task_role_with_completed_task()
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=25)
         role_lines = [ln for ln in lines if ln.kind == "role"]
         assert len(role_lines) >= 1, f"expected a role line, got {lines}"
         role_label = role_lines[0].label
-        # T3 contract: visible=1, total=2 → "(1 task remaining)". The
-        # test's original intent — that the count reflects TOTAL tasks,
-        # not just the running subset — is preserved by the math
-        # (2 - 1 = 1 remaining), but the format changes from "(2 tasks)".
-        assert "(1 task remaining)" in role_label, (
-            f"role label should show (1 task remaining) under T3 "
-            f"(visible=1, total=2), got: {role_label}"
+        # The role label carries the role's full task count "(N tasks)".
+        # No "remaining" suffix — that variant counted completed tasks
+        # and grew as the run progressed.
+        assert "(2 tasks)" in role_label, (
+            f"role label should show total count (2 tasks), got: {role_label}"
+        )
+        assert "remaining" not in role_label, (
+            f"role label must NOT carry 'remaining' suffix; got: {role_label}"
         )
 
     def test_role_label_count_with_all_tasks_completed(self):
@@ -246,6 +245,55 @@ class TestRuntimeRoleLabelTaskCountFromDefinitions:
         if role_lines:
             assert "(2 tasks)" in role_lines[0].label, (
                 f"if role line appears, it must show total task count, got: {role_lines[0].label}"
+            )
+
+    def test_role_label_count_is_stable_as_tasks_complete(self) -> None:
+        """Regression for the '(M remaining) goes UP as tasks complete' bug.
+
+        The role label must read ``(2 tasks)`` (the total) regardless of
+        how many tasks are completed. Previously the label read
+        ``(N tasks remaining)`` where ``N = total - visible = completed
+        count``, so as tasks completed the "remaining" number grew.
+
+        This test fires one task completion at a time on the same
+        fixture and asserts the label stays at ``(2 tasks)`` and never
+        carries the ``remaining`` suffix.
+        """
+        state = self._multi_task_role_with_completed_task()
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+        role_lines = [ln for ln in lines if ln.kind == "role"]
+        assert role_lines, f"expected a role line, got {lines}"
+        # First snapshot: t1 completed (visible=1, total=2). Label
+        # MUST be "(2 tasks)" — NOT "(1 task remaining)".
+        assert "(2 tasks)" in role_lines[0].label, (
+            f"role label must show total count '(2 tasks)' after 1 completion; "
+            f"got {role_lines[0].label!r}"
+        )
+        assert "remaining" not in role_lines[0].label, (
+            f"role label must NOT carry 'remaining' suffix; got {role_lines[0].label!r}"
+        )
+
+        # Complete the second task too. Label must still read "(2 tasks)".
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-04-20T10:00:09Z",
+                "task": {"id": "t2", "name": "Configure firewall"},
+                "hosts": {"web1": {"ok": True, "changed": False}},
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+        role_lines = [ln for ln in lines if ln.kind == "role"]
+        if role_lines:
+            assert "(2 tasks)" in role_lines[0].label, (
+                f"role label must remain '(2 tasks)' after all completions; "
+                f"got {role_lines[0].label!r}"
+            )
+            assert "remaining" not in role_lines[0].label, (
+                f"role label must NOT carry 'remaining' suffix after completions; "
+                f"got {role_lines[0].label!r}"
             )
 
 

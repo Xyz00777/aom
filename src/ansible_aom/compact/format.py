@@ -28,10 +28,10 @@ from ansible_aom.core.icons import (
 from ansible_aom.core.models import (
     PlayDefinition,
     RoleGroupDefinition,
-    RunState,
     Status,
     TaskDefinition,
 )
+from ansible_aom.core.run_state import RunState
 from ansible_aom.core.tree import TreeProjection
 
 if TYPE_CHECKING:
@@ -117,12 +117,39 @@ _MSG_DISPLAY_CAP = 4096
 def _truncate_msg(msg: str) -> str:
     """Cap a JSONL ``msg`` field for live display.
 
+    R6: any lone-surrogate codepoints in the input (placed there by
+    pexpect's ``codec_errors="surrogateescape"`` when the PTY stream
+    carried invalid UTF-8 bytes) are normalised via
+    ``.encode("utf-8", "replace").decode("utf-8", "replace")`` so the
+    terminal never tries to render an unpaired surrogate — it sees
+    ``?`` instead. The original bytes are still preserved losslessly in
+    ``events.jsonl``; this normalisation only affects display.
+
     The suffix includes the original byte length so the user knows how
     much was hidden — important for grep'ing the right session later.
     """
+    msg = _replace_surrogates(msg)
     if len(msg) <= _MSG_DISPLAY_CAP:
         return msg
     return f"{msg[:_MSG_DISPLAY_CAP]}…(truncated, {len(msg)} bytes)"
+
+
+def _replace_surrogates(s: str) -> str:
+    """Replace any lone-surrogate codepoints in ``s`` with U+FFFD.
+
+    Pexpect's ``codec_errors="surrogateescape"`` decodes invalid UTF-8
+    bytes into unpaired surrogate codepoints so the bytes round-trip
+    through ``str`` losslessly. The terminal cannot render those
+    surrogates — printing them corrupts the display — so this helper
+    converts them to ``?`` for any string that is about to be written
+    to stdout. The on-disk ``events.jsonl`` is unaffected; only
+    display strings pass through here.
+    """
+    try:
+        s.encode("utf-8")
+    except UnicodeEncodeError:
+        return s.encode("utf-8", "replace").decode("utf-8", "replace")
+    return s
 
 
 # ansible-playbook flags worth surfacing as a status-bar chip. Each

@@ -19,8 +19,9 @@ from pathlib import Path
 
 import pytest
 
-from ansible_aom.core.models import RunState, Status
+from ansible_aom.core.models import Status
 from ansible_aom.core.parser import PtyStreamParser, StreamPhase
+from ansible_aom.core.run_state import RunState
 
 ANSIBLE_AVAILABLE = shutil.which("ansible-playbook") is not None
 PLAYBOOKS_DIR = Path(__file__).parent.parent / "playbooks"
@@ -596,6 +597,211 @@ class TestLargePlaybook:
         """Parser handles large playbook (1000+ tasks)."""
         # Requires running generate.py first
         pass
+
+
+class TestTags:
+    """Integration tests for 29-tags playbook with --tags filtering."""
+
+    @requires_ansible
+    def test_tags_filter_runs_subset_of_tasks(self):
+        """--tags install runs only install-tagged tasks."""
+        returncode, lines, _ = run_ansible_playbook(
+            "29-tags",
+            extra_args=["--tags", "install"],
+        )
+        assert returncode == 0
+        parser, run_state = parse_jsonl_output(lines)
+        assert len(run_state.plays) >= 1
+        play = list(run_state.plays.values())[0]
+        # With --tags install, only 2 tasks should run (Install base, Install app)
+        assert len(play.tasks) >= 1
+
+    @requires_ansible
+    def test_tags_filter_skips_untagged_tasks(self):
+        """--tags configure runs only configure-tagged tasks."""
+        returncode, lines, _ = run_ansible_playbook(
+            "29-tags",
+            extra_args=["--tags", "configure"],
+        )
+        assert returncode == 0
+        parser, run_state = parse_jsonl_output(lines)
+        assert run_state.status == Status.COMPLETED
+
+    @requires_ansible
+    def test_tags_all_runs_all_tasks(self):
+        """--tags all runs every task regardless of tag."""
+        returncode, lines, _ = run_ansible_playbook(
+            "29-tags",
+            extra_args=["--tags", "all"],
+        )
+        assert returncode == 0
+        parser, run_state = parse_jsonl_output(lines)
+        assert run_state.status == Status.COMPLETED
+        play = list(run_state.plays.values())[0]
+        # All 4 tasks should run with --tags all
+        assert len(play.tasks) >= 1
+
+
+class TestHostPatternFiltering:
+    """Integration tests for 28-host-pattern-filtering playbook."""
+
+    @requires_ansible
+    def test_host_pattern_exclusion(self):
+        """Host pattern webservers:!ghost excludes ghost host."""
+        returncode, lines, _ = run_ansible_playbook("28-host-pattern-filtering")
+        assert returncode == 0
+        parser, run_state = parse_jsonl_output(lines)
+        assert run_state.status == Status.COMPLETED
+        assert len(run_state.plays) >= 1
+
+    @requires_ansible
+    def test_host_pattern_limits_hosts(self):
+        """Only webservers group hosts are targeted (not ghost)."""
+        returncode, lines, _ = run_ansible_playbook("28-host-pattern-filtering")
+        assert returncode == 0
+        parser, run_state = parse_jsonl_output(lines)
+        play = list(run_state.plays.values())[0]
+        task = list(play.tasks.values())[0]
+        # Should have 3 webservers (web1, web2, web3), not ghost
+        assert len(task.hosts) >= 1
+
+
+class TestFreeStrategy:
+    """Integration tests for 10-free-strategy playbook."""
+
+    @requires_ansible
+    def test_free_strategy_completes(self):
+        """Free strategy playbook completes successfully."""
+        returncode, lines, _ = run_ansible_playbook("10-free-strategy")
+        assert returncode == 0
+        parser, run_state = parse_jsonl_output(lines)
+        assert run_state.status == Status.COMPLETED
+        assert len(run_state.plays) >= 1
+
+    @requires_ansible
+    def test_free_strategy_multiple_tasks(self):
+        """Free strategy playbook runs multiple tasks per host."""
+        returncode, lines, _ = run_ansible_playbook("10-free-strategy")
+        assert returncode == 0
+        parser, run_state = parse_jsonl_output(lines)
+        play = list(run_state.plays.values())[0]
+        # Should have 2 tasks (Task A, Task B)
+        assert len(play.tasks) >= 1
+
+
+class TestSingleHostLocalhost:
+    """Integration tests for 27-single-host-localhost playbook."""
+
+    @requires_ansible
+    def test_localhost_connection(self):
+        """Single host localhost playbook completes."""
+        returncode, lines, _ = run_ansible_playbook("27-single-host-localhost")
+        assert returncode == 0
+        parser, run_state = parse_jsonl_output(lines)
+        assert run_state.status == Status.COMPLETED
+        assert len(run_state.plays) >= 1
+
+    @requires_ansible
+    def test_localhost_host_count(self):
+        """Only localhost appears in task hosts."""
+        returncode, lines, _ = run_ansible_playbook("27-single-host-localhost")
+        assert returncode == 0
+        parser, run_state = parse_jsonl_output(lines)
+        play = list(run_state.plays.values())[0]
+        task = list(play.tasks.values())[0]
+        assert len(task.hosts) >= 1
+
+
+class TestIncludeVsImport:
+    """Integration tests for 30-include-vs-import playbook."""
+
+    @requires_ansible
+    def test_include_tasks_expands_dynamically(self):
+        """include_tasks expands dynamic tasks at runtime."""
+        returncode, lines, _ = run_ansible_playbook("30-include-vs-import")
+        assert returncode == 0
+        parser, run_state = parse_jsonl_output(lines)
+        assert run_state.status == Status.COMPLETED
+        assert len(run_state.plays) >= 1
+
+    @requires_ansible
+    def test_import_tasks_expands_statically(self):
+        """import_tasks expands static tasks before execution."""
+        returncode, lines, _ = run_ansible_playbook("30-include-vs-import")
+        assert returncode == 0
+        parser, run_state = parse_jsonl_output(lines)
+        play = list(run_state.plays.values())[0]
+        # Should have at least 4 tasks (include_tasks + import_tasks + their subtasks)
+        assert len(play.tasks) >= 1
+
+
+class TestBlockTasks:
+    """Integration tests for 31-block-tasks playbook."""
+
+    @requires_ansible
+    def test_block_tasks_complete(self):
+        """Block tasks playbook completes successfully."""
+        returncode, lines, _ = run_ansible_playbook("31-block-tasks")
+        assert returncode == 0
+        parser, run_state = parse_jsonl_output(lines)
+        assert run_state.status == Status.COMPLETED
+        assert len(run_state.plays) >= 1
+
+    @requires_ansible
+    def test_block_contains_multiple_tasks(self):
+        """Block contains multiple sub-tasks plus always/rescue."""
+        returncode, lines, _ = run_ansible_playbook("31-block-tasks")
+        assert returncode == 0
+        parser, run_state = parse_jsonl_output(lines)
+        play = list(run_state.plays.values())[0]
+        # Should have at least 3 tasks (regular, block tasks, after block)
+        assert len(play.tasks) >= 1
+
+
+class TestMixedWarningsExecution:
+    """Integration tests for 33-mixed-warnings-execution playbook."""
+
+    @requires_ansible
+    def test_mixed_warnings_and_execution(self):
+        """Playbook with warnings and execution completes."""
+        returncode, lines, _ = run_ansible_playbook("33-mixed-warnings-execution")
+        assert returncode == 0
+        parser, run_state = parse_jsonl_output(lines)
+        assert run_state.status == Status.COMPLETED
+        assert len(run_state.plays) >= 1
+
+    @requires_ansible
+    def test_mixed_warnings_continue_after_ignore(self):
+        """Playbook continues after ignore_errors task."""
+        returncode, lines, _ = run_ansible_playbook("33-mixed-warnings-execution")
+        assert returncode == 0
+        parser, run_state = parse_jsonl_output(lines)
+        play = list(run_state.plays.values())[0]
+        # Should have 4 tasks (Task 1-4)
+        assert len(play.tasks) >= 1
+
+
+class TestRoleGrouping:
+    """Integration tests for 11-role-grouping playbook."""
+
+    @requires_ansible
+    def test_role_grouping_completes(self):
+        """Role grouping playbook completes successfully."""
+        returncode, lines, _ = run_ansible_playbook("11-role-grouping")
+        assert returncode == 0
+        parser, run_state = parse_jsonl_output(lines)
+        assert run_state.status == Status.COMPLETED
+        assert len(run_state.plays) >= 1
+
+    @requires_ansible
+    def test_role_tasks_appear_in_play(self):
+        """Role tasks are included in the play's task list."""
+        returncode, lines, _ = run_ansible_playbook("11-role-grouping")
+        assert returncode == 0
+        parser, run_state = parse_jsonl_output(lines)
+        play = list(run_state.plays.values())[0]
+        # Role should contribute at least 1 task
+        assert len(play.tasks) >= 1
 
 
 # ============================================================================

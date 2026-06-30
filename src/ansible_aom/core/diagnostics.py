@@ -160,7 +160,9 @@ def _reset_for_testing() -> None:
     if _watchdog_seconds is not None:
         try:
             faulthandler.cancel_dump_traceback_later()
-        except Exception:
+        except RuntimeError:
+            # RuntimeError: watchdog timer was never armed (the only
+            # documented failure mode for cancel_dump_traceback_later).
             pass
     if tracemalloc.is_tracing():
         tracemalloc.stop()

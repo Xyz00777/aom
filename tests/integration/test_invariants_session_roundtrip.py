@@ -31,7 +31,8 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from ansible_aom.core.inspect_model import StatusCounts, build_task_tree
-from ansible_aom.core.models import RunState, Status, TaskRunState
+from ansible_aom.core.models import Status, TaskRunState
+from ansible_aom.core.run_state import RunState
 from ansible_aom.session.store import SessionManager, load_session
 
 _TERMINAL = {Status.OK, Status.CHANGED, Status.FAILED, Status.SKIPPED, Status.UNREACHABLE}

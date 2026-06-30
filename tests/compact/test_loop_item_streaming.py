@@ -282,3 +282,108 @@ class TestItemEventTypeIsAuthoritative:
         r._emit_event_log(_aom_jsonl_item_event("v2_runner_item_on_skipped", "localhost", "y"))
         logged = _logged(r)
         assert any(_CYAN in ln and "item=y" in ln for ln in logged)
+
+
+def _async_poll_payload(
+    *,
+    job_id: str = "6c1b0ac27534a522",
+    finished: bool = False,
+    failed: bool = False,
+    msg: str = "Connection failure: The read operation timed out",
+) -> dict:
+    """Build an async-poll-shaped payload (no _ansible_item_label, no item).
+
+    This matches the dict ansible-core delivers when an async-poll result
+    arrives via v2_runner_item_on_failed (e.g. connection drops during
+    polling). The payload has ``ansible_job_id``/``started``/``attempts``/
+    ``finished`` but is NOT a real loop item — it is bookkeeping.
+    """
+    raw: dict = {
+        "ansible_job_id": job_id,
+        "attempts": 1,
+        "changed": True,
+        "failed": failed,
+        "finished": finished,
+        "started": 1,
+        "warnings": ["Value for result key 'finished' of type int was converted to bool."],
+    }
+    if msg:
+        raw["msg"] = msg
+    return raw
+
+
+class TestAsyncPollDoesNotLeakDictIntoItemLabel:
+    """Async-poll bookkeeping payloads must not leak the raw dict into (item=...).
+
+    When ansible-core delivers an async-poll result via v2_runner_item_on_failed
+    (e.g. connection drops during polling), the payload has ``ansible_job_id``/
+    ``started``/``attempts``/``finished`` but no ``_ansible_item_label`` and no
+    ``item`` field. The renderer must detect this shape and render a recognisable
+    label instead of falling through to ``str(raw)``.
+    """
+
+    def test_async_poll_failed_does_not_leak_dict_into_item_label(self):
+        r = _renderer()
+        r._emit_event_log(_task_start("T", "u1"))
+        raw = _async_poll_payload()
+        r._emit_event_log(
+            {
+                "_event": "v2_runner_item_on_failed",
+                "_timestamp": "2026-05-11T10:00:01Z",
+                "task": {"id": "u1"},
+                "hosts": {"ds5": raw},
+            }
+        )
+        text = _all_text(r)
+        assert "failed: [ds5]" in text
+        assert "Connection failure: The read operation timed out" in text
+        assert "(async, job_id=6c1b0ac27534a522)" in text
+        assert "{'_ansible_job_id'" not in text
+        assert "ansible_job_id" not in text
+
+    def test_async_poll_failed_stays_compact_one_line(self):
+        r = _renderer()
+        r._emit_event_log(_task_start("T", "u1"))
+        raw = _async_poll_payload()
+        r._emit_event_log(
+            {
+                "_event": "v2_runner_item_on_failed",
+                "_timestamp": "2026-05-11T10:00:01Z",
+                "task": {"id": "u1"},
+                "hosts": {"ds5": raw},
+            }
+        )
+        # Exactly one host-result line (TASK header is separate).
+        host_lines = [ln for ln in _logged(r) if "ds5" in ln]
+        assert len(host_lines) == 1
+
+    def test_async_poll_in_flight_does_not_render_as_item(self):
+        r = _renderer()
+        r._emit_event_log(_task_start("T", "u1"))
+        raw = _async_poll_payload(finished=False)
+        r._emit_event_log(
+            {
+                "_event": "v2_runner_item_on_ok",
+                "_timestamp": "2026-05-11T10:00:01Z",
+                "task": {"id": "u1"},
+                "hosts": {"ds5": raw},
+            }
+        )
+        # No host line should be printed for an in-flight async poll.
+        text = _all_text(r)
+        assert "ds5" not in text
+
+    def test_async_poll_failed_label_is_red(self):
+        r = _renderer(colorize=True)
+        r._emit_event_log(_task_start("T", "u1"))
+        raw = _async_poll_payload()
+        r._emit_event_log(
+            {
+                "_event": "v2_runner_item_on_failed",
+                "_timestamp": "2026-05-11T10:00:01Z",
+                "task": {"id": "u1"},
+                "hosts": {"ds5": raw},
+            }
+        )
+        logged = _logged(r)
+        assert any(_RED in ln and "async" in ln and "ds5" in ln for ln in logged)

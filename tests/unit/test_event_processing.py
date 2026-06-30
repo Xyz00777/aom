@@ -13,11 +13,11 @@ import pytest
 from ansible_aom.core.models import (
     HostRunState,
     PlayRunState,
-    RunState,
     Status,
     TaskDefinition,
     TaskRunState,
 )
+from ansible_aom.core.run_state import RunState
 
 # ==============================================================================
 # TC-197: handle_event Dispatcher Routing
@@ -457,7 +457,12 @@ class TestRunnerOnStartTaskCreation:
         assert isinstance(task_state, TaskRunState)
         assert task_state.task_id == "task-uuid-1"
         assert task_state.name == "Install nginx"
-        assert task_state.status == Status.RUNNING
+        # After runner_on_ok for the only host, the task correctly
+        # promotes to COMPLETED (model state stays self-consistent with
+        # per-host terminal status). This is the correct new behavior;
+        # the prior test asserted RUNNING which encoded the bug that
+        # _handle_v2_runner_on_* didn't update task.status.
+        assert task_state.status == Status.COMPLETED
 
     def test_runner_start_sets_task_start_time(
         self, event_play_start: dict, event_runner_start: dict, event_runner_ok: dict
@@ -1277,7 +1282,7 @@ class TestTimestampLocalTimezone:
 
     def test_utc_timestamp_parsed_with_timezone(self) -> None:
         """TC-085: _parse_timestamp returns timezone-aware datetime from UTC string."""
-        from ansible_aom.core.models import _parse_timestamp
+        from ansible_aom.core.run_state import _parse_timestamp
 
         event = {"_timestamp": "2026-04-20T15:30:00Z"}
         result = _parse_timestamp(event)
@@ -1285,7 +1290,7 @@ class TestTimestampLocalTimezone:
 
     def test_utc_timestamp_converted_to_local_timezone(self) -> None:
         """TC-085: UTC timestamp can be converted to local timezone via astimezone()."""
-        from ansible_aom.core.models import _parse_timestamp
+        from ansible_aom.core.run_state import _parse_timestamp
 
         event = {"_timestamp": "2026-04-20T15:30:00Z"}
         result = _parse_timestamp(event)
@@ -1295,7 +1300,7 @@ class TestTimestampLocalTimezone:
 
     def test_utc_z_suffix_parsed_correctly(self) -> None:
         """TC-085: 'Z' suffix in timestamps is handled as UTC."""
-        from ansible_aom.core.models import _parse_timestamp
+        from ansible_aom.core.run_state import _parse_timestamp
 
         event_z = {"_timestamp": "2026-04-20T10:00:00Z"}
         event_offset = {"_timestamp": "2026-04-20T10:00:00+00:00"}
@@ -1305,7 +1310,7 @@ class TestTimestampLocalTimezone:
 
     def test_utc_timestamp_without_z(self) -> None:
         """TC-085: Timestamps without Z still parse as UTC if +00:00."""
-        from ansible_aom.core.models import _parse_timestamp
+        from ansible_aom.core.run_state import _parse_timestamp
 
         event = {"_timestamp": "2026-04-20T10:00:00+00:00"}
         result = _parse_timestamp(event)
@@ -1323,7 +1328,7 @@ class TestTimestampLocalTimezone:
     )
     def test_various_utc_timestamps(self, ts_str: str, expected_hour: int) -> None:
         """TC-085: Various UTC timestamp strings parse correctly."""
-        from ansible_aom.core.models import _parse_timestamp
+        from ansible_aom.core.run_state import _parse_timestamp
 
         event = {"_timestamp": ts_str}
         result = _parse_timestamp(event)
@@ -1331,7 +1336,7 @@ class TestTimestampLocalTimezone:
 
     def test_local_timezone_preserves_instant(self) -> None:
         """TC-085: fromisoformat().astimezone() preserves UTC instant."""
-        from ansible_aom.core.models import _parse_timestamp
+        from ansible_aom.core.run_state import _parse_timestamp
 
         event = {"_timestamp": "2026-04-20T10:00:00Z"}
         utc_ts = _parse_timestamp(event)

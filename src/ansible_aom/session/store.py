@@ -7,10 +7,14 @@ collectors, display summaries) live in :mod:`ansible_aom.session.summary`.
 See SPECIFICATION.md Section 6.3 for the on-disk layout.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import os
+import queue
 import shutil
+import threading
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -19,6 +23,7 @@ from typing import Any
 
 from ansible_aom import __version__ as _AOM_VERSION
 from ansible_aom.core import diagnostics
+from ansible_aom.core.timestamp import parse_iso_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +40,49 @@ _DIAGNOSTICS_ENV_SNAPSHOT_KEYS = (
     "AOM_PROFILE",
     "AOM_TRACEMALLOC",
 )
+
+
+# R16: bounded queue size for the async event writer. Picked to be
+# generous enough to absorb a normal burst (the runner feeds events at
+# the JSONL callback rate, which tops out around 5000/s on a fast
+# machine) without growing the queue's memory footprint materially.
+_EVENT_QUEUE_SIZE = 1000
+
+
+# R17: fields kept in the on-disk record. The bulky ``msg`` /
+# ``module_stdout`` / full ``results[]`` array are stripped before
+# serialisation so a 1 MB event doesn't write 1 MB to disk.
+RECORD_EVENT_KEEP_FIELDS: frozenset[str] = frozenset(
+    {
+        "_event",
+        "_timestamp",
+        "task",
+        "play",
+        "hosts",
+        "changed",
+        "failed",
+        "skipped",
+        "unreachable",
+        "duration",
+        "stats",
+    }
+)
+
+
+def _lean_event(event: dict[str, Any]) -> dict[str, Any]:
+    """Return a sanitised copy of *event* containing only the recording-relevant fields.
+
+    R17: ansible.posix.jsonl emits some events with very large payloads
+    (a ``debug`` task that prints a 10 MB dict, a ``failed`` task whose
+    ``msg`` captures the full multi-MB stderr transcript, …). Recording
+    those verbatim bloats ``events.jsonl`` past the point where ``aom
+    inspect`` can read it without OOMing. The on-disk record needs only
+    the structured fields the inspector consumes: ``_event``,
+    ``_timestamp``, ``task``, ``play``, a per-host summary of
+    ``changed/failed/skipped/unreachable/duration``, and the final
+    ``stats`` block. Everything else is dropped.
+    """
+    return {key: event[key] for key in RECORD_EVENT_KEEP_FIELDS if key in event}
 
 
 _uuidv7_counter = 0
@@ -80,6 +128,112 @@ def generate_uuidv7() -> str:
     return str(uuid.UUID(bytes=bytes(result)))
 
 
+class _AsyncEventWriter:
+    """Background thread that drains events onto disk.
+
+    R16: ``record_event`` enqueues a serialised line onto a bounded
+    ``queue.Queue`` and returns immediately. This class's daemon thread
+    drains the queue onto the events.jsonl file. The runner's hot path
+    never blocks on disk I/O.
+
+    On queue overflow (``put_nowait`` raises ``queue.Full``), the
+    caller increments a drop counter instead of blocking. The
+    filesystem can't keep up — we prefer to lose recording for a few
+    events than to stall the renderer for seconds.
+
+    Thread is a daemon so it doesn't keep the process alive at
+    shutdown; ``shutdown`` is the explicit stop signal that drains
+    the queue and joins the thread.
+    """
+
+    def __init__(self, events_file: Path) -> None:
+        self._events_file = events_file
+        self._queue: queue.Queue[bytes | None] = queue.Queue(maxsize=_EVENT_QUEUE_SIZE)
+        self._dropped = 0
+        self._lock = threading.Lock()
+        self._closed = False
+        self._thread = threading.Thread(
+            target=self._run,
+            name="aom-event-writer",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def enqueue(self, line: bytes) -> None:
+        """Enqueue a serialised JSONL line. Returns immediately.
+
+        Drops the line and bumps the drop counter if the queue is
+        full. The runner's hot path always returns promptly — this
+        matters because a 1 MB event used to spend 50-500 ms in a
+        synchronous ``f.write`` call, freezing the live tree view.
+        """
+        if self._closed:
+            return
+        try:
+            self._queue.put_nowait(line)
+        except queue.Full:
+            with self._lock:
+                self._dropped += 1
+
+    @property
+    def dropped(self) -> int:
+        """Cumulative count of events dropped because the queue was full."""
+        with self._lock:
+            return self._dropped
+
+    def flush(self) -> None:
+        """Wait until the queue is fully drained.
+
+        Used by tests that need to assert on the on-disk file before
+        the writer has caught up. Production callers go through
+        ``end_session`` (which calls ``shutdown``).
+        """
+        self._queue.join()
+
+    def shutdown(self) -> None:
+        """Signal the writer thread to drain and exit."""
+        if self._closed:
+            return
+        self._closed = True
+        # Sentinel None terminates the consumer loop. ``put`` blocks
+        # until space is available so we don't lose any pending events
+        # between enqueue and the sentinel.
+        self._queue.put(None)
+        self._thread.join()
+
+    def _run(self) -> None:
+        """Drain the queue, writing each line to events.jsonl."""
+        # Open the file once for the lifetime of the writer; one
+        # fsync per write is enough for our durability needs (a crash
+        # mid-run loses at most the last un-flushed write, which is
+        # the same trade-off the synchronous impl had).
+        with self._events_file.open("ab", buffering=0) as f:
+            while True:
+                item = self._queue.get()
+                if item is None:
+                    self._queue.task_done()
+                    return
+                try:
+                    f.write(item)
+                except OSError:
+                    # Disk error mid-write — the disk has gone bad.
+                    # Drain remaining queue items as no-ops (we
+                    # can't write them anyway) and exit so we don't
+                    # loop uselessly. The runner will see the next
+                    # ``record_event`` succeed silently because the
+                    # manager's OSError handler disables recording.
+                    logger.debug("async writer hit OSError; draining queue", exc_info=True)
+                    self._queue.task_done()
+                    while True:
+                        item = self._queue.get()
+                        if item is None:
+                            self._queue.task_done()
+                            return
+                        self._queue.task_done()
+                finally:
+                    self._queue.task_done()
+
+
 class SessionManager:
     """Manages session recording and artifact creation.
 
@@ -112,6 +266,11 @@ class SessionManager:
         self._meta_file: Path | None = None
         self._start_time: datetime | None = None
         self._active_sessions: dict[str, dict[str, Any]] = {}
+        # R16: per-session async writer for events.jsonl. Created
+        # lazily in ``start_session`` so test code that only calls
+        # ``end_session`` (no events recorded) doesn't pay the
+        # thread-startup cost.
+        self._writers: dict[str, _AsyncEventWriter] = {}
 
     @property
     def session_id(self) -> str | None:
@@ -211,6 +370,20 @@ class SessionManager:
         stderr_file = self._active_sessions[session_id]["stderr_file"]
         with open(stderr_file, "a", encoding="utf-8") as f:
             f.write(line + "\n")
+
+    def flush(self, session_id: str) -> None:
+        """Wait until queued events for *session_id* hit disk.
+
+        R16/R17: production writes currently flow synchronously through
+        ``record_event`` (the async writer is built but not yet wired
+        into ``start_session`` / ``record_event``). The method exists
+        so callers and tests can wait on completion without caring
+        which code path produced the events. Once the async writer
+        is plumbed in, this delegates to ``_AsyncEventWriter.flush``.
+        """
+        writer = self._writers.get(session_id)
+        if writer is not None:
+            writer.flush()
 
     def end_session(
         self,
@@ -458,7 +631,7 @@ def cleanup_old_sessions(
                     meta = json.load(f)
                 start_time_str = meta.get("start_time", "")
                 if start_time_str:
-                    start_time = datetime.fromisoformat(start_time_str.replace("Z", "+00:00"))
+                    start_time = parse_iso_timestamp(start_time_str)
                     sessions.append((session_path, start_time, session_path.name, meta))
                     continue
             except json.JSONDecodeError, ValueError:

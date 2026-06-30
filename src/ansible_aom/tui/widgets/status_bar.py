@@ -10,6 +10,7 @@ from rich.text import Text
 from textual.widget import Widget
 
 from ansible_aom.core.config import StatusBarConfig
+from ansible_aom.core.duration import format_elapsed_hms
 
 
 class StatusBar(Widget):
@@ -113,24 +114,20 @@ class StatusBar(Widget):
         self._subprocess_pid = pid
 
     def _format_elapsed_time(self) -> str:
-        """Format elapsed time as H:MM:SS or M:SS.
+        """Format elapsed time as ``H:MM:SS`` or ``M:SS``.
+
+        Thin wrapper around
+        :func:`ansible_aom.core.duration.format_elapsed_hms` — this
+        widget supplies the elapsed-seconds computation (and the
+        ``"0:00"`` fallback when no start time has been recorded yet).
 
         Returns:
             Formatted time string
         """
         if self._start_time is None:
             return "0:00"
-
         elapsed = datetime.now() - self._start_time
-        total_seconds = int(elapsed.total_seconds())
-
-        hours = total_seconds // 3600
-        minutes = (total_seconds % 3600) // 60
-        seconds = total_seconds % 60
-
-        if hours > 0:
-            return f"{hours}:{minutes:02d}:{seconds:02d}"
-        return f"{minutes}:{seconds:02d}"
+        return format_elapsed_hms(int(elapsed.total_seconds()))
 
     def _format_host_count(self) -> str:
         """Format host count.

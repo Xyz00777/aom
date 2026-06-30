@@ -44,16 +44,18 @@ _LINE = (
 
 def _feed_many(n: int, *, diag: diagnostics.RunDiagnostics) -> str:
     from ansible_aom.ansible.runner import _feed
+    from ansible_aom.core.run_state import RunState
 
     renderer = MagicMock()
     parser = _execution_parser()
+    state = RunState(playbook="x")
     sink = _FakeSink()
     captured = io.StringIO()
     original = sys.stderr
     sys.stderr = captured
     try:
         for _ in range(n):
-            _feed(_LINE, parser, renderer, sink, diag=diag)
+            _feed(_LINE, parser, state, renderer, sink, diag=diag)
     finally:
         sys.stderr = original
     return captured.getvalue()

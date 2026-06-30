@@ -11,7 +11,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from ansible_aom.compact.renderer import CompactRenderer
-from ansible_aom.core.models import HostRunState, PlayRunState, RunState, Status, TaskRunState
+from ansible_aom.core.models import HostRunState, PlayRunState, Status, TaskRunState
+from ansible_aom.core.run_state import RunState
 
 
 def _state_with_two_hosts() -> RunState:
