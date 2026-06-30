@@ -71,3 +71,178 @@ with patch("ansible_aom.renderer.factory.create_renderer") as mock_renderer:
 ```
 
 **Key insight**: The `patch` path must match where the function is imported/used, not where it's defined. Since `cli.py` does `from ansible_aom.renderer.factory import create_renderer`, we patch `ansible_aom.renderer.factory.create_renderer`.
+
+## Host Status Display (resolved)
+
+### Skipped status was missing from host overview (resolved 2026-05)
+
+The host overview (`format_host_rows`) and host summary (`format_host_summary`) only showed ok/changed/failed/unreachable. `Status.SKIPPED` was tracked in `RunState` and `tree.py` but never surfaced in the display.
+
+**Fix**: Added `skipped` parameter to `_format_count_cells`, `format_host_summary`, and conditional `skipped` column to `format_host_rows` (hidden when no host has skipped tasks, mirroring the `unreachable` column pattern). The `v2_runner_on_skipped` handler already created `HostRunState(status=Status.SKIPPED)` correctly.
+
+### Per-host summary lines were duplicating the host table (resolved 2026-05)
+
+After completion, the renderer printed both a column-aligned host table (`format_host_rows`) AND per-host summary lines (`format_host_summary`) with the same data. The summary lines were pure duplication.
+
+**Fix**: Removed `_format_per_host_lines` method entirely. On completion, the host table now always prints (not just on failure). The tree snapshot only prints on failure/cancel — on success, stale running spinners would be misleading. `_capture_panel_snapshot` now returns `(tree_lines, host_lines)` tuple so callers can print them independently.
+
+### Host leaves only showed RUNNING hosts (resolved 2026-05)
+
+Tree host leaves under a running task only showed hosts with `Status.RUNNING`. This meant completed hosts disappeared from the tree before the task was done.
+
+**Fix**: Removed the `if hs.status != Status.RUNNING: continue` filter in `_emit_runtime_play`. All hosts under a running task now appear with status-specific icons (● OK, ◐ RUNNING, ○ SKIPPED, etc.).
+
+### Linear strategy tasks stayed RUNNING until playbook end (resolved 2026-05)
+
+Under linear strategy, `task.status` only transitioned to COMPLETED at `v2_playbook_on_stats`. Previous tasks showed as "running" long after they finished.
+
+**Fix**: In `_handle_v2_playbook_on_task_start`, when a new task starts under linear strategy, mark all other RUNNING tasks in the same play as COMPLETED (either all hosts terminal, or empty hosts meaning no runner events arrived). The `_classify` method respects `Status.COMPLETED` as an early exit returning "completed" so the tree prunes them immediately.
+
+### Hostname fallback showed all hosts from all plays (resolved 2026-05)
+
+The tree fallback `_all_known_hostnames` collected hostnames from every
+task across every play when `runtime.hosts` was empty. On multi-play
+playbooks, play 2 would show host leaves from play 1 (plus `localhost`
+from test playbooks).
+
+**Fix**: Replaced with `_play_target_hostnames(play, play_def)` that uses
+`play_def.resolved_hosts` (preflight targets) when available, falling
+back to the play's own runtime task hostnames. Call site already had both
+`play` (PlayRunState) and `play_def` (PlayDefinition) in scope.
+
+### Elapsed time stuck at 0s for fallback host leaves (resolved 2026-05)
+
+Fallback host leaves (when `runtime.hosts` is empty) hardcoded
+`elapsed_s=0.0` with `Status.RUNNING`. The elapsed counter never
+advanced from zero, even for tasks that had been running for minutes.
+
+**Fix**: Compute elapsed from `runtime.start_time` instead of hardcoding
+0. When `start_time` is None (task hasn't started yet), 0 is correct.
+
+### Dynamic children not shown as pending in tree (resolved 2026-05-23)
+
+Grafted `include_tasks` children (in `TaskDefinition.children`) appeared only in role task counts, not as visual □ pending entries in the tree. Users couldn't see what dynamic tasks were coming.
+
+**Fix**: Added a new loop in `_play_running_and_pending` after the runtime-only tasks loop. Iterates `play_def.tasks` for entries with `.children`, emitting each child as either "running" (if announced at runtime with a matching `TaskRunState`) or "pending" (if not yet seen). Completed children are filtered. Duplicates prevented via `emitted_names` — the runtime-only loop now also adds to `emitted_names` so dynamic children already picked up there don't re-appear.
+
+**Tests added**: TC-320 (pending before announcement), TC-321 (running status), TC-322 (completed filtered), TC-323 (under role header), TC-324 (host leaves), + duplicate-prevention test.
+
+## Cross-Play Task Leakage (resolved 2026-05-24)
+
+Completed plays showed `◐` running tasks from *later* plays because
+`_play_running_and_pending` searched `runtime_by_name` across all plays
+without filtering by play ownership.
+
+**Fix** (`dab145a`): Added `include_cross_play=False` parameter. Completed
+plays use `False` — they only emit their own tasks. Active plays still
+use `True` to show handler tasks from other plays.
+
+**Key files**: `tree.py:_play_running_and_pending` — new `include_cross_play` parameter
+
+## Tree Flicker Between Plays (resolved 2026-05-24)
+
+Between play transitions, the tree alternated between completed and
+current play on alternate frames because the play selection lacked
+temporal persistence.
+
+**Fix** (`f179469`): Introduced `_last_running_play_id` — a sticky
+fallback that persists the most recently running play across frames.
+Selection tiers: (1) fresh running play, (2) previous frame's sticky,
+(3) cold-start fallback.
+
+**Key files**: `tree.py:_select_play_for_tree` — `_last_running_play_id` logic
+
+## Stuck Meta Tasks Under Linear Strategy (resolved 2026-05-24)
+
+`meta: reset_connection` showed `◐` forever (elapsed time >15 minutes)
+because the linear force-completion loop had scope guards that skipped
+meta tasks with zero hosts.
+
+**Fix** (`d981444`): Added third completion branch scoped to same play:
+`elif p.play_id == play.play_id:` force-transitions RUNNING hosts to
+OK. Only RUNNING is force-completed — real terminal events preserved.
+
+**Key files**: `models.py:_handle_v2_playbook_on_task_start` — new
+force-completion branch
+
+## Upcoming Plays Invisible (resolved 2026-05-24)
+
+Plays with zero `runtime.tasks` (not yet started) were silently omitted
+from the tree because the skip guard `and runtime.tasks` treated them
+the same as completed plays.
+
+**Fix** (`cd68065`): Changed guard to `runtime.tasks is not None` instead
+of truthiness. Upcoming plays have empty dicts (truthy `is not None`)
+while completed+empty plays still get skipped.
+
+**Key files**: `tree.py:_select_play_for_tree` — skip guard logic
+
+## --hide-state Comma-Separated Support (2026-06-22)
+
+**Change**: `--hide-state` now accepts both comma-separated values (`--hide-state ok,skipped`) and repeatable invocations (`--hide-state ok --hide-state skipped`).
+
+**Pattern**: Used `action="extend"` with a custom `type` function (`_comma_sep_state`) that splits on commas, validates each token, and returns a `list[str]`. Argparse's `extend` action flattens list-returning types into a single accumulated list.
+
+**Key details**:
+- `choices` parameter was removed (it conflicts with a list-returning `type` function — validation happens inside `_comma_sep_state` instead)
+- `action="extend"` is available in Python 3.8+ (project uses 3.14)
+- The `hide_state` attribute on the parsed namespace still arrives as `list[str]` — no downstream changes needed in `main()` or `_run_compact()`
+- Existing tests for repeatable invocation still pass unchanged
+- New tests cover: comma-separated, mixed append+comma, unknown in comma-separated, single value without comma
+
+## Strategy Detection Corrected (resolved 2026-05-24)
+
+Strategy detection never flipped to "free" because `v2_runner_on_start`
+only fires outside lockstep mode — but no code handled this signal.
+
+**Fix**: In `_handle_v2_runner_on_start`, flip `detected_strategy`
+from "linear" to "free" on first occurrence. This is correct because
+the JSONL callback guards `runner_on_start` behind `if self._is_lockstep: return`.
+
+**Key files**: `models.py:_handle_v2_runner_on_start` — strategy flip logic
+
+## Throttle Gate Render-Starvation Bug (resolved 2026-06-22)
+
+The dirty-path throttle in `_render_status_panel` could suppress renders
+indefinitely when state changes arrived faster than the 0.25 s window.
+
+**Symptom**: User reports "i already had a view with status changed but
+they did not get showed" — the panel froze on stale output during event
+bursts.
+
+**Root cause**: The original gate (lines 494-503) compared
+`elapsed_since_compute < _PANEL_COMPUTE_THROTTLE_S`. If state changes
+kept arriving faster than 0.25 s, every render call skipped AND
+`_last_panel_compute_time` was never updated — the timer couldn't
+"advance" past the throttle window. Result: 0 renders per second despite
+the panel being dirty.
+
+**Fix**: Split the clock in two:
+- `_last_panel_compute_time` — when the panel was last actually rendered
+- `_last_state_change_monotonic` — when state last changed
+
+Gate logic now branches on `last_compute >= last_change`:
+- If compute is AFTER the last state change → already saw this state →
+  wait up to 1 s for the tick refresh
+- If compute is BEFORE the last state change → stale compute → render
+  now (after a 50 ms coalesce window to absorb truly simultaneous events)
+
+`update_state` and `set_definitions` stamp `_last_state_change_monotonic`
+alongside `_panel_dirty = True`. Added `_PANEL_DIRTY_COALESCE_S = 0.05`
+constant for the burst-absorption window.
+
+**Files touched**:
+- `src/ansible_aom/compact/renderer.py` — gate logic, init, two stamp
+  sites
+- `tests/compact/test_render_dirty_flag.py` — `test_perf_043` (renders
+  after burst settles) and `test_perf_044` (waits for tick refresh when
+  compute is fresh)
+
+**Verification**: 2810 tests pass (was 2808, +2 from regression tests).
+mypy strict, ruff lint, ruff format — all clean.
+
+**Pattern**: When a throttle gate depends on a "did we render this yet?"
+check, the gate must advance the timer on EVERY call (even when it
+skips) OR it must distinguish "state changed since last render" from
+"no state changed" via a separate clock. Otherwise a fast-changing
+input can starve the output indefinitely.

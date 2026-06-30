@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from textual.widgets import RichLog
 
-from ansible_aom.core.state import MAX_LOG_LINES
+from ansible_aom.core.state_machine import MAX_LOG_LINES
 
 if TYPE_CHECKING:
     from textual.events import Mount

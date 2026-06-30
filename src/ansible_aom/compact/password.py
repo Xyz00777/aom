@@ -1,40 +1,26 @@
 """Password handling for compact mode.
 
-Terminal pass-through pattern for password prompts.
-See SPECIFICATION.md Section 5.10.
+The pure detection heuristic (:func:`is_password_prompt`) and the list
+of ansible/sudo prompt regexes (``PASSWORD_PATTERNS``) live in
+:mod:`ansible_aom.core.prompts` — they're re-exported here for back
+compat with code that learned to import them from this module.
+
+This module owns only the *response* side: stopping Rich Live and
+delegating to ``getpass`` for a terminal pass-through read. See
+SPECIFICATION.md Section 5.10.
 """
 
 from __future__ import annotations
 
 import getpass
-import re
 import sys
 from typing import Any
 
-# From SPECIFICATION.md Section 5.10
-PASSWORD_PATTERNS: list[str] = [
-    r"Vault password: ",
-    r"Vault password \([^)]+\): ",  # vault_id variant
-    r"SSH password: ",
-    r"BECOME password: ",
-    r"BECOME password\[defaults to SSH password\]: ",
-    r"New Vault password: ",
-    r"Confirm New Vault password: ",
-]
+from ansible_aom.core.prompts import PASSWORD_PATTERNS, is_password_prompt
+
+__all__ = ["PASSWORD_PATTERNS", "is_password_prompt", "handle_password_prompt"]
 
 DEFAULT_PASSWORD_TIMEOUT = 60
-
-
-def is_password_prompt(text: str) -> bool:
-    """Check if text matches any known password prompt pattern.
-
-    Args:
-        text: The text to check for password prompt patterns.
-
-    Returns:
-        True if text matches any password prompt pattern, False otherwise.
-    """
-    return any(re.search(pattern, text) for pattern in PASSWORD_PATTERNS)
 
 
 def handle_password_prompt(
@@ -57,10 +43,10 @@ def handle_password_prompt(
     try:
         sys.stdout.write("\033[999;0H\n")
         sys.stdout.flush()
-    except (OSError, AttributeError):
+    except OSError, AttributeError:
         pass  # Non-TTY environment
 
     try:
         return getpass.getpass(prompt_text)
-    except (EOFError, KeyboardInterrupt, OSError):
+    except EOFError, KeyboardInterrupt, OSError:
         return ""

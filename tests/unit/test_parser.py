@@ -205,6 +205,134 @@ class TestJsonLineStreamBasics:
         assert len(non_json_calls) == 2
 
 
+class TestJsonLineStreamCarryBuffer:
+    """R1: PTY can split a JSONL event across reads. The first half on its
+    own is unparseable JSON; the parser must stash it and rejoin with the
+    next chunk instead of dropping both halves."""
+
+    def test_two_chunk_join_yields_full_event(self):
+        """Half a JSONL line then the rest should yield one event."""
+        parser = JsonLineStream()
+        assert parser.feed_line('{"_event":"v2_runner_on_ok","hosts":{"web1":{"msg":"hel') == []
+        result = parser.feed_line('lo"}}}')
+        assert len(result) == 1
+        assert result[0]["_event"] == "v2_runner_on_ok"
+        assert result[0]["hosts"]["web1"]["msg"] == "hello"
+
+    def test_many_small_chunks_join(self):
+        """A 100-chunk slow-drip split still yields exactly one event."""
+        full = '{"_event":"v2_playbook_on_start","msg":"' + ("x" * 200) + '"}'
+        parser = JsonLineStream()
+        chunk_size = max(1, len(full) // 100)
+        events: list[dict] = []
+        for i in range(0, len(full), chunk_size):
+            events.extend(parser.feed_line(full[i : i + chunk_size]))
+        assert len(events) == 1
+        assert events[0]["_event"] == "v2_playbook_on_start"
+
+    def test_carry_buffer_overflow_drops_without_raising(self):
+        """One pathologically large partial event is dropped, not OOM'd,
+        and a subsequent well-formed line parses cleanly."""
+        parser = JsonLineStream()
+        # First chunk is a partial JSON that's already larger than the
+        # 1 MB cap. Storing it as carry would be unbounded growth — the
+        # parser must drop it.
+        oversized = '{"_event":"x","msg":"' + ("a" * 1_100_000)
+        assert parser.feed_line(oversized) == []
+        # After the drop, the carry must be empty so the next line is
+        # parsed standalone.
+        result = parser.feed_line('{"_event":"v2_playbook_on_start"}')
+        assert len(result) == 1
+        assert result[0]["_event"] == "v2_playbook_on_start"
+
+    def test_well_formed_line_does_not_use_carry(self):
+        """Sanity: a normal line in one go bypasses the carry path."""
+        parser = JsonLineStream()
+        result = parser.feed_line('{"_event":"v2_playbook_on_start"}')
+        assert len(result) == 1
+        # And a subsequent line still parses fine.
+        result2 = parser.feed_line('{"_event":"v2_runner_on_ok","hosts":{}}')
+        assert len(result2) == 1
+
+    def test_garbage_carry_does_not_swallow_next_valid_event(self):
+        """A garbage prefix that can't be the head of a real event (e.g.
+        a bare ``{``) must not corrupt the next valid line by prepending.
+        Discovered by hypothesis: ``feed_line("{")`` stashed ``{`` as carry,
+        then ``feed_line('{"_event":...}')`` produced ``{{"_event":...}`` →
+        invalid JSON → re-stashed → event permanently lost."""
+        parser = JsonLineStream()
+        assert parser.feed_line("{") == []
+        result = parser.feed_line('{"_event":"v2_playbook_on_start"}')
+        assert len(result) == 1
+        assert result[0]["_event"] == "v2_playbook_on_start"
+
+
+class TestRunStateUnknownEvent:
+    """R5: unknown _event values are counted so the renderer can show a
+    one-line "(N unknown events: foo×3)" hint at completion — quieter
+    than warnings, but visible enough for future-version drift."""
+
+    def test_unknown_event_does_not_raise(self):
+        state = RunState(playbook="test.yml")
+        # Should not raise.
+        state.handle_event({"_event": "v2_playbook_on_include", "foo": "bar"})
+
+    def test_unknown_event_leaves_plays_empty(self):
+        state = RunState(playbook="test.yml")
+        state.handle_event({"_event": "v2_some_future_event"})
+        assert state.plays == {}
+
+    def test_unknown_event_increments_counter(self):
+        state = RunState(playbook="test.yml")
+        state.handle_event({"_event": "v2_playbook_on_include"})
+        state.handle_event({"_event": "v2_playbook_on_include"})
+        state.handle_event({"_event": "v2_other_new_event"})
+        assert state.unknown_events == {"v2_playbook_on_include": 2, "v2_other_new_event": 1}
+
+    def test_known_events_do_not_increment_counter(self):
+        state = RunState(playbook="test.yml")
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_start",
+                "_timestamp": "2026-04-20T10:00:00Z",
+            }
+        )
+        assert state.unknown_events == {}
+
+    def test_missing_event_field_does_not_increment(self):
+        """Events without _event are degenerate, not unknown — don't count."""
+        state = RunState(playbook="test.yml")
+        state.handle_event({"foo": "bar"})  # no _event key
+        assert state.unknown_events == {}
+
+
+class TestPtyStreamParserPlaintextCap:
+    """R2: plaintext_lines must be bounded.
+
+    Without a cap, a long run with verbose pexpect noise (warnings, info
+    banners, prompt echoes) can grow plaintext_lines without limit. The
+    cap matches the log panel's MAX_LOG_LINES so the parser doesn't
+    accumulate more than the panel could ever display.
+    """
+
+    def test_plaintext_lines_capped_at_max_log_lines(self):
+        from ansible_aom.core.state_machine import MAX_LOG_LINES
+
+        parser = PtyStreamParser()
+        # Push the parser past the cap. Use feed_line with non-JSON in
+        # EXECUTION phase so it routes to _handle_plaintext.
+        parser.phase = StreamPhase.EXECUTION
+        for i in range(MAX_LOG_LINES + 100):
+            parser.feed_line(f"random ansible chatter line {i}")
+        assert len(parser.plaintext_lines) == MAX_LOG_LINES
+        # The retained tail should be the *most recent* lines, not the
+        # first ones — a stuck head defeats the purpose.
+        assert "random ansible chatter line" in parser.plaintext_lines[-1]
+        last_idx = int(parser.plaintext_lines[-1].rsplit(" ", 1)[1])
+        first_idx = int(parser.plaintext_lines[0].rsplit(" ", 1)[1])
+        assert last_idx > first_idx
+
+
 class TestPtyStreamParserPhases:
     """TC-128 to TC-142: PTY stream phase transitions."""
 
@@ -1723,3 +1851,53 @@ class TestListTasksEdgeCases:
         assert tasks[0]["name"] == "Install"
         assert tasks[1]["name"] == "Configure"
         assert tasks[2]["name"] == "Restart"
+
+
+class TestWarningDetectionThroughAnsiPrefix:
+    """Real ansible-playbook prefixes warnings with ANSI color codes —
+    e.g. \\x1b[1;35m[WARNING]:\\x1b[0m. The parser must classify them
+    as warnings anyway so the panel's ⚠ counter stays accurate.
+    """
+
+    def test_ansi_prefixed_warning_is_classified(self):
+        from ansible_aom.core.models import WarningType
+        from ansible_aom.core.parser import PtyStreamParser
+
+        parser = PtyStreamParser()
+        line = "\x1b[1;35m[WARNING]: example warning\x1b[0m"
+        parser.feed_line(line + "\n")
+
+        assert len(parser.warnings) == 1
+        assert parser.warnings[0].type == WarningType.WARNING
+        # ANSI codes should be stripped from the stored message so
+        # downstream UI doesn't have to re-strip.
+        assert "\x1b[" not in parser.warnings[0].message
+        assert "[WARNING]: example warning" in parser.warnings[0].message
+
+    def test_ansi_prefixed_deprecation_is_classified(self):
+        from ansible_aom.core.models import WarningType
+        from ansible_aom.core.parser import PtyStreamParser
+
+        parser = PtyStreamParser()
+        line = "\x1b[0;35m[DEPRECATION WARNING]: old API\x1b[0m"
+        parser.feed_line(line + "\n")
+
+        assert len(parser.warnings) == 1
+        assert parser.warnings[0].type == WarningType.DEPRECATION
+        assert "\x1b[" not in parser.warnings[0].message
+
+    def test_plain_warning_still_classified(self):
+        """Backwards-compat: warnings without ANSI prefix still match."""
+        from ansible_aom.core.parser import PtyStreamParser
+
+        parser = PtyStreamParser()
+        parser.feed_line("[WARNING]: bare warning\n")
+        assert len(parser.warnings) == 1
+
+    def test_non_warning_text_with_ansi_passes_through(self):
+        """ANSI-coloured non-warning text must NOT be misclassified."""
+        from ansible_aom.core.parser import PtyStreamParser
+
+        parser = PtyStreamParser()
+        parser.feed_line("\x1b[31msome random colored text\x1b[0m\n")
+        assert parser.warnings == []

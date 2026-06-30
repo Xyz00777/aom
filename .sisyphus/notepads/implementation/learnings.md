@@ -218,4 +218,1741 @@ RichLog's `write()` method accepts `scroll_end` parameter - pass `scroll_end=sel
 - **TC-145** (Terminal pass-through): 11 tests — getpass masking, prompt display, special chars, cursor positioning, non-TTY fallback
 - **TC-146** (TUI modal): 6 tests — suspend() context, prompt suffix, return values, error handling, synchronous nature
 - **TC-147** (Password masking): 5 tests — getpass masking in both modes, Renderer Protocol interface
+
+## 2026-05-24 Tree replay determinism harness
+
+- Added a pure frame-capture helper in `tests/integration/test_replay_determinism.py` that
+  drives `RunState.handle_event()` + `TreeProjection.from_run_state()` + `tree_lines(now=...)`
+  for every JSONL event.
+- Deterministic timestamps came straight from each event's `_timestamp`, so the captured frame
+  signatures stay stable across repeated runs.
+- A shared-prefix assertion across successive frames is a lightweight guard against row churn /
+  reordering without needing full snapshot fixtures.
 - **TC-148** (Timeout default): 9 tests — DEFAULT_PASSWORD_TIMEOUT=60, type checks, timeout constant availability
+
+## 2026-05-25 run_once / serial window probe
+
+- Real `ansible.posix.jsonl` output for `serial: 1` repeats `v2_playbook_on_play_start` once per batch.
+- The repeated play-start events keep the same `play.id` and `play.path`, and the repeated task events keep the same `task.id` and `task.path`.
+- The only stream field that clearly changes at the batch/window boundary is `play.duration.start` on each repeated `v2_playbook_on_play_start` event.
+- For the `run_once: true` task under `serial: 1`, the task row still reappears once per batch with the same task identity; the host field changes from `web1` → `web2` → `web3` across batches.
+- Recommendation: treat `play.duration.start` (or an internal ordinal derived from repeated play-start events) as the smallest stable batch/window discriminator and scope runtime play/task row identity with it.
+
+## 2026-06-21 Play boundary regression repros
+
+- Added `tests/unit/test_play_boundary_state.py` to pin two play-boundary regressions in `core.models`.
+- Duplicate `v2_playbook_on_play_start` for the same `play.id` currently replaces the whole `PlayRunState`, so the repro asserts that completed task entries must survive the second play-start.
+- The cross-play meta-task repro needs the next play's first `v2_playbook_on_task_start` before any boundary finalization can mask the issue; otherwise `_finalize_play()` makes the state look healthy too early.
+
+## 2026-05-08 nom-style Display Backend Swap (branch: feat/nom-compact-renderer)
+
+### What changed
+
+- **`compact/display.py`**: replaced `rich.live.Live` with direct stdout
+  ANSI cursor positioning + DEC mode 2026 (synchronized output). Public
+  API (`start`/`stop`/`update`/`print_log`/`clear`, `is_running`, `is_tty`)
+  is preserved so `CompactRenderer` needs no changes. Each frame is wrapped
+
+## 2026-05-24 Tree meta-task normalization
+
+- Compact tree projection now treats explicit `meta: ...` tasks as hostless
+  control-flow rows: the task stays visible, but synthetic host leaves are
+  suppressed even when runtime fallback data is present.
+- Caveat: the heuristic is intentionally narrow and string-based; if Ansible
+  introduces other hostless pseudo-actions, add them explicitly instead of
+  broadening the fallback.
+  in BSU (`\x1b[?2026h`) / ESU (`\x1b[?2026l`) so multi-line redraws apply
+  atomically without flicker.
+- **250 ms refresh throttle ported.** `Display.update()` records the
+  monotonic timestamp of each emitted frame and skips writes that fall
+  inside the window — rapid bursts coalesce to the latest content.
+  `print_log()` bypasses the throttle (logs are informational) but resets
+  the throttle clock since the status is redrawn as part of the same frame.
+- **`compact/renderer.py::handle_completion`**: now prints the final
+  summary on stdout when `is_tty=False`. Closes PQ6 — without this, a
+  piped run produced zero final-state output because `Display.update()`
+
+## 2026-05-25 run_once / serial replay identity
+
+- `serial` is a play-level batching directive, not a separate strategy.
+  `run_once` executes once per active batch, so the same logical task can
+  legitimately reappear across multiple execution windows in one play.
+- The existing `task.path` disambiguation still covers same-name async /
+  delegated rows inside a batch, but it does **not** distinguish repeated
+  `run_once` windows across serial batches.
+- The missing dimension is batch identity: play identity alone is too
+  coarse, and per-task runtime identity alone is too fine. The durable
+  key needs to include the current batch/window.
+
+## 2026-05-24 Phase 0 replay harness / frame coverage
+
+### Deterministic replay helper
+- Added `ansible_aom.core.replay.iter_tree_frames()` as a pure helper that
+  reuses one `TreeProjection` across successive JSONL events.
+- This preserves projection-local continuity state during replay, which is
+  required for frame-by-frame assertions instead of final-snapshot-only checks.
+
+### Frame-level regression shape
+- The replay regression now inspects per-frame task groups, not just the final
+  tree text.
+- Same-name concurrent task rows can be asserted by grouping each frame’s task
+  label with the attached host leaves; that catches row swapping / collapse if
+  it ever regresses.
+  is a no-op in non-TTY mode.
+- **`core/session.py::cleanup_old_sessions`**: was using `datetime.now()`
+  as the fallback sort key for sessions without `meta.json`, giving every
+  fallback the same microsecond and producing nondeterministic order
+  (TC-228 was flaky for this reason). Now uses directory `mtime`. Also
+  fixed `except json.JSONDecodeError, ValueError:` — Python 3 parses that
+  as Py2-style "catch only `JSONDecodeError`, bind to local `ValueError`"
+  and silently shadows the builtin name inside the block; replaced with
+  the parenthesised tuple form.
+
+### Test impact
+
+- Suite: **1583 passed, 0 failed, 6 skipped** (was 1579/1/6).
+- Added `tests/compact/test_display_ansi.py` (2 tests): asserts BSU/ESU
+  presence in TTY output and absence in non-TTY output.
+- Rewrote 5 tests in `tests/integration/test_compact_renderer.py` that
+  asserted Rich Live implementation details (`_live`, `_console.show_cursor`,
+  `live.refresh_per_second`) to assert observable behaviour: non-TTY
+
+## 2026-05-25 Sticky fallback identity split
+
+- `TreeProjection._last_running_play_id` stays on the legacy plain runtime
+  play id for sticky-fallback compatibility and test expectations.
+- Window-aware lease/selection now uses a separate internal runtime identity
+  (`play_id + window_start/window_ordinal`) so repeated `serial` / `run_once`
+  batches still disambiguate active play windows.
+- This split keeps public sticky state stable while preserving batch-safe
+  selection and lease lookup in the projection layer.
+  produces no ANSI, `stop()` emits the show-cursor sequence, throttle
+  coalesces frames within 250 ms.
+
+## 2026-05-24 Projection lifecycle note
+
+- `CompactRenderer` should keep the cached `TreeProjection` alive across
+  non-structural result events (`runner_on_ok` / failed / skipped /
+  unreachable) so sticky tree state stays anchored between frames.
+- Projection invalidation is still needed for task/host start events
+  (`task_start`, handler task start, `runner_on_start`) because those can
+  introduce new tree nodes and new role-name memo entries.
+- Added one PQ6 test asserting non-TTY `handle_completion` prints the
+  final summary as plain text.
+
+## 2026-05-10 Runner Implementation (same branch)
+
+### What changed
+
+- **New `src/ansible_aom/runner.py`** — `run_playbook(playbook, args, renderer)`
+  spawns `ansible-playbook` via `pexpect.spawn` with `ANSIBLE_STDOUT_CALLBACK=ansible.posix.jsonl`,
+  reads the PTY line-by-line using `child.expect([newline, EOF, TIMEOUT, *PASSWORD_PATTERNS])`,
+  feeds JSONL lines to the existing `PtyStreamParser`, and pumps emitted
+  events into the renderer via `update_state`.
+- **Password prompts are matched at the pexpect layer**, not in the parser.
+  Live PTY prompts (`Vault password: `) have no trailing newline so they
+  never reach the parser's line-oriented `feed_line`. The runner round-trips
+  through `renderer.handle_password_prompt(prompt)` and writes the result
+  back to the child via `child.sendline`.
+- **Lifecycle ownership** — `renderer.start` before spawn,
+  `handle_completion(exit_code, state)` on exit, `renderer.stop` in a
+  `finally`. Spawn-time failures (`ExceptionPexpect`/`FileNotFoundError`/
+  `OSError`) → exit 127, state="crashed". `KeyboardInterrupt` →
+  `child.sendintr() + close(force=True)` → exit 130.
+- **`cli.py` rewired** to call `run_playbook` instead of the previous stub.
+  Renderer constructed with `is_tty=sys.stdout.isatty()` so the PQ6
+  non-TTY summary path activates correctly under pipes.
+
+### Test impact
+
+- New `tests/integration/test_runner.py` — 4 tests covering happy path,
+  event forwarding, non-zero exit → state="failed", missing executable →
+  exit 127 + state="crashed". Tests substitute a fake "ansible-playbook"
+
+## 2026-05-24 Tree play identity caveat
+
+- Tree projection now prefers `play_id` for joining runtime plays to
+  preflight play definitions, with display-name matching only as a
+  fallback for legacy/partial streams. This prevents duplicate visible
+  play names from collapsing into one projection row.
+  built from `python -c "..."` that emits canned JSONL — exercises the
+  real spawn/expect loop without needing Ansible to be installed.
+- Updated TC-027 in `tests/unit/test_cli.py` — used to patch
+  `create_renderer.side_effect = FileNotFoundError`; now patches
+  `runner.run_playbook` because that's where the FileNotFound handling
+  lives.
+- Suite: **1587 passed, 0 failed, 6 skipped** (was 1583/0/6).
+
+### End-to-end smoke
+
+```
+$ uv run aom .sisyphus/test-fixtures/simple.yml -i localhost, -c local
+.sisyphus/test-fixtures/simple.yml │ 1/1 hosts │ 0:00:00 ●
+$ echo $?
+0
+
+$ uv run aom .sisyphus/test-fixtures/syntax_error.yml -i localhost, -c local
+.sisyphus/test-fixtures/syntax_error.yml │ 0/0 hosts │ 0:00:00 ✖
+$ echo $?
+4
+```
+
+### Quirk noted
+
+Python 3.14 parses `except A, B, C:` as the same `ast.Tuple` as
+`except (A, B, C):` — i.e. it now means "catch any of these three", not
+the Py2 "catch A and bind to local B" semantics. Ruff format takes the
+parens away and accepts the parens-less form as canonical. **The fix in
+`session.py` (commit a4bd140) was about clarity, not a bug** — both
+forms catch the tuple correctly under 3.14. The session.py file got
+re-formatted by ruff after the commit so the parens may be gone again
+on disk. Worth deciding as a project: keep parens for portability to
+older Pythons or accept ruff's preference. Project is currently 3.14-only
+(`requires-python = ">=3.14"`), so ruff's preference is harmless here.
+
+### Still open after this branch
+
+- **Pre-flight `--list-tasks` / `--list-hosts`** — runner skips them.
+  The renderer therefore can't show the full task tree or resolved-hosts
+  list at startup; it builds state purely from JSONL events as they
+  arrive. ARCHITECTURE.md's data-flow diagram describes parallel
+  pre-flight that still doesn't exist yet. **Next major slice.**
+- **`_row_count()` is approximate** — no width-aware wrapping. Long
+  status lines that wrap will under-count rows; redraws will leave
+  artefacts. Currently the panel is single-line, so this is theoretical.
+- **Terminal resize (SIGWINCH)** is not handled.
+- **ASCII fallback for non-Unicode terminals** — `core/icons.py` has
+  the mapping (`STATUS_ICONS_ASCII`) but the renderer hard-codes the
+  Unicode forms in `format_status_bar` and `handle_completion`. Needs
+  a `supports_unicode()` detector + icon-set parameter threading.
+
+## 2026-05-24 Delegated task identity normalization
+
+- `TaskRunState.path` now persists the upstream JSONL task path, so core
+  projection can distinguish same-name delegated/non-delegated task rows
+  without repurposing host attribution.
+- `TreeProjection._play_running_and_pending()` now prefers exact
+  `task.path` matches before bare-name heuristics, which keeps the
+  delegated and non-delegated twins in preflight order even when runtime
+  arrival order is reversed.
+- Regression added in `tests/unit/test_tree_projection.py` using the
+  real server-setup delegate example (`deploy_vms.yml:134`) and a
+  non-delegated twin (`snapshot.yml:13`).
+
+## 2026-05-10 TTY UX fixes + nom-style streaming logs (same branch)
+
+Triggered by an interactive smoke test from the user: "starts and
+immediately terminates and clears". Diagnosed as four coupled gaps —
+the panel cleared on stop with no record left, no streaming task output
+during the run, no elapsed-time updates during quiet periods, and the
+warnings counter stuck at zero because of an ANSI-prefix mismatch.
+
+### What changed
+
+- **`compact/renderer.py::handle_completion`**: moved the final-summary
+  `print()` outside the `if not is_tty` guard and put it AFTER `stop()`.
+  In TTY mode this lands at the cursor position the panel used to occupy,
+  leaving the run outcome as the last visible line; in non-TTY it's the
+  only output Display ever produces (PQ6 still satisfied).
+- **`compact/renderer.py::_emit_event_log`**: new helper called from
+  `update_state` that prints a nom-style log line above the status panel
+  for each significant event (PLAY, TASK headers, ok/changed/fatal/
+  skipping per host). v2_playbook_on_stats stays silent — the panel and
+  the final summary already cover that. Throttling on the panel update
+  means the panel may visibly trail the logs, which matches nom.
+- **`compact/renderer.py::tick`**: new public method that re-renders
+  the status bar without processing an event. Extracted the status-bar
+  computation into `_render_status_bar()` so both `update_state` and
+  `tick` share it. The runner's TIMEOUT branch calls `tick()` via
+  `getattr` so renderers without it (TUI) are silently skipped.
+- **`core/parser.py::_handle_plaintext`**: strip CSI SGR escapes
+  before matching `WARNING_PATTERNS`. Real ansible-playbook prints
+  `\x1b[1;35m[WARNING]:\x1b[0m...` and the `^\[WARNING\]:` anchor
+  never matched through the colour escape. Store the cleaned message
+  so downstream UI doesn't need to re-strip.
+- **`core/parser.py::drain_warnings`**: returns and clears the warnings
+  list in one call, so the runner can forward newly-detected warnings
+  without tracking an index.
+- **`runner.py::_feed`**: after each `feed_line`, drain warnings and
+  forward via `renderer.add_warning(message, is_deprecation)` if the
+  renderer implements it (getattr-guarded).
+
+### Test impact
+
+- Suite: **1594 passed, 0 failed, 6 skipped** (was 1587/0/6).
+- New tests cover: TTY final-summary persistence, log-line emission for
+  every significant event type, `tick()` panel-only refresh, ANSI-
+  prefixed warning classification (with backwards-compat for plain form
+  and a negative case for non-warning ANSI text).
+
+### End-to-end smoke (pipe mode)
+
+```
+$ uv run aom .sisyphus/test-fixtures/simple.yml -i localhost, -c local
+
+PLAY [Simple test playbook] *********...
+TASK [First task] *********...
+ok: [localhost]
+TASK [Second task with tags] *********...
+ok: [localhost]
+TASK [Third task] *********...
+ok: [localhost]
+.sisyphus/test-fixtures/simple.yml │ 1/1 hosts │ ⚠ 1 │ ✱ 1 │ 0:00:00 ●
+```
+
+The `⚠ 1 │ ✱ 1` confirms the warning + deprecation that ansible-core
+2.20 emits at startup are now reaching the panel.
+
+### Still open after these fixes
+
+- **Pre-flight `--list-tasks` / `--list-hosts`** (unchanged — next major
+  slice). The renderer can't show the task tree at startup yet.
+- **`_row_count()` width-aware wrapping**, **SIGWINCH**, **ASCII
+  fallback wiring** (unchanged).
+- **Stderr-only diagnostics** — pexpect.spawn merges stderr into the
+  pty, so warnings come through; but ansible-playbook's syntax-error
+  diagnostics go to stderr in a way that doesn't always reach our
+  parser (the syntax_error.yml smoke shows exit 4 with an empty log).
+  Worth investigating once pre-flight is in.
+- **Renderer Protocol gaps** — `tick`/`add_warning` are getattr-guarded
+  on the runner side. Once the TUI is wired through `runner.run_playbook`
+  (rather than its current `app.run()` path), we should promote both to
+  the Protocol so calls aren't optional.
+- **Visual TTY smoke** — please re-run interactively now that streaming
+  logs + final-summary persistence are in. Should look like nom: logs
+  scrolling, panel anchored, summary survives at the cursor on exit.
+
+## 2026-05-24 Recursive grouped-role traversal
+
+- `RoleGroupDefinition.tasks` and nested `TaskDefinition.children` now
+  share one recursive preflight walk in `core/models.py` + `core/tree.py`,
+  so `_task_def_index`, role labels, and tree emission stay in the same
+  order for grouped roles with include_role/import_role descendants.
+- The sticky play fallback only stops lingering once the active play's
+  nested running task is visible to the tree; recursive traversal makes
+  that nested async-status row count as the active play instead of a stale
+  previous play.
+
+## 2026-05-10 Pre-flight `--list-tasks` / `--list-hosts` (same branch)
+
+The major slice that was open after the TTY UX work — runner now does
+parallel pre-flight before the JSONL spawn so the renderer has plays,
+tasks, and resolved hosts from the very first frame instead of building
+state purely from JSONL events as they arrive. Plan in
+`docs/superpowers/plans/2026-05-10-preflight-listing.md`.
+
+### What changed
+
+- **New `core/preflight.py`** — split by purity per the ABSTRACT rule
+  in CLAUDE.md:
+  - `assemble_definitions(plays=, play_hosts=)` — pure mapping from raw
+    parsed dicts (output of existing `parse_list_tasks_output` /
+    `parse_list_hosts_output`) to `list[PlayDefinition]` with
+    `TaskDefinition` children, applies `group_roles` for 5+-task role
+    collapses, stitches `resolved_hosts` in by `play_number`. No I/O.
+  - `run_preflight(playbook=, ansible_args=, executable=...)` — spawns
+    `ansible-playbook --list-tasks` and `--list-hosts` concurrently in
+    a `ThreadPoolExecutor` (max_workers=2) with a 30s timeout each.
+    Subprocess errors (FileNotFoundError → 127, PermissionError → 126,
+    TimeoutExpired → 124, OSError → 1) become entries in
+    `PreParseResult.errors` rather than exceptions. Whichever
+    subprocess succeeded still contributes its data.
+- **`core/parser.py::PreParseResult`** — extended with two optional
+  fields: `definitions: list[PlayDefinition]` and `errors: list[str]`.
+  Defaults to empty so existing call sites keep working.
+- **`renderer/protocol.py::Renderer`** — new required Protocol method
+  `set_definitions(definitions: list)`. Called once between `start()`
+  and the first `update_state()`. Annotated as `list` (not
+  `list[PlayDefinition]`) to keep the Protocol free of model imports;
+  `runtime_checkable` only verifies presence anyway.
+- **`compact/renderer.py::CompactRenderer`** — new `_definitions: list`
+  attribute and `set_definitions()` method that recomputes the status
+  bar. The host count is now `max(len(host_statuses_from_jsonl),
+  len(union of resolved_hosts))` — preflight seeds the denominator
+  from frame zero, JSONL takes over once events arrive. Same union
+  logic applied to `handle_completion()`.
+- **`tui/app.py::AOMApp.set_definitions`** — no-op for now. The TUI
+  builds its tree from RunState; preflight wiring there is a separate
+  slice once the TUI moves under `runner.run_playbook`.
+- **`runner.py::run_playbook`** — calls `run_preflight()` after
+  `renderer.start()` and before the `pexpect.spawn` block. Pushes
+  `pre_result.definitions` through `renderer.set_definitions` (getattr-
+  guarded) and forwards each `pre_result.errors` entry through
+  `renderer.add_warning(err, False)`.
+
+### Test impact
+
+- Suite: **1611 passed, 0 failed, 6 skipped** (was 1594/0/6, +17 new
+  tests).
+- `tests/unit/test_preflight.py` — 6 tests: PreParseResult shape,
+  empty-input handling, missing host data, role grouping invocation,
+  basic combination from existing fixtures.
+- `tests/integration/test_preflight_runner.py` — 4 tests using a fake
+  Python `ansible-playbook` shim (same trick as `test_runner.py`):
+  parallel-execution success, FileNotFoundError → error entry,
+  --list-hosts failure isolated from --list-tasks success, ansible_args
+  forwarded to both invocations.
+- `tests/compact/test_renderer_set_definitions.py` — 5 tests:
+  storage, hosts_total seeding, pre-start safety, empty-list handling,
+  union across plays.
+- `tests/integration/test_runner.py::TestRunnerPreflight` — 2 tests for
+  the wiring: definitions forwarded to renderer, errors forwarded as
+  warnings.
+
+### End-to-end smoke (pipe mode)
+
+```
+$ uv run aom .sisyphus/test-fixtures/simple.yml -i localhost, -c local
+PLAY [Simple test playbook] *********...
+TASK [First task] *********...
+ok: [localhost]
+TASK [Second task with tags] *********...
+ok: [localhost]
+TASK [Third task] *********...
+ok: [localhost]
+.sisyphus/test-fixtures/simple.yml │ 1/1 hosts │ ⚠ 1 │ ✱ 1 │ 0:00:00 ●
+$ echo $?
+0
+
+$ uv run aom .sisyphus/test-fixtures/syntax_error.yml -i localhost, -c local
+.sisyphus/test-fixtures/syntax_error.yml │ 0/0 hosts │ ⚠ 2 │ 0:00:00 ✖
+$ echo $?
+4
+```
+
+The `⚠ 2` on `syntax_error.yml` is preflight's two failures (one each
+from `--list-tasks` and `--list-hosts`) bubbling up via `add_warning` —
+this is new diagnostic surface that didn't exist before. Closes the
+"empty log on syntax error" gap noted in the previous session's "still
+open" list.
+
+### Still open after this slice
+
+- **Task tree rendering** — preflight now hands the renderer a full
+  `list[PlayDefinition]` with tasks, but the compact renderer only uses
+  it to seed `hosts_total`. Drawing the actual tree (preview before
+  run, progress during run) is a follow-up slice and depends on the
+  width-aware `_row_count()` work since a multi-line panel will hit
+  the wrap-counting bug.
+- **TUI preflight integration** — `AOMApp.set_definitions` is a no-op.
+  Should populate `TaskTree` widget once the TUI moves under
+  `runner.run_playbook`.
+- **Unicode warning escape** — same warning text is now emitted twice
+  in some cases (once from preflight stderr, once from JSONL stderr).
+  Worth deduping if it produces noisy `⚠` counts in the wild.
+- **`include_tasks` dynamic expansion** — TC-094 / TC-095 still
+  unimplemented. Definitions from preflight are static; runtime needs
+  to graft dynamic tasks under their `include_tasks` parent when
+  unknown task UUIDs arrive.
+- **`_row_count()` width-aware wrapping**, **SIGWINCH**, **ASCII
+  fallback wiring** (unchanged).
+
+## 2026-05-10 Pre-flight summary + error visibility (same branch)
+
+Two follow-up polish slices on top of the preflight orchestration:
+
+### What changed (slice 1: startup tree preview)
+
+- **`compact/renderer.py::format_preflight_summary`** — pure formatter
+  that turns the `list[PlayDefinition]` from preflight into a one-shot
+  startup summary, one line per play:
+
+  ```
+  PLAY [Setup web servers] (webservers, 2 hosts, 3 tasks)
+  PLAY [Setup database]    (dbservers, 1 host, 2 tasks)
+  ```
+
+  RoleGroupDefinition entries contribute their inner task count, not
+  1. Pluralisation handled (1 host vs N hosts). Returns None for empty
+  input so the caller can skip the print.
+- **`compact/renderer.py::CompactRenderer.set_definitions`** — calls
+  `_display.print_log()` with the formatted summary so it lands above
+  the status panel in TTY mode and as plain text in pipe mode.
+
+### What changed (slice 2: error visibility + NOCOLOR)
+
+- **`core/preflight.py::_preflight_env`** — sets `ANSIBLE_NOCOLOR=1`
+  in the subprocess environment. ansible-playbook otherwise suppresses
+  stderr entirely when stderr is not a TTY (which is always the case
+  for our captured subprocess), leaving us with empty `(no stderr)`
+  messages for syntax errors. With NOCOLOR set, the actual YAML
+  diagnostic — line, column, source-context lines — comes through.
+- **`compact/renderer.py::CompactRenderer.print_log`** — thin
+  pass-through to `Display.print_log()`. Lets the runner surface
+  important messages above the panel without going through the
+  warning-counter aggregation.
+- **`runner.py::run_playbook`** — preflight errors now have two
+  surfaces: full message via `renderer.print_log()` (so the user can
+  actually read the YAML diagnostic), and counter bump via
+  `add_warning()` (so the panel reflects the failure). Identical
+  error bodies from `--list-tasks` and `--list-hosts` are deduped
+  for the print path; the counter still bumps for both since both
+  subprocesses really did fail.
+
+### Test impact
+
+- Suite: **1622 passed, 0 failed, 6 skipped** (was 1611/0/6, +11 new
+  tests).
+- `tests/compact/test_preflight_summary.py` — 6 tests: empty input,
+  single play, multi-play, pluralisation, role-group task counting,
+  no-resolved-hosts fallback.
+- `tests/compact/test_renderer_set_definitions.py` — 2 added tests
+  for the print-log behaviour.
+- `tests/integration/test_preflight_runner.py` — 1 added test
+  asserting `ANSIBLE_NOCOLOR=1` is set in subprocess env.
+- `tests/integration/test_runner.py::TestRunnerPreflight` — 2 added
+  tests: `print_log` called for preflight errors, dedup on identical
+  bodies vs distinct bodies.
+
+### End-to-end smoke (pipe mode)
+
+```
+$ uv run aom .sisyphus/test-fixtures/simple.yml -i localhost, -c local
+PLAY [Simple test playbook] (localhost, 1 host, 3 tasks)
+
+PLAY [Simple test playbook] *********...
+TASK [First task] *********...
+ok: [localhost]
+TASK [Second task with tags] *********...
+ok: [localhost]
+TASK [Third task] *********...
+ok: [localhost]
+.sisyphus/test-fixtures/simple.yml │ 1/1 hosts │ ⚠ 1 │ ✱ 1 │ 0:00:00 ●
+
+$ uv run aom .sisyphus/test-fixtures/syntax_error.yml -i localhost, -c local
+--list-tasks failed (exit 4): [ERROR]: YAML parsing failed: While scanning a simple key could not find expected ':'.
+Origin: /Users/felix/Coding/ansible-aom/.sisyphus/test-fixtures/syntax_error.yml:10:12
+
+ 8     - name: Broken task
+ 9       debug
+10         msg: "bad syntax - missing colon"
+              ^ column 12
+.sisyphus/test-fixtures/syntax_error.yml │ 0/0 hosts │ ⚠ 2 │ 0:00:00 ✖
+$ echo $?
+4
+```
+
+The syntax_error case used to be empty-log + exit 4 — now shows the
+full ansible diagnostic above the panel, deduped to one print, with
+the counter still showing `⚠ 2` since both preflight subprocesses
+genuinely failed.
+
+### Quirk noted: `ANSIBLE_NOCOLOR` vs `ANSIBLE_FORCE_COLOR`
+
+ansible-playbook's TTY-detection-driven output has three modes:
+- TTY stderr → coloured output
+- non-TTY stderr (default) → suppressed entirely
+- non-TTY stderr + `ANSIBLE_NOCOLOR=1` → plain output
+- non-TTY stderr + `ANSIBLE_FORCE_COLOR=1` → coloured output
+
+We use NOCOLOR rather than FORCE_COLOR + strip — saves us an ANSI-strip
+pass and there's no benefit to colouring output we're going to wrap in
+our own format string anyway.
+
+### Still open after this slice
+
+- **Task progress in status bar** — currently `X/Y hosts` only. Adding
+  `task: M/N` would use preflight's static count, but include_tasks
+  inflates the dynamic count. Probably wants a "tasks done" tally
+  rather than a fraction.
+- **TUI preflight integration**, **`include_tasks` dynamic
+  expansion**, **width-aware row count**, **SIGWINCH**, **ASCII
+  fallback** — all unchanged from before.
+- **Renderer Protocol cleanup** — `print_log` joins `tick`/`add_warning`
+  as getattr-guarded on the runner side. All four (incl. preflight's
+  `set_definitions`) want to be required Protocol methods once the TUI
+  is wired through `runner.run_playbook`, so no more stringly-typed
+  attribute lookups.
+
+## 2026-05-10 TTY rewind bug + UX polish (same branch)
+
+User reported: "terminal clearing may also affect the currently/last
+displayed command line that started aom" (interactive fish smoke).
+True bug, plus three UX polish items in the same session.
+
+### Bug fix: status rewind erased the command line above
+
+`Display._rewind_status()` returned `CSI N F` for an N-row status, where
+`F` is "cursor previous line" — it moves UP N lines and to col 1. After
+writing an N-row status with no trailing newline, the cursor is on the
+LAST row of the block; to get back to the FIRST row needs N-1 lines up.
+For N=1 it needs no vertical movement at all, just `\r`.
+
+The old code over-rewound by one line. With the typical 1-row status
+the rewind landed on the user's shell command line; the subsequent
+`CSI J` (clear-to-EOS) wiped it. Every redraw repeated the damage.
+
+Fix in `compact/display.py::_rewind_status`:
+- N = 0: return `""` (unchanged — nothing drawn yet)
+- N = 1: return `"\r"` (cursor already on the right row)
+- N > 1: return `CSI (N-1) F`
+
+Tests in `tests/compact/test_display_ansi.py::TestRewindCorrectness`
+pin three cases: 1-row uses `\r`, multi-row uses `CSI (N-1) F`, the
+print_log-after-update flow never emits `CSI 1 F` (the bug signature).
+
+### UX polish 1: per-host summary on completion
+
+`format_host_summary()` had been sitting in `compact/renderer.py` with
+its own unit tests but no caller. Now `handle_completion` aggregates
+per-host status counts across every task in every play and prints
+one indented line per host underneath the aggregate status:
+
+```
+.sisyphus/test-fixtures/simple.yml │ 1/1 hosts │ ⚠ 1 │ ✱ 1 │ 0:00:00 ●
+  localhost: ● 3 ok
+```
+
+With one host this barely differs from the aggregate; with N hosts
+it's the only way to see who succeeded vs who failed at a glance.
+Empty-state-safe — preflight-only-failure runs don't get a stray
+hosts block.
+
+### UX polish 2: warnings now visible, not just counted
+
+`⚠ 1` on the panel was opaque — the user had no way to know whether
+the warning was a benign deprecation notice or something they should
+act on. `CompactRenderer.add_warning` now prints each unique warning
+message via `Display.print_log` AND bumps the counter (as before).
+
+Repeated identical messages (e.g. the same deprecation firing
+per-host on a many-host run) print once but each still contributes
+to the counter — `_seen_warning_messages: set[str]` tracks the
+prints. The parser keeps the raw `[WARNING]: ...` /
+`[DEPRECATION WARNING]: ...` prefix on the message, so we print
+as-is when the message already starts with `[`, and add our own
+`[WARNING]` / `[DEPRECATION]` prefix only when it's absent.
+
+### Test impact
+
+- Suite: **1633 passed, 0 failed, 6 skipped** (was 1622/0/6, +11 new
+  tests this session).
+- `tests/compact/test_display_ansi.py` — 3 new tests for rewind
+  correctness.
+- `tests/compact/test_completion_summary.py` — 3 new tests covering
+  per-host breakdown, indent, empty-state safety.
+- `tests/compact/test_warning_visibility.py` — 5 new tests covering
+  print-with-message, prefix classification, counter still bumps,
+  dedupe of repeats, distinct messages each print.
+
+### End-to-end smoke (pipe mode)
+
+```
+$ uv run aom .sisyphus/test-fixtures/simple.yml -i localhost, -c local
+PLAY [Simple test playbook] (localhost, 1 host, 3 tasks)
+[WARNING]: Deprecation warnings can be disabled by setting `deprecation_warnings=False` in ansible.cfg.
+[DEPRECATION WARNING]: Importing 'to_text' from 'ansible.module_utils._text' is deprecated. ...
+
+PLAY [Simple test playbook] *********...
+TASK [First task] *********...
+ok: [localhost]
+TASK [Second task with tags] *********...
+ok: [localhost]
+TASK [Third task] *********...
+ok: [localhost]
+.sisyphus/test-fixtures/simple.yml │ 1/1 hosts │ ⚠ 1 │ ✱ 1 │ 0:00:00 ●
+  localhost: ● 3 ok
+```
+
+### Feature roadmap (open question for next session)
+
+User asked: "what other features would be useful? how can we make
+usage as easy and simple as possible, with sane defaults?"
+
+Ranked rough notes; pick which are worth a slice:
+
+**Smaller / quick wins:**
+1. **Promote getattr-guarded methods to required Protocol** —
+   `print_log`, `add_warning`, `tick`, `set_definitions` are all on
+   CompactRenderer; AOMApp can implement no-op or sensible. Removes
+   the stringly-typed lookups in `runner.py`.
+2. **Auto-detect `./inventory.ini`** — if no `-i` flag and the file
+   exists in cwd, default to it. ansible.cfg-driven users won't be
+   affected because they have an explicit setting.
+3. **`--check` / `--diff` first-class flags** — currently passable as
+   REMAINDER args. Promoting to first-class lets aom remember and
+   replay them.
+4. **Better `aom` (no-args) output** — current help is verbose;
+   could lead with a single Usage line.
+
+**Medium / feature-shaped:**
+5. **Task progress in status bar** — `tasks: M/N` uses preflight's
+   static count for N. Caveat: include_tasks inflates the dynamic
+   count past N. Could show "tasks: M" without denominator, or use
+   "tasks: M of ~N" to signal the soft estimate.
+6. **Verbose passthrough** — repeated `-v` (`-vvv`) maps to
+   ansible-playbook's verbosity. Mildly tricky because aom's own `-v`
+   currently means "diagnostics-on", not passthrough.
+7. **Recap-style failure summary** — when something failed, list the
+   failed task name + host + first message line at the bottom, above
+   the per-host summary. Right now the user has to scroll up through
+   the log to find the fatal line.
+8. **Tag preview** — preflight summary could include "tags: [foo, bar]"
+   per play, so the user can sanity-check before passing `--tags`.
+
+**Large / blocked:**
+9. **TUI end-to-end** — currently broken. AOMApp uses `app.run()` for
+   its own event loop; runner calls `update_state()` from a different
+   loop. Needs `call_from_thread` plumbing or a different model where
+   the runner drives Textual's loop.
+10. **`aom inspect` subcommands** — list/show/diff/prune are stubs.
+    Spec describes session artifacts in `.aom/` but the writer isn't
+    wired in.
+11. **`include_tasks` dynamic expansion** — TC-094/TC-095. Need to
+    graft TaskDefinition(is_dynamic=True, task_order=-1) under the
+    parent include_tasks node when unknown task UUIDs appear.
+12. **SIGWINCH + width-aware `_row_count()`** — robustness for tall
+    panels with wrapping, terminal resize. Currently theoretical.
+13. **ASCII fallback** — `core/icons.STATUS_ICONS_ASCII` exists; the
+    renderer hard-codes Unicode. Need a `supports_unicode()` detector
+    + parameter threading.
+14. **Session recording** — write `.aom/<session_id>/` with raw JSONL,
+    state snapshot, diagnostics. Enables `aom inspect`.
+
+---
+
+## 2026-05-10 (later) — Argparse-wall trim, recap-style summary, inventory auto-detect
+
+User reported (verbatim):
+> `uv run aom .sisyphus/test-fixtures/simple.yml -i localhost -c local
+> .sisyphus/test-fixtures/simple.yml`
+> ... `ansible-playbook: error: unrecognized arguments: ...` followed
+> by ~200 lines of `--help` text dumped twice into the panel.
+
+Three slices delivered, all TDD, all green (1656 passing, 6 skipped).
+
+### 1. Trim argparse help wall from preflight stderr
+`core/preflight._trim_stderr()` extracts only lines matching
+`^[\w.-]+:\s*error:\s*.+` from stderr; falls back to the first 5
+non-empty lines when no marker is present. Drops the redundant
+`print_log` path in `runner.py` — `add_warning` already prints + bumps
+counter, so the two-surface dance produced doubled output.
+
+Net effect on the user's command above: from ~200 lines of help text
+to two clean lines:
+```
+[WARNING] --list-tasks failed (exit 2): ansible-playbook: error: unrecognized arguments: ...
+[WARNING] --list-hosts failed (exit 2): ansible-playbook: error: unrecognized arguments: ...
+```
+
+Tests: `test_preflight.py` (5 new `_trim_stderr` cases) +
+`test_preflight_runner.py` (1 new integration). Two old runner
+tests pinning `print_log`-side dedupe deleted; replaced by single
+`test_run_playbook_forwards_every_preflight_error_to_add_warning`.
+
+### 2. Failure recap on completion
+New `format_failure_recap(state)` in `compact/renderer.py` returns one
+line per (host, task) pair that ended FAILED or UNREACHABLE.
+`handle_completion` calls it after the per-host summary block, gated on
+`exit_code != 0`. Visual: indented under the status line, mirrors
+the per-host summary's two-space indent.
+
+Roadmap item #7 from yesterday — checked off.
+
+### 3. Inventory auto-detect (CLI)
+`cli.detect_default_inventory()` walks a preference-ordered tuple of
+conventional names (`inventory.ini` → `.yml`/.yaml → `inventory` →
+`hosts.ini` → `hosts.yml`/.yaml → `hosts`). `ensure_inventory_arg()`
+prepends `-i <path>` to ansible_args iff none of `-i`,
+`--inventory`, `--inventory-file`, `--inventory=...` is present AND a
+candidate file exists in CWD.
+
+Roadmap item #2 — checked off.
+
+### What's still open
+
+Quick wins remaining:
+- (#1) Promote optional Protocol methods (`print_log`, `add_warning`,
+  `tick`, `set_definitions`) to required. Now that all CompactRenderer
+  call sites use them, AOMApp just needs no-op stubs.
+- (#3) `--check`/`--diff` first-class flags
+- (#4) Better empty-aom output
+
+Feature-shaped:
+- (#5) Task progress in status bar — use preflight task count as denom
+- (#6) Verbose passthrough — `-v` collision needs renaming
+- (#8) Tag preview in preflight summary
+
+Larger / blocked: 9-14 unchanged from yesterday.
+
+### One quirk noted (not fixed)
+
+`runner.py:117` is `except pexpect.exceptions.ExceptionPexpect, FileNotFoundError, OSError:`
+— Python 3.14 happily parses this as `except (A, B, C):` (tuple
+expression as the test). It's valid 3.x; not a bug; just unusual.
+
+---
+
+## 2026-05-10 (third pass) — Protocol promotion, kwargs cleanup, duplicate-playbook detection
+
+User asked: "continue roadmap. simplify code & usage where possible."
+
+Three more slices delivered (1661 passing, 6 skipped).
+
+### 1. Promote optional Protocol methods to required (#1)
+`print_log`, `add_warning`, `tick` were getattr-guarded throughout
+`runner.py`. Adding no-op stubs to AOMApp lets us drop all four
+guards (the fourth being `set_definitions`, which was already on the
+Protocol but still guarded). Net: 4 `getattr(...)` lookups gone, the
+Protocol is now an honest contract, and the runner reads top-down
+without lookup-then-call dances.
+
+### 2. Drop **kwargs from CompactRenderer + factory
+`CompactRenderer.__init__(**kwargs)` only ever read `is_tty`. The
+factory blindly forwarded kwargs, which would have crashed for
+TUI mode if anything other than `is_tty` was passed. Replaced with
+explicit `is_tty: bool = True` parameters on both. The
+`test_factory_passes_kwargs_to_renderer` test was renamed to
+`test_factory_forwards_is_tty_to_compact_renderer` and tightened
+to assert the actual contract (Display.is_tty matches the request).
+
+### 3. Detect duplicate playbook positional (#3 from yesterday's roadmap, repurposed)
+Direct response to the user's reproducer (`aom site.yml ... site.yml`).
+`detect_duplicate_playbook(playbook, ansible_args)` checks if the
+positional appears (path-normalised) anywhere in ansible_args. Main
+exits 2 with a one-line message before touching pexpect. The
+trim-stderr work from earlier still catches the case where the user's
+typo is something other than an exact path repeat.
+
+Bonus tidy: dropped a redundant local `import os` from the verbose
+branch in `cli.py` (`os` is now imported at module scope for
+`detect_default_inventory`).
+
+### Remaining roadmap
+
+Quick wins:
+- (#4) Better empty-aom output — minor; argparse help is fine
+- (#3-original) `--check` / `--diff` first-class flags — works already
+  via REMAINDER; first-class makes them tab-completable and visible
+  in `--help` but is not strictly a simplification
+
+Feature-shaped: 5, 6, 8 unchanged.
+
+Larger / blocked: 9-14 unchanged.
+
+### Quirks noted but not addressed
+
+- `runner.py:95` `except A, B, C:` — Python 3.x parses this as
+  `except (A, B, C):` (tuple expression as the except test). Valid,
+  unusual, would normally write with parens. Same shape exists at
+  `core/models.py:132`.
+
+---
+
+## 2026-05-10 — CLI cleanups + task progress segment
+
+### 1. Drop dead `--changes-only` top-level flag
+`args.changes_only` was parsed but never read in `main()` or the
+runner. The useful instance lives on `aom inspect diff`. Removed the
+parser arg + the two pinning unit tests.
+
+### 2. Wire `aom inspect …` to the real implementation
+The top-level CLI had a parallel stub parser (`create_inspect_parser`)
+and `handle_inspect` that printed misleading lines like "Listing
+sessions..." while a real implementation in
+`src/ansible_aom/inspect/cli.py` already covers list / show / diff /
+prune end-to-end. Refactored `inspect.cli.main` to accept an explicit
+`argv: list[str] | None` so the dispatcher can pass `sys.argv[2:]`
+(stripping the `inspect` token before the inspect parser sees it).
+
+Replaced the stub-pinning `TestInspectSubcommand` parser tests (11
+cases) with four dispatch tests that mock `inspect.cli.main` and
+assert (a) the forwarded argv slice and (b) propagated exit code.
+Real subcommand behaviour is already covered by
+`tests/integration/test_inspect.py`. Deleted the
+`TestInspectTUIMode` block — those four tests pinned fictional stub
+behaviour that returned 0 for `aom inspect --tui`.
+
+### 3. Drop dead `--version` arg + `NotImplementedError` catch
+`main()` short-circuits on `--version in sys.argv` before parse_args
+runs, so the parser-level `--version` arg and the `if args.version`
+block were unreachable. Also removed `except NotImplementedError`
+from the runner-call try-block — nothing in src/ raises it any more
+(runner and AOMApp are both fully implemented), and the catch-all
+`except Exception` already returns the same exit code 1.
+
+### 4. Task progress segment in the status bar (roadmap #5)
+Status bar now reads
+`site.yml │ 3/10 hosts │ 5/47 tasks │ 0:01:23` whenever preflight
+gives us a static task count. Without this segment, on a 50-task
+playbook the user can't tell if they're 10% or 90% through the run.
+
+Two pure helpers in `compact/renderer.py`:
+- `count_total_tasks(definitions)` sums leaf TaskDefinitions across
+  plays, expanding `RoleGroupDefinition` entries to their inner tasks.
+- `count_completed_tasks(state)` counts task entries whose status is
+  in `{OK, CHANGED, FAILED, SKIPPED, UNREACHABLE, COMPLETED}`. RUNNING
+  is explicitly excluded — a task is in flight until every host has a
+  terminal result.
+
+`format_status_bar` gains optional `tasks_completed`/`tasks_total`
+params. The segment is omitted entirely when `tasks_total == 0`, so
+playbooks with only `include_tasks` (no static count) and existing
+five-arg callers keep their current output. Wired into both the live
+`_render_status_bar` (event + tick) and the final
+`handle_completion` frame.
+
+### 5. Tag preview + task-count fix (roadmap #8 + adjacent bug)
+
+**Tag preview.** `format_preflight_summary` now appends `Tags: a, b, c`
+when preflight `--list-tasks` produces any tags. Helper
+`collect_tags(definitions)` returns the sorted unique set, expanding
+`RoleGroupDefinition` entries so tags from inside roles surface. Line
+suppressed when no task carries a tag (e.g. plain "always" defaults).
+
+**Task-count fix surfaced by the live test of #8.** The previous
+`count_completed_tasks` matched `TaskRunState.status` against terminal
+values, but the state machine never moves task.status past
+PENDING/RUNNING — only `task.hosts` gets populated, by the
+`v2_runner_on_*` handlers. Result: `0/3 tasks` on a 3-task success
+run. Switched to "task has at least one host result"; monotonic and
+ansible-faithful for linear strategy. The dead `_TASK_DONE_STATUSES`
+frozenset got removed with the change. Updated tests to use realistic
+state shape (host entries instead of fictional task.status
+transitions).
+
+### 6. ASCII fallback for non-UTF8 terminals (roadmap #13)
+
+`STATUS_ICONS_ASCII` already lived in `core/icons.py` (with TC-377
+unit tests) but was never reachable from the renderer; on `LANG=C`
+consoles `│ ⚠ ✱ ● ◆ ✖` rendered as `?` / mojibake. Added
+`is_unicode_terminal()` (returns False unless `sys.stdout.encoding`
+contains "utf"), `ascii_mode: bool = False` on `format_status_bar`
+and `format_host_summary`, plus a per-instance `_ascii_mode`
+auto-detected in `CompactRenderer.__init__`. ASCII mode swaps
+separator → `|`, warning → `!`, deprecation → `*`, status icons →
+`STATUS_ICONS_ASCII`, completion glyphs → `* / X`. Threaded through
+every status-bar render + the final indicator + the per-host summary.
+Smoke-tested with `PYTHONIOENCODING=ascii`.
+
+### 7. Width-aware row count + SIGWINCH self-heal (roadmap #12)
+
+`_row_count` was newline-only — a status bar that wrapped at the
+right margin counted as 1 row but rendered as 2+, so subsequent
+rewinds left stale half-bars on screen. Fixed:
+
+- `_row_count(text, width)` sums `ceil(len(line) / width)` per logical
+  line. Trailing `"\n"` no longer counts (the cursor sits at start of
+  the next row but nothing renders there).
+- New `_terminal_width()` calls `shutil.get_terminal_size()` on every
+  render. The kernel keeps TIOCGWINSZ current per SIGWINCH, so resize
+  is picked up on the next `update()` / `print_log()` without an
+  explicit signal handler.
+- 12 unit tests for the row count math + 1 integration test pinning
+  that `Display.update` records the wrapped count from the live
+  terminal width (monkeypatched to 20 cols).
+
+Approximation kept: `len()` undercounts East Asian wide chars (emoji,
+CJK). Documented in the docstring; safe at every current call site
+(status bar content is BMP punctuation + ASCII).
+
+### 8. Drop -v alias for ansible passthrough (roadmap #6)
+
+AOM's `--verbose` previously had a `-v` short alias that shadowed
+ansible-playbook's own `-v` / `-vv` / `-vvv` verbosity ramp. `aom
+site.yml -v` activated AOM debug instead of ansible verbosity.
+
+Dropped the `-v` alias. `--verbose` (long form only) stays for AOM
+diagnostics. Bare `-v` after the playbook now flows through REMAINDER
+to ansible-playbook unchanged. Help epilog updated to document the
+convention. Single test rewritten from "verbose accepts -v" to "-v
+after the playbook leaves args.verbose False and lands in
+ansible_args".
+
+### Remaining roadmap
+
+Larger / blocked: 9 (TUI end-to-end), 11 (include_tasks dynamic
+expansion), 14 (session recording).
+
+---
+
+## 2026-05-11 — include_tasks dynamic expansion (roadmap #11)
+
+TC-094 / TC-095 from TEST_SPECIFICATION.md, Section 5.2 in
+SPECIFICATION.md. Picked because it's the most contained of the three
+remaining roadmap items (#9 TUI needs cross-loop plumbing, #14 needs
+the `.aom/` writer wired in; this one is pure state-machine logic).
+
+### What landed
+
+`RunState` now grafts dynamic `TaskDefinition` nodes onto preflight
+`definitions` when a `v2_playbook_on_task_start` or `v2_runner_on_start`
+event arrives for a task name that doesn't match any preflight leaf:
+
+- New private method `RunState._graft_or_match_task(task_id, task_name)`.
+  Called from both task-start handlers (linear and free strategy).
+- Match algorithm: iterate every leaf `TaskDefinition` across all plays
+  (unwrapping `RoleGroupDefinition` for visibility), compare by name.
+  Hit → save as `_last_matched_task_def`; miss → graft as child of
+  whichever node is currently saved as the parent cursor.
+- Dynamic children inherit `play_id`, `play_order`, `role` from the
+  parent; `task_order=-1`, `is_dynamic=True`, fresh empty `tags`.
+- `_grafted_uuids: set[str]` deduplicates: a UUID arriving twice (e.g.
+  `task_start` then a later `runner_on_start` for the same task) only
+  grafts once.
+- Orphan unknown tasks (no preflight match yet) are dropped silently —
+  no spurious grafts onto an arbitrary node.
+
+Helper `_iter_leaf_task_defs(plays)` extracted at module scope as the
+pure piece. Could move to a dedicated `core/matching.py` if matching
+grows more cases (path, sequential-name fallback per TC-092/TC-093);
+single function in `models.py` is fine for now.
+
+### Tests
+
+`tests/unit/test_dynamic_expansion.py` — 8 cases, all green:
+1. Single unknown task grafted as child of last matched parent (TC-095)
+2. Dynamic task inherits play_id / play_order from parent
+3. Multiple unknown tasks accumulate under same parent (TC-094)
+4. Repeated UUID across task_start + runner_on_start doesn't duplicate
+5. Static-task arrival between dynamics resets the parent cursor
+6. Orphan unknown task before any match is dropped, no crash
+7. Grafting works through `v2_runner_on_start` (free strategy)
+8. No definitions at all → handler still safe, doesn't crash
+
+Full suite: 1691 passed, 6 skipped (no regressions; same skip count).
+
+### Open caveats
+
+- Name-collision tolerance: matching is "first leaf with that name
+  across all plays". Two static tasks with identical names in different
+  plays would set the cursor to whichever is iterated first. Live
+  ansible event order means this rarely matters in practice; if it
+  bites, add play-scoping (match within current play first).
+- The renderer doesn't yet *display* dynamic children differently —
+  preflight summary still shows the static task count. That's fine for
+  the spec ("dynamic include_tasks are not counted" — `count_total_tasks`
+  already only walks the top-level `tasks` list, not `children`).
+
+### Remaining roadmap
+
+Larger / blocked: 9 (TUI end-to-end), 14 (session recording).
+
+---
+
+## 2026-05-11 (later) — Session recording wired into runner (roadmap #14)
+
+The `SessionManager` in `core/session.py` and the `aom inspect` read
+side both existed in full; the missing piece was the runner ever
+*writing* anything. With this slice, every `run_playbook` invocation
+produces a session directory that `aom inspect list` / `show` can
+immediately replay.
+
+### Design
+
+`run_playbook` now takes an optional `session_dir: Path | None`
+defaulting to `~/.local/state/aom/sessions/` (matching the inspect-side
+default in `inspect/cli.py`). Inside, a private `_SessionSink` class
+wraps a `SessionManager`:
+
+- Constructor tries `start_session()`; OSError logs at DEBUG and
+  leaves the sink in a no-op state. Recording is observability, not
+  control flow — disk problems must never abort a real ansible run.
+- `record_event(event)` mirrors every parsed JSONL event before it
+  reaches the renderer (placed in `_feed()` between `feed_line` and
+  `renderer.update_state`, so the on-disk order matches what the
+  renderer actually saw).
+- `record_stderr(line)` captures plaintext warnings drained from the
+  parser plus the preflight error lines.
+- `end(status)` writes the final `status` / `end_time` / `duration`
+  into meta.json. Called on every exit path: clean exit, non-zero
+  exit (`failed`), exec-missing (`crashed`), and KeyboardInterrupt
+  (`crashed`).
+
+The sink is threaded through `_drive`, `_flush_pending`, and `_feed`.
+mypy caught one missed callsite (the EOF-during-expect branch in
+`_drive` was passing 3 args instead of 4) — fixed before commit.
+
+### Tests
+
+`tests/integration/test_runner_session_recording.py`, 6 cases, all
+green:
+1. Run creates `events.jsonl`, `meta.json`, `stderr.log` under
+   session_dir.
+2. Every JSONL event seen by the renderer also lands in `events.jsonl`.
+3. meta.json status = `completed` on exit 0.
+4. meta.json status = `failed` on non-zero exit.
+5. Unwritable `session_dir` (point it at a file): run still succeeds,
+   renderer.handle_completion still fires.
+6. Default state dir (`~/.local/state/aom/sessions/`) gets a session
+   when no override is passed — patched `Path.home()` to a tmp_path.
+
+Full suite: 1697 passed, 6 skipped (up from 1691; +6 = the new file).
+
+### Quirks / open items
+
+- The pre-existing `runner.py:95` `except A, B, C:` (tuple-expression
+  except) still parses fine on 3.x but is unusual. Untouched in this
+  slice.
+- `mypy` still reports the pre-existing "Returning Any from str
+  function" warning in models.py and the pexpect stubs-missing note in
+  runner.py. Neither is new.
+- `inspect/cli.py` defaults `--state-dir` to the same path the runner
+  now writes to, so `aom inspect list` works end-to-end after the
+  first recorded run with no extra wiring. We don't yet have a
+  `--no-record` opt-out — could add if disk usage becomes a concern.
+- `SessionManager.create_artifact()` is wired in core but not called
+  by the runner; the inspect-side reads from the live `events.jsonl`
+  directly, so the `.aom` artifact file is decorative for now.
+  Promotable to a post-run consolidation step if/when the cleanup
+  policy moves toward purging session dirs.
+
+### Remaining roadmap
+
+Larger / blocked: 9 (TUI end-to-end). That's the last one and the
+hardest — AOMApp's `app.run()` event loop versus the runner's pexpect
+loop need either `call_from_thread` plumbing or a model where the
+runner drives Textual's loop instead of owning its own.
+
+---
+
+## 2026-05-11 (third pass) — TUI end-to-end wiring (roadmap #9)
+
+The architectural collision that blocked this: `cli.py` was calling
+`run_playbook(playbook, args, aom_app)`, which runs a pexpect loop
+synchronously. Textual's own `app.run()` was never invoked, so the
+TUI rendered nothing. The fix flips ownership: in TUI mode, Textual
+drives, and pexpect runs in a Textual worker.
+
+### What landed
+
+`AOMApp` now accepts `playbook`, `ansible_args`, and an optional
+`session_dir` in its constructor; the no-arg form keeps working so
+the protocol smoke tests (and the pre-existing
+`tests/compact/test_password.py::TestTUIModePasswordModal` suite)
+don't break. The app owns a `RunState` and exposes read-only
+properties for every piece of state widgets need:
+
+- `run_state` (mutated by `update_state` → `state.handle_event`)
+- `exit_code`, `final_state` (set by `handle_completion`)
+- `warnings_count`, `deprecations_count`, `log_lines`
+
+`on_mount()` pushes `MainScreen` and — when constructed with a
+playbook — kicks off `run_worker(self._run_playbook_worker,
+thread=True, exclusive=True)`. The worker calls `run_playbook(self...
+self)`, which drives the existing pexpect loop and hits the
+Renderer-Protocol callbacks on `self`. Mutations to plain Python
+state (`_run_state`, counters, log lines) are intentionally direct;
+any visible widget refresh that depends on them is the widget's
+responsibility to schedule via `call_from_thread`.
+
+Two behavioural changes worth noting:
+
+1. **`stop()` is now a no-op.** The legacy `self.exit()` here tore
+   the UI down the instant the runner returned, leaving the user
+   staring at a blank terminal. Now Textual's loop keeps spinning;
+   the user quits with `q` (which is already wired via
+   `action_quit`).
+2. **`handle_completion` only records state.** It never exits the
+   app, for the same reason.
+
+### CLI wiring
+
+`cli.py` now branches on `args.tui` before touching renderers:
+
+- `_run_compact(playbook, args)` — the old synchronous path,
+  unchanged in behaviour.
+- `_run_tui(playbook, args)` — constructs `AOMApp(playbook=...,
+  ansible_args=...)` and calls `app.run()`. After the loop returns
+  (user quit, or completion + manual q), `app.exit_code` becomes the
+  process exit code; `None` (user quit mid-run) → 1.
+
+The KeyboardInterrupt + generic-Exception guards from the old code
+are still there, just split across the two helpers.
+
+### Tests
+
+`tests/tui/test_app_end_to_end.py` (9 cases):
+1. Construction with playbook+args (and the no-arg default still
+   works).
+2. `start()` resets a fresh `RunState`.
+3. `update_state` mutates `run_state.plays`.
+4. `handle_completion` stores `exit_code` + `final_state`.
+5. `set_definitions` lands on `run_state.definitions`.
+6. `add_warning` bumps the right counter (warning vs deprecation).
+7. `print_log` appends to `log_lines` in order.
+8. **Pilot-driven worker test:** `app.run_test()` actually mounts
+   the app, patches `run_playbook` to a recording stub, and asserts
+   the worker fires with `renderer is app`, the right playbook
+   path, args, and `session_dir`, and that completion lands.
+
+`tests/unit/test_cli_tui_launch.py` (4 cases):
+1. `aom --tui site.yml` calls `app.run()`, never the legacy
+   `run_playbook`.
+2. `app.exit_code` propagates as the process exit code.
+3. `exit_code=None` (user quit) → cli returns 1.
+4. Compact mode still calls `run_playbook` + `create_renderer` —
+   no regression.
+
+Full suite: 1710 passed, 6 skipped (up from 1697 — exactly the 13
+new tests).
+
+### Open caveats
+
+- Widgets don't yet **react** to state mutations. The plumbing is
+  there (state is owned by the app, the worker can mutate it
+  safely), but `MainScreen.update_from_state()` is only called from
+  the existing inert paths. A follow-up should wire reactive
+  attributes or periodic refreshes via `app.set_interval(...)` so
+  the panels actually update during a run. That's UI work, not loop
+  architecture, so it can land as its own slice once someone runs
+  the TUI for real and decides what should pulse.
+- `handle_password_prompt` still uses `with self.suspend(): getpass...`
+  — that's the same surface
+  `tests/compact/test_password.py::TestTUIModePasswordModal` covers,
+  and it works correctly from the worker thread because `suspend()`
+  is already designed to be reentrant from foreign threads.
+- The `runner.py:95` tuple-expression `except` still parses fine
+  but reads unusually. Untouched.
+
+### Roadmap complete
+
+All 14 items shipped. The remaining `.sisyphus/notepads/` items
+(TC-094/095/096 dynamic-task ordering tests, session-recording
+cleanup policy review) are tidy-up work, not blocking features.
+
+## 2026-05 Host Status Display Overhaul
+
+### Skipped status added to host overview
+
+`format_host_rows`, `format_host_summary`, and `_format_count_cells` now
+include a `skipped` parameter. The host table shows a conditional `skipped`
+column (hidden when no host has skipped tasks, mirroring `unreachable`).
+
+### Per-host summary lines removed from completion
+
+The `_format_per_host_lines` method was removed. On completion, the
+column-aligned host table (`format_host_rows`) now always prints (both
+success and failure). The per-host summary lines (`hostname: ● N ok ◆ M
+changed ○ K skipped`) were pure duplication with the host table.
+
+On failure/cancel: tree + host table + status bar + failure recap.
+On success: host table + status bar (no tree — stale running spinners
+would be misleading).
+
+### Linear strategy completion marking
+
+Under linear strategy, `v2_playbook_on_task_start` now marks any
+previously-running task in the same play as COMPLETED. This prevents
+stale "running" entries from lingering until `v2_playbook_on_stats`.
+
+### All hosts appear as tree leaves
+
+Under a running task, ALL hosts now appear as leaves (not just RUNNING).
+Completed hosts show ● (OK), skipped hosts show ○, etc. Only
+RUNNING hosts were shown before, which meant completed hosts vanished
+from the tree mid-playbook.
+
+### Role task count augmentation + prefix extraction
+
+`_emit_runtime_play` now counts runtime tasks per role that weren't in
+preflight (include_role tasks). `_task_role` extracts role from
+`"role : task"` prefix when the role name is in `_known_roles` (built
+from both preflight definitions and runtime task names). This makes
+dynamic roles like `podman` show correct "(N tasks)" counts.
+
+## 2026-05-23 — Tree rendering fix pass (branch: feat/nom-compact-renderer)
+
+Four tree rendering bugs found in interactive multi-play smoke testing.
+All four interact: a play's host leaves vanish when the next play starts,
+stale `□ pending` tasks from a completed play linger in the tree, the
+elapsed timer for fallback host leaves is stuck at `0s`, and hosts like
+`localhost` show up in playbooks they were never targeted by.
+
+### 1. Host leaves missing during execution (tree budget starvation)
+
+On a 24-row terminal with 17 hosts, the tree panel needed 20+ lines
+(one per host leaf + task header + role header) but the budget formula
+gave it only 17. Host leaves were truncated from the bottom.
+
+**Fix**: Raised `_compute_tree_budget` cap from 40 to 60
+(`src/ansible_aom/compact/format.py:320`). Formula is now
+`max(8, min(60, rows // 2 + active_hosts // 3))`. The 40 cap was
+arbitrary — 60 covers up to ~35 host leaves on a standard 24-row
+terminal without excessive budget waste.
+
+### 2. Stale `□ pending` tasks from completed plays
+
+When play 1 completed and play 2 started running, `_play_running_and_pending`
+in `_emit_runtime_play` only searched the *current* play's runtime tasks.
+If play 1 had handler tasks (like `meta: flush_handlers`) whose
+`runtime.tasks` lived under play 1's UUID, they showed as `□ pending`
+forever because the search never crossed play boundaries.
+
+**Fix**: Extended the running/pending scan to search across *all* plays.
+Also added cross-play completion marking: when a handler task in a
+different play UUID is found running, the linear-completion loop in
+`PlayRunState._mark_completed()` now iterates `self.plays.values()` not
+just the current play's tasks.
+
+Completed plays are skipped from tree rendering when another play has
+running items — a play with zero running items and another play actively
+running gets pruned. This uses running-item detection rather than
+terminal state: handler plays with no local tasks but running items in
+other plays stay visible.
+
+### 3. Elapsed time stuck at 0s for fallback host leaves
+
+When `runtime.hosts` was empty (first task in a new play, or a handler
+with no per-host events yet), the fallback path created host leaves with
+`Status.RUNNING` and `elapsed_s=0.0`. The elapsed counter never advanced
+from zero.
+
+**Fix**: Compute elapsed from the task's `runtime.start_time` instead of
+hardcoding 0. When `runtime.start_time` is None (pre-start) it still
+falls back to 0, which is correct — the task hasn't started yet.
+
+### 4. All hosts appearing in every play (hostname fallback scope)
+
+The fallback function `_all_known_hostnames` collected hostnames from
+every task in every play. On a multi-play playbook where play 1 targets
+`[web1, web2, web3]` and play 2 targets `[db1]`, play 2 would show
+leaves for `web1`, `web2`, and `web3` (and `localhost` from test
+playbooks) because the fallback had no play scoping.
+
+**Fix**: Replaced `_all_known_hostnames` with `_play_target_hostnames`
+that takes a `PlayDefinition` parameter and uses `play_def.resolved_hosts`
+from preflight when available. When preflight data is absent, it falls
+back to hostnames from the play's own runtime tasks only. The call site
+in `_emit_runtime_play` already has both `play` (PlayRunState) and
+`play_def` (PlayDefinition) in scope, so no plumbing changes needed.
+
+### Test impact
+
+Suite: 2189 passed, 1 known-failure, 1 deselected. The known failure
+(`test_render_includes_stderr_tail_on_failure`) is a pre-existing
+integration test that depends on ansible-core being installed.
+
+### Commits (unpushed — git.eisen5.eu:2222 unreachable)
+
+```
+9d9e2e7 feat(tree): show host leaves during execution, higher budget cap
+a2c79e2 fix(tree): cross-play runtime_by_name + completed-play skip
+c722bcd fix(tree): cross-play linear completion, remove runtime.tasks guard
+00db4bb fix(core): skip completed plays, use _all_known_hostnames fallback
+63051d5 fix(tree): filter stale task items (□ pending) from completed plays
+f932bee fix(tree): scope hostname fallback to play targets, fix elapsed time
+72eba82 fix(core): scope hostname fallback to play targets, fix elapsed time
+```
+
+### Still open
+
+- Push blocked: remote `git.eisen5.eu:2222` connection refused
+- Fallback host leaves still default to `Status.RUNNING` — when a task
+  finishes but `runtime.hosts` is empty, the fallback shows spinners
+  instead of the final status. Root cause: ansible doesn't emit
+  `v2_runner_on_ok` for implicit tasks like `meta: flush_handlers`.
+
+## 2026-05-23 — Linear Force-Completion Fix
+
+### What Changed
+- Added a third completion branch in `_handle_v2_playbook_on_task_start` for
+  tasks that still have RUNNING hosts when a new task starts in the same play
+  under linear strategy.
+- Strategy detection corrected: `v2_runner_on_start` now flips strategy from
+  `"linear"` to `"free"` because the JSONL callback only emits that event
+  when NOT in lockstep mode (`if self._is_lockstep: return`).
+
+### Key Design Decisions
+1. **Same-play only**: Force-completion is scoped to `p.play_id == play.play_id`.
+   Cross-play completion was wrong — ansible can start play 2 while play 1 is
+   still running.
+2. **Preserve real terminal events**: Only `Status.RUNNING` hosts get force-
+   transitioned to `Status.OK`. Hosts that received `v2_runner_on_failed` etc.
+   keep their actual status.
+3. **Strategy flip on runner_on_start**: The earlier `task_start`→linear detection
+   is premature. If `runner_on_start` ever fires, the playbook is NOT in lockstep
+   mode. The code now flips `detected_strategy` to `"free"` in this case.
+
+### Files Modified
+- `src/ansible_aom/core/models.py`: +2 changes
+  1. New `elif p.play_id == play.play_id:` branch in linear completion loop
+  2. Strategy flip in `_handle_v2_runner_on_start`
+- `tests/unit/test_models.py`: +4 test methods in new `TestLinearForceCompletion`
+- `tests/unit/test_event_processing.py`: Updated TC-203 test assertion
+
+### Test Results
+- 2255 tests pass, 1 pre-existing failure (test_render_includes_stderr_tail_on_failure)
+- ruff clean on all modified files
+
+## 2026-05-24 — Cross-Play Leakage, Tree Flicker, Stuck Meta Tasks, Upcoming Plays
+
+Five tree rendering bugs fixed in interactive multi-play smoke testing.
+These followed on from the May 23 fixes — all four interact and required
+careful ordering to avoid regressing each other.
+
+### 1. Cross-play task leakage (◐ zombies)
+
+**Bug**: Completed plays showed `◐` (running) tasks borrowed from later
+plays via `_play_running_and_pending` when the cross-play scan found
+running items in a *different* play. A completed play's tree showed
+`◐` tasks from the currently-running play.
+
+**Root cause**: The cross-play scan in `_play_running_and_pending`
+searched `runtime_by_name` across *all* plays. It didn't filter out
+completed plays' own tasks — it found running tasks in other plays and
+reported them as belonging to the completed play.
+
+**Fix** (`dab145a`): In `_play_running_and_pending`, completed plays now
+only emit their own completed tasks. Running tasks from other plays
+are not attributed to a completed play's tree. This uses a new
+`include_cross_play=False` parameter that only completed plays use;
+active plays still use `True` to show borrowed tasks.
+
+**Key design decision**: The cross-play scan is still needed for active
+plays to show pending/running state from handler tasks in other plays.
+The fix scopes it to only run for non-completed plays.
+
+### 2. Tree flicker between completed and current plays
+
+**Bug**: When one play ended and the next started, the tree panel
+flickered between showing the completed play and the current play on
+alternate frames. This was especially visible during the gap between
+play completion events — `v2_playbook_on_play_start` for play 2 hadn't
+arrived yet, but play 1 was already marked complete.
+
+**Root cause**: The tree play selection logic alternated between
+"the last play with running items" and "the last play in the list"
+when no play had explicitly running items. The decision bounced
+between plays on each render frame.
+
+**Fix** (`f179469`): Introduced `_last_running_play_id` — a sticky
+fallback that remembers the most recently active play. The selection
+tiers are now:
+1. Fresh running play (active play with `any_running == True`)
+2. Previous frame's sticky play (`_last_running_play_id`)
+3. Last play with tasks (cold-start fallback)
+
+This prevents oscillation because tier 2 persists the choice across
+frames until a new play actually starts running.
+
+**Tests**: 4 new test methods in `TestStickyFallback`:
+- `test_sticky_fallback_fresh_running_play` — active play wins
+- `test_sticky_fallback_remembers_previous` — sticky persists
+- `test_sticky_fallback_no_previous` — cold-start fallback
+- `test_sticky_fallback_transitions_to_new` — new play overrides sticky
+
+### 3. Stuck meta tasks under linear strategy (◐ 949s)
+
+**Bug**: Under linear strategy, `meta: reset_connection` tasks showed
+`◐` forever with elapsed time like `0:15:49` (949 seconds = 15 min).
+The task completed almost instantly but never got force-completed
+because it had zero hosts (meta tasks don't run on hosts).
+
+**Root cause**: The linear completion branch in `_handle_v2_playbook_on_task_start`
+had two guard conditions: (a) all hosts terminal OR (b) empty hosts.
+But the empty-hosts branch only ran when `p.play_id == play.play_id` —
+and the outer loop iterated `self.plays.values()` which included
+*other* plays. When meta tasks belonged to play 1 but the outer loop
+was checking play 2, the force-completion was skipped.
+
+**Fix** (`d981444`): Added a third completion branch in the linear
+strategy force-completion loop:
+```python
+elif p.play_id == play.play_id:
+    # Same play — force-complete RUNNING hosts on this new task start
+    for host_state in p.hosts.values():
+        if host_state.status == Status.RUNNING:
+            host_state.status = Status.OK
+```
+This scopes force-completion to the same play, preventing cross-play
+host stealing. Hosts with real terminal events (`FAILED`, `UNREACHABLE`)
+keep their actual status — only `RUNNING` gets force-transitioned.
+
+### 4. Upcoming plays invisible
+
+**Bug**: Plays that hadn't started yet (zero `runtime.tasks`) were
+silently omitted from the tree. On a 3-play playbook, the tree only
+showed play 1 until play 2 started.
+
+**Root cause**: The sticky fallback (`_last_running_play_id`) and the
+skip-completed-plays logic had a joint guard: `and runtime.tasks`.
+When a play had no runtime tasks yet (upcoming play), this guard
+treated it like a completed play and skipped it.
+
+**Fix** (`cd68065`): Changed the skip guard from `runtime.tasks` (empty
+for upcoming plays too) to `is not None` — upcoming plays have no
+runtime tasks yet but should still appear. Only completed plays with
+zero running items and nonzero runtime tasks get skipped. The guard
+now reads: skip if play is not active AND has runtime tasks AND no
+running items in any play.
+
+**Key insight**: The original `runtime.tasks` check was meant to skip
+completed plays that had no tasks (like handler-only plays). But it
+was accidentally too broad — it also skipped upcoming plays.
+
+### 5. Strategy detection corrected
+
+**Bug**: The strategy detection in `_handle_v2_playbook_on_task_start`
+could never detect "free" strategy. The JSONL callback only emits
+`v2_runner_on_start` when `self._is_lockstep` is False (i.e., when
+NOT in linear mode). So whenever this event fires, the strategy is
+NOT linear.
+
+**Fix** (`d981444`): In `_handle_v2_runner_on_start`, added:
+```python
+if self.detected_strategy == "linear":
+    self.detected_strategy = "free"
+```
+This flips the detected strategy from the default ("linear") to
+"free" on the first runner_on_start event.
+
+### Test Impact
+
+- Suite: 2255 passed, 1 known-failure (test_render_includes_stderr_tail_on_failure)
+- +52 new tests across all include/import/role features (incremental since May 23)
+
+### Commits (still unpushed — git.eisen5.eu:2222 unreachable)
+
+```
+dab145a fix(tree): prevent cross-play task leakage in tree rendering
+f179469 fix(tree): implement sticky fallback to prevent tree flicker
+d981444 fix(core): force-complete stuck hosts under linear strategy
+cd68065 fix(tree): don't skip upcoming plays in sticky fallback
+```
+
+### Still open
+
+- Push blocked: remote `git.eisen5.eu:2222` connection refused
+  (11 commits unpushed total — 7 from May 23 + 4 from May 24)
+- Fallback host leaves still default to `Status.RUNNING` — when a task
+  finishes but `runtime.hosts` is empty, the fallback shows spinners
+  instead of the final status. Root cause: ansible doesn't emit
+  `v2_runner_on_ok` for implicit tasks like `meta: flush_handlers`.
+  Partially mitigated: the sticky fallback keeps the last active play
+  visible instead of bouncing to the completed play, so this issue
+  only manifests during brief transition windows.
+
+## 2026-05-24 Tree projection same-name task identity
+
+- `_play_running_and_pending()` now builds per-name runtime candidate lists and
+  consumes unmatched runtime task executions by `task_id` / stable runtime
+  identity instead of reusing the first matching display name.
+- Same-name preflight task definitions now project as distinct visible rows in
+  execution order when their runtime events arrive with different ids.
+- Dynamic child matching uses the same unmatched-candidate selection so a
+  runtime task is not reused for a later child line after it has already been
+  projected once.
+
+## 2026-05-24 Tree projection typecheck cleanup
+
+- The `ordered_plays` loop in `tree.py` needed a variable rename to avoid
+  reusing `play_def` with a broader `PlayDefinition | None` type in the same
+  scope.
+- `mypy src/ansible_aom/core/tree.py` still reports a pre-existing
+  `no-any-return` issue in `src/ansible_aom/core/models.py`, but the local
+  tree-module type error from the identity change is gone.
+
+
+## 2026-05-24 Tree Flicker Regression Harness Search
+
+### Existing reusable patterns
+- `tests/compact/test_tree_projection_lifecycle.py` already proves projection instance continuity across frames with `MagicMock`, `_renderer()`, `_seed_sticky_gap_state()`, and `tree_lines(20)` assertions.
+- `tests/unit/test_tree_projection.py` has pure-data `TreeProjection.from_run_state(...)` coverage plus deterministic repeated-call checks (`bounded == again`) that can be reused for replayed frame assertions.
+- `tests/compact/test_golden_frames.py` and `tests/integration/test_replay_determinism.py` already provide replay / golden scaffolding that can be extended to capture per-frame output, not just final-state output.
+
+### Blind spots
+- Current coverage mostly checks final frames or two-frame sticky cases; no existing test asserts row identity churn across a longer replay sequence.
+- No fixture today captures a hostile frame sequence specifically for tree flicker; likely need a new replay JSONL fixture plus per-event frame snapshots.
+
+## 2026-05-24 Ancestry-aware child matching
+
+- `TreeProjection._play_running_and_pending()` now walks preflight tasks recursively and
+  prefers runtime candidates whose host set overlaps the current ancestor branch before
+  falling back to flat arrival order.
+- That keeps repeated child labels under different include/import parents attached to the
+  correct branch instead of swapping host leaves when runtime arrivals interleave.
+- Caveat: if two same-name branches expose identical host sets, the projection still falls
+  back to the existing arrival-order tie-break; add a stronger runtime ancestry signal if a
+  future repro needs it.
+
+## 2026-05-24 Shared recursive preflight traversal
+
+- Added a shared `iter_preflight_task_defs()` helper in `core/models.py` and
+  pointed `core/tree.py` at it so grouped roles and nested children are walked
+  in one pre-order path for role indexing, task counting, and tree emission.
+- `count_leaf_tasks()` still uses the dedicated leaf-tree walk; the shared
+  iterator is for the projection/indexing path, not for counting duplicates.
+
+## 2026-05-24 Runtime role prefix guard
+
+- Runtime tree emission now treats ``role : task`` prefixes as roles only
+  when the prefix has no whitespace, so literal task names like ``Install
+  foo : bar`` stay ungrouped while include_role-style ``podman : ...`` and
+  ``nginx : ...`` tasks still group and count correctly.
+
+## 2026-05-24 Phase 2 durable projection / row leases
+
+- Added a private ``RunState._tree_revision`` counter that bumps when
+  definitions are reassigned or dynamic tasks are grafted. ``TreeProjection``
+  now watches that revision and refreshes its role memo in place instead of
+  being recreated.
+- ``CompactRenderer`` no longer invalidates ``_projection`` on task/host start
+  events; the same projection instance now survives successive events and
+  quiet gaps while the core projection refreshes itself lazily.
+- Added short-lived internal row leases in ``core/tree.py`` so the sticky play
+  anchor and row continuity metadata age out intentionally instead of living
+  forever as a side effect of caching.
+- Lease bookkeeping is time-bounded (UTC timestamps) and pruned during
+  projection passes, which keeps the continuity state small while still
+  preserving gap stability.
+- Targeted verification: ``uv run pytest tests/unit/test_tree_projection.py
+  tests/compact/test_tree_projection_lifecycle.py
+  tests/integration/test_replay_determinism.py -q`` → passed.
+
+## 2026-05-24 Play-boundary borrowing tightening
+
+- `TreeProjection._play_running_and_pending()` now only classifies tasks
+  owned by the current play; generic same-name cross-play borrowing was
+  removed so hostile transition windows do not leak rows across play
+  boundaries.
+- `include_cross_play` remains as a compatibility knob for existing call
+  sites, but explicit ownership still needs to be modeled before any
+  borrowing can return safely.
+- Added regression coverage that keeps a play's own RUNNING task visible
+  while a same-name task in another play stays pending instead of being
+  borrowed.
+
+## 2026-05-24 Async launcher / async-status path disambiguation
+
+- `RunState._graft_or_match_task()` now prefers `task.path` over bare
+  task name when both are available. That keeps an async launcher row
+  and a later async-status row from stealing the same parent cursor when
+  they share a display name.
+- The runtime JSONL `task.path` field is the right discriminator for
+  these real-world async shapes because the launcher and poller live at
+  different file:line coordinates in the playbook, even when the visible
+  labels are identical.
+- Targeted verification passed:
+  `uv run pytest tests/unit/test_run_state_index.py tests/unit/test_tree_projection.py tests/unit/test_dynamic_expansion.py -q`.
+
+## 2026-05-25 run_once / serial window normalization
+
+- `PlayRunState` now records `window_start` from `play.duration.start` and
+  an ordinal fallback for repeated play-start windows.
+- `v2_playbook_on_play_start` now creates a fresh play window, so repeated
+  `run_once` batches don't inherit prior task-host state.
+- Tree projection scopes runtime task leases by the play-window identity,
+  which keeps the same logical task row from being reused across serial
+  batches.
+
+
+## 2026-05-25 Compact noisy-output QA
+- Targeted compact renderer regression tests passed: 117/117 in `tests/compact/test_render_dirty_flag.py`, `tests/compact/test_display_ansi.py`, `tests/compact/test_renderer_stats.py`, `tests/integration/test_compact_renderer.py`, `tests/unit/test_renderer_stats_parity.py`.
+- Ordinary compact smoke passed on `.sisyphus/test-fixtures/simple.yml` after installing missing `ansible.posix` collection in the local uv environment.
+- Noisy-output smoke passed with a synthetic local playbook emitting sustained stdout (`/tmp/opencode/aom-noisy-smoke/noisy_slow.yml`); compact renderer completed with final host/task summary and no obvious freeze.
+- Initial smoke failure was environment-related (`ansible.posix.jsonl` missing), not a renderer regression.
+
+## 2026-05-25 Tree gap-state anchor expiry
+
+- Root cause: `TreeProjection.tree_lines()` dropped `active_play_id` to `None` once the play lease expired and no fresh running play was found, which let the next quiet frame widen back out to every completed play.
+- Fix: keep the last running play pinned by its internal runtime identity even after the lease ages out; leases still expire for continuity metadata, but they no longer control play selection.
+- Added regressions for both the lease-expiry gap and the hostless meta-task gap so earlier completed plays stay hidden while the current play remains anchored.
+
+## 2026-05-25 Failed loop inspect fixture restore
+
+- Restored `tests/fixtures/sessions/019e4520-fa64-7000-a627-000000000002/stderr.log`
+  with the documented brew-cask tail so the failed-loop inspect golden test can
+  render the stderr header and curl 404 line again.
+
+## 2026-05-25 TUI replay mypy cleanup
+
+- Cleared the last `uv run mypy src/ansible_aom` blockers in the TUI/replay
+  path with typing-only changes: explicit tree-node narrowing for
+  `set_label()`, a real `str | None` pane-id return, and a dynamic completer
+  assignment via `setattr()`.
+
+## 2026-05-25 Tree sticky fallback cleanup
+
+- Removed the bare play-header fallback from `TreeProjection.tree_lines()` so a
+  play only stays visible while it still has running/pending surface.
+- Updated sticky regressions to expect completed plays to disappear on quiet
+  frames, while active plays still render normally while work remains.
+
+## 2026-06-21 Task: mitogen-models-fix
+
+### Problem
+ansible.posix.jsonl emits events with non-canonical `task`/`hosts` shapes when mitogen drops the SSH link mid-task. Three shapes crashed `RunState`:
+1. `task` as bare UUID string → `.get()` on `str` raises `AttributeError`
+2. `task` as `None` → `.get()` on `NoneType` raises `AttributeError`
+3. `hosts` as list → `.items()` on `list` or `for hostname in list` materialises bogus host entries
+
+### Helpers Added
+- `RunState._task_dict(event) -> dict[str, Any]` — returns `event["task"]` if it's a `dict`, else `{}`. Mirrors the `isinstance(play_data, dict)` guard in `_resolve_play_id` (line 458).
+- `RunState._hosts_dict(event) -> dict[str, Any]` — returns `event["hosts"]` if it's a `dict`, else `{}`. Prevents `.items()` crash on list-shaped hosts and prevents string-iteration in the skipped handler.
+
+### Handlers Patched
+All 7 handlers that accessed `task` or `hosts` from event payloads:
+1. `_handle_v2_playbook_on_task_start` — `task_data = self._task_dict(event)`
+2. `_handle_v2_runner_on_start` — `task_data = self._task_dict(event)`
+3. `_handle_v2_runner_item_on` — `task_data = self._task_dict(event)` + `for hostname in self._hosts_dict(event)`
+4. `_handle_v2_runner_on_ok` — `task_data = self._task_dict(event)` + `hosts_data = self._hosts_dict(event)`
+5. `_handle_v2_runner_on_failed` — `task_data = self._task_dict(event)` + `hosts_data = self._hosts_dict(event)`
+6. `_handle_v2_runner_on_skipped` — `task_data = self._task_dict(event)` + `hosts_data = self._hosts_dict(event)`
+7. `_handle_v2_runner_on_unreachable` — `task_data = self._task_dict(event)` + `hosts_data = self._hosts_dict(event)`
+
+### Behavioural Contract
+- Malformed events silently drop (no state change, no exception).
+- Pre-existing RUNNING hosts remain RUNNING (TC-MITOGEN-1..6).
+- Subsequent well-formed events still mutate state correctly (TC-MITOGEN-7).
+- Malformed payloads of the runner_on_* family are NOT counted as unknown (the event type is known; only the payload is malformed).
+
+### Key Pattern
+The project already had `isinstance(play_data, dict)` in `_resolve_play_id` (line 458) for the same defensive pattern on the `play` field. The `_task_dict` and `_hosts_dict` helpers follow this same idiom but extract it into reusable private methods.
+
+## 2026-06-21 Task: mitogen-renderer-fix
+
+### Helpers added to `CompactRenderer` (mirroring `core/models.py`)
+
+- `_task_dict(event) -> dict`: Returns `event["task"]` if it's a dict, else `{}`. Defensive against mitogen-distorted `task: "uuid-string"` or `task: None`.
+- `_hosts_dict(event) -> dict`: Returns `event["hosts"]` if it's a dict, else synthesises `{host: {}}` from the singular `host` key, else `{}`. Defensive against mitogen-distorted `hosts: ["host1", "host2"]`.
+
+### Call sites patched (14 total)
+
+**`_emit_event_log`**: 6 `_task_dict` replacements (task_start, runner_start, runner_on_ok, runner_on_failed, item_on_*), 5 `_hosts_dict` replacements (runner_on_ok, runner_on_failed, runner_on_unreachable, runner_on_skipped, item_on_*).
+
+**`_inline_duration_suffix`**: 1 `_task_dict` replacement for `task_id` lookup.
+
+**`_bump_task_counters`**: 2 `_task_dict` replacements (task_id lookup, path lookup).
+
+**`_start_running_task`**: 1 `_task_dict` replacement (task dict extraction).
+
+### Key insight: `host` singular fallback
+
+TC-MITOGEN-106 revealed that `_hosts_dict` must also handle the case where `hosts` is absent but `host` (singular) is present. Mitogen events sometimes carry `host: "foreman"` instead of `hosts: {"foreman": {}}`. Without this fallback, the renderer silently skips the event entirely, producing no log output for otherwise well-formed events. The fix synthesises `{hostname: {}}` from the singular key so the normal iteration path still works.
+
+### Test results
+- `tests/compact/test_mitogen_robustness.py`: 8/8 pass (TC-MITOGEN-100..107)
+- `tests/compact/`: 367 pass, 0 fail
+- `tests/`: 2727 pass, 6 skip, 1 xfail, 0 fail
+- mypy: clean
+
+## Play-boundary state-machine bugs (June 2026)
+
+### Two bugs in `_handle_v2_playbook_on_play_start` (`src/ansible_aom/core/models.py:414`)
+
+**Bug 1 — Cross-play graft cursor leak.** `_last_matched_task_def` (declared at line 276) was set whenever a runtime task matched a preflight TaskDefinition but never reset on play boundaries. Result: an unknown task arriving after a new play's `play_start` but before its first matched `task_start` got grafted as a child of the PRIOR play's last preflight task, polluting the prior play's definition's `children` list.
+
+**Bug 2 — Force-finalisation under strategy: free.** The unconditional `_finalize_play` loop (lines 428-433) marked all RUNNING hosts/tasks of prior plays as OK/COMPLETED whenever the next play started. Under `strategy: free` (ansible-core 2.16+), the next play's `play_start` can arrive while prior-play hosts are still running. This produced a stale "all green" tree — the user's reported "task/host list not accurate" symptom.
+
+### Fix
+
+Both fixed in the same function:
+- Added `if prior.detected_strategy == "free": continue` inside the finalisation loop.
+- Added `self._last_matched_task_def = None` immediately after the loop, guarded by a comment explaining the cross-play graft invariant.
+
+### Regression tests added
+
+`tests/unit/test_play_boundary_state.py`: TC-BOUNDARY-4 (cross-play graft guard), TC-BOUNDARY-5 (free-strategy not auto-finalised), TC-BOUNDARY-6 (linear-strategy still finalised — guards against over-correction).
+
+### Verification
+
+- Both reproductions pass post-fix.
+- `git stash` of the fix confirms the new tests FAIL on the buggy code.
+- Full suite: 2148 passed (was 2145; +3 new tests).
+- mypy: clean.
+- ruff check: my files clean. Pre-existing ruff errors in `tree.py` (F841) and `tui/screens/inspect.py` (E501) are NOT in scope.
+
+### Lesson
+
+The `_last_matched_task_def` cursor is the same pattern as a stack-pointer in a recursive-descent parser: it must be pushed/popped on every grammar boundary. Play boundaries are the natural pop point — anything else is a bug.

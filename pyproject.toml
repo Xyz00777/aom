@@ -3,11 +3,14 @@
 
 [project]
 name = "ansible-aom"
-version = "0.1.0"
+version = "0.93.0"
 description = "Ansible Output Monitor - nom-style TUI for ansible-playbook"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
-authors = [{name = "Xyz00777", email = "git@paeiser.de"}]
+authors = [
+    {name = "Xyz00777", email = "git@paeiser.de"},
+    {name = "Felix Karg", email = "f.karg10@gmail.com"},
+]
 requires-python = ">=3.14"
 classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
@@ -22,6 +25,8 @@ dependencies = [
     "pexpect>=4.8",
     "psutil>=5.9",
     "blessed>=1.20",           # ANSI cursor positioning for compact mode
+    "argcomplete>=3.5",        # bash/zsh/fish tab-completion for the CLI
+    "orjson>=3.10",            # Fast JSON parser on the PTY event hot path
 ]
 
 [project.scripts]
@@ -32,12 +37,15 @@ dev = [
     "textual-dev>=0.86",
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
+    "pytest-xdist>=3.8.0",
     "pytest-textual-snapshot>=0.5",
     "pytest-cov",
     "ruff",
     "mypy",
     "inline-snapshot>=0.10",   # Compact mode snapshot testing
     "pre-commit>=3.0",
+    "jsonschema>=4.20",        # schemas/run_summary.v1.json contract test
+    "hypothesis>=6",           # property-based tests (Batch C)
 ]
 
 integration = [
@@ -61,6 +69,9 @@ packages = ["src/ansible_aom"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+markers = [
+    "needs_ansible: requires real ansible-playbook + ansible.posix collection (auto-skipped otherwise)",
+]
 
 [tool.ruff]
 line-length = 100
@@ -72,12 +83,27 @@ select = ["E", "F", "W", "I"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["F401", "F811", "F841", "E501"]
 "**/__init__.py" = ["F401"]
+# Ansible callback plugins put DOCUMENTATION before imports by convention.
+"src/ansible_aom/ansible/callback/*.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.14"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+# The bundled ansible callback plugin subclasses GPL ansible code that
+# has no type stubs; it runs inside the ansible subprocess, never imported
+# by AOM, so strict typing buys nothing here.
+module = "ansible_aom.ansible.callback.*"
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+# The vendored ansible collections (incl. ansible.posix.jsonl) ship no stubs.
+module = "ansible_collections.*"
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "ansible_aom.compact.*"
@@ -100,17 +126,17 @@ disallow_untyped_defs = false
 disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
-module = "ansible_aom.inspect.diff"
-disallow_untyped_defs = false
-disallow_untyped_calls = false
-
-[[tool.mypy.overrides]]
 module = "ansible_aom.inspect.display"
 disallow_untyped_defs = false
 disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
 module = "yaml"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# pexpect ships no type stubs; we only use a thin slice of its API.
+module = "pexpect.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -124,3 +150,29 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "ansible_module_utils.*"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "psutil"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "argcomplete.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "ansible_aom.inspect.cli"
+# argcomplete reads ``action.completer`` off argparse Action instances
+# at runtime; the attribute isn't in argparse's type stubs.
+disable_error_code = ["attr-defined"]
+
+[[tool.mypy.overrides]]
+module = "ansible_aom.replay"
+# argcomplete reads ``action.completer`` off argparse Action instances
+# at runtime; the attribute isn't in argparse's type stubs.
+disable_error_code = ["attr-defined"]
+
+[[tool.mypy.overrides]]
+module = "ansible_aom.rerun.cli"
+# argcomplete reads ``action.completer`` off argparse Action instances
+# at runtime; the attribute isn't in argparse's type stubs.
+disable_error_code = ["attr-defined"]

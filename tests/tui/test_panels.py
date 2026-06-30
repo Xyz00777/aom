@@ -39,7 +39,7 @@ class TestLogPanelMaxLines:
 
     def test_max_lines_50000_default(self):
         """TC-274: RichLog enforces max_lines=50000 by default."""
-        from ansible_aom.core.state import MAX_LOG_LINES
+        from ansible_aom.core.state_machine import MAX_LOG_LINES
 
         assert MAX_LOG_LINES == 50000
 

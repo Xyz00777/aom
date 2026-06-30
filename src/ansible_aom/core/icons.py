@@ -15,6 +15,8 @@ Icons:
 Running animation cycles through quadrants at 4 FPS.
 """
 
+import sys
+
 from ansible_aom.core.models import Status
 
 # =============================================================================
@@ -181,3 +183,18 @@ def get_status_icon_ascii(status: Status) -> str:
         'X'
     """
     return STATUS_ICONS_ASCII.get(status, "?")
+
+
+def is_unicode_terminal() -> bool:
+    """True if stdout claims a UTF-family encoding.
+
+    Used by the compact renderer to decide whether to emit Unicode glyphs
+    (●, ◆, │, ⚠, …) or ASCII fallbacks. False on `LANG=C` consoles, dumb
+    pipes that report ``encoding=None``, or anything not advertising
+    "utf" — covers the conservative cases where Unicode would render as
+    `?` or mojibake.
+    """
+    encoding = getattr(sys.stdout, "encoding", None)
+    if not encoding:
+        return False
+    return "utf" in encoding.lower()

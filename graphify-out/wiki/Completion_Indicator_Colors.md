@@ -1,0 +1,35 @@
+# Completion Indicator Colors
+
+> 7 nodes · cohesion 0.48
+
+## Key Concepts
+
+- **TestFinalCompletionIndicator** (13 connections) — `tests/compact/test_status_bar_colors.py`
+- **._final_line()** (6 connections) — `tests/compact/test_status_bar_colors.py`
+- **.test_cancelled_indicator_is_yellow()** (2 connections) — `tests/compact/test_status_bar_colors.py`
+- **.test_completed_indicator_is_green()** (2 connections) — `tests/compact/test_status_bar_colors.py`
+- **.test_failed_indicator_is_red()** (2 connections) — `tests/compact/test_status_bar_colors.py`
+- **.test_no_color_when_disabled()** (2 connections) — `tests/compact/test_status_bar_colors.py`
+- **The trailing ●/✖ indicator picks its colour from the state.** (1 connections) — `tests/compact/test_status_bar_colors.py`
+
+## Relationships
+
+- [[Run State Completion Recap]] (3 shared connections)
+- [[Compact Renderer Implementation]] (2 shared connections)
+- [[Role Group Task Models]] (1 shared connections)
+- [[Run State Summary Panel]] (1 shared connections)
+- [[Status Bar Color Tests]] (1 shared connections)
+
+## Source Files
+
+- `tests/compact/test_status_bar_colors.py`
+
+## Audit Trail
+
+- EXTRACTED: 22 (79%)
+- INFERRED: 6 (21%)
+- AMBIGUOUS: 0 (0%)
+
+---
+
+*Part of the graphify knowledge wiki. See [[index]] to navigate.*

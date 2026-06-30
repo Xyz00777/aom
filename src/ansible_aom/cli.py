@@ -5,11 +5,157 @@ See SPECIFICATION.md Section 3 for command interface details.
 """
 
 import argparse
+import difflib
 import logging
+import os
 import shutil
 import sys
+from collections.abc import Sequence
+
+import argcomplete
 
 from ansible_aom import __version__
+from ansible_aom.core.log_filter import VALID_STATES
+
+# Files we'll auto-discover as inventory when the user doesn't pass -i.
+# Order is preference order — `inventory.ini` wins over `hosts` because
+# the former is more specific to ansible's conventions.
+_DEFAULT_INVENTORY_NAMES = (
+    "inventory.ini",
+    "inventory.yml",
+    "inventory.yaml",
+    "inventory",
+    "hosts.ini",
+    "hosts.yml",
+    "hosts.yaml",
+    "hosts",
+)
+
+# All flags ansible-playbook accepts for specifying inventory; if the user
+# already supplied any of these we leave their args alone.
+_INVENTORY_FLAGS = ("-i", "--inventory", "--inventory-file")
+
+
+def detect_default_inventory() -> str | None:
+    """Return the first conventional inventory file found in CWD, or None."""
+    for name in _DEFAULT_INVENTORY_NAMES:
+        if os.path.isfile(name):
+            return name
+    return None
+
+
+def detect_duplicate_playbook(playbook: str, ansible_args: list[str]) -> bool:
+    """True if `playbook` appears (path-normalised) in `ansible_args`.
+
+    Catches the easy typo where the user types
+    `aom site.yml -i inv.ini site.yml` — the trailing copy lands in
+    ansible_args via argparse REMAINDER, ansible-playbook then dies
+    with an unhelpful argparse error. Surfacing it earlier saves the
+    user a confused moment.
+    """
+    target = os.path.normpath(playbook)
+    return any(os.path.normpath(arg) == target for arg in ansible_args)
+
+
+def merge_limit_args(ansible_args: list[str]) -> list[str]:
+    """Collapse repeated ``-l`` / ``--limit`` flags into a single comma-joined one.
+
+    ansible-playbook stores ``--limit`` as a plain string (not append),
+    so ``-l a -l b`` silently keeps only ``b``. Users reach for the
+    repeat-the-flag idiom because most CLIs accept it; we merge into
+    the comma syntax ansible actually honours as a union.
+
+    The merged flag is placed at the position of the FIRST limit
+    occurrence; trailing limit tokens are removed. The flag form
+    (``-l`` vs ``--limit``) follows the first occurrence. A trailing
+    bare ``-l`` with no value is left alone — ansible will surface
+    that as a usage error and inventing a value would mask it.
+    """
+    # Find every (start_index, flag_form, value) triple. Three forms:
+    #   "-l X" / "--limit X" (two tokens) and "--limit=X" (one token).
+    found: list[tuple[int, str, str]] = []
+    i = 0
+    while i < len(ansible_args):
+        tok = ansible_args[i]
+        if tok in ("-l", "--limit"):
+            if i + 1 >= len(ansible_args):
+                break  # dangling flag — leave for ansible to reject
+            found.append((i, tok, ansible_args[i + 1]))
+            i += 2
+            continue
+        if tok.startswith("--limit="):
+            found.append((i, "--limit", tok[len("--limit=") :]))
+            i += 1
+            continue
+        i += 1
+    if len(found) < 2:
+        return list(ansible_args)
+
+    drop_indices: set[int] = set()
+    for start, flag, _ in found:
+        drop_indices.add(start)
+        # Two-token forms also consume the value slot.
+        if not ansible_args[start].startswith("--limit="):
+            drop_indices.add(start + 1)
+
+    first_pos, first_flag, _ = found[0]
+    merged_value = ",".join(value for _, _, value in found)
+
+    out: list[str] = []
+    for idx, tok in enumerate(ansible_args):
+        if idx == first_pos:
+            out.extend([first_flag, merged_value])
+            continue
+        if idx in drop_indices:
+            continue
+        out.append(tok)
+    return out
+
+
+def ensure_inventory_arg(ansible_args: list[str]) -> list[str]:
+    """If no -i/--inventory flag is set, prepend one pointing at the default file.
+
+    A no-op when the user already supplied an inventory or no default exists.
+    Returns the (possibly modified) args list — never mutates the input.
+    """
+    if any(arg in _INVENTORY_FLAGS or arg.startswith("--inventory=") for arg in ansible_args):
+        return ansible_args
+    default = detect_default_inventory()
+    if default is None:
+        return ansible_args
+    return ["-i", default, *ansible_args]
+
+
+class _HideStateAction(argparse.Action):
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: str | Sequence[str] | None,
+        option_string: str | None = None,
+    ) -> None:
+        choices_str = ", ".join(sorted(VALID_STATES))
+        accumulated: list[str] = list(getattr(namespace, self.dest) or [])
+        raw_values: list[str] = (
+            list(values)
+            if isinstance(values, Sequence) and not isinstance(values, str)
+            else [values]
+            if isinstance(values, str)
+            else []
+        )
+        for raw in raw_values:
+            for token in str(raw).split(","):
+                token = token.strip()
+                lowered = token.lower()
+                if lowered not in VALID_STATES:
+                    suggestion = difflib.get_close_matches(lowered, VALID_STATES, n=1, cutoff=0.6)
+                    hint = f"; did you mean {suggestion[0]!r}?" if suggestion else ""
+                    parser.error(
+                        f"argument --hide-state: invalid choice: {token!r} "
+                        f"(choose from {choices_str}){hint}"
+                    )
+                accumulated.append(lowered)
+        setattr(namespace, self.dest, accumulated)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -20,23 +166,107 @@ def create_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="aom",
-        description="Ansible Output Monitor - nom-style TUI for ansible-playbook",
+        description="Ansible Output Monitor — nom-style live view for ansible-playbook.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  aom playbook.yml                      Run playbook with compact view
-  aom --tui playbook.yml                Run playbook with full TUI
-  aom playbook.yml -i inventory.ini     Pass options to ansible-playbook
-  aom inspect list                      List all recorded sessions
-  aom inspect <session-id>              Show session summary
-  aom inspect diff <id1> <id2>          Compare two sessions
-        """,
-    )
+  aom playbook.yml                      Run playbook with compact view (default)
+  aom --tui playbook.yml                Run with the full multi-panel TUI
+  aom playbook.yml -i inv.ini -v        Flags after the playbook are forwarded
+  aom playbook.yml -vvv --tags=deploy   …including ansible-playbook's own -v / -vv / -vvv
+  aom inspect                           Launch the TUI on the most recent run
+  aom inspect --text                    Dump the most recent run as plain text
+  aom inspect prune --days 30           Delete sessions older than N days
+  aom replay <session-id>               Replay a recorded session at original pace
+  aom replay <session-id> --speed 10    Replay 10x faster
+  aom rerun                             Rerun the latest session's failed hosts
+  aom rerun <session-id> --failed       Rerun failed hosts from a specific session
+  aom rerun <session-id> --unreachable  Rerun failed AND unreachable hosts
+  aom rerun --changes-only -y           Rerun changed hosts; skip the prompt
+  aom --no-record playbook.yml          Run without writing a session directory
+  aom --install-completion bash >> ~/.bashrc   Enable tab-completion for bash
 
-    parser.add_argument(
-        "--version",
-        action="store_true",
-        help="Show version and exit",
+Argument forwarding:
+  Anything after the playbook path is passed verbatim to ansible-playbook,
+  with two ergonomic exceptions:
+  - If you pass -i / --inventory, AOM leaves your inventory alone; otherwise
+    AOM auto-detects ./inventory.ini (then .yml, .yaml, hosts) and prepends
+    -i for convenience.
+  - Repeated -l / --limit flags are merged into a single comma-joined value
+    (e.g. `-l web1 -l web2` → `-l web1,web2`). ansible-playbook itself stores
+    --limit as a single string and silently keeps only the LAST occurrence,
+    which is rarely what users mean. AOM merges them so the union runs.
+
+Verbosity:
+  AOM's own debug flag is --verbose (long form only). The short -v
+  is reserved for ansible-playbook, so `aom site.yml -v` raises
+  ansible verbosity, not AOM verbosity.
+
+Session recording:
+  Every run writes ~/.local/state/aom/sessions/<uuidv7>/ containing
+  events.jsonl, stderr.log, and meta.json. Recording is best-effort —
+  disk errors are logged but never abort the run. Use `aom inspect`
+  to replay past runs; `aom inspect prune` to clean up.
+  Pass --no-record to disable session writing for a single invocation
+  (debug logs from --verbose are unaffected).
+
+Replay:
+  `aom replay <session-id>` re-streams a recorded run's events.jsonl
+  through the renderer at the original cadence (or scaled with
+  --speed N — use --speed 0 for as-fast-as-possible). Replay does
+  not reproduce AOM-emitted warnings, the preflight summary, or
+  password-prompt log lines — only what's in the JSONL stream.
+
+Shell completion:
+  aom --install-completion <bash|zsh|fish>
+  Prints the rc-file snippet to stdout. Pipe to your rc file or eval
+  it directly. Powered by argcomplete; tab-completes subcommands,
+  flags, and recorded session IDs.
+
+Debugging:
+  faulthandler is enabled unconditionally so a SIGSEGV in pexpect /
+  ptyprocess / any C extension dumps a Python + C stack to stderr
+  before the process dies. Every recorded session also writes
+  diagnostics.json next to meta.json (lifecycle timestamps, event
+  histogram, per-renderer counters). Inspect with
+  `aom inspect --debug [--session ID]` or `--json` for jq.
+
+  AOM_DEBUG=1          One knob, everything verbose: DEBUG-level
+                       logging, per-loop pexpect trace (TIMEOUT
+                       branches, buffer contents — useful when an
+                       interactive prompt doesn't fire), every-100th
+                       event stderr counter, and a one-line
+                       `[aom-debug] events=… renders=… top=…`
+                       post-run digest on stderr.
+  AOM_WATCHDOG=<secs>  Periodic stack dump every N seconds via
+                       faulthandler.dump_traceback_later. Catches
+                       hangs without a fault.
+  AOM_PROFILE=1        cProfile around the runner's _drive loop.
+                       Dumps to ~/.local/state/aom/profile/<sid>.pstats
+                       — open with `python -m pstats <file>` or
+                       snakeviz. ~5-10% CPU cost.
+  AOM_TRACEMALLOC=1    tracemalloc snapshot at completion; peak KB
+                       lands in diagnostics.json under
+                       `resources.tracemalloc_peak_kb`. ~10% memory
+                       cost.
+
+File locations:
+  Sessions:    ~/.local/state/aom/sessions/<uuidv7>/
+  Config:      ~/.config/aom/config.yaml (optional)
+  Inventory:   auto-detects ./inventory.ini, ./inventory.yml,
+               ./inventory.yaml, ./inventory, ./hosts.ini, ./hosts.yml,
+               ./hosts.yaml, ./hosts (first match wins).
+
+Exit codes:
+  0   playbook completed cleanly
+  1   playbook failed, or AOM crashed
+  2   ansible-playbook reported unreachable hosts, or AOM detected
+      a CLI usage error (e.g. duplicate playbook positional)
+  127 ansible-playbook executable not found
+  130 cancelled by user (Ctrl+C)
+
+See README.md and SPECIFICATION.md in the source tree for full details.
+        """,
     )
 
     parser.add_argument(
@@ -46,16 +276,58 @@ Examples:
     )
 
     parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Print pre-execution diagnostics and enable DEBUG logging",
+        "--format",
+        choices=["compact", "json"],
+        default="compact",
+        help=(
+            "Output format. 'compact' (default) streams the nom-style live view. "
+            "'json' is silent during the run and emits a single JSON object on stdout "
+            "at completion — designed for CI and `jq` pipelines. "
+            "Mutually exclusive with --tui."
+        ),
     )
 
     parser.add_argument(
-        "--changes-only",
+        "--verbose",
         action="store_true",
-        help="Only show tasks with changes",
+        help="Print AOM pre-execution diagnostics and enable DEBUG logging",
+    )
+
+    parser.add_argument(
+        "--no-record",
+        action="store_true",
+        dest="no_record",
+        help=(
+            "Disable session recording for this run. "
+            "No directory is written under ~/.local/state/aom/sessions/."
+        ),
+    )
+
+    parser.add_argument(
+        "--hide-state",
+        action=_HideStateAction,
+        nargs=1,
+        default=None,
+        dest="hide_state",
+        help=(
+            "Suppress per-host lines of the given state from the live compact log. "
+            "Accepts comma-separated values (e.g. --hide-state ok,skipped) or "
+            "repeatable invocations (e.g. --hide-state ok --hide-state skipped). "
+            "Choices: ok, changed, failed, skipped, unreachable. "
+            "The status panel, event recording, and aom inspect are unaffected."
+        ),
+    )
+
+    parser.add_argument(
+        "--install-completion",
+        choices=("bash", "zsh", "fish"),
+        metavar="SHELL",
+        default=None,
+        help=(
+            "Print the rc-file snippet for the given shell to stdout, "
+            "then exit. Pipe to your rc file (e.g. "
+            "`aom --install-completion bash >> ~/.bashrc`)."
+        ),
     )
 
     parser.add_argument(
@@ -71,111 +343,75 @@ Examples:
         help="Additional arguments passed to ansible-playbook",
     )
 
-    return parser
-
-
-def create_inspect_parser() -> argparse.ArgumentParser:
-    """Create the argument parser for the inspect subcommand.
-
-    Returns:
-        Configured ArgumentParser instance.
-    """
-    parser = argparse.ArgumentParser(
-        prog="aom inspect",
-        description="Inspect previous run sessions",
-    )
-
-    parser.add_argument(
-        "inspect_action",
-        nargs="?",
-        default="list",
-        help="Action: list, show, diff, or prune",
-    )
-
-    parser.add_argument(
-        "--failed",
-        action="store_true",
-        help="Filter to show only failed tasks",
-    )
-
-    parser.add_argument(
-        "--host",
-        metavar="HOST",
-        help="Filter results by host",
-    )
-
-    parser.add_argument(
-        "--tree",
-        action="store_true",
-        help="Show task tree structure",
-    )
-
-    parser.add_argument(
-        "--export",
-        action="store_true",
-        help="Export as .aom artifact file",
-    )
-
-    parser.add_argument(
-        "--days",
-        type=int,
-        metavar="N",
-        help="Days threshold for prune (default: 30)",
-    )
-
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output in JSON format",
-    )
-
-    parser.add_argument(
-        "--jsonl",
-        action="store_true",
-        help="Output raw JSONL event dump",
-    )
-
-    parser.add_argument(
-        "--tui",
-        action="store_true",
-        help="Launch Textual TUI for browsing sessions",
-    )
-
-    parser.add_argument(
-        "session_ids",
-        nargs="*",
-        help="Session ID(s) for show, diff",
-    )
+    # F5: arm shell completion. No-op unless the shell wrapper sets
+    # the _ARGCOMPLETE env var, so this is free on the normal CLI path.
+    argcomplete.autocomplete(parser)
 
     return parser
 
 
-def handle_inspect(args: argparse.Namespace) -> int:
-    """Handle the 'inspect' subcommand.
+def _run_compact(
+    playbook: str,
+    ansible_args: list[str],
+    record: bool = True,
+    format: str = "compact",
+    hide_states: list[str] | None = None,
+) -> int:
+    """Spawn the streaming renderer (compact ANSI or end-of-run JSON) via a LiveDriver.
 
-    Args:
-        args: Parsed command-line arguments.
-
-    Returns:
-        Exit code.
+    The composition root pattern: one EventSource (LiveDriver), one
+    Renderer (factory-built), one call. See ARCHITECTURE.md §4.
     """
-    action = args.inspect_action
+    from typing import cast
 
-    if action == "list":
-        print("Listing sessions...")
-        return 0
-    elif action == "diff":
-        if len(args.session_ids) < 2:
-            print("Error: diff requires two session IDs", file=sys.stderr)
-            return 1
-        print(f"Comparing sessions {args.session_ids[0]} and {args.session_ids[1]}...")
-        return 0
-    elif action == "prune":
-        days = args.days or 30
-        print(f"Pruning sessions older than {days} days...")
-        return 0
-    else:
-        return 0
+    from ansible_aom.drivers.live import LiveDriver
+    from ansible_aom.renderer.factory import RenderMode, create_renderer
+
+    try:
+        renderer = create_renderer(
+            mode=cast(RenderMode, format),
+            is_tty=sys.stdout.isatty(),
+            hide_states=hide_states if hide_states is not None else [],
+        )
+        driver = LiveDriver(playbook, ansible_args, record=record)
+        return driver.drive(renderer)
+    except KeyboardInterrupt:
+        print("Cancelled by user", file=sys.stderr)
+        return 130
+    except Exception as e:
+        import traceback
+
+        traceback.print_exc(file=sys.stderr)
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def _run_tui(playbook: str, ansible_args: list[str], record: bool = True) -> int:
+    """Launch the Textual TUI driven by a LiveDriver.
+
+    AOMApp owns its own event loop (``app.run()``) and pumps the
+    driver from a worker thread; the driver wraps the same pexpect
+    runner the compact path uses. ``app.exit_code`` is whatever
+    ``driver.drive`` returned, reachable after ``app.run()`` exits.
+    ``None`` (user quit before completion) maps to exit 1 — we treat
+    an aborted-by-quit run as non-success without pretending to know
+    the playbook's true outcome.
+    """
+    from ansible_aom.drivers.live import LiveDriver
+    from ansible_aom.tui.app import AOMApp
+
+    try:
+        driver = LiveDriver(playbook, ansible_args, record=record)
+        app = AOMApp(driver=driver, playbook=playbook, ansible_args=ansible_args)
+        app.run()
+    except KeyboardInterrupt:
+        print("Cancelled by user", file=sys.stderr)
+        return 130
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    exit_code = app.exit_code
+    return exit_code if exit_code is not None else 1
 
 
 def main() -> int:
@@ -184,25 +420,67 @@ def main() -> int:
     Returns:
         Exit code (0 for success, non-zero for errors).
     """
+    from ansible_aom.core import diagnostics
+
+    diagnostics.install_from_env()
+
     if "--version" in sys.argv:
-        print(f"aom {__version__}")
+        from ansible_aom import source_hash
+
+        # Install-time metadata version + live source-tree hash. The
+        # version comes from the installed .dist-info (snapshotted by
+        # uv/pip at install time) and can be stale for editable
+        # installs. The src hash, by contrast, is computed from the
+        # .py files Python is currently importing — so if the two
+        # don't match a known-good reference, the user can tell at a
+        # glance whether the running code matches what they think
+        # they have installed.
+        print(f"aom {__version__} ({source_hash()})")
         return 0
 
     if "--help" in sys.argv or "-h" in sys.argv:
         create_parser().print_help()
         return 0
 
+    if "--install-completion" in sys.argv:
+        from ansible_aom.completion import SUPPORTED_SHELLS, completion_snippet
+
+        # Read the value ourselves; we cannot call create_parser().parse_args()
+        # here because argcomplete may have side-effects we want to avoid on
+        # this fast path, and because parse_args would also require a playbook
+        # later in main(). Pulling the value with a tiny lookup keeps the path
+        # explicit and side-effect-free.
+        idx = sys.argv.index("--install-completion")
+        shell = sys.argv[idx + 1] if idx + 1 < len(sys.argv) else ""
+        if shell not in SUPPORTED_SHELLS:
+            print(
+                f"aom: unsupported shell {shell!r}; expected one of {', '.join(SUPPORTED_SHELLS)}",
+                file=sys.stderr,
+            )
+            return 2
+        sys.stdout.write(completion_snippet(shell))
+        return 0
+
+    if len(sys.argv) > 1 and sys.argv[1] == "replay":
+        from ansible_aom.drivers.replay import cli_main as replay_main
+
+        return replay_main(sys.argv[2:])
+
     if len(sys.argv) > 1 and sys.argv[1] == "inspect":
-        parser = create_inspect_parser()
-        args = parser.parse_args(sys.argv[2:])
-        return handle_inspect(args)
+        from ansible_aom.inspect.cli import main as inspect_main
+
+        return inspect_main(sys.argv[2:])
+
+    if len(sys.argv) > 1 and sys.argv[1] == "rerun":
+        from ansible_aom.rerun.cli import main as rerun_main
+
+        return rerun_main(sys.argv[2:])
 
     parser = create_parser()
     args = parser.parse_args()
 
     if args.verbose:
-        import os
-
+        diagnostics.set_debug()
         aom_logger = logging.getLogger("ansible_aom")
         aom_logger.setLevel(logging.DEBUG)
         console_handler = logging.StreamHandler()
@@ -215,29 +493,49 @@ def main() -> int:
         print(f"Terminal: tty={sys.stdout.isatty()}, columns={shutil.get_terminal_size().columns}")
         aom_logger.debug("--list-tasks summary: verbose mode enabled, diagnostics printed")
 
-    if args.version:
-        print(f"aom {__version__}")
-        return 0
-
     if args.playbook:
-        from ansible_aom.renderer.factory import create_renderer
+        if args.tui and args.format == "json":
+            print(
+                "aom: --tui and --format json are mutually exclusive. "
+                "Use --format json without --tui for end-of-run JSON output.",
+                file=sys.stderr,
+            )
+            return 2
 
+        if detect_duplicate_playbook(args.playbook, args.ansible_args):
+            print(
+                f"aom: '{args.playbook}' appears twice on the command line — "
+                "drop the trailing duplicate.",
+                file=sys.stderr,
+            )
+            return 2
+
+        ansible_args = ensure_inventory_arg(merge_limit_args(args.ansible_args))
+
+        record = not args.no_record
+        hide_states: list[str] = list(args.hide_state) if args.hide_state is not None else []
+        if args.tui and hide_states:
+            print(
+                "aom: --hide-state only affects compact mode and is ignored in --tui.",
+                file=sys.stderr,
+            )
         try:
-            create_renderer(tui_mode=args.tui)
-            print(f"Running playbook: {args.playbook}")
-            return 0
-        except FileNotFoundError:
-            print("Error: ansible-playbook not found", file=sys.stderr)
-            return 127
-        except KeyboardInterrupt:
-            print("Cancelled by user", file=sys.stderr)
-            return 130
-        except NotImplementedError:
-            print("Renderer not yet implemented")
-            return 1
-        except Exception as e:
-            print(f"Error: {e}", file=sys.stderr)
-            return 1
+            if args.tui:
+                return _run_tui(args.playbook, ansible_args, record=record)
+            return _run_compact(
+                args.playbook,
+                ansible_args,
+                record=record,
+                format=args.format,
+                hide_states=hide_states,
+            )
+        finally:
+            # AOM_DEBUG=1 → single-line post-run digest on stderr. Silent
+            # otherwise. Lands in finally so even a non-zero exit still
+            # shows the signal that's usually most actionable.
+            from ansible_aom.core import diagnostics
+
+            diagnostics.print_summary_if_debug()
 
     parser.print_help()
     return 0

@@ -273,6 +273,7 @@ class TestHostStatusIndicators:
         hostname: str,
         ok: int,
         changed: int,
+        skipped: int,
         failed: int,
         unreachable: int,
     ) -> str:
@@ -285,6 +286,9 @@ class TestHostStatusIndicators:
         if changed > 0:
             icon = "◆"  # CHANGED icon
             parts.append(f"{icon} {changed} changed")
+        if skipped > 0:
+            icon = "○"  # SKIPPED icon
+            parts.append(f"{icon} {skipped} skipped")
         if failed > 0:
             icon = "✖"  # FAILED icon
             parts.append(f"{icon} {failed} failed")
@@ -300,6 +304,7 @@ class TestHostStatusIndicators:
             hostname="web1",
             ok=12,
             changed=0,
+            skipped=0,
             failed=0,
             unreachable=0,
         )
@@ -313,6 +318,7 @@ class TestHostStatusIndicators:
             hostname="web1",
             ok=2,
             changed=3,
+            skipped=0,
             failed=0,
             unreachable=0,
         )
@@ -324,6 +330,7 @@ class TestHostStatusIndicators:
             hostname="web1",
             ok=2,
             changed=0,
+            skipped=0,
             failed=1,
             unreachable=0,
         )
@@ -335,10 +342,23 @@ class TestHostStatusIndicators:
             hostname="web1",
             ok=2,
             changed=0,
+            skipped=0,
             failed=0,
             unreachable=1,
         )
         assert "⊝ 1 unreachable" in result
+
+    def test_host_summary_with_skipped(self):
+        """Host summary shows skipped count."""
+        result = self.format_host_summary(
+            hostname="web1",
+            ok=2,
+            changed=0,
+            skipped=3,
+            failed=0,
+            unreachable=0,
+        )
+        assert "○ 3 skipped" in result
 
 
 # ============================================================================
@@ -537,6 +557,163 @@ class TestCompactRendererHandleCompletion:
         # Should not raise
         renderer.handle_completion(0, "completed")
 
+    def test_tick_refreshes_status_bar_without_an_event(self):
+        """tick() lets the runner refresh elapsed time during quiet periods.
+
+        Without it the status panel freezes on the last event — for a
+        long-running task with no JSONL output the elapsed counter would
+        appear stuck. tick must (a) update the display with a fresh
+        status bar and (b) NOT call print_log (it's a panel-only refresh).
+        """
+        from unittest.mock import MagicMock
+
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer(is_tty=True)
+        renderer._display = MagicMock(is_tty=True)
+        renderer.start("playbook.yml", [])
+        renderer._display.reset_mock()
+
+        renderer.tick()
+
+        renderer._display.update.assert_called()
+        # Status bar should at least mention the playbook name.
+        rendered = renderer._display.update.call_args.args[0]
+        assert "playbook.yml" in rendered
+        renderer._display.print_log.assert_not_called()
+
+    def test_update_state_streams_log_lines_for_significant_events(self):
+        """Each significant JSONL event must produce a log line above the panel.
+
+        Without this, fast playbooks render only as a flickering panel — the
+        user has no visibility into what tasks ran or what they did. The
+        contract is: PLAY/TASK headers, per-host result lines, no logging
+        for stats (the panel already shows that). Specific format is
+        intentionally loose here — we only assert the relevant identifying
+        substrings appear in the right order.
+        """
+        from unittest.mock import MagicMock
+
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer(is_tty=True)
+        renderer._display = MagicMock(is_tty=True)
+        renderer.start("playbook.yml", [])
+
+        events = [
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-10T13:00:00Z",
+                "play": {"name": "Simple play", "id": "p1"},
+                "tasks": [],
+            },
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-10T13:00:00Z",
+                "task": {"name": "First task", "id": "t1", "path": "f.yml:1"},
+                "hosts": {},
+            },
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-10T13:00:00Z",
+                "task": {"name": "First task", "id": "t1", "path": "f.yml:1"},
+                "hosts": {"localhost": {"changed": False, "msg": "Hello"}},
+            },
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-10T13:00:00Z",
+                "task": {"name": "First task", "id": "t1", "path": "f.yml:1"},
+                "hosts": {"web1": {"changed": True, "msg": "Updated"}},
+            },
+            {
+                "_event": "v2_runner_on_failed",
+                "_timestamp": "2026-05-10T13:00:00Z",
+                "task": {"name": "First task", "id": "t1", "path": "f.yml:1"},
+                "hosts": {"db1": {"msg": "boom"}},
+            },
+            {
+                "_event": "v2_playbook_on_stats",
+                "_timestamp": "2026-05-10T13:00:00Z",
+                "stats": {"localhost": {"ok": 1, "changed": 0, "failures": 0}},
+            },
+        ]
+        for event in events:
+            renderer.update_state(event)
+
+        log_calls = [c.args[0] for c in renderer._display.print_log.call_args_list]
+        joined = "\n".join(log_calls)
+
+        assert any("PLAY" in line and "Simple play" in line for line in log_calls), (
+            f"play_start must emit a PLAY [name] header line, got: {log_calls}"
+        )
+        assert any("TASK" in line and "First task" in line for line in log_calls), (
+            f"task_start must emit a TASK [name] header line, got: {log_calls}"
+        )
+        # ok with changed=False
+        assert any("ok:" in line and "localhost" in line for line in log_calls), (
+            f"runner_on_ok with changed=False must emit ok: [host], got: {log_calls}"
+        )
+        # ok with changed=True
+        assert any("changed:" in line and "web1" in line for line in log_calls), (
+            f"runner_on_ok with changed=True must emit changed: [host], got: {log_calls}"
+        )
+        # failed
+        assert any("fatal:" in line and "db1" in line for line in log_calls), (
+            f"runner_on_failed must emit fatal: [host], got: {log_calls}"
+        )
+        # stats event must NOT produce a log line — the panel already
+        # shows aggregated stats and the final-summary print covers it.
+        assert "PLAY RECAP" not in joined, (
+            f"v2_playbook_on_stats should not emit a PLAY RECAP log; "
+            f"the final-summary print handles that. Got: {log_calls}"
+        )
+
+    def test_tty_completion_persists_final_summary_after_panel_clear(self, capsys):
+        """TTY completion leaves the final summary visible after stop() clears the panel.
+
+        Regression: the previous implementation called Display.update(final_status)
+        followed by Display.stop(), which wipes the panel. For fast-finishing
+        playbooks the user saw the panel flash and then the screen go blank —
+        no record of the run. The final summary must end up OUTSIDE any
+        DEC-2026 frame so the panel-clear sequence cannot erase it.
+        """
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer(is_tty=True)
+        renderer.start("playbook.yml", [])
+        capsys.readouterr()  # discard start() output
+
+        renderer.handle_completion(0, "completed")
+
+        out = capsys.readouterr().out
+        # Anything emitted after the last ESU (\x1b[?2026l) is plain text
+        # that the panel-clear sequence cannot have erased.
+        post_frame = out.rsplit("\x1b[?2026l", 1)[-1]
+        assert "playbook.yml" in post_frame, (
+            f"final summary missing after last frame: {post_frame!r}"
+        )
+        assert "●" in post_frame, f"completion indicator missing: {post_frame!r}"
+
+    def test_non_tty_completion_prints_final_summary(self, capsys):
+        """PQ6: non-TTY emits the final status summary on completion.
+
+        In TTY mode the summary is part of the live status panel; in non-TTY
+        (pipes, CI logs) the panel is suppressed entirely, so the run would
+        produce no final-state line at all unless we print it explicitly here.
+        """
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer(is_tty=False)
+        renderer.start("playbook.yml", [])
+        capsys.readouterr()  # discard anything from start()
+
+        renderer.handle_completion(0, "completed")
+
+        out = capsys.readouterr().out
+        assert "playbook.yml" in out, f"final summary missing playbook name: {out!r}"
+        assert "●" in out, f"final summary missing completion indicator: {out!r}"
+        assert "\x1b[" not in out, f"non-TTY must not emit ANSI: {out!r}"
+
 
 class TestCompactRendererStop:
     """Tests for CompactRenderer.stop() method."""
@@ -669,14 +846,14 @@ class TestNonTTYBehavior:
         display.stop()
         assert display._content == ""
 
-    def test_non_tty_display_start_is_noop(self):
-        """TC-042: Non-TTY Display.start() does not create Live instance."""
+    def test_non_tty_display_start_is_noop(self, capsys):
+        """TC-042: Non-TTY Display.start() emits nothing and stays idle."""
         from ansible_aom.compact.display import Display
 
         display = Display(is_tty=False)
         display.start()
-        assert display._live is None
         assert display._is_running is False
+        assert capsys.readouterr().out == ""
         display.stop()
 
     def test_non_tty_display_print_log_uses_stdout(self, capsys):
@@ -688,14 +865,18 @@ class TestNonTTYBehavior:
         captured = capsys.readouterr()
         assert "PLAY RECAP *****" in captured.out
 
-    def test_non_tty_renderer_does_not_use_live(self):
-        """TC-042: CompactRenderer with is_tty=False has no Live display."""
+    def test_non_tty_renderer_does_not_use_live(self, capsys):
+        """TC-042: CompactRenderer with is_tty=False emits no positioning codes."""
         from ansible_aom.compact.renderer import CompactRenderer
 
         renderer = CompactRenderer(is_tty=False)
         renderer.start("test.yml", [])
         assert renderer._display._is_tty is False
-        assert renderer._display._live is None
+        assert renderer._display._is_running is False
+        # No DEC sync / cursor / clear codes should ever reach stdout in
+        # non-TTY mode, regardless of how many state events we feed it.
+        out = capsys.readouterr().out
+        assert "\x1b[" not in out
         renderer.stop()
 
     def test_non_tty_renderer_update_state_does_not_crash(self):
@@ -931,11 +1112,9 @@ class TestSignalHandling:
         except BrokenPipeError:
             pass
 
-    def test_terminal_cleanup_on_exit(self):
-        """TC-053: Terminal cleanup on exit restores cursor, colors, and screen."""
+    def test_terminal_cleanup_on_exit(self, capsys):
+        """TC-053: Terminal cleanup on exit restores cursor and stops the display."""
         from unittest.mock import MagicMock
-
-        from rich.console import Console
 
         from ansible_aom.compact.display import Display
         from ansible_aom.compact.renderer import CompactRenderer
@@ -949,17 +1128,14 @@ class TestSignalHandling:
         renderer.stop()
         mock_display.stop.assert_called_once()
 
-        mock_console = MagicMock(spec=Console)
-        mock_live = MagicMock()
+        # The TTY display must emit the show-cursor sequence on stop so
+        # the user's shell isn't left with a hidden cursor.
         display = Display(is_tty=True)
-        display._console = mock_console
-        display._live = mock_live
-        display._is_running = True
-
+        display.start()
+        capsys.readouterr()  # discard start() output
         display.stop()
-
-        mock_console.show_cursor.assert_called_once()
-        mock_live.stop.assert_called_once()
+        out = capsys.readouterr().out
+        assert "\x1b[?25h" in out, f"expected show-cursor sequence in {out!r}"
         assert display.is_running is False
 
 
@@ -972,7 +1148,14 @@ class TestRefreshStrategy:
     """Tests for TC-054 to TC-058: Refresh strategy."""
 
     def test_event_driven_refresh_triggers(self):
-        """TC-054: Status panel re-renders on state change events."""
+        """TC-054: Status panel re-renders on state change events.
+
+        With the HS-1/HS-8 compute throttle, events arriving inside the
+        same 0.25 s window coalesce to one panel compute (and one
+        ``Display.update`` call). The throttle is bypassed between
+        events to keep this test about the per-event refresh contract
+        rather than the throttle semantics (which have their own test).
+        """
         from ansible_aom.compact.renderer import CompactRenderer
 
         renderer = CompactRenderer(is_tty=False)
@@ -1009,34 +1192,59 @@ class TestRefreshStrategy:
                     "v2_runner_on_unreachable",
                 ):
                     event["hosts"] = {"web1": {"ok": True}}
+                # Reset the compute-throttle clock so each event in
+                # this fixture exercises the refresh path, not the
+                # coalescing gate (covered separately).
+                renderer._last_panel_compute_time = 0.0
                 renderer.update_state(event)
 
             assert update_call_count == len(events)
 
-    def test_throttled_refresh_rate_max_four_per_second(self):
-        """TC-055: Rich Live refresh_per_second=4 limits render frequency."""
+    def test_throttled_refresh_rate_max_four_per_second(self, capsys):
+        """TC-055: Updates within 250ms of the last write are coalesced."""
+        import time
+
         from ansible_aom.compact.display import Display
 
         display = Display(is_tty=True)
         display.start()
-        live_instance = display._live
-        assert live_instance is not None
-        assert live_instance.refresh_per_second == 4
+        capsys.readouterr()  # discard start() output
+
+        before = time.monotonic()
+        for i in range(10):
+            display.update(f"frame {i}")
+        elapsed = time.monotonic() - before
+        assert elapsed < 0.25, "burst was meant to fit inside one throttle window"
+
+        # Each frame begins with BSU (\x1b[?2026h). With a 250ms throttle
+        # the burst should collapse to one frame — possibly two if the
+        # final state is flushed eagerly. Anything more means no throttle.
+        frame_count = capsys.readouterr().out.count("\x1b[?2026h")
+        assert frame_count <= 2, f"throttle missing: emitted {frame_count} frames in <250ms"
+
         display.stop()
 
     def test_event_driven_refresh_calls_display_update(self):
-        """TC-054: Each state change event triggers a display.update() call."""
+        """TC-054: Each state change event triggers a display.update() call.
+
+        The HS-1/HS-8 compute throttle skips bursts inside the 0.25 s
+        window — the test resets the throttle clock between events so
+        we still verify the one-update-per-event contract for events
+        spaced beyond the window.
+        """
         from ansible_aom.compact.renderer import CompactRenderer
 
         renderer = CompactRenderer(is_tty=False)
         renderer.start("site.yml", [])
 
         with patch.object(renderer._display, "update") as mock_update:
+            renderer._last_panel_compute_time = 0.0
             renderer.update_state(
                 {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"}
             )
             assert mock_update.call_count == 1
 
+            renderer._last_panel_compute_time = 0.0
             renderer.update_state(
                 {"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:01Z"}
             )
@@ -1096,14 +1304,16 @@ class TestNonTTYRefreshFallback:
         assert "PLAY [webservers]" in lines[0]
         assert "TASK [Install nginx]" in lines[1]
 
-    def test_non_tty_no_continuous_elapsed_time(self):
-        """TC-058: Non-TTY does not have continuous elapsed time updates."""
+    def test_non_tty_no_continuous_elapsed_time(self, capsys):
+        """TC-058: Non-TTY emits no continuous Live-style updates."""
         from ansible_aom.compact.display import Display
 
         display = Display(is_tty=False)
         display.start()
-        assert display._live is None
+        display.update("anything")
+        display.update("anything else")
         assert display._is_running is False
+        assert capsys.readouterr().out == ""
         display.stop()
 
 

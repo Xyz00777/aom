@@ -1,268 +1,175 @@
-"""Inspect CLI commands for AOM.
+"""Inspect CLI commands for AOM (rebuilt).
 
-See SPECIFICATION.md Section 3.3 for inspect subcommand details.
+The CLI exposes three invocations:
+
+* ``aom inspect``         — launch the TUI on the most recent session.
+* ``aom inspect --text``  — dump the most recent session as plain text.
+* ``aom inspect prune``   — clean up old sessions on disk.
+
+The legacy ``list`` / ``show`` / ``diff`` subcommands are removed;
+chronological in-TUI navigation replaces them.
+
+When stdout is not a TTY (CI, pipe, redirect), the no-arg invocation
+falls back to ``--text`` automatically so scripts and SSH workflows
+keep working.
+
+See ``docs/superpowers/specs/2026-05-20-inspect-rebuild-design.md``.
 """
 
+from __future__ import annotations
+
 import argparse
-import json
 import sys
 from pathlib import Path
 
-from ansible_aom.core.session import cleanup_old_sessions, list_sessions, load_session
-from ansible_aom.inspect.diff import diff_sessions
-from ansible_aom.inspect.display import (
-    format_diff_table,
-    format_session_summary,
-    format_session_table,
-    format_tree_view,
+from ansible_aom.inspect.formatters import format_diagnostics_section
+from ansible_aom.inspect.text import render_session
+from ansible_aom.session.store import (
+    cleanup_old_sessions,
+    find_latest_session,
+    load_session,
 )
 
 
-def inspect_list(state_dir: Path, output_format: str = "table") -> int:
-    """List all sessions.
-
-    Args:
-        state_dir: Directory containing session data
-        output_format: Output format ('table', 'json', 'jsonl')
-
-    Returns:
-        Exit code (0 for success)
-    """
-    sessions = list_sessions(state_dir)
-
-    if output_format == "json":
-        print(json.dumps(sessions, indent=2))
-    elif output_format == "jsonl":
-        for session in sessions:
-            print(json.dumps(session))
-    else:
-        output = format_session_table(sessions)
-        print(output)
-
-    return 0
+def _default_state_dir() -> Path:
+    return Path.home() / ".local" / "state" / "aom" / "sessions"
 
 
-def inspect_show(
-    session_id: str,
-    state_dir: Path,
-    failed_only: bool = False,
-    host_filter: str | None = None,
-    show_tree: bool = False,
-    output_format: str = "table",
-) -> int:
-    """Show session summary.
+def _stdout_is_tty() -> bool:
+    try:
+        return sys.stdout.isatty()
+    except AttributeError, ValueError:
+        return False
 
-    Args:
-        session_id: Session ID to show
-        state_dir: Directory containing session data
-        failed_only: If True, show only failed tasks
-        host_filter: Filter to tasks for specific host
-        show_tree: If True, show ASCII tree view
-        output_format: Output format ('table', 'json', 'jsonl')
 
-    Returns:
-        Exit code (0 for success, 1 for not found)
-    """
-    session = load_session(session_id, state_dir)
-
+def inspect_text(state_dir: Path) -> int:
+    """Print the most-recent session as plain text. Return exit code."""
+    latest = find_latest_session(state_dir)
+    if latest is None:
+        print(f"No sessions found in {state_dir}")
+        return 0
+    session = load_session(latest, state_dir)
     if session is None:
-        print(f"Session not found: {session_id}", file=sys.stderr)
+        print(f"Session not found: {latest}", file=sys.stderr)
         return 1
-
-    if failed_only:
-        session = _filter_failed(session)
-
-    if host_filter:
-        session = _filter_by_host(session, host_filter)
-
-    if output_format == "json":
-        print(json.dumps(session, indent=2))
-    elif output_format == "jsonl":
-        events = session.get("events", [])
-        for event in events:
-            print(json.dumps(event))
-    elif show_tree:
-        output = format_tree_view(session)
-        print(output)
-    else:
-        output = format_session_summary(session)
-        print(output)
-
+    print(render_session(session), end="")
     return 0
 
 
-def inspect_diff(
-    session_id_1: str,
-    session_id_2: str,
-    state_dir: Path,
-    changes_only: bool = False,
-    output_format: str = "table",
-) -> int:
-    """Compare two sessions.
+def inspect_tui(state_dir: Path) -> int:
+    """Launch the TUI inspector. Returns the TUI's exit code."""
+    # Lazy import: keeps `--text` invocation free of Textual cost.
+    from ansible_aom.tui.screens.inspect import InspectApp
 
-    Args:
-        session_id_1: Baseline session ID
-        session_id_2: Current session ID
-        state_dir: Directory containing session data
-        changes_only: If True, show only changed tasks
-        output_format: Output format ('table', 'json')
-
-    Returns:
-        Exit code (0 for success, 1 for not found)
-    """
-    session1 = load_session(session_id_1, state_dir)
-    session2 = load_session(session_id_2, state_dir)
-
-    if session1 is None:
-        print(f"Session not found: {session_id_1}", file=sys.stderr)
-        return 1
-
-    if session2 is None:
-        print(f"Session not found: {session_id_2}", file=sys.stderr)
-        return 1
-
-    result = diff_sessions(session1, session2, changes_only=changes_only)
-
-    if output_format == "json":
-        print(json.dumps(result, indent=2))
-    else:
-        output = format_diff_table(result)
-        print(output)
-
+    latest = find_latest_session(state_dir)
+    app = InspectApp(state_dir=state_dir, initial_session_id=latest)
+    app.run()
     return 0
 
 
-def inspect_prune(state_dir: Path, days: int = 30) -> int:
-    """Cleanup old sessions.
-
-    Args:
-        state_dir: Directory containing session data
-        days: Remove sessions older than this many days
-
-    Returns:
-        Exit code (0 for success)
-    """
+def inspect_prune(state_dir: Path, days: int) -> int:
+    """Remove sessions older than ``days`` days."""
     deleted = cleanup_old_sessions(state_dir, keep_days=days)
     print(f"Pruned {deleted} session(s)")
     return 0
 
 
-def _filter_failed(session: dict) -> dict:
-    """Filter session events to only include failed tasks."""
-    filtered_events = []
-    for event in session.get("events", []):
-        event_type = event.get("_event", "")
-        if event_type == "v2_runner_on_failed":
-            filtered_events.append(event)
-        elif event_type == "v2_runner_on_unreachable":
-            filtered_events.append(event)
-        elif event_type in (
-            "v2_playbook_on_start",
-            "v2_playbook_on_play_start",
-            "v2_playbook_on_stats",
-        ):
-            filtered_events.append(event)
+def inspect_debug(
+    state_dir: Path,
+    session_id: str | None = None,
+    *,
+    as_json: bool = False,
+) -> int:
+    """Print the diagnostics.json contents for ``session_id`` (or latest).
 
-    result = dict(session)
-    result["events"] = filtered_events
-    return result
+    ``as_json=True`` emits the raw record (or ``null`` for legacy
+    sessions) to stdout for jq pipelines. The human-readable path
+    keeps its session-header line for context.
+    """
+    import json as _json
 
-
-def _filter_by_host(session: dict, hostname: str) -> dict:
-    """Filter session events to only include tasks for a specific host."""
-    filtered_events = []
-    for event in session.get("events", []):
-        hosts = event.get("hosts", {})
-        if hosts and hostname in hosts:
-            filtered_events.append(event)
-        elif event.get("_event") in (
-            "v2_playbook_on_start",
-            "v2_playbook_on_play_start",
-            "v2_playbook_on_stats",
-        ):
-            filtered_events.append(event)
-
-    result = dict(session)
-    result["events"] = filtered_events
-    return result
+    target = session_id or find_latest_session(state_dir)
+    if target is None:
+        if as_json:
+            print(_json.dumps(None))
+        else:
+            print(f"No sessions found in {state_dir}")
+        return 0
+    session = load_session(target, state_dir)
+    if session is None:
+        print(f"Session not found: {target}", file=sys.stderr)
+        return 1
+    record = session.get("diagnostics")
+    if as_json:
+        print(_json.dumps(record))
+        return 0
+    print(f"Session {target}")
+    print(format_diagnostics_section(record), end="")
+    return 0
 
 
-def main() -> int:
-    """CLI entry point for inspect commands."""
-    parser = argparse.ArgumentParser(description="Inspect AOM sessions")
-    subparsers = parser.add_subparsers(dest="command", help="Subcommand")
-
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="aom inspect",
+        description="Inspect AOM sessions",
+    )
     parser.add_argument(
         "--state-dir",
         type=Path,
-        default=Path.home() / ".local" / "state" / "aom" / "sessions",
+        default=_default_state_dir(),
         help="Directory containing session data",
     )
-
-    list_parser = subparsers.add_parser("list", help="List all sessions")
-    list_parser.add_argument("--failed", action="store_true", help="Show only failed sessions")
-    list_parser.add_argument("--host", type=str, help="Filter by hostname")
-    list_parser.add_argument("--json", action="store_true", help="Output as JSON")
-    list_parser.add_argument("--jsonl", action="store_true", help="Output as JSONL")
-
-    show_parser = subparsers.add_parser("show", help="Show session summary")
-    show_parser.add_argument("session_id", help="Session ID to show")
-    show_parser.add_argument("--failed", action="store_true", help="Show only failed tasks")
-    show_parser.add_argument("--host", type=str, help="Filter by hostname")
-    show_parser.add_argument("--tree", action="store_true", help="Show ASCII tree view")
-    show_parser.add_argument("--json", action="store_true", help="Output as JSON")
-    show_parser.add_argument("--jsonl", action="store_true", help="Output as JSONL")
-
-    diff_parser = subparsers.add_parser("diff", help="Compare two sessions")
-    diff_parser.add_argument("session_id_1", help="Baseline session ID")
-    diff_parser.add_argument("session_id_2", help="Current session ID")
-    diff_parser.add_argument("--changes-only", action="store_true", help="Show only changed tasks")
-    diff_parser.add_argument("--json", action="store_true", help="Output as JSON")
-
-    prune_parser = subparsers.add_parser("prune", help="Cleanup old sessions")
-    prune_parser.add_argument(
-        "--days", type=int, default=30, help="Remove sessions older than N days"
+    parser.add_argument(
+        "--text",
+        action="store_true",
+        help="Render output as plain text instead of launching the TUI "
+        "(also implied when stdout is not a TTY).",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Print the session's diagnostics.json summary (lifecycle "
+        "timeline, event histogram, counters) and exit.",
+    )
+    parser.add_argument(
+        "--json",
+        dest="as_json",
+        action="store_true",
+        help="With --debug, emit the raw diagnostics.json record on stdout "
+        "instead of the human-readable summary (for jq pipelines).",
+    )
+    parser.add_argument(
+        "--session",
+        dest="session_id",
+        default=None,
+        help="Specific session ID (default: most recent). Used with --debug.",
+    )
+    sub = parser.add_subparsers(dest="command", help="Subcommand")
 
-    args = parser.parse_args()
+    prune = sub.add_parser("prune", help="Remove old sessions")
+    prune.add_argument("--days", type=int, default=30, help="Remove sessions older than N days")
 
-    if args.command == "list":
-        if getattr(args, "jsonl", False):
-            output_format = "jsonl"
-        elif getattr(args, "json", False):
-            output_format = "json"
-        else:
-            output_format = "table"
-        return inspect_list(args.state_dir, output_format)
-    elif args.command == "show":
-        if getattr(args, "jsonl", False):
-            output_format = "jsonl"
-        elif getattr(args, "json", False):
-            output_format = "json"
-        else:
-            output_format = "table"
-        return inspect_show(
-            args.session_id,
-            args.state_dir,
-            failed_only=getattr(args, "failed", False),
-            host_filter=getattr(args, "host", None),
-            show_tree=getattr(args, "tree", False),
-            output_format=output_format,
-        )
-    elif args.command == "diff":
-        output_format = "json" if getattr(args, "json", False) else "table"
-        return inspect_diff(
-            args.session_id_1,
-            args.session_id_2,
-            args.state_dir,
-            changes_only=getattr(args, "changes_only", False),
-            output_format=output_format,
-        )
-    elif args.command == "prune":
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    from ansible_aom.core import diagnostics
+
+    diagnostics.install_from_env()
+
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+
+    if args.command == "prune":
         return inspect_prune(args.state_dir, args.days)
-    else:
-        parser.print_help()
-        return 1
+
+    if args.debug:
+        return inspect_debug(args.state_dir, args.session_id, as_json=args.as_json)
+
+    use_text = args.text or not _stdout_is_tty()
+    if use_text:
+        return inspect_text(args.state_dir)
+    return inspect_tui(args.state_dir)
 
 
 if __name__ == "__main__":

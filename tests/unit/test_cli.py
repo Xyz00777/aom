@@ -18,9 +18,10 @@ CORE_MODULE_PATHS = [
     "src/ansible_aom/cli.py",
     "src/ansible_aom/__main__.py",
     "src/ansible_aom/core/models.py",
-    "src/ansible_aom/core/state.py",
+    "src/ansible_aom/core/state_machine.py",
     "src/ansible_aom/core/parser.py",
-    "src/ansible_aom/core/session.py",
+    "src/ansible_aom/session/store.py",
+    "src/ansible_aom/session/summary.py",
     "src/ansible_aom/core/config.py",
     "src/ansible_aom/core/redaction.py",
     "src/ansible_aom/core/icons.py",
@@ -28,12 +29,11 @@ CORE_MODULE_PATHS = [
     "src/ansible_aom/renderer/factory.py",
     "src/ansible_aom/compact/renderer.py",
     "src/ansible_aom/compact/display.py",
-    "src/ansible_aom/compact/logs.py",
     "src/ansible_aom/compact/password.py",
     "src/ansible_aom/tui/app.py",
     "src/ansible_aom/inspect/cli.py",
-    "src/ansible_aom/inspect/display.py",
-    "src/ansible_aom/inspect/diff.py",
+    "src/ansible_aom/inspect/formatters.py",
+    "src/ansible_aom/inspect/text.py",
 ]
 
 
@@ -66,6 +66,79 @@ class TestPackageIdentity:
         import re
 
         assert re.match(r"^\d+\.\d+\.\d+.*$", __version__)
+
+    def test_version_matches_installed_package_metadata(self):
+        """TC-001b: ``__version__`` must track the installed package version.
+
+        Previously a hardcoded literal in ``__init__.py`` lagged behind
+        the version in ``pyproject.toml``, so ``aom --version`` reported
+        stale info after editable reinstalls. The single source of truth
+        is now the package metadata.
+        """
+        from importlib.metadata import version
+
+        from ansible_aom import __version__
+
+        assert __version__ == version("ansible-aom")
+
+    def test_source_hash_is_short_stable_hex(self):
+        """``source_hash()`` returns a deterministic short hex digest."""
+        from ansible_aom import source_hash
+
+        h = source_hash()
+        assert isinstance(h, str)
+        assert len(h) == 12
+        assert all(c in "0123456789abcdef" for c in h)
+        # Stable across calls (cached).
+        assert source_hash() == h
+
+    def test_source_hash_changes_when_source_changes(self, tmp_path, monkeypatch):
+        """A source-file content change must alter the hash.
+
+        Verifies the hash actually reads the files, isn't constant or
+        stubbed. Constructs a tiny fake package to avoid touching the
+        real source tree.
+        """
+        from ansible_aom import _compute_source_hash
+
+        # Bypass the cache so each call recomputes against the file content.
+        pkg = tmp_path / "ansible_aom"
+        pkg.mkdir()
+        (pkg / "__init__.py").write_text("x = 1\n")
+        (pkg / "core.py").write_text("y = 2\n")
+
+        # Patch __file__ inside the function's module so it points at
+        # our fake package. Easier: call the worker function with a
+        # custom path? It's a module-level closure on __file__, so
+        # we monkeypatch by adjusting Path() resolution. Use the same
+        # approach: write the package, then call _compute_source_hash
+        # after redirecting its __file__.
+        import ansible_aom as aom_mod
+
+        original_file = aom_mod.__file__
+        try:
+            monkeypatch.setattr(aom_mod, "__file__", str(pkg / "__init__.py"))
+            first = _compute_source_hash()
+
+            (pkg / "core.py").write_text("y = 999\n")  # change content
+            second = _compute_source_hash()
+
+            assert first != second
+        finally:
+            monkeypatch.setattr(aom_mod, "__file__", original_file)
+
+    def test_cli_version_includes_source_hash(self, capsys):
+        """``aom --version`` prints version AND source hash."""
+        from unittest.mock import patch
+
+        from ansible_aom import __version__, source_hash
+        from ansible_aom.cli import main
+
+        with patch("sys.argv", ["aom", "--version"]):
+            main()
+        captured = capsys.readouterr()
+        assert __version__ in captured.out
+        assert source_hash() in captured.out
 
 
 class TestCLIEntryPoint:
@@ -142,7 +215,8 @@ class TestCoreModuleStructure:
 
     def test_core_module_exists(self):
         """TC-003: core/ module exists."""
-        from ansible_aom.core import models, parser, state
+        from ansible_aom.core import models, parser
+        from ansible_aom.core import state_machine as state
 
         assert models is not None
         assert state is not None
@@ -257,12 +331,14 @@ class TestRendererFactory:
         renderer = create_renderer()
         assert hasattr(renderer, "start")
 
-    def test_factory_passes_kwargs_to_renderer(self):
-        """TC-005: Factory passes kwargs to renderer constructor."""
+    def test_factory_forwards_is_tty_to_compact_renderer(self):
+        """create_renderer(is_tty=False) constructs a non-TTY CompactRenderer."""
+        from ansible_aom.compact.renderer import CompactRenderer
         from ansible_aom.renderer.factory import create_renderer
 
-        renderer = create_renderer(verbose=True, playbook="test.yml")
-        assert renderer is not None
+        renderer = create_renderer(tui_mode=False, is_tty=False)
+        assert isinstance(renderer, CompactRenderer)
+        assert renderer._display.is_tty is False
 
 
 class TestBasicCLIInvocation:
@@ -333,13 +409,21 @@ class TestVerboseFlag:
         args = parser.parse_args(["--verbose", "playbook.yml"])
         assert args.verbose is True
 
-    def test_verbose_flag_short_form(self):
-        """TC-008: -v flag works."""
+    def test_short_v_does_not_set_aom_verbose(self):
+        """The bare ``-v`` is reserved for ansible-playbook passthrough.
+
+        AOM's own debug flag is ``--verbose`` (long form only). When the
+        user writes ``aom playbook.yml -v`` the ``-v`` lands in
+        ``ansible_args`` via REMAINDER and reaches ansible-playbook —
+        which is what they want, since that's how ansible's verbosity
+        ramp works.
+        """
         from ansible_aom.cli import create_parser
 
         parser = create_parser()
-        args = parser.parse_args(["-v", "playbook.yml"])
-        assert args.verbose is True
+        args = parser.parse_args(["playbook.yml", "-v"])
+        assert args.verbose is False
+        assert "-v" in args.ansible_args
 
     def test_verbose_flag_defaults_false(self):
         """TC-008: Verbose defaults to False."""
@@ -438,105 +522,48 @@ class TestAnsibleOptionsPassthrough:
 
 
 class TestInspectSubcommand:
-    """Tests for TC-013 to TC-023: Inspect Subcommand."""
+    """Tests for TC-013 to TC-023: Inspect Subcommand dispatch.
 
-    def test_inspect_subcommand_exists(self):
-        """TC-013: 'inspect' subcommand exists."""
-        from ansible_aom.cli import create_inspect_parser
+    The top-level CLI strips the ``inspect`` token and delegates to
+    ``ansible_aom.inspect.cli.main``. These tests pin the dispatch contract;
+    behaviour of each subcommand is exercised by tests/integration/test_inspect.py.
+    """
 
-        parser = create_inspect_parser()
-        args = parser.parse_args([])
-        assert args.inspect_action == "list"
+    def test_inspect_dispatches_to_inspect_main_with_remaining_argv(self):
+        """No-arg `aom inspect` forwards an empty argv to inspect.cli.main."""
+        from ansible_aom.cli import main
 
-    def test_inspect_list_subcommand(self):
-        """TC-013: 'aom inspect list' lists all sessions."""
-        from ansible_aom.cli import create_inspect_parser
+        with patch("ansible_aom.inspect.cli.main", return_value=0) as mock_main:
+            with patch("sys.argv", ["aom", "inspect"]):
+                result = main()
+                assert result == 0
+                mock_main.assert_called_once_with([])
 
-        parser = create_inspect_parser()
-        args = parser.parse_args(["list"])
-        assert args.inspect_action == "list"
+    def test_inspect_forwards_text_flag(self):
+        """`aom inspect --text` forwards `['--text']` to inspect.cli.main."""
+        from ansible_aom.cli import main
 
-    def test_inspect_show_session(self):
-        """TC-014: 'aom inspect <session-id>' shows session summary."""
-        from ansible_aom.cli import create_inspect_parser
+        with patch("ansible_aom.inspect.cli.main", return_value=0) as mock_main:
+            with patch("sys.argv", ["aom", "inspect", "--text"]):
+                main()
+                mock_main.assert_called_once_with(["--text"])
 
-        parser = create_inspect_parser()
-        args = parser.parse_args(["session-123"])
-        assert args.inspect_action == "session-123"
+    def test_inspect_forwards_prune_subcommand(self):
+        """`aom inspect prune --days 30` forwards args verbatim."""
+        from ansible_aom.cli import main
 
-    def test_inspect_filter_failed(self):
-        """TC-015: 'aom inspect <id> --failed' shows failed tasks."""
-        from ansible_aom.cli import create_inspect_parser
+        with patch("ansible_aom.inspect.cli.main", return_value=0) as mock_main:
+            with patch("sys.argv", ["aom", "inspect", "prune", "--days", "30"]):
+                main()
+                mock_main.assert_called_once_with(["prune", "--days", "30"])
 
-        parser = create_inspect_parser()
-        args = parser.parse_args(["session-123", "--failed"])
-        assert args.failed is True
+    def test_inspect_propagates_exit_code(self):
+        """Exit code from inspect.cli.main flows back through the dispatcher."""
+        from ansible_aom.cli import main
 
-    def test_inspect_filter_host(self):
-        """TC-016: 'aom inspect <id> --host <name>' filters by host."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["session-123", "--host", "web1"])
-        assert args.host == "web1"
-
-    def test_inspect_tree_view(self):
-        """TC-017: 'aom inspect <id> --tree' shows task tree."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["session-123", "--tree"])
-        assert args.tree is True
-
-    def test_inspect_export_artifact(self):
-        """TC-018: 'aom inspect <id> --export' creates .aom file."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["session-123", "--export"])
-        assert args.export is True
-
-    def test_inspect_diff_sessions(self):
-        """TC-019: 'aom inspect diff <id1> <id2>' compares sessions."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["diff", "id1", "id2"])
-        assert args.inspect_action == "diff"
-        assert args.session_ids == ["id1", "id2"]
-
-    def test_inspect_prune_sessions(self):
-        """TC-020: 'aom inspect prune --days 30' removes old sessions."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["prune", "--days", "30"])
-        assert args.inspect_action == "prune"
-        assert args.days == 30
-
-    def test_inspect_tui_mode(self):
-        """TC-021: 'aom inspect --tui' launches TUI for browsing."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["--tui"])
-        assert args.tui is True
-
-    def test_inspect_json_output(self):
-        """TC-022: 'aom inspect <id> --json' outputs JSON."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["session-123", "--json"])
-        assert args.json is True
-
-    def test_inspect_jsonl_output(self):
-        """TC-023: 'aom inspect <id> --jsonl' outputs raw events."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["session-123", "--jsonl"])
-        assert args.jsonl is True
+        with patch("ansible_aom.inspect.cli.main", return_value=2):
+            with patch("sys.argv", ["aom", "inspect", "--text"]):
+                assert main() == 2
 
 
 class TestExitCodes:
@@ -559,14 +586,20 @@ class TestExitCodes:
             assert result == 0
 
     def test_exit_code_127_for_missing_ansible(self):
-        """TC-027: Exit code 127 when ansible-playbook not found."""
+        """TC-027: Exit code 127 when ansible-playbook not found.
+
+        The runner is responsible for detecting the missing executable and
+        returning 127 cleanly (its own tests cover the pexpect spawn-failure
+        path); here we just assert that whatever exit code the runner
+        returns is propagated through main().
+        """
         from ansible_aom.cli import main
 
-        with patch("ansible_aom.renderer.factory.create_renderer") as mock_renderer:
-            mock_renderer.side_effect = FileNotFoundError("ansible-playbook")
+        with patch("ansible_aom.ansible.runner.run_playbook", return_value=127) as mock_run:
             with patch("sys.argv", ["aom", "playbook.yml"]):
                 result = main()
                 assert result == 127
+                mock_run.assert_called_once()
 
     def test_exit_code_130_for_sigint(self):
         """TC-028: Exit code 130 for user cancelled (Ctrl+C)."""
@@ -587,26 +620,6 @@ class TestExitCodes:
             assert isinstance(result, int)
 
 
-class TestChangesOnlyFlag:
-    """Tests for --changes-only flag."""
-
-    def test_changes_only_flag_exists(self):
-        """--changes-only flag exists."""
-        from ansible_aom.cli import create_parser
-
-        parser = create_parser()
-        args = parser.parse_args(["--changes-only", "playbook.yml"])
-        assert args.changes_only is True
-
-    def test_changes_only_defaults_false(self):
-        """--changes-only defaults to False."""
-        from ansible_aom.cli import create_parser
-
-        parser = create_parser()
-        args = parser.parse_args(["playbook.yml"])
-        assert args.changes_only is False
-
-
 class TestVerboseDiagnostics:
     """Tests for TC-008: Verbose flag diagnostics."""
 
@@ -617,6 +630,7 @@ class TestVerboseDiagnostics:
         with (
             patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
             patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
             patch("builtins.print") as mock_print,
         ):
@@ -633,6 +647,7 @@ class TestVerboseDiagnostics:
         with (
             patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
             patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
             patch("builtins.print") as mock_print,
         ):
@@ -647,6 +662,7 @@ class TestVerboseDiagnostics:
         with (
             patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
             patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
             patch("builtins.print") as mock_print,
         ):
@@ -672,6 +688,7 @@ class TestVerboseDiagnostics:
         with (
             patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
             patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
             patch("builtins.print") as mock_print,
         ):
@@ -694,6 +711,7 @@ class TestVerboseDebugLogging:
         with (
             patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
             patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
         ):
             main()
@@ -724,6 +742,7 @@ class TestVerboseDebugLogging:
             with (
                 patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
                 patch("ansible_aom.renderer.factory.create_renderer"),
+                patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
                 patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
             ):
                 main()
@@ -744,6 +763,7 @@ class TestVerboseDebugLogging:
         with (
             patch("sys.argv", ["aom", "playbook.yml"]),
             patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
         ):
             main()
 
@@ -751,41 +771,19 @@ class TestVerboseDebugLogging:
         if aom_logger.level != logging.NOTSET:
             assert aom_logger.level != logging.DEBUG or original_level == logging.DEBUG
 
-
-class TestInspectTUIMode:
-    """Tests for TC-021: Inspect TUI mode."""
-
-    def test_inspect_tui_flag_in_inspect_parser(self):
-        """TC-021: 'aom inspect --tui' flag is parsed correctly."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args(["--tui"])
-        assert args.tui is True
-
-    def test_inspect_tui_launches_textual_app(self):
-        """TC-021: 'aom inspect --tui' launches Textual TUI for browsing."""
+    def test_verbose_sets_diagnostics_debug_flag(self):
+        """--verbose should set diagnostics._debug to True."""
         from ansible_aom.cli import main
+        from ansible_aom.core import diagnostics
 
-        with patch("sys.argv", ["aom", "inspect", "--tui"]):
-            result = main()
-            assert result == 0
-
-    def test_inspect_without_tui_returns_text_output(self):
-        """TC-021: 'aom inspect list' without --tui returns text output."""
-        from ansible_aom.cli import main
-
-        with patch("sys.argv", ["aom", "inspect", "list"]):
-            result = main()
-            assert result == 0
-
-    def test_inspect_tui_default_is_false(self):
-        """TC-021: Inspect parser defaults tui to False."""
-        from ansible_aom.cli import create_inspect_parser
-
-        parser = create_inspect_parser()
-        args = parser.parse_args([])
-        assert args.tui is False
+        with (
+            patch("sys.argv", ["aom", "--verbose", "playbook.yml"]),
+            patch("ansible_aom.renderer.factory.create_renderer"),
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
+            patch("shutil.which", return_value="/usr/bin/ansible-playbook"),
+        ):
+            main()
+        assert diagnostics.is_debug() is True
 
 
 class TestExitCode1:
@@ -930,3 +928,433 @@ class TestExitCode2:
         state.plays["play-1"] = play
 
         assert determine_exit_code(state) == 2
+
+
+def test_aom_rerun_dispatches_to_rerun_main(monkeypatch):
+    """Top-level `aom rerun ...` invokes the rerun subcommand main."""
+    from ansible_aom import cli as cli_mod
+
+    captured: dict = {}
+
+    def fake_rerun_main(argv):
+        captured["argv"] = argv
+        return 42
+
+    monkeypatch.setattr(
+        "ansible_aom.rerun.cli.main",
+        fake_rerun_main,
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["aom", "rerun", "abc12345", "--failed", "--yes"],
+    )
+    rc = cli_mod.main()
+    assert rc == 42
+    assert captured["argv"] == ["abc12345", "--failed", "--yes"]
+
+
+class TestHelpMentionsInstallCompletion:
+    """F5: --help output references the new --install-completion flag."""
+
+    def test_help_text_documents_install_completion(self):
+        import io
+
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        buf = io.StringIO()
+        parser.print_help(buf)
+        out = buf.getvalue()
+        assert "--install-completion" in out
+        # The flag has its own Examples line so users see the typical usage.
+        assert "bash" in out
+
+
+class TestInstallCompletionFlag:
+    """F5: ``aom --install-completion <shell>`` prints the rc snippet."""
+
+    def test_bash_prints_snippet_to_stdout(self, capsys):
+        from ansible_aom.cli import main
+
+        with patch("sys.argv", ["aom", "--install-completion", "bash"]):
+            rc = main()
+
+        captured = capsys.readouterr()
+        assert rc == 0
+        assert "register-python-argcomplete" in captured.out
+        assert "aom" in captured.out
+
+    def test_zsh_prints_snippet_to_stdout(self, capsys):
+        from ansible_aom.cli import main
+
+        with patch("sys.argv", ["aom", "--install-completion", "zsh"]):
+            rc = main()
+
+        captured = capsys.readouterr()
+        assert rc == 0
+        assert "register-python-argcomplete" in captured.out
+        assert "bashcompinit" in captured.out  # zsh-specific glue
+
+    def test_fish_prints_snippet_to_stdout(self, capsys):
+        from ansible_aom.cli import main
+
+        with patch("sys.argv", ["aom", "--install-completion", "fish"]):
+            rc = main()
+
+        captured = capsys.readouterr()
+        assert rc == 0
+        assert "register-python-argcomplete" in captured.out
+        assert "fish" in captured.out
+
+    def test_unknown_shell_returns_exit_2_and_prints_to_stderr(self, capsys):
+        from ansible_aom.cli import main
+
+        with patch("sys.argv", ["aom", "--install-completion", "powershell"]):
+            rc = main()
+
+        captured = capsys.readouterr()
+        assert rc == 2
+        assert "powershell" in captured.err
+        assert "bash" in captured.err and "zsh" in captured.err and "fish" in captured.err
+
+
+class TestArgcompleteHook:
+    """F5: argcomplete.autocomplete must be called inside create_parser."""
+
+    def test_create_parser_calls_argcomplete_autocomplete(self):
+        from unittest.mock import patch
+
+        from ansible_aom.cli import create_parser
+
+        with patch("ansible_aom.cli.argcomplete.autocomplete") as mock_ac:
+            parser = create_parser()
+            mock_ac.assert_called_once_with(parser)
+
+
+class TestFormatFlag:
+    """Tests for F6: --format {compact,json} flag."""
+
+    def test_format_flag_defaults_to_compact(self):
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["playbook.yml"])
+        assert args.format == "compact"
+
+    def test_format_flag_accepts_json(self):
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--format", "json", "playbook.yml"])
+        assert args.format == "json"
+
+    def test_format_flag_accepts_compact_explicit(self):
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--format", "compact", "playbook.yml"])
+        assert args.format == "compact"
+
+    def test_format_flag_rejects_unknown_value(self, capsys):
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--format", "yaml", "playbook.yml"])
+
+    def test_format_flag_does_not_appear_in_ansible_args(self):
+        """--format is consumed by argparse, not forwarded to ansible-playbook."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--format", "json", "playbook.yml", "-i", "inv.ini"])
+        assert args.format == "json"
+        assert args.ansible_args == ["-i", "inv.ini"]
+
+    def test_main_rejects_tui_plus_json_format(self, capsys):
+        """`aom --tui --format json playbook.yml` exits 2 with a usage error."""
+        from ansible_aom.cli import main
+
+        with patch("sys.argv", ["aom", "--tui", "--format", "json", "playbook.yml"]):
+            result = main()
+        assert result == 2
+        captured = capsys.readouterr()
+        assert "--tui" in captured.err and "--format json" in captured.err
+
+    def test_main_dispatches_json_renderer_when_format_json(self):
+        """`aom --format json playbook.yml` constructs a JsonRenderer."""
+        from ansible_aom.cli import main
+        from ansible_aom.formats.json import JsonRenderer
+
+        captured_renderer: dict = {}
+
+        def fake_run_playbook(playbook, ansible_args, renderer, **kwargs):
+            captured_renderer["renderer"] = renderer
+            return 0
+
+        with (
+            patch("ansible_aom.ansible.runner.run_playbook", side_effect=fake_run_playbook),
+            patch("sys.argv", ["aom", "--format", "json", "playbook.yml"]),
+        ):
+            result = main()
+
+        assert result == 0
+        assert isinstance(captured_renderer["renderer"], JsonRenderer)
+
+
+class TestHideStateFlag:
+    """Tests for --hide-state flag."""
+
+    def test_hide_state_default_is_empty(self):
+        """No --hide-state flag → hide_state is None."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["playbook.yml"])
+        assert args.hide_state is None
+
+    def test_hide_state_accepts_single_value(self):
+        """--hide-state ok sets hide_state=["ok"]."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--hide-state", "ok", "playbook.yml"])
+        assert args.hide_state == ["ok"]
+
+    def test_hide_state_is_repeatable(self):
+        """--hide-state can be specified multiple times."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(
+            [
+                "--hide-state",
+                "ok",
+                "--hide-state",
+                "skipped",
+                "playbook.yml",
+            ]
+        )
+        assert args.hide_state == ["ok", "skipped"]
+
+    def test_hide_state_rejects_unknown_value(self, capsys):
+        """Unknown state values are rejected by argparse."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--hide-state", "unknown", "playbook.yml"])
+
+    def test_hide_state_all_valid_values(self):
+        """All choices are accepted."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(
+            [
+                "--hide-state",
+                "ok",
+                "--hide-state",
+                "changed",
+                "--hide-state",
+                "failed",
+                "--hide-state",
+                "skipped",
+                "--hide-state",
+                "unreachable",
+                "playbook.yml",
+            ]
+        )
+        assert sorted(args.hide_state) == ["changed", "failed", "ok", "skipped", "unreachable"]
+
+    def test_hide_state_does_not_appear_in_ansible_args(self):
+        """--hide-state must be consumed by argparse, not forwarded to ansible."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--hide-state", "ok", "playbook.yml", "-i", "inv.ini"])
+        assert args.hide_state == ["ok"]
+        assert args.ansible_args == ["-i", "inv.ini"]
+
+    def test_hide_state_comma_separated(self):
+        """--hide-state ok,skipped splits into ["ok", "skipped"]."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--hide-state", "ok,skipped", "playbook.yml"])
+        assert sorted(args.hide_state) == ["ok", "skipped"]
+
+    def test_hide_state_mixed_append_and_comma(self):
+        """--hide-state ok --hide-state skipped,failed combines both."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(
+            [
+                "--hide-state",
+                "ok",
+                "--hide-state",
+                "skipped,failed",
+                "playbook.yml",
+            ]
+        )
+        assert sorted(args.hide_state) == ["failed", "ok", "skipped"]
+
+    def test_hide_state_rejects_unknown_in_comma_separated(self, capsys):
+        """Unknown value in comma-separated list is rejected."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--hide-state", "ok,unknown,skipped", "playbook.yml"])
+
+    def test_hide_state_single_comma_not_required(self):
+        """Single value still works without any comma."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--hide-state", "ok", "playbook.yml"])
+        assert args.hide_state == ["ok"]
+
+    def test_hide_state_case_insensitive_ok(self):
+        """--hide-state OK is accepted and lowercased to 'ok'."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--hide-state", "OK", "playbook.yml"])
+        assert args.hide_state == ["ok"]
+
+    def test_hide_state_case_insensitive_mixed(self):
+        """--hide-state OK,Skipped is accepted and lowercased."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--hide-state", "OK,Skipped", "playbook.yml"])
+        assert sorted(args.hide_state) == ["ok", "skipped"]
+
+    def test_hide_state_case_insensitive_all_upper(self):
+        """All-uppercase state names are accepted and lowercased."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(
+            [
+                "--hide-state",
+                "OK",
+                "--hide-state",
+                "CHANGED",
+                "--hide-state",
+                "FAILED",
+                "playbook.yml",
+            ]
+        )
+        assert sorted(args.hide_state) == ["changed", "failed", "ok"]
+
+    def test_hide_state_case_insensitive_dedup(self):
+        """--hide-state ok,OK stores both tokens; dedup happens downstream."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--hide-state", "ok,OK", "playbook.yml"])
+        assert args.hide_state == ["ok", "ok"]
+
+    def test_hide_state_typo_suggests_skipped(self, capsys):
+        """Typo 'skip' suggests 'skipped'."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--hide-state", "skip", "playbook.yml"])
+        captured = capsys.readouterr()
+        assert "did you mean 'skipped'?" in captured.err
+
+    def test_hide_state_typo_suggests_failed(self, capsys):
+        """Typo 'fail' suggests 'failed'."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--hide-state", "fail", "playbook.yml"])
+        captured = capsys.readouterr()
+        assert "did you mean 'failed'?" in captured.err
+
+    def test_hide_state_random_garbage_no_suggestion(self, capsys):
+        """Random garbage value gets no 'did you mean' suggestion."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--hide-state", "xyz", "playbook.yml"])
+        captured = capsys.readouterr()
+        assert "did you mean" not in captured.err
+
+    def test_hide_state_error_includes_choices(self, capsys):
+        """Error message includes (choose from ...) listing valid states."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--hide-state", "bogus", "playbook.yml"])
+        captured = capsys.readouterr()
+        assert "choose from" in captured.err
+        assert "ok" in captured.err
+
+    def test_hide_state_typo_error_preserves_original_token(self, capsys):
+        """Error message shows the original (un-lowered) token in quotes."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--hide-state", "Skip", "playbook.yml"])
+        captured = capsys.readouterr()
+        assert "'Skip'" in captured.err
+
+
+class TestHideStateCompactPlumbing:
+    """--hide-state propagates from CLI to create_renderer/run_playbook."""
+
+    def test_hide_state_propagates_to_renderer(self):
+        """aom --hide-state ok playbook.yml → create_renderer gets hide_states=["ok"]."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0) as mock_run,
+            patch("ansible_aom.renderer.factory.create_renderer") as mock_create,
+            patch("sys.argv", ["aom", "--hide-state", "ok", "playbook.yml"]),
+        ):
+            assert main() == 0
+
+        # create_renderer should have been called with hide_states=["ok"]
+        _args, kwargs = mock_create.call_args
+        assert kwargs.get("hide_states") == ["ok"]
+
+    def test_hide_state_propagates_multiple_values(self):
+        """--hide-state ok --hide-state skipped → hide_states=["ok", "skipped"]."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0) as mock_run,
+            patch("ansible_aom.renderer.factory.create_renderer") as mock_create,
+            patch(
+                "sys.argv",
+                ["aom", "--hide-state", "ok", "--hide-state", "skipped", "playbook.yml"],
+            ),
+        ):
+            assert main() == 0
+
+        _args, kwargs = mock_create.call_args
+        assert sorted(kwargs.get("hide_states")) == ["ok", "skipped"]
+
+    def test_hide_state_default_propagates_empty_list(self):
+        """No --hide-state flag → create_renderer gets hide_states=[]."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0) as mock_run,
+            patch("ansible_aom.renderer.factory.create_renderer") as mock_create,
+            patch("sys.argv", ["aom", "playbook.yml"]),
+        ):
+            main()
+
+        _args, kwargs = mock_create.call_args
+        assert kwargs.get("hide_states") == []

@@ -13,14 +13,14 @@ from typing import Any
 
 import pytest
 
-from ansible_aom.core.session import (
+from ansible_aom.session.store import (
     SessionManager,
     cleanup_old_sessions,
-    create_session_summary,
     generate_uuidv7,
     list_sessions,
     load_session,
 )
+from ansible_aom.session.summary import create_session_summary
 
 
 class TestGenerateUUIDv7:
@@ -144,6 +144,35 @@ class TestStartSession:
 
         start_time = datetime.fromisoformat(meta["start_time"].replace("Z", "+00:00"))
         assert before <= start_time <= after
+
+    def test_start_session_persists_ansible_args(self, tmp_path: Path):
+        """meta.json includes the ansible_args list so aom rerun can replay flags."""
+        session_dir = tmp_path / "sessions"
+        manager = SessionManager(session_dir=session_dir, playbook="deploy.yml")
+
+        session_id = manager.start_session(
+            "deploy.yml",
+            ansible_args=["-i", "inv.ini", "--tags", "web"],
+        )
+
+        meta_file = session_dir / session_id / "meta.json"
+        with open(meta_file) as f:
+            meta = json.load(f)
+
+        assert meta["ansible_args"] == ["-i", "inv.ini", "--tags", "web"]
+
+    def test_start_session_default_ansible_args_is_empty_list(self, tmp_path: Path):
+        """Old call sites that don't pass ansible_args get [] in meta.json."""
+        session_dir = tmp_path / "sessions"
+        manager = SessionManager(session_dir=session_dir, playbook="deploy.yml")
+
+        session_id = manager.start_session("deploy.yml")
+
+        meta_file = session_dir / session_id / "meta.json"
+        with open(meta_file) as f:
+            meta = json.load(f)
+
+        assert meta["ansible_args"] == []
 
 
 class TestRecordEvent:
@@ -538,15 +567,21 @@ class TestSessionRotation:
         session_dir = tmp_path / "sessions"
         session_dir.mkdir(parents=True)
 
+        # Use dates relative to "now" so the test doesn't go stale as
+        # wall-clock drifts past the hardcoded threshold.
+        now = datetime.now(timezone.utc)
+        old_ts = (now - timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        new_ts = (now - timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
         old_session = session_dir / "old_session"
         old_session.mkdir()
-        old_meta = {"playbook": "old.yml", "start_time": "2026-03-01T10:00:00Z"}
+        old_meta = {"playbook": "old.yml", "start_time": old_ts}
         with open(old_session / "meta.json", "w") as f:
             json.dump(old_meta, f)
 
         new_session = session_dir / "new_session"
         new_session.mkdir()
-        new_meta = {"playbook": "new.yml", "start_time": "2026-04-20T10:00:00Z"}
+        new_meta = {"playbook": "new.yml", "start_time": new_ts}
         with open(new_session / "meta.json", "w") as f:
             json.dump(new_meta, f)
 

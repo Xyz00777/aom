@@ -1,0 +1,240 @@
+# Run-duration estimate (ETA) — design
+
+**Date:** 2026-06-16
+**Status:** Approved, ready for implementation
+**Branch:** `feat/nom-compact-renderer`
+
+## Problem
+
+We already surface a "Last run: N tasks in T (D ago)" hint from the most
+recent matching completed session (see `session/history.py` →
+`PriorRun`). That same prior session knows how long it took — so we can
+project a live **remaining-time** estimate during the current run.
+
+It will not be as accurate as a purpose-built progress model — a *first*
+run has no prior, and a much-faster second run (everything cached/skipped)
+diverges from the prior pace. But for the common "roughly normal" re-run
+it's a major glanceability win, and the failure modes degrade to "show
+nothing", never "show garbage".
+
+## Chosen model: per-task profile + live pace (self-correcting)
+
+Rather than scale a flat total by task-count fraction (wrong — tasks are
+wildly uneven in wall time), we mine **per-task wall durations** from the
+prior session and track how much of that prior wall-clock the current run
+has *covered*, then scale the remainder by the observed pace.
+
+```
+covered      = Σ prior_wall[path] for completed tasks        (done_prior)
+             + Σ min(run_elapsed, prior_wall[path]) for in-flight tasks
+pace_ratio   = elapsed / covered               # <1 ⇒ faster than last time
+remaining    = pace_ratio × (prior_wall_total_s − covered)
+```
+
+Why this formulation (covered-work accumulation) rather than matching the
+*upcoming* task list:
+
+- We never have to predict upcoming tasks (`--list-tasks` doesn't expand
+  `include_tasks`, so we couldn't reliably anyway).
+- Uneven tasks are handled intrinsically: completing a big task jumps
+  `covered` a lot.
+- Skips self-correct: a task skipped this run that ran for 30 s last run
+  advances `covered` by ~30 s while `elapsed` barely moves →
+  `pace_ratio` drops → ETA shrinks. Correct.
+- New/edited tasks whose paths don't match the prior map contribute 0 to
+  `covered` → graceful underestimate of progress, absorbed partly by
+  `pace_ratio`, and bounded by the clamp (below).
+
+### In-flight credit (amended 2026-06-16)
+
+The first cut accumulated `done_prior` only at task *completion*. That
+inflated the ETA during a long-running task: `done_prior` froze while
+`elapsed` climbed, so `pace_ratio` rose and `remaining` grew (then pinned at
+the 5× clamp) — the opposite of what should happen while the run works
+through a task it *knew* would be long. Fix: credit each in-flight task
+`min(run_elapsed, prior_wall[path])` into `covered` (capped at its prior
+duration so a genuine overrun still counts against pace). The renderer
+records `task_id → (path, start_wall)` on the task's first announcement
+(task_start / first runner_on_start) and pops it on completion; the credit
+is recomputed each render. The warmup gate stays on *completed* work
+(`done_prior`, `matched_tasks`) — an in-flight credit refines an estimate
+but never trips the gate open on its own.
+
+### Result-segmented pace (amended 2026-06-16)
+
+A single global `pace_ratio` mis-scales the *fixed floor*. Measured across
+repeated real runs, `ok`/`skipped` tasks are ~constant run-to-run (idempotency
+checks) while `changed` (and failed/unreachable) tasks carry essentially all
+the variance. On a fast re-run a global pace (e.g. 0.28) wrongly shrinks the
+constant floor too.
+
+Fix: mine each prior task's result and split the prior wall into a fixed
+floor (ok/skipped) and a variable part (changed/failed/unreachable). Project:
+
+```
+remaining = (fixed_total − covered_fixed)                    # unscaled floor
+          + clamp(work_pace) × (var_total − covered_var)
+work_pace = Σ actual_wall(variable tasks, in flight+done)
+          / Σ prior_wall(variable tasks, in flight+done)     # default 1.0
+```
+
+`covered_*` accumulate by each task's *prior* bucket via
+`add_completed`/`add_in_flight` on a `RunProgress`; the renderer holds the
+completed-only progress and folds in-flight tasks into a copy each render.
+The pace clamp low bound drops to **0.05** (was 0.2): with the floor protected
+separately, a genuinely fast re-run can push the variable pace well below 0.2
+(cached installs run near-instantly). Mining classifies a path variable if any
+host reported `changed`, or the task failed/was unreachable; ok-without-change
+and skipped stay in the floor.
+
+Empirically validated end-to-end on a real slow→fast `site.yml` rerun (203s
+prior → 58s actual): the segmented projection tracked true-remaining within
+~1s throughout, where the old global-pace model under-predicted 3–4×.
+
+Known follow-up: the warmup gate keys on covered *prior wall*, so on a fast
+re-run where the big variable tasks complete late, the estimate appears late.
+A count-based or time-based warmup would surface it earlier.
+
+## Robustness: warmup gate + clamp
+
+Early in a run `done_prior` is tiny, so `pace_ratio` is noisy; a diverged
+playbook (shifted task paths → few/no matches) could push `done_prior ≈ 0`
+and blow the ETA up. Guards:
+
+- **Warmup gate** — emit no estimate until `done_prior ≥ 10% ×
+  prior_wall_total_s` AND `matched_tasks ≥ 2`. If paths never match
+  (edited playbook), the gate never opens → stays on today's elapsed-only
+  bar forever.
+- **Pace clamp** — `pace_ratio` clamped to `[0.2, 5.0]` so a diverged run
+  can't show absurd values.
+- **No usable prior** — `prior_wall_total_s ≤ 0` (first run, or pre-mining
+  session) → estimate is `None` → status bar unchanged.
+
+## Architecture & layering
+
+| Layer | File | Change |
+|-------|------|--------|
+| core (pure) | `core/estimate.py` *(new)* | `RunEstimate`, `covered_prior_s`, `project_remaining` — projection math, no I/O |
+| core (pure) | `core/duration.py` | reused as-is (`format_duration_compact`) |
+| session (I/O) | `session/history.py` | mine per-task wall durations into `PriorRun`, same `events.jsonl` pass as `loop_totals` |
+| infra | `compact/renderer.py` | accumulate covered prior work on task completion; call projector; feed status bar |
+| infra | `compact/format.py` | `format_status_bar` gains `remaining_seconds: float \| None` |
+
+Pure math in `core/`; mutable accumulation in the renderer (mirrors the
+existing `_tasks_completed` / `_completed_task_ids` counters). `core/`
+imports nothing from `compact/`.
+
+## Data: mining prior per-task wall durations
+
+Extend the winning-session mine in `find_previous_run` (it already opens
+`events.jsonl` once for `loop_totals`) with per-task wall timing:
+
+- Walk events in order. On each `v2_playbook_on_task_start` with a
+  `_timestamp` and `task.path`, the **previous** task's wall duration is
+  `this_ts − prev_ts`; accumulate it under the previous task's path. Close
+  the final task at `v2_playbook_on_stats` (`stats_ts − prev_ts`).
+- A recurring path (role/include invoked twice) accumulates total +
+  occurrence count; store the **per-occurrence average**
+  `task_wall_s[path] = total / count`. `prior_wall_total_s = Σ all deltas`.
+- Best-effort: missing/malformed events → empty map + `0.0` total (feature
+  silently off), same pattern as `loop_totals`.
+
+`PriorRun` gains two fields (both default-empty so old sessions are safe):
+
+```python
+task_wall_s: dict[str, float] = field(default_factory=dict)
+prior_wall_total_s: float = 0.0
+```
+
+`prior_wall_total_s` (sum of inter-task deltas) is intentionally *separate*
+from the existing `duration_seconds` used by the "Last run" hint: the mined
+total excludes pre-first-task setup and post-last-task teardown, so the
+ratio math stays internally consistent — `done_prior` reaches
+`prior_wall_total_s` exactly when every prior task has re-run. No
+`meta.json` schema bump.
+
+## Projection (`core/estimate.py`)
+
+```python
+@dataclass(frozen=True)
+class RunEstimate:
+    task_wall_s: dict[str, float]      # per-occurrence avg, from PriorRun
+    prior_wall_total_s: float
+
+_PACE_MIN, _PACE_MAX = 0.2, 5.0
+_WARMUP_FRACTION = 0.10
+_WARMUP_MIN_TASKS = 2
+
+def covered_prior_s(
+    estimate: RunEstimate, completed_paths: Iterable[str]
+) -> tuple[float, int]:
+    """Sum per-occurrence priors for completed paths; return (done_prior, matched).
+
+    A completed path absent from task_wall_s contributes 0 and is not
+    counted as matched.
+    """
+
+def project_remaining(
+    estimate: RunEstimate,
+    done_prior_s: float,
+    matched_tasks: int,
+    elapsed_s: float,
+) -> float | None:
+    if estimate.prior_wall_total_s <= 0:
+        return None
+    if matched_tasks < _WARMUP_MIN_TASKS:
+        return None
+    if done_prior_s < _WARMUP_FRACTION * estimate.prior_wall_total_s:
+        return None
+    if done_prior_s <= 0:                      # defensive; gate above implies >0
+        return None
+    pace = elapsed_s / done_prior_s
+    pace = min(max(pace, _PACE_MIN), _PACE_MAX)
+    return max(pace * (estimate.prior_wall_total_s - done_prior_s), 0.0)
+```
+
+Renderer side: maintain `done_prior` + `matched_tasks` incrementally,
+bumped on each terminal task event keyed by `task.path` (cheaper than
+re-summing a set each render; mirrors `_completed_task_ids` guarding
+double counts). On render, call `project_remaining(...)`; `None` → bar
+unchanged.
+
+## Display
+
+`format_status_bar` gains `remaining_seconds: float | None = None`:
+
+```
+site.yml │ 5/47 tasks │ ⚠ 2 │ 0:05:23  ~1m40s left
+```
+
+- Rendered `f"~{format_duration_compact(remaining)} left"`, dimmed
+  (`_DIM`), hugging the elapsed segment with a space — an annotation on
+  it, like the liveness dot — not a pipe-separated peer counter.
+- Omitted entirely when `None`. Width-safe: ≤12 chars (`~99h59m left`).
+
+## Testing (TDD, failing-first)
+
+- **Mining** (`session/history.py`): per-task wall = inter-`task_start`
+  delta; final task closed at `on_stats`; recurring path averaged;
+  malformed/missing events → empty + 0.0.
+- **Projection** (`core/estimate.py`, pure): warmup gate (under fraction →
+  None; under min-tasks → None); pace clamp at both ends; fast-rerun
+  shrinks remaining; `prior_wall_total_s == 0` → None; `covered_prior_s`
+  ignores unmatched paths and counts matched correctly.
+- **Status bar** (`compact/format.py`): segment present/absent, dim wrap,
+  ascii mode, width budget.
+- **Renderer integration**: completion bumps `done_prior`; `None`
+  projection leaves the bar untouched.
+
+New `TEST_SPECIFICATION.md` cases to be allocated contiguous TC numbers
+when implementing.
+
+## Out of scope (YAGNI)
+
+- ETA wall-clock-of-day display and elapsed/total framing (we chose
+  remaining-time only).
+- Per-host ETA, persisting a dedicated profile.json, or `meta.json`
+  versioning — mining the existing event log is sufficient.
+- TUI surfacing — compact renderer only for now (the status bar is the
+  compact view's; TUI can adopt `project_remaining` later for free since
+  it's pure `core`).

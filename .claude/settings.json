@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run ruff format --check \"$CLAUDE_TOOL_INPUT_FILE\" 2>/dev/null && uv run ruff check \"$CLAUDE_TOOL_INPUT_FILE\" 2>/dev/null"
+            "command": "f=$(jq -r '.tool_input.file_path // .tool_response.filePath // empty'); case \"$f\" in *.py) uv run ruff format --check \"$f\" >/dev/null 2>&1 && uv run ruff check \"$f\" >/dev/null 2>&1 ;; esac"
           }
         ]
       }

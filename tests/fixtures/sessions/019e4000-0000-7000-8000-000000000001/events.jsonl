@@ -1,0 +1,7 @@
+{"_event":"v2_playbook_on_start","_timestamp":"2026-05-19T18:02:00.000000Z","playbook":{"file":"ansible/site.yml"}}
+{"_event":"v2_playbook_on_play_start","_timestamp":"2026-05-19T18:02:00.500000Z","play":{"id":"p1","name":"all"}}
+{"_event":"v2_playbook_on_task_start","_timestamp":"2026-05-19T18:02:01.000000Z","task":{"id":"t1","name":"common : ping","path":"roles/common/tasks/main.yml:1","role":"common"},"play":{"id":"p1","name":"all"}}
+{"_event":"v2_runner_on_ok","_timestamp":"2026-05-19T18:02:02.000000Z","task":{"id":"t1","name":"common : ping","path":"roles/common/tasks/main.yml:1","role":"common"},"play":{"id":"p1","name":"all"},"hosts":{"web1":{"changed":false,"failed":false}}}
+{"_event":"v2_playbook_on_task_start","_timestamp":"2026-05-19T18:02:03.000000Z","task":{"id":"t2","name":"common : echo","path":"roles/common/tasks/main.yml:5","role":"common"},"play":{"id":"p1","name":"all"}}
+{"_event":"v2_runner_on_ok","_timestamp":"2026-05-19T18:02:04.000000Z","task":{"id":"t2","name":"common : echo","path":"roles/common/tasks/main.yml:5","role":"common"},"play":{"id":"p1","name":"all"},"hosts":{"web1":{"changed":true,"failed":false}}}
+{"_event":"v2_playbook_on_stats","_timestamp":"2026-05-19T18:02:42.000000Z","stats":{"web1":{"ok":2,"changed":1,"failures":0,"unreachable":0,"skipped":0}}}

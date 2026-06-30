@@ -1,6 +1,8 @@
 """Entry point for running AOM as a module: python -m ansible_aom."""
 
+import sys
+
 from ansible_aom.cli import main
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

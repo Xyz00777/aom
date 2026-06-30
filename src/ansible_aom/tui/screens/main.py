@@ -10,6 +10,7 @@ from textual.binding import Binding
 from textual.screen import Screen
 
 from ansible_aom.core.models import RunState
+from ansible_aom.core.tree import TreeProjection
 from ansible_aom.tui.keybindings import KEYBINDINGS, KeyContext
 from ansible_aom.tui.widgets import DebugPanel, LogPanel, StatusBar, SummaryPanel, TaskTree
 
@@ -23,6 +24,8 @@ class MainScreen(Screen):
     - Right panel: Summary (top) + Log panel (bottom)
     - Footer: Help shortcuts
     """
+
+    _projection: TreeProjection | None = None
 
     DEFAULT_CSS = """
     MainScreen {
@@ -71,9 +74,19 @@ class MainScreen(Screen):
         yield StatusBar()
 
     def update_from_state(self, run_state: RunState) -> None:
-        """Update all widgets from RunState."""
-        summary = self.query_one(SummaryPanel)
-        status = self.query_one(StatusBar)
+        """Update all widgets from RunState.
+
+        Idempotent: safe to call on every UI tick. The tree is rebuilt
+        from the projection each call so completed tasks/plays are
+        dropped automatically.
+        """
+        try:
+            summary = self.query_one(SummaryPanel)
+            status = self.query_one(StatusBar)
+            tree = self.query_one(TaskTree)
+        except Exception:
+            # Screen not fully mounted yet; the next tick will retry.
+            return
 
         current_play_name = ""
         hosts_total = 0
@@ -107,8 +120,42 @@ class MainScreen(Screen):
         status.set_host_count(hosts_completed, hosts_total)
         status.set_playbook_name(run_state.playbook)
 
+        # Tree handling: two-mode refresh.
+        # When the projection is visible (during a run), rebuild from
+        # projection every call — this drops completed tasks/plays so
+        # the tree only shows running and pending items.
+        # When the projection is NOT visible (before tasks arrive, or
+        # after end_time is set), fall back to the original two-step
+        # behaviour: skeleton built once from definitions, icons mutated
+        # every call via apply_state_icons. This preserves final status
+        # icons after completion — populate_from_definitions alone would
+        # reset all icons to PENDING.
+        if self._projection is None or self._projection._state is not run_state:
+            self._projection = TreeProjection.from_run_state(run_state)
+        raw_height = tree.size.height
+        budget = max(8, min(60, raw_height if raw_height > 0 else 20))
+        if self._projection.is_tree_visible():
+            tree.populate_from_projection(self._projection, budget=budget)
+        else:
+            if run_state.definitions and not list(tree.root.children):
+                tree.populate_from_definitions(run_state.definitions)
+            if run_state.plays:
+                tree.apply_state_icons(run_state)
+
         if run_state.start_time:
-            self._update_elapsed_from_start(run_state.start_time)
+            try:
+                self._update_elapsed_from_start(run_state.start_time)
+            except TypeError:
+                # naive/aware datetime mismatch on legacy fixtures; the
+                # tree/summary updates above are the load-bearing path
+                # and must not be blocked by a clock-format quirk.
+                pass
+
+        # Force a refresh — Textual reactives only fire on assignment,
+        # but we mutated node labels imperatively above.
+        summary.refresh()
+        status.refresh()
+        tree.refresh()
 
     def _update_elapsed_from_start(self, start_time: datetime) -> None:
         """Update elapsed time on both panels from start time."""

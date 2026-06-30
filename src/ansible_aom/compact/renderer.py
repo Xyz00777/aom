@@ -1,156 +1,90 @@
-"""Compact renderer for AOM.
+"""Compact renderer — Rich Live lifecycle and per-event log emission.
 
-This module implements the ANSI-based compact view renderer.
-See SPECIFICATION.md Section 4.1 for compact view details.
+Pure formatters live in :mod:`ansible_aom.compact.format`;
+exit-code derivation lives in :mod:`ansible_aom.compact.exit_code`.
+Both are re-exported here so historical
+``from ansible_aom.compact.renderer import format_status_bar`` (etc.)
+imports keep working. See ARCHITECTURE.md §7.3.
+
+See SPECIFICATION.md Section 4.1 for compact view behaviour.
 """
 
 from __future__ import annotations
 
+import shutil
 import time
 from typing import TYPE_CHECKING
 
 from ansible_aom.compact.display import Display
+from ansible_aom.compact.exit_code import determine_exit_code  # noqa: F401 — re-export
+from ansible_aom.compact.format import (
+    _BOLD,  # noqa: F401 — re-export
+    _CYAN,
+    _DIM,
+    _GREEN,
+    _MAGENTA,
+    _MSG_DISPLAY_CAP,  # noqa: F401 — re-export
+    _RED,
+    _RESET,  # noqa: F401 — re-export
+    _SGR_RE,  # noqa: F401 — re-export
+    _YELLOW,
+    _color_enabled,
+    _compute_mode_label,
+    _compute_tree_budget,
+    _format_count_cells,  # noqa: F401 — re-export
+    _strip_sgr,  # noqa: F401 — re-export
+    _truncate_msg,
+    _truncate_visible,  # noqa: F401 — re-export
+    _wrap,
+    collect_tags,  # noqa: F401 — re-export
+    count_completed_tasks,
+    count_total_tasks,
+    count_total_tasks_seen,
+    format_failure_recap,
+    format_host_rows,
+    format_host_summary,  # noqa: F401 — re-exported for test access
+    format_preflight_summary,
+    format_status_bar,
+    format_tree_block,
+)
 from ansible_aom.compact.password import handle_password_prompt as do_handle_password_prompt
-from ansible_aom.core.icons import STATUS_ICONS
+from ansible_aom.core import diagnostics
+from ansible_aom.core.estimate import (
+    RunEstimate,
+    RunProgress,
+    add_completed,
+    add_in_flight,
+    project_remaining,
+)
+from ansible_aom.core.heartbeat import HeartbeatTracker, LivenessState  # noqa: F401
+from ansible_aom.core.icons import is_unicode_terminal
+from ansible_aom.core.log_filter import (
+    normalize_hide_states,
+    should_hide_event,
+    should_hide_host_result,
+)
 from ansible_aom.core.models import RunState, Status
+from ansible_aom.core.tree import TreeProjection
 
 if TYPE_CHECKING:
-    pass
+    from ansible_aom.session.history import PriorRun
 
 
-# =============================================================================
-# Module-Level Formatting Functions
-# =============================================================================
-
-
-def format_status_bar(
-    playbook: str,
-    hosts_completed: int,
-    hosts_total: int,
-    warnings: int,
-    deprecations: int,
-    elapsed_seconds: float,
-) -> str:
-    """Format the status bar for compact mode display.
-
-    Args:
-        playbook: Path to the playbook file.
-        hosts_completed: Number of hosts that completed.
-        hosts_total: Total number of hosts.
-        warnings: Number of warnings encountered.
-        deprecations: Number of deprecations encountered.
-        elapsed_seconds: Elapsed time in seconds.
-
-    Returns:
-        Formatted status bar string: "playbook │ X/Y hosts │ ⚠ N ✱ N │ H:MM:SS"
-
-    Example:
-        >>> format_status_bar("site.yml", 3, 10, 2, 1, 323)
-        'site.yml │ 3/10 hosts │ ⚠ 2 ✱ 1 │ 0:05:23'
-    """
-    elapsed_int = int(elapsed_seconds)
-    elapsed_h = elapsed_int // 3600
-    elapsed_m = (elapsed_int % 3600) // 60
-    elapsed_s = elapsed_int % 60
-    elapsed_str = f"{elapsed_h}:{elapsed_m:02d}:{elapsed_s:02d}"
-
-    parts = [
-        playbook,
-        f"{hosts_completed}/{hosts_total} hosts",
-    ]
-
-    if warnings > 0:
-        parts.append(f"⚠ {warnings}")
-    if deprecations > 0:
-        parts.append(f"✱ {deprecations}")
-
-    parts.append(elapsed_str)
-
-    return " │ ".join(parts)
-
-
-def format_host_summary(
-    hostname: str,
-    ok: int,
-    changed: int,
-    failed: int,
-    unreachable: int,
-) -> str:
-    """Format a host summary line with status icons.
-
-    Only includes non-zero counts in the output.
-
-    Args:
-        hostname: The hostname.
-        ok: Number of OK tasks.
-        changed: Number of changed tasks.
-        failed: Number of failed tasks.
-        unreachable: Number of unreachable tasks.
-
-    Returns:
-        Formatted host summary with icons: "hostname: ● N ok, ◆ M changed, ..."
-
-    Example:
-        >>> format_host_summary("web1", 12, 3, 0, 0)
-        'web1: ● 12 ok ◆ 3 changed'
-    """
-    parts = [f"{hostname}:"]
-
-    if ok > 0:
-        icon = STATUS_ICONS[Status.OK]
-        parts.append(f"{icon} {ok} ok")
-    if changed > 0:
-        icon = STATUS_ICONS[Status.CHANGED]
-        parts.append(f"{icon} {changed} changed")
-    if failed > 0:
-        icon = STATUS_ICONS[Status.FAILED]
-        parts.append(f"{icon} {failed} failed")
-    if unreachable > 0:
-        icon = STATUS_ICONS[Status.UNREACHABLE]
-        parts.append(f"{icon} {unreachable} unreachable")
-
-    return " ".join(parts)
-
-
-def determine_exit_code(state: RunState) -> int:
-    """Determine exit code from RunState.
-
-    Traverses the RunState to determine the appropriate exit code:
-    - 0: All tasks completed OK, CHANGED, or SKIPPED
-    - 1: Any task FAILED (takes precedence over UNREACHABLE)
-    - 2: Any host UNREACHABLE (but not if any FAILED)
-
-    Args:
-        state: The RunState to analyze.
-
-    Returns:
-        Exit code (0, 1, or 2).
-
-    Example:
-        >>> state = RunState(playbook="test.yml")
-        >>> determine_exit_code(state)
-        0
-    """
-    # Check for FAILED first (takes precedence)
-    for play in state.plays.values():
-        for task in play.tasks.values():
-            for host_state in task.hosts.values():
-                if host_state.status == Status.FAILED:
-                    return 1
-
-    # Then check for UNREACHABLE
-    for play in state.plays.values():
-        for task in play.tasks.values():
-            for host_state in task.hosts.values():
-                if host_state.status == Status.UNREACHABLE:
-                    return 2
-
-    return 0
-
-
-# =============================================================================
-# CompactRenderer Implementation
-# =============================================================================
+# HS-1/HS-8: status-panel compute throttle. Aligned with Display.update's
+# write throttle (0.25 s) so a compute whose output Display would
+# coalesce is short-circuited entirely. The clean-tick refresh uses the
+# same 0.25 s window so the spinner glyph (◐→◓→◑→◒) and elapsed-time
+# segment animate at 4 FPS during quiet periods.
+_PANEL_COMPUTE_THROTTLE_S = 0.25
+_PANEL_TICK_REFRESH_S = 0.25
+# Dirty-path coalesce window. When state changes keep arriving faster
+# than ``_PANEL_COMPUTE_THROTTLE_S`` we still want to render *eventually*
+# (the old gate skipped every call within the throttle window, which
+# could starve the panel forever during a burst). This short window
+# collapses truly simultaneous events (e.g. one task_start followed by
+# five runner_on_ok within microseconds) without burning CPU, but lets
+# the next render proceed as soon as the burst settles.
+_PANEL_DIRTY_COALESCE_S = 0.05
 
 
 class CompactRenderer:
@@ -167,25 +101,130 @@ class CompactRenderer:
         _start_time: Timestamp when rendering started.
     """
 
-    def __init__(self, **kwargs: object) -> None:
+    def __init__(self, is_tty: bool = True, hide_states: list[str] | None = None) -> None:
         """Initialize the compact renderer.
 
         Args:
-            **kwargs: Additional configuration options.
-                - is_tty: Whether stdout is a TTY (default: True).
+            is_tty: Whether stdout is a TTY. Non-TTY mode disables ANSI
+                cursor control and prints log lines as plain text.
+            hide_states: List of host states to suppress from the live
+                compact log (e.g. ``["ok", "skipped"]``). The status
+                panel, event recording, and aom inspect are unaffected.
         """
-        is_tty = kwargs.get("is_tty", True)
-        if isinstance(is_tty, bool):
-            self._display = Display(is_tty=is_tty)
-        else:
-            self._display = Display(is_tty=True)
-
+        self._display = Display(is_tty=is_tty)
+        valid, _unknown = normalize_hide_states(hide_states or [])
+        self._hide_states: frozenset[str] = valid
         self._state: RunState | None = None
         self._playbook: str = ""
         self._args: list[str] = []
         self._start_time: float = 0.0
         self._warnings_count: int = 0
         self._deprecations_count: int = 0
+        self._definitions: list = []
+        self._seen_warning_messages: set[str] = set()
+        self._ascii_mode: bool = not is_unicode_terminal()
+        self._colorize: bool = _color_enabled(is_tty)
+        self._heartbeat = HeartbeatTracker()
+        # Per-task timing: start timestamp (seconds since epoch) keyed by
+        # task UUID, plus a tiny single-entry cache of "the task we just
+        # printed a TASK header for" so the inline result lines and the
+        # post-task summary can quote the right duration.
+        self._task_start_times: dict[str, float] = {}
+        self._last_task_uuid: str | None = None
+        self._last_task_name: str | None = None
+        self._last_task_start_time: float | None = None
+        # Pre-rendered chips like ``DRY RUN`` / ``DIFF`` shown in the
+        # status bar's leftmost slot. Computed once in ``start()``
+        # from the ansible_args; never changes during a run.
+        self._mode_label: str = ""
+        # Skipped-task collapsing: hold ``skipping: [host]`` lines for
+        # the in-flight task and decide on flush whether to print them
+        # individually (mixed-result task) or compress into a single
+        # ``… N hosts skipped`` line (all-skipped task). Reset on each
+        # task_start; flushed by the next task_start or stats.
+        self._pending_skipped_hosts: list[str] = []
+        self._current_task_had_nonskipped_result: bool = False
+        # Hosts that produced a per-host result line carrying an inline
+        # duration suffix for the *currently running* task. Used by the
+        # post-task summary to suppress its own duration when exactly
+        # one host already displayed it on its result line — avoiding
+        # duplication on single-host runs (and on run_once / delegated
+        # tasks in multi-host runs).
+        self._current_task_inline_duration_hosts: set[str] = set()
+        # ``(host, task_id)`` pairs for which we have already streamed
+        # per-item loop lines from ``v2_runner_item_on_*`` events. The
+        # aggregate ``v2_runner_on_ok``/``on_failed`` then suppresses its
+        # own ``results[]`` expansion for these pairs so items aren't
+        # rendered twice. Empty under the plain ``ansible.posix.jsonl``
+        # fallback (no item events), where the aggregate expansion stays
+        # the only source of per-item lines.
+        self._streamed_loop_items: set[tuple[str, str]] = set()
+        # Optional prior-run stats for the preflight "Last run" hint.
+        # Must be set via :meth:`set_prior_run` BEFORE
+        # :meth:`set_definitions` so the hint is included in the
+        # one-shot startup summary.
+        self._prior_run: "PriorRun | None" = None
+        # Phase 4 (diagnostics): per-renderer activity counters published
+        # via :py:meth:`collect_stats` at :py:meth:`stop`. Render bumps
+        # land in :py:meth:`_render_status_panel`; log-write bumps in
+        # :py:meth:`print_log`. Both increment unconditionally — the
+        # cost is one int add and the post-mortem signal is worth it.
+        self._render_calls: int = 0
+        self._log_writes: int = 0
+        # HS-3: cached TreeProjection. ``TreeProjection`` memoizes its
+        # role-index per instance and now refreshes its own shape-aware
+        # caches when the underlying RunState revision changes, so the
+        # same instance can survive across renders and quiet gaps.
+        self._projection: TreeProjection | None = None
+        # HS-2: incremental task counters. The format-layer functions
+        # ``count_completed_tasks`` / ``count_total_tasks_seen`` walked
+        # the full state on every render — fine for handle_completion
+        # but quadratic per event. The counters here are bumped in
+        # ``update_state`` and read directly by the status bar.
+        # ``_completed_task_ids`` guards against double-counting when a
+        # terminal event arrives more than once for the same task
+        # (e.g. host-by-host events under the free strategy).
+        self._tasks_seen: int = 0
+        self._tasks_completed: int = 0
+        self._completed_task_ids: set[str] = set()
+        # Live run-duration estimate. ``_estimate`` is the matching prior
+        # run's result-segmented per-task wall profile (built in
+        # ``set_prior_run``); ``_progress`` accumulates covered prior work as
+        # tasks complete (bumped alongside ``_tasks_completed``, under the
+        # same once-per-task guard). The status bar feeds these — plus
+        # in-flight top-ups computed each render — through
+        # ``project_remaining``. See :mod:`ansible_aom.core.estimate`.
+        self._estimate: RunEstimate | None = None
+        self._progress: RunProgress = RunProgress()
+        # Currently-running tasks: ``task_id -> (task.path, start_wall)``,
+        # where ``start_wall`` is ``time.time()`` at the task's first
+        # announcement (same clock as the status-bar elapsed). Lets the ETA
+        # credit a long in-flight task's progress against its prior
+        # duration instead of letting it inflate the estimate. Entries are
+        # popped when the task completes.
+        self._running_task_starts: dict[str, tuple[str, float]] = {}
+        # Tasks whose TASK [..] header has already been printed. Under
+        # the free strategy ansible.posix.jsonl emits v2_runner_on_start
+        # per host instead of one v2_playbook_on_task_start up front, so
+        # the header is emitted from either event — whichever arrives
+        # first. This set keeps us from printing it twice when both fire.
+        self._announced_task_uuids: set[str] = set()
+        # HS-1/HS-8: dirty-flag + compute throttle on the status panel.
+        # The flag turns on when state changes; the panel computation
+        # is throttled to the same 0.25 s window Display.update uses
+        # to coalesce stdout writes — beyond that window the compute
+        # output is invisible anyway. A 1 s "clock advance" threshold
+        # lets the elapsed-time segment in the status bar keep ticking
+        # during quiet periods without computing on every tick().
+        self._panel_dirty: bool = False
+        self._last_panel_compute_time: float = 0.0
+        # HS-1/HS-8: monotonic timestamp of the most recent state change.
+        # Tracked separately from ``_last_panel_compute_time`` so the
+        # dirty-path gate can distinguish "last compute already saw the
+        # latest state" from "last compute is stale — render now". Without
+        # this split, a burst of state changes arriving faster than the
+        # compute throttle could starve the panel indefinitely.
+        self._last_state_change_monotonic: float = 0.0
 
     def start(self, playbook: str, args: list[str]) -> None:
         """Start rendering a playbook run.
@@ -200,6 +239,19 @@ class CompactRenderer:
         self._playbook = playbook
         self._args = args
         self._start_time = time.time()
+        self._mode_label = _compute_mode_label(args, self._colorize)
+
+        # Reset the incremental counters so a re-used renderer instance
+        # (e.g. ``aom replay`` driving a fresh run on the same object)
+        # starts at zero rather than carrying state over.
+        self._tasks_seen = 0
+        self._tasks_completed = 0
+        self._completed_task_ids = set()
+        self._announced_task_uuids = set()
+        # ``_estimate`` is set by ``set_prior_run`` and not reset here, the
+        # same way ``_prior_run`` isn't — only the per-run accumulators are.
+        self._progress = RunProgress()
+        self._running_task_starts = {}
 
         # Initialize RunState
         self._state = RunState(playbook=playbook)
@@ -215,8 +267,65 @@ class CompactRenderer:
             warnings=0,
             deprecations=0,
             elapsed_seconds=0.0,
+            ascii_mode=self._ascii_mode,
+            colorize=self._colorize,
+            mode_label=self._mode_label,
         )
         self._display.update(status_bar)
+
+    def set_prior_run(self, prior_run: "PriorRun | None") -> None:
+        """Store the matching prior-run stats for the preflight summary.
+
+        Must be called before :meth:`set_definitions` so the hint line
+        is included in the one-shot startup summary. ``None`` means no
+        matching prior run — the line is silently omitted.
+
+        The prior run's mined ``loop_totals`` are also copied onto the
+        RunState so the tree can render ``N/total`` loop progress live.
+        """
+        self._prior_run = prior_run
+        if prior_run is not None and prior_run.prior_wall_total_s > 0:
+            self._estimate = RunEstimate(
+                task_wall_s=dict(prior_run.task_wall_s),
+                variable_paths=prior_run.variable_paths,
+                prior_wall_total_s=prior_run.prior_wall_total_s,
+                prior_var_total_s=prior_run.prior_var_total_s,
+            )
+        else:
+            self._estimate = None
+        if self._state is not None:
+            self._state.loop_totals = dict(prior_run.loop_totals) if prior_run else {}
+
+    def set_definitions(self, definitions: list) -> None:
+        """Store preflight definitions and emit the startup summary.
+
+        Two effects:
+        1. The status bar's host count switches from `0/0` to `0/N` from
+           the next frame onwards, using the union of every play's
+           resolved_hosts as the denominator.
+        2. A one-shot startup summary (PLAY/host/task counts per play)
+           is printed above the status panel, mirroring nom's preview.
+        """
+        self._definitions = list(definitions)
+
+        summary = format_preflight_summary(self._definitions, prior_run=self._prior_run)
+        if summary is not None:
+            self._display.print_log(summary)
+
+        if self._state is None:
+            return
+        # Mirror onto state so the state machine's task_start handler
+        # can look up per-play resolved_hosts (used to synthesise the
+        # per-host RUNNING entries under linear strategy, where the
+        # JSONL callback does not emit v2_runner_on_start).
+        self._state.definitions = list(self._definitions)
+        # HS-1/HS-8: mark dirty so the next render computes against the
+        # fresh definitions. Stamp the state-change clock so the
+        # dirty-path throttle gate can recognise "stale compute" vs
+        # "compute already saw this state".
+        self._panel_dirty = True
+        self._last_state_change_monotonic = time.monotonic()
+        self._render_status_panel()
 
     def update_state(self, event: dict) -> None:
         """Handle a new JSONL event.
@@ -229,30 +338,262 @@ class CompactRenderer:
         if self._state is None:
             return
 
+        # Stream the event as a log line above the status panel BEFORE
+        # mutating state — keeps the visual story "what happened, then
+        # the panel reflects it". Throttling on the panel update means
+        # the panel may visibly trail the logs, which matches nom.
+        self._emit_event_log(event)
+
         # Update RunState with the event
         self._state.handle_event(event)
 
-        # Calculate current statistics from state
-        hosts_completed = 0
-        hosts_total = 0
+        # HS-2: bump the incremental counters using the freshly-mutated
+        # state. Done after ``handle_event`` so the task's hosts dict
+        # reflects the event we just processed.
+        self._bump_task_counters(event)
 
-        # Count hosts and states from RunState
+        # HS-1/HS-8: mark the panel as needing recompute. The actual
+        # decision to compute is gated inside ``_render_status_panel``.
+        self._panel_dirty = True
+        # HS-1/HS-8: stamp the state-change clock so the dirty-path
+        # gate can recognise "stale compute" vs "already rendered this
+        # state".
+        self._last_state_change_monotonic = time.monotonic()
+
+        # Refresh the status panel with current state + elapsed time.
+        self._render_status_panel()
+
+    def _bump_task_counters(self, event: dict) -> None:
+        """Update ``_tasks_seen`` / ``_tasks_completed`` from a single event.
+
+        Tracks the same ground truth as ``count_completed_tasks`` but at
+        per-event cost — at most one task lookup plus an O(H) walk over
+        that task's hosts. ``_completed_task_ids`` keeps the count
+        idempotent across replayed or per-host-fanned-out events.
+        """
+        if self._state is None:
+            return
+        event_type = event.get("_event", "")
+        if event_type == "v2_playbook_on_task_start":
+            self._tasks_seen += 1
+            self._record_running_start(event)
+            return
+        if event_type == "v2_runner_on_start":
+            # Free strategy announces tasks per-host here instead of via
+            # task_start; record the first sighting so in-flight credit
+            # works under both strategies.
+            self._record_running_start(event)
+            return
+        if event_type in ("v2_playbook_on_play_start", "v2_playbook_on_stats"):
+            # A new play (or the final stats event) is proof that every prior
+            # play is done: RunState._finalize_play flips their lingering
+            # RUNNING hosts to a terminal status *in place*, without emitting
+            # any v2_runner_on_* the per-event branch below could hook.
+            # ``ansible.builtin.pause`` is the canonical case — it yields no
+            # v2_runner_on_ok at all. Reconcile every newly-terminal task so
+            # _tasks_completed keeps matching the count_completed_tasks oracle
+            # (HS-2). These boundary events are rare (once per play / once at
+            # end), so the full walk is cheap beside the per-runner-event path.
+            self._reconcile_completed_tasks()
+            return
+        if event_type not in (
+            "v2_runner_on_ok",
+            "v2_runner_on_failed",
+            "v2_runner_on_skipped",
+            "v2_runner_on_unreachable",
+        ):
+            return
+        task_id = self._task_dict(event).get("id", "")
+        if not task_id or task_id in self._completed_task_ids:
+            return
+        play_id = self._state._resolve_play_id(event)
+        play = self._state.plays.get(play_id) if play_id else None
+        if play is None:
+            # Fallback: scan plays for the task. Free-strategy events
+            # may carry no usable play_id at all; the lookup degrades
+            # but stays O(P) rather than O(P×T).
+            for candidate in self._state.plays.values():
+                if task_id in candidate.tasks:
+                    play = candidate
+                    break
+        if play is None:
+            return
+        task = play.tasks.get(task_id)
+        if task is None or not task.hosts:
+            return
+        if all(hs.status != Status.RUNNING for hs in task.hosts.values()):
+            path = self._task_dict(event).get("path", "") or (task.path or "")
+            self._count_completed_task(task_id, path)
+
+    def _reconcile_completed_tasks(self) -> None:
+        """Count tasks finalised in RunState without a terminal runner event.
+
+        ``RunState._finalize_play`` (fired at play-start and stats
+        boundaries) flips a play's lingering RUNNING hosts to terminal in
+        place, so a pause — or any action with no v2_runner_on_* result —
+        never reaches the per-event branch in ``_bump_task_counters``. Walk
+        every play once and count any task that is now terminal and not yet
+        counted, mirroring ``count_completed_tasks`` exactly so the
+        incremental counter cannot drift below the oracle (HS-2).
+        """
+        if self._state is None:
+            return
+        for play in self._state.plays.values():
+            for task_id, task in play.tasks.items():
+                if task_id in self._completed_task_ids or not task.hosts:
+                    continue
+                if all(hs.status != Status.RUNNING for hs in task.hosts.values()):
+                    self._count_completed_task(task_id, task.path or "")
+
+    def _count_completed_task(self, task_id: str, path: str) -> None:
+        """Fold one finished task into the incremental progress counters.
+
+        Idempotent via ``_completed_task_ids``. The task is no longer in
+        flight, so its recorded start gives this run's actual wall (the
+        work-pace numerator); fall back to the prior wall when no start was
+        recorded — a finalised pause has none (neutral, pace ≈ 1). Keyed by
+        task path, the only cross-run stable identity; an unmatched path
+        contributes nothing.
+        """
+        self._completed_task_ids.add(task_id)
+        self._tasks_completed += 1
+        start = self._running_task_starts.pop(task_id, None)
+        if self._estimate is not None:
+            prior_wall = self._estimate.task_wall_s.get(path)
+            actual_wall = (time.time() - start[1]) if start is not None else (prior_wall or 0.0)
+            add_completed(self._estimate, self._progress, path, actual_wall)
+
+    def _record_running_start(self, event: dict) -> None:
+        """Note when a task entered flight, for the live ETA's in-flight credit.
+
+        Records ``task_id -> (task.path, wall_now)`` on the task's first
+        announcement (task_start under linear, the first runner_on_start
+        under free). Only tasks carrying both an id and a path are tracked
+        — a path is needed to look up the prior duration to credit against —
+        and only the first sighting wins so a per-host fan-out doesn't reset
+        the clock.
+        """
+        task = self._task_dict(event)
+        task_id = task.get("id")
+        path = task.get("path")
+        if not task_id or not path or task_id in self._running_task_starts:
+            return
+        self._running_task_starts[task_id] = (path, time.time())
+
+    def tick(self) -> None:
+        """Refresh the status panel without processing an event.
+
+        The runner calls this during quiet periods (no PTY output for a
+        timeout window) so the elapsed-time counter keeps moving even
+        when ansible isn't emitting any events. Display throttling means
+        rapid ticks coalesce; calling every 0.5s is fine.
+        """
+        if self._state is None:
+            return
+        self._render_status_panel()
+
+    def note_pty_bytes(self) -> None:
+        self._heartbeat.note_bytes(time.monotonic())
+
+    def note_subprocess_active(self, active: bool) -> None:
+        self._heartbeat.note_cpu_sample(time.monotonic(), active)
+
+    def _render_status_panel(self) -> None:
+        """Compute and push the current panel (status bar + tree + hosts).
+
+        Composes three regions into a single Display update:
+        1. Status bar (existing — counts, elapsed, warnings, liveness).
+        2. Tree block (Task 7) — visible only while a task is RUNNING.
+        3. Per-host summary table (Task 6) — visible whenever the run
+           targets more than one host.
+
+        All three pieces are joined with newlines; Display tracks the
+        resulting row count for cursor management.
+        """
+        if self._state is None:
+            return
+
+        # HS-1/HS-8: skip the heavy compute when its output would either
+        # be coalesced away by Display.update (within the same 0.25 s
+        # write window) or would just re-render the previous picture
+        # (no state change, no meaningful clock advance).
+        #
+        # Dirty-path gating: the previous gate compared only against
+        # ``_last_panel_compute_time`` and skipped every call within the
+        # 0.25 s window. If state changes kept arriving faster than that,
+        # the gate kept suppressing forever — the panel froze on stale
+        # output. The fix tracks when the most recent state change
+        # arrived (``_last_state_change_monotonic``) and uses the
+        # comparison ``last_compute >= last_state_change`` to recognise
+        # "we already rendered this state" vs "we owe the user a render".
+        now = time.monotonic()
+        last_compute = self._last_panel_compute_time
+        if last_compute > 0.0:
+            elapsed_since_compute = now - last_compute
+            if self._panel_dirty:
+                last_change = self._last_state_change_monotonic
+                if last_compute >= last_change:
+                    # Last compute already saw the latest state — safe
+                    # to wait for the longer 1 s clock-advance refresh.
+                    if elapsed_since_compute < _PANEL_TICK_REFRESH_S:
+                        return
+                else:
+                    # Last compute is stale (state changed since).
+                    # Coalesce only a very short burst window so
+                    # simultaneous events don't fan out into multiple
+                    # computes, but render as soon as the burst settles.
+                    if elapsed_since_compute < _PANEL_DIRTY_COALESCE_S:
+                        return
+            else:
+                if elapsed_since_compute < _PANEL_TICK_REFRESH_S:
+                    return
+
+        # Counted after the early-return so a state-less call (e.g. an
+        # update_state that hit a renderer that already stopped) doesn't
+        # inflate the metric.
+        self._render_calls += 1
+
+        # --- Region 1: status bar (existing logic) -------------------------
+        # Per-host status: last terminal state wins. We skip RUNNING
+        # entries because a host's HostRunState in the *current* task
+        # is transiently RUNNING while previous tasks left it at OK —
+        # without this guard the `X/Y hosts` count would oscillate
+        # back to zero every time a new task started.
         host_statuses: dict[str, Status] = {}
-
         for play in self._state.plays.values():
             for task in play.tasks.values():
                 for hostname, host_state in task.hosts.items():
+                    if host_state.status == Status.RUNNING:
+                        continue
                     host_statuses[hostname] = host_state.status
 
-        hosts_total = len(host_statuses)
-        for status in host_statuses.values():
-            if status in (Status.OK, Status.CHANGED, Status.SKIPPED, Status.COMPLETED):
-                hosts_completed += 1
+        # Prefer the preflight-resolved host count when JSONL hasn't yet
+        # filled in any host states, so the user sees `0/N hosts` from
+        # the first frame instead of `0/0 hosts`.
+        preflight_hosts: set[str] = set()
+        for play_def in self._definitions:
+            preflight_hosts.update(play_def.resolved_hosts)
+        hosts_total = max(len(host_statuses), len(preflight_hosts))
 
-        # Calculate elapsed time
-        elapsed = time.time() - self._start_time
+        hosts_completed = sum(
+            1
+            for s in host_statuses.values()
+            if s in (Status.OK, Status.CHANGED, Status.SKIPPED, Status.COMPLETED)
+        )
 
-        # Format and update status bar
+        now_wall = time.time()
+        elapsed = now_wall - self._start_time
+        remaining_seconds: float | None = None
+        if self._estimate is not None:
+            # Top up a copy of completed progress with tasks still in flight,
+            # crediting each against its prior duration so a long-running task
+            # burns the estimate down instead of inflating it. The copy keeps
+            # in-flight work out of the warmup gate (which is on completed
+            # work only).
+            progress = self._progress.copy()
+            for path, start in self._running_task_starts.values():
+                add_in_flight(self._estimate, progress, path, now_wall - start)
+            remaining_seconds = project_remaining(self._estimate, progress)
         status_bar = format_status_bar(
             playbook=self._playbook,
             hosts_completed=hosts_completed,
@@ -260,8 +601,111 @@ class CompactRenderer:
             warnings=self._warnings_count,
             deprecations=self._deprecations_count,
             elapsed_seconds=elapsed,
+            remaining_seconds=remaining_seconds,
+            tasks_completed=self._tasks_completed,
+            tasks_total=max(
+                count_total_tasks(self._definitions),
+                self._tasks_seen,
+            ),
+            ascii_mode=self._ascii_mode,
+            colorize=self._colorize,
+            mode_label=self._mode_label,
+            liveness=self._heartbeat.state(time.monotonic()),
         )
-        self._display.update(status_bar)
+
+        # --- Regions 2 & 3: tree + host rows -------------------------------
+        # HS-3: reuse the cached projection between renders. The
+        # projection refreshes its own revision-aware caches when the
+        # underlying RunState shape changes.
+        if self._projection is None or self._projection._state is not self._state:
+            self._projection = TreeProjection.from_run_state(self._state)
+        projection = self._projection
+        cols, rows = shutil.get_terminal_size((80, 24))
+        active_hosts = sum(1 for s in host_statuses.values() if s == Status.RUNNING)
+        budget = _compute_tree_budget(rows, active_hosts)
+        # Spinner frame derived from wall clock so the running glyph
+        # actually animates between renders. 4 FPS matches the panel
+        # refresh budget — anything faster would tear past the throttle.
+        frame = int(now * 4)
+        tree_lines = format_tree_block(
+            projection,
+            budget=budget,
+            width=cols,
+            ascii_mode=self._ascii_mode,
+            colorize=self._colorize,
+            animation_frame=frame,
+        )
+        host_lines: list[str] = []
+        if projection.is_host_summary_visible():
+            host_lines = format_host_rows(
+                projection,
+                width=cols,
+                ascii_mode=self._ascii_mode,
+                colorize=self._colorize,
+                animation_frame=frame,
+            )
+
+        # Status bar is the BOTTOM line so it stays anchored where the
+        # user's eye expects a status line. Tree + host rows render
+        # above it (and grow upward into the log area as needed).
+        parts: list[str] = []
+        if tree_lines:
+            parts.append("\n".join(tree_lines))
+        if host_lines:
+            parts.append("\n".join(host_lines))
+        parts.append(status_bar)
+        self._display.update("\n".join(parts))
+        # HS-1/HS-8: record successful compute and clear the dirty flag
+        # so the next call's gate evaluates against this timestamp.
+        self._panel_dirty = False
+        self._last_panel_compute_time = now
+
+    def _render_status_bar(self) -> None:
+        """Deprecated alias — kept for any test references that still call
+        the old name. New code calls ``_render_status_panel``."""
+        self._render_status_panel()
+
+    def handle_interactive_prompt(self, prompt_text: str) -> str:
+        """Surface a pause / vars_prompt-style prompt and capture one line.
+
+        Mirrors ``handle_password_prompt`` but uses ``input()`` for an
+        echoing read — pause and vars_prompt are not secrets. The Rich
+        Live panel is stopped before the prompt prints so the user can
+        actually see the captured prompt text; the panel restarts in a
+        finally block so a crashing ``input()`` never leaves the
+        terminal headless.
+
+        Two non-obvious correctness details:
+
+        1. The prompt is written to ``sys.stdout`` explicitly via
+           ``write()+flush()`` rather than passed as ``input()``'s
+           prompt argument. CPython's ``input(prompt)`` routes the
+           prompt through ``readline`` when both stdin and stdout
+           are TTYs, and readline emits the prompt on **stderr** —
+           so a user running ``aom site.yml 2>file`` never sees the
+           prompt. Writing to stdout directly bypasses that.
+        2. ``KeyboardInterrupt`` propagates. The pause module
+           advertises "Press Enter to continue or Ctrl+C to abort" —
+           translating a Ctrl+C into a returned empty string
+           (i.e. Enter) silently reversed the abort. Now Ctrl+C
+           bubbles up to the runner's outer handler, which SIGINTs
+           the child and exits 130.
+        """
+        import sys
+
+        self._display.stop()
+        try:
+            sys.stdout.write(prompt_text)
+            sys.stdout.flush()
+            return input()
+        except EOFError:
+            # Ctrl+D / closed stdin — treat as "user pressed Enter"
+            # so the playbook can proceed in non-interactive
+            # environments. KeyboardInterrupt is intentionally NOT
+            # caught here; see docstring.
+            return ""
+        finally:
+            self._display.start()
 
     def handle_password_prompt(self, prompt_text: str) -> str:
         """Handle a password prompt.
@@ -286,11 +730,29 @@ class CompactRenderer:
             # Restart display after password prompt
             self._display.start()
 
+    def print_log(self, message: str) -> None:
+        """Print a log line above the status panel.
+
+        Thin pass-through to the Display. Used by the runner to surface
+        preflight errors verbatim — these are too important to hide
+        behind just a counter.
+        """
+        self._log_writes += 1
+        self._display.print_log(message)
+        # Sustained log storms can otherwise starve panel refreshes: the
+        # display writes the log immediately, then this periodic repaint keeps
+        # the tree/status panel moving on the same cadence as quiet ticks.
+        if self._state is not None and self._display.is_tty and self._display.is_running:
+            self._render_status_panel()
+
     def add_warning(self, message: str, is_deprecation: bool = False) -> None:
         """Add a warning or deprecation detected from PTY stream.
 
-        Called by the PTY stream handler when it detects warning patterns
-        in stderr lines (warnings are not emitted as JSONL events).
+        Bumps the counter AND prints the message above the panel so the
+        user can see what the warning is about — `⚠ 1` on its own is
+        opaque. Repeated identical messages (e.g. the same deprecation
+        firing per-host on a many-host run) are deduped to one print
+        but still each contribute to the counter.
 
         Args:
             message: The warning message text.
@@ -300,6 +762,21 @@ class CompactRenderer:
             self._deprecations_count += 1
         else:
             self._warnings_count += 1
+
+        if message in self._seen_warning_messages:
+            return
+        self._seen_warning_messages.add(message)
+        # The parser keeps the raw `[WARNING]: ...` / `[DEPRECATION WARNING]: ...`
+        # prefix on the message. Don't double it up.
+        if message.startswith("["):
+            text = message
+        else:
+            prefix = "DEPRECATION" if is_deprecation else "WARNING"
+            text = f"[{prefix}] {message}"
+        # Match ansible's default callback colouring: warnings and
+        # deprecations render in magenta so they stand out from ordinary
+        # ok/changed/skipping log lines.
+        self._display.print_log(_wrap(text, _MAGENTA, self._colorize))
 
     def handle_completion(self, exit_code: int, state: str) -> None:
         """Handle playbook completion (success/failure/crash).
@@ -318,16 +795,36 @@ class CompactRenderer:
         hosts_total = 0
 
         if self._state is not None:
+            # Skip RUNNING so a cancelled-mid-task run still counts the
+            # host as "completed earlier tasks" — see _render_status_panel
+            # for the rationale.
             host_statuses: dict[str, Status] = {}
             for play in self._state.plays.values():
                 for task in play.tasks.values():
                     for hostname, host_state in task.hosts.items():
+                        if host_state.status == Status.RUNNING:
+                            continue
                         host_statuses[hostname] = host_state.status
 
-            hosts_total = len(host_statuses)
+            preflight_hosts: set[str] = set()
+            for play_def in self._definitions:
+                preflight_hosts.update(play_def.resolved_hosts)
+            hosts_total = max(len(host_statuses), len(preflight_hosts))
+
             for status in host_statuses.values():
                 if status in (Status.OK, Status.CHANGED, Status.SKIPPED, Status.COMPLETED):
                     hosts_completed += 1
+
+        # Use the runtime-grown denominator here too — otherwise on
+        # cancellation the count snaps back to the preflight-only total,
+        # which can be smaller than the runtime-announced count
+        # (dynamic include_tasks). User-reported `30/4 tasks` regression.
+        tasks_total = (
+            count_total_tasks_seen(self._definitions, self._state)
+            if self._state
+            else count_total_tasks(self._definitions)
+        )
+        tasks_completed = count_completed_tasks(self._state) if self._state else 0
 
         # Format final status bar
         status_bar = format_status_bar(
@@ -337,22 +834,147 @@ class CompactRenderer:
             warnings=self._warnings_count,
             deprecations=self._deprecations_count,
             elapsed_seconds=elapsed,
+            tasks_completed=tasks_completed,
+            tasks_total=tasks_total,
+            ascii_mode=self._ascii_mode,
+            colorize=self._colorize,
+            mode_label=self._mode_label,
         )
 
-        # Add final state indicator
-        state_indicator = {
-            "completed": "●",
-            "failed": "✖",
-            "crashed": "✖",
-        }.get(state, "?")
+        # Add final state indicator with a label so the user can
+        # distinguish a clean exit (●) from a failure (✖ failed),
+        # a user-initiated Ctrl+C (✖ cancelled, exit 130), or a
+        # mid-run crash (✖ crashed). Without the label, every
+        # non-zero exit looked identical and gave the user no clue
+        # whether the playbook or AOM was to blame.
+        if self._ascii_mode:
+            icon = {"completed": "*", "failed": "X", "crashed": "X"}.get(state, "?")
+        else:
+            icon = {"completed": "●", "failed": "✖", "crashed": "✖"}.get(state, "?")
 
-        final_status = f"{status_bar} {state_indicator}"
+        if state == "completed":
+            label = ""
+            indicator_color = _GREEN
+        elif state == "crashed" and exit_code == 130:
+            label = " cancelled by user"
+            indicator_color = _YELLOW
+        elif state == "crashed" and exit_code == 127:
+            label = " ansible-playbook not found"
+            indicator_color = _RED
+        elif state == "crashed":
+            label = " crashed"
+            indicator_color = _RED
+        else:
+            label = " failed"
+            indicator_color = _RED
 
-        # Update display one final time
+        indicator = _wrap(f"{icon}{label}", indicator_color, self._colorize)
+        final_status = f"{status_bar} {indicator}"
+
+        # Capture frozen host-table and (on failure) tree lines BEFORE
+        # display.stop() wipes the live panel.
+        snapshot_tree, snapshot_host = self._capture_panel_snapshot()
+
+        # Last in-panel update — visible briefly during stop() in TTY mode,
+        # a no-op in non-TTY. Throttling can swallow this; the print() below
+        # is what guarantees the final state survives.
         self._display.update(final_status)
 
-        # Stop the display
+        # Wipe the panel and release the cursor.
         self._display.stop()
+
+        # On failure, replay the tree + host table so the user can see what
+        # was in flight at the moment of failure. On success the tree is
+        # omitted — running-task spinners would be misleading when the run
+        # is already complete.
+        if exit_code != 0:
+            for line in snapshot_tree:
+                print(line)
+        for line in snapshot_host:
+            print(line)
+
+        # Print the final summary OUTSIDE any DEC-2026 frame so the panel
+        # clear above can't erase it. In TTY mode this lands at the cursor
+        # position the panel used to occupy, leaving the user with the run
+        # outcome as the last visible line. In non-TTY (pipes, CI) it's
+        # the only output Display ever produces (PQ6).
+        print(final_status)
+
+        # On a non-clean exit, also list which (host, task) pairs failed.
+        # The aggregate counts answer "did it work?"; the recap answers
+        # "what do I need to look at?". Skipped on success — there's
+        # nothing to list and the clutter would be misleading.
+        if exit_code != 0 and self._state is not None:
+            for line in format_failure_recap(self._state, colorize=self._colorize):
+                print(f"  {line}")
+
+        # R5: future-version-drift hint. If ansible-core (or a third-party
+        # callback) emitted any _event values we don't handle, list them
+        # so the user knows something was unhandled — easier than reading
+        # logs after the fact when a run "completed but did the wrong thing".
+        if self._state is not None and self._state.unknown_events:
+            parts = ", ".join(
+                f"{name}×{count}"
+                for name, count in sorted(
+                    self._state.unknown_events.items(),
+                    key=lambda kv: (-kv[1], kv[0]),
+                )
+            )
+            total = sum(self._state.unknown_events.values())
+            print(f"  ({total} unknown events: {parts})")
+
+    def _capture_panel_snapshot(self) -> tuple[list[str], list[str]]:
+        """Render the current tree and host overview as static lines.
+
+        Returns a ``(tree_lines, host_lines)`` tuple. Callers print tree
+        lines only on failure (stale running spinners are misleading on
+        success) but always print host lines for the per-host breakdown.
+        """
+        if self._state is None:
+            return [], []
+        if self._projection is None or self._projection._state is not self._state:
+            self._projection = TreeProjection.from_run_state(self._state)
+        projection = self._projection
+        cols, rows = shutil.get_terminal_size((80, 24))
+        active_hosts = sum(
+            1
+            for play in self._state.plays.values()
+            for task in play.tasks.values()
+            for hs in task.hosts.values()
+            if hs.status == Status.RUNNING
+        )
+        budget = _compute_tree_budget(rows, active_hosts)
+        tree_lines = format_tree_block(
+            projection,
+            budget=budget,
+            width=cols,
+            ascii_mode=self._ascii_mode,
+            colorize=self._colorize,
+            animation_frame=0,
+        )
+        host_lines: list[str] = []
+        if projection.is_host_summary_visible():
+            host_lines = format_host_rows(
+                projection,
+                width=cols,
+                ascii_mode=self._ascii_mode,
+                colorize=self._colorize,
+                animation_frame=0,
+            )
+        return tree_lines, host_lines
+
+    def collect_stats(self) -> diagnostics.RendererStats:
+        """Return an immutable snapshot of this renderer's activity counters.
+
+        Called from :py:meth:`stop` and surfaced via
+        :func:`diagnostics.get_last_renderer_stats` so phase 5
+        (``diagnostics.json``) can fold the numbers into the run record
+        without coupling the session layer to the renderer.
+        """
+        return diagnostics.RendererStats(
+            render_calls=self._render_calls,
+            log_writes=self._log_writes,
+        )
 
     def stop(self) -> None:
         """Stop rendering and clean up resources.
@@ -360,5 +982,541 @@ class CompactRenderer:
         Restores terminal state, flushes output, and cleans up
         any running Rich Live display.
         """
+        diagnostics.set_last_renderer_stats(self.collect_stats())
         self._display.stop()
         self._state = None
+
+    def _maybe_emit_pause_seconds_hint(self, task: dict) -> None:
+        """Surface a one-line hint when a pause-with-seconds task starts.
+
+        ``ansible.builtin.pause`` with ``seconds:`` doesn't read stdin
+        and emits no further output during the wait — without this
+        hint, the task name appears and then the panel sits silent
+        until the sleep finishes. We can't know the elapsed without
+        wiring a per-task timer; just printing the requested duration
+        is enough signal.
+        """
+        action = (task.get("action") or "").lower()
+        # Accept "pause", "ansible.builtin.pause", and any FQCN variant.
+        if not action.endswith("pause"):
+            return
+        seconds = task.get("args", {}).get("seconds")
+        if seconds is None:
+            return
+        # Tolerate string serialisations — ansible sometimes wraps int args.
+        try:
+            seconds_num = int(float(str(seconds)))
+        except TypeError, ValueError:
+            return
+        self._display.print_log(f"[pause] sleeping {seconds_num}s…")
+
+    def _event_time(self, event: dict) -> float | None:
+        """Parse ``_timestamp`` from a JSONL event into a Unix float.
+
+        Returns ``None`` when the timestamp is missing or malformed —
+        callers fall back to wall-clock or skip timing for that event.
+        """
+        ts = event.get("_timestamp")
+        if not ts:
+            return None
+        try:
+            from datetime import datetime
+
+            if ts.endswith("Z"):
+                ts = ts[:-1] + "+00:00"
+            return datetime.fromisoformat(ts).timestamp()
+        except ValueError, TypeError, AttributeError:
+            return None
+
+    def _format_duration(self, seconds: float) -> str:
+        """Compact human duration: ``0.4s`` / ``12.3s`` / ``1m23s`` / ``1h02m``."""
+        if seconds < 60:
+            return f"{seconds:.1f}s"
+        if seconds < 3600:
+            minutes = int(seconds // 60)
+            return f"{minutes}m{int(seconds % 60):02d}s"
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        return f"{hours}h{minutes:02d}m"
+
+    def _emit_previous_task_summary(self, now: float) -> None:
+        """Print a one-line summary of the task that just finished.
+
+        Triggered right before the next task_start prints its TASK
+        header so the user sees the duration of *the previous task*
+        directly under that task's output. Format:
+
+            [HH:MM:SS] <task name> — N.Ns (H:MM:SS)  (1 failed, 2 ok)
+
+        Where the timestamp is the wall-clock at the moment the new
+        task started (which is also when the old task ended in
+        linear strategy), ``N.Ns`` is the previous task's duration,
+        the parenthesized value is the cumulative playbook elapsed
+        time, and the trailing status counts summarise how many
+        hosts ended in each terminal state.  ``--hide-state`` is
+        honoured: hidden states are omitted from the counts.
+        """
+        if self._last_task_start_time is None or self._last_task_name is None:
+            return
+        duration = now - self._last_task_start_time
+        cum = now - self._start_time
+
+        # Local-time timestamp keeps the format consistent with what
+        # users see from ansible's profile_tasks callback.
+        from datetime import datetime
+
+        wall = datetime.fromtimestamp(now).strftime("%H:%M:%S")
+        prefix = _wrap(f"[{wall}]", _DIM, self._colorize)
+        cum_str = _wrap(f"({self._format_duration(cum)})", _DIM, self._colorize)
+
+        summary_suffix = self._build_status_suffix()
+
+        # Drop the per-task duration when exactly one host already
+        # displayed it on its inline result line — keeping the cleaner
+        # ``— (cum)`` shape for single-host runs and run_once tasks.
+        if len(self._current_task_inline_duration_hosts) == 1:
+            line = f"{prefix} {self._last_task_name} — {cum_str}{summary_suffix}"
+        else:
+            duration_str = _wrap(self._format_duration(duration), _CYAN, self._colorize)
+            line = f"{prefix} {self._last_task_name} — {duration_str} {cum_str}{summary_suffix}"
+        self._display.print_log(line)
+
+    def _build_status_suffix(self) -> str:
+        """Build the trailing ``(N failed, M ok)`` status summary.
+
+        Walks the most recent task's host states, tallies per-status
+        counts, respects ``--hide-state``, and returns a coloured
+        string like ``"  (1 failed, 2 ok)"`` or an empty string when
+        no counts are available or all are hidden.
+        """
+        if self._last_task_uuid is None or self._state is None:
+            return ""
+        task = None
+        for play in self._state.plays.values():
+            if self._last_task_uuid in play.tasks:
+                task = play.tasks[self._last_task_uuid]
+                break
+        if task is None:
+            return ""
+
+        # OK+changed → CHANGED (same rule as tree projection).
+        counts: dict[Status, int] = {}
+        for hs in task.hosts.values():
+            effective = Status.CHANGED if hs.status == Status.OK and hs.changed else hs.status
+            if effective in (
+                Status.FAILED,
+                Status.UNREACHABLE,
+                Status.CHANGED,
+                Status.OK,
+                Status.SKIPPED,
+            ):
+                counts[effective] = counts.get(effective, 0) + 1
+
+        has_errors = any(counts.get(s, 0) > 0 for s in (Status.FAILED, Status.UNREACHABLE))
+        # (Status, display label, ANSI colour, always_show)
+        # FAILED/UNREACHABLE always appear even with --hide-state.
+        # fmt: off
+        entries: list[tuple[Status, str, str, bool]] = [
+            (Status.FAILED,      "failed",      _RED,     True),
+            (Status.UNREACHABLE, "unreachable", _MAGENTA, True),
+            (Status.CHANGED,     "changed",     _YELLOW,  False),
+            (Status.OK,          "ok",          _GREEN,   False),
+            (Status.SKIPPED,     "skipped",     _CYAN,    False),
+        ]
+        # fmt: on
+        parts: list[str] = []
+        for status, label, colour, always_show in entries:
+            n = counts.get(status, 0)
+            if n == 0:
+                continue
+            if not always_show and status.value in self._hide_states:
+                continue
+            if has_errors and status not in (Status.FAILED, Status.UNREACHABLE):
+                colour = _DIM
+            parts.append(f"{n} {_wrap(label, colour, self._colorize)}")
+
+        if not parts:
+            return ""
+        return f"  ({', '.join(parts)})"
+
+    def _flush_pending_skips(self, *, force_individual: bool) -> None:
+        """Drain the per-task skipped-host buffer.
+
+        ``force_individual=True`` is the mixed-task case: a non-skipped
+        result arrived for the same task, so the user expects the
+        per-host detail. Print each skipped host as the original
+        ``skipping: [host]`` line (cyan, like ansible's default
+        callback).
+
+        ``force_individual=False`` is the all-skipped case: the task
+        finished without any other result type. Collapse into a
+        single ``… N host(s) skipped`` line. For ≤3 hosts the names
+        are inlined for context; beyond that just the count.
+        """
+        if not self._pending_skipped_hosts:
+            return
+        hosts = self._pending_skipped_hosts
+        self._pending_skipped_hosts = []
+        if force_individual:
+            for host in hosts:
+                self._display.print_log(_wrap(f"skipping: [{host}]", _CYAN, self._colorize))
+            return
+        count = len(hosts)
+        plural = "" if count == 1 else "s"
+        if count <= 3:
+            host_list = ", ".join(hosts)
+            line = f"… {count} host{plural} skipped: {host_list}"
+        else:
+            line = f"… {count} hosts skipped"
+        # Compressed line: cyan to match the per-host colour but
+        # leading with ``…`` so the user can tell at a glance it's an
+        # aggregate, not an individual host record.
+        self._display.print_log(_wrap(line, _CYAN, self._colorize))
+
+    def _enter_terminal_event(self, event_name: str) -> bool:
+        """Bookkeeping for a non-skipped terminal result event.
+
+        Flushes any buffered skipping lines (force_individual=True
+        because a non-skipped result just arrived — mixed-result task
+        detail wins), marks the current task as having produced a real
+        result (so the per-task summary treats it as non-skipped),
+        and checks whether the event should be hidden per
+        ``--hide-state``.
+
+        Returns:
+            ``True`` if the caller should ``return`` immediately
+            (event suppressed); ``False`` to proceed with normal
+            rendering.
+        """
+        self._flush_pending_skips(force_individual=True)
+        self._current_task_had_nonskipped_result = True
+        return should_hide_event(event_name, self._hide_states)
+
+    def _announce_task(
+        self,
+        *,
+        task_uuid: str,
+        task_name: str,
+        event_time: float | None,
+        task_meta: dict,
+    ) -> None:
+        """Emit the TASK [..] header and reset per-task bookkeeping.
+
+        Called from either ``v2_playbook_on_task_start`` (linear
+        strategy) or the first ``v2_runner_on_start`` for a task
+        (free strategy). Idempotent on ``task_uuid``.
+        """
+        if task_uuid and task_uuid in self._announced_task_uuids:
+            return
+        # First: dispose of any skipped-host buffer left over from the
+        # previous task. If that task only ever produced skipped
+        # results, collapse them; otherwise (the buffer would have been
+        # drained by an earlier non-skipped result), this is a no-op.
+        self._flush_pending_skips(force_individual=self._current_task_had_nonskipped_result)
+        # Reset per-task state for the task we're about to print.
+        self._current_task_had_nonskipped_result = False
+        # Summary for the previous task lands BEFORE the new TASK
+        # header — keeps it visually attached to its own output.
+        if event_time is not None:
+            self._emit_previous_task_summary(event_time)
+        # Now safe to discard the previous task's host set.
+        self._current_task_inline_duration_hosts = set()
+        self._display.print_log(f"\nTASK [{task_name}] " + "*" * 50)
+        self._maybe_emit_pause_seconds_hint(task_meta)
+        # Stash timing for the inline-duration logic below and for the
+        # *next* summary line.
+        if event_time is not None:
+            self._task_start_times[task_uuid] = event_time
+            self._last_task_uuid = task_uuid
+            self._last_task_name = task_name
+            self._last_task_start_time = event_time
+        if task_uuid:
+            self._announced_task_uuids.add(task_uuid)
+
+    def _task_dict(self, event: dict) -> dict:
+        """Extract the ``task`` field as a dict.
+
+        ansible.posix.jsonl may emit ``task`` as a bare UUID string or
+        ``None`` when the mitogen transport drops mid-task.  Return an
+        empty dict in those cases so callers can safely call ``.get()``.
+        """
+        task = event.get("task")
+        return task if isinstance(task, dict) else {}
+
+    def _hosts_dict(self, event: dict) -> dict:
+        """Extract the ``hosts`` field as a dict.
+
+        mitogen bulk-reconnect events can emit ``hosts`` as a list of
+        hostnames instead of the canonical ``{hostname: result}`` dict.
+        Return an empty dict so callers can safely call ``.items()`` or
+        iterate without materialising bogus host entries.
+        """
+        hosts = event.get("hosts")
+        return hosts if isinstance(hosts, dict) else {}
+
+    def _emit_event_log(self, event: dict) -> None:
+        """Print one nom-style log line for a JSONL event.
+
+        Stats events are intentionally silent — the live panel and the
+        final-summary print already cover what they would say. Unknown
+        event types are silent too: the panel still updates from state,
+        we just don't add to the log noise.
+
+        Coloring matches ansible's stock default callback so users
+        switching from raw ``ansible-playbook`` see the same per-task
+        cues — ok green, changed yellow, fatal red, unreachable
+        magenta, skipping cyan. (We synthesize these lines from JSONL
+        events; ansible's normal callback isn't running because AOM
+        forces the ``ansible.posix.jsonl`` callback for structured
+        output — hence why ansible itself isn't producing them.)
+
+        Per-host result lines also carry an inline duration in
+        parentheses (e.g. ``ok: [web1] (2.3s)``), computed as the
+        gap between the event's ``_timestamp`` and the parent task's
+        recorded start time. On the *next* task_start, a summary
+        line for the previous task lands first so the user sees how
+        long it took with a wall-clock timestamp.
+        """
+        name = event.get("_event")
+        event_time = self._event_time(event)
+        if name == "v2_playbook_on_play_start":
+            play_name = event.get("play", {}).get("name", "") or "(unnamed)"
+            self._display.print_log(f"\nPLAY [{play_name}] " + "*" * 50)
+        elif name == "v2_playbook_on_task_start":
+            task = self._task_dict(event)
+            self._announce_task(
+                task_uuid=task.get("id", ""),
+                task_name=task.get("name", "") or "(unnamed)",
+                event_time=event_time,
+                task_meta=task,
+            )
+        elif name == "v2_runner_on_start":
+            # Free strategy: no v2_playbook_on_task_start before runner
+            # events. Use the first runner_start per task as the
+            # fallback signal for the TASK header so the streaming log
+            # is still anchored to a task name.
+            task = self._task_dict(event)
+            task_uuid = task.get("id", "")
+            if task_uuid and task_uuid not in self._announced_task_uuids:
+                self._announce_task(
+                    task_uuid=task_uuid,
+                    task_name=task.get("name", "") or "(unnamed)",
+                    event_time=event_time,
+                    task_meta=task,
+                )
+        elif name == "v2_runner_on_ok":
+            # Flush skips and flag task as having a real result, but do NOT
+            # early-return on the event-level hide check. The ok/changed
+            # distinction is per-host (result.changed), so we filter inside
+            # the host loop instead.
+            self._flush_pending_skips(force_individual=True)
+            self._current_task_had_nonskipped_result = True
+            suffix = self._inline_duration_suffix(event, event_time)
+            task_id = self._task_dict(event).get("id", "")
+            lines: list[str] = []
+            for host, result in self._hosts_dict(event).items():
+                # Items already streamed live from v2_runner_item_on_* —
+                # the aggregate adds nothing per-item, so skip it entirely.
+                if (host, task_id) in self._streamed_loop_items:
+                    continue
+                # Per-host hide filter: ok vs changed is determined by
+                # result.changed, not by the event type alone.
+                if should_hide_host_result(result, name, self._hide_states):
+                    continue
+                # Looped task (plain jsonl fallback): expand the per-item
+                # ``results`` array into one line per item (matching
+                # ansible's default callback) instead of a single aggregate
+                # host line — this array is the only source of per-item
+                # detail when no item events streamed.
+                item_lines = self._loop_item_lines(host, result)
+                if item_lines:
+                    lines.extend(item_lines)
+                    continue
+                if suffix:
+                    self._current_task_inline_duration_hosts.add(host)
+                if result.get("changed"):
+                    lines.append(_wrap(f"changed: [{host}]{suffix}", _YELLOW, self._colorize))
+                else:
+                    lines.append(_wrap(f"ok: [{host}]{suffix}", _GREEN, self._colorize))
+            if lines:
+                self._display.print_log("\n".join(lines))
+        elif name == "v2_runner_on_failed":
+            if self._enter_terminal_event(name):
+                return
+            suffix = self._inline_duration_suffix(event, event_time)
+            task_id = self._task_dict(event).get("id", "")
+            lines = []
+            for host, result in self._hosts_dict(event).items():
+                # Items already streamed live (including the failed item) —
+                # the aggregate fatal line would duplicate them, so skip.
+                if (host, task_id) in self._streamed_loop_items:
+                    continue
+                # Looped task that failed (plain jsonl fallback): the
+                # per-item lines (including the ``failed:`` item) replace
+                # the aggregate ``fatal:`` line, matching ansible's default.
+                item_lines = self._loop_item_lines(host, result)
+                if item_lines:
+                    lines.extend(item_lines)
+                    continue
+                if suffix:
+                    self._current_task_inline_duration_hosts.add(host)
+                msg = _truncate_msg(result.get("msg", "") or "")
+                lines.append(
+                    _wrap(
+                        f"fatal: [{host}]{suffix}: FAILED! => {msg}",
+                        _RED,
+                        self._colorize,
+                    )
+                )
+            if lines:
+                self._display.print_log("\n".join(lines))
+        elif name == "v2_runner_on_unreachable":
+            if self._enter_terminal_event(name):
+                return
+            suffix = self._inline_duration_suffix(event, event_time)
+            lines = []
+            for host, result in self._hosts_dict(event).items():
+                if suffix:
+                    self._current_task_inline_duration_hosts.add(host)
+                msg = _truncate_msg(result.get("msg", "") or "")
+                lines.append(
+                    _wrap(
+                        f"fatal: [{host}]{suffix}: UNREACHABLE! => {msg}",
+                        _MAGENTA,
+                        self._colorize,
+                    )
+                )
+            if lines:
+                self._display.print_log("\n".join(lines))
+        elif name == "v2_runner_on_skipped":
+            if should_hide_event(name, self._hide_states):
+                return
+            # Hold individual skipping lines until we know whether
+            # they're worth printing one-by-one (mixed-result task)
+            # or worth collapsing (all-skipped task). The flush
+            # happens at task transition or stats.
+            self._pending_skipped_hosts.extend(self._hosts_dict(event).keys())
+        elif name in (
+            "v2_runner_item_on_ok",
+            "v2_runner_item_on_failed",
+            "v2_runner_item_on_skipped",
+        ):
+            if name == "v2_runner_item_on_ok":
+                # Per-host filter: ok vs changed is per-item, not per-event.
+                # Still flush skips and flag the task if any non-skipped item
+                # is visible (not hidden).
+                self._flush_pending_skips(force_individual=True)
+                self._current_task_had_nonskipped_result = True
+                task_id = self._task_dict(event).get("id", "")
+                streamed_lines: list[str] = []
+                for host, raw in self._hosts_dict(event).items():
+                    if not isinstance(raw, dict):
+                        continue
+                    if should_hide_host_result(raw, name, self._hide_states):
+                        continue
+                    self._streamed_loop_items.add((host, task_id))
+                    streamed_lines.append(self._format_loop_item_line(host, raw, name))
+                if streamed_lines:
+                    self._display.print_log("\n".join(streamed_lines))
+            else:
+                # v2_runner_item_on_failed and v2_runner_item_on_skipped have
+                # unambiguous states — event-level hide is correct.
+                if should_hide_event(name, self._hide_states):
+                    if name != "v2_runner_item_on_skipped":
+                        self._flush_pending_skips(force_individual=True)
+                        self._current_task_had_nonskipped_result = True
+                    return
+                task_id = self._task_dict(event).get("id", "")
+                streamed_lines_alt: list[str] = []
+                for host, raw in self._hosts_dict(event).items():
+                    if not isinstance(raw, dict):
+                        continue
+                    self._streamed_loop_items.add((host, task_id))
+                    streamed_lines_alt.append(self._format_loop_item_line(host, raw, name))
+                if streamed_lines_alt:
+                    if name != "v2_runner_item_on_skipped":
+                        self._flush_pending_skips(force_individual=True)
+                        self._current_task_had_nonskipped_result = True
+                    self._display.print_log("\n".join(streamed_lines_alt))
+        elif name == "v2_playbook_on_stats":
+            # Drain the final task's skipped buffer with the same
+            # mixed-vs-all-skipped rule we use at task transitions.
+            self._flush_pending_skips(force_individual=self._current_task_had_nonskipped_result)
+            self._current_task_had_nonskipped_result = False
+            # Final task's summary line — same logic as the inter-task
+            # case, just triggered by stats instead of the next task_start.
+            if event_time is not None:
+                self._emit_previous_task_summary(event_time)
+                # Clear so a subsequent run doesn't see a stale last task.
+                self._last_task_uuid = None
+                self._last_task_name = None
+                self._last_task_start_time = None
+
+    def _loop_item_lines(self, host: str, result: dict) -> list[str]:
+        """Expand a looped task's per-host ``results`` array into log lines.
+
+        Returns one line per loop item — ``ok``/``changed``/``failed``/
+        ``skipping`` with an ``=> (item=<label>)`` suffix — coloured like
+        ansible's default callback. Returns an empty list when ``result``
+        has no loop (``results`` absent/empty), so callers fall back to the
+        single aggregate host line.
+
+        The item label mirrors ``core.inspect_model._make_loop_item``:
+        ``_ansible_item_label`` when ansible computed one, else the raw
+        ``item`` value. Per-item lines carry no inline duration (ansible
+        doesn't time individual items either); the per-task summary line
+        still reports the loop's total wall time.
+        """
+        results = result.get("results")
+        if not isinstance(results, list) or not results:
+            return []
+        return [self._format_loop_item_line(host, raw) for raw in results if isinstance(raw, dict)]
+
+    def _format_loop_item_line(self, host: str, raw: dict, event_type: str | None = None) -> str:
+        """Format one loop item's result as a coloured log line.
+
+        Returns ``ok``/``changed``/``failed``/``skipping: [host] =>
+        (item=<label>)`` coloured like ansible's default callback. Shared
+        by the end-of-loop aggregate expansion (:meth:`_loop_item_lines`)
+        and the live ``v2_runner_item_on_*`` streaming path so both render
+        identically. The label mirrors ``core.inspect_model._make_loop_item``:
+        ``_ansible_item_label`` when ansible computed one, else ``item``.
+
+        ``event_type`` is the JSONL event name (e.g.
+        ``v2_runner_item_on_failed``).  When supplied, it takes precedence
+        over ``raw.get("failed")``/``raw.get("skipped")`` because the real
+        ``aom_jsonl`` callback omits those flags on per-item payloads.
+        The aggregate path (``_loop_item_lines``) passes ``event_type=None``
+        since the aggregate ``results[]`` entries carry the flags correctly.
+        """
+        label = str(raw.get("_ansible_item_label") or raw.get("item") or "")
+        if event_type == "v2_runner_item_on_failed" or raw.get("failed"):
+            msg = _truncate_msg(raw.get("msg", "") or "")
+            text = f"failed: [{host}] => (item={label})"
+            if msg:
+                text += f" => {msg}"
+            return _wrap(text, _RED, self._colorize)
+        if event_type == "v2_runner_item_on_skipped" or raw.get("skipped"):
+            return _wrap(f"skipping: [{host}] => (item={label})", _CYAN, self._colorize)
+        if raw.get("changed"):
+            return _wrap(f"changed: [{host}] => (item={label})", _YELLOW, self._colorize)
+        return _wrap(f"ok: [{host}] => (item={label})", _GREEN, self._colorize)
+
+    def _inline_duration_suffix(self, event: dict, event_time: float | None) -> str:
+        """Return `` (2.3s)`` for the per-host result line, or empty.
+
+        Empty when timing data is unavailable (missing ``_timestamp``,
+        no recorded task start) so the result line still renders.
+        Skipped tasks are intentionally NOT timed inline — they
+        haven't really run, the duration is meaningless.
+        """
+        if event_time is None:
+            return ""
+        task_id = self._task_dict(event).get("id", "")
+        start = self._task_start_times.get(task_id)
+        if start is None:
+            return ""
+        delta = event_time - start
+        if delta < 0:
+            return ""
+        return f" ({self._format_duration(delta)})"

@@ -1,0 +1,8 @@
+{"_event":"v2_playbook_on_play_start","_timestamp":"2026-05-20T12:52:44.000000Z","play":{"id":"p1","name":"all","path":"/Users/felix/configs/ansible/site.yml:13"}}
+{"_event":"v2_playbook_on_task_start","_timestamp":"2026-05-20T12:52:44.500000Z","task":{"id":"t1","name":"Gathering Facts","path":"/Users/felix/configs/ansible/site.yml:13"}}
+{"_event":"v2_runner_on_ok","_timestamp":"2026-05-20T12:52:45.000000Z","task":{"id":"t1","name":"Gathering Facts","path":"/Users/felix/configs/ansible/site.yml:13"},"hosts":{"caeli":{"changed":false,"failed":false}}}
+{"_event":"v2_playbook_on_task_start","_timestamp":"2026-05-20T12:52:45.500000Z","task":{"id":"t2","name":"Update brew","path":"/Users/felix/configs/ansible/roles/os_macos/tasks/main.yml:10"}}
+{"_event":"v2_runner_on_ok","_timestamp":"2026-05-20T12:52:46.500000Z","task":{"id":"t2","name":"Update brew","path":"/Users/felix/configs/ansible/roles/os_macos/tasks/main.yml:10"},"hosts":{"caeli":{"changed":false,"failed":false}}}
+{"_event":"v2_playbook_on_task_start","_timestamp":"2026-05-20T12:52:47.000000Z","task":{"id":"t3","name":"Install brew casks","path":"/Users/felix/configs/ansible/roles/os_macos/tasks/main.yml:42"}}
+{"_event":"v2_runner_on_ok","_timestamp":"2026-05-20T12:52:50.000000Z","task":{"id":"t3","name":"Install brew casks","path":"/Users/felix/configs/ansible/roles/os_macos/tasks/main.yml:42"},"hosts":{"caeli":{"changed":true,"failed":false}}}
+{"_event":"v2_playbook_on_stats","_timestamp":"2026-05-20T12:52:51.000000Z","stats":{"caeli":{"ok":2,"changed":1,"failures":0,"unreachable":0,"skipped":0}}}

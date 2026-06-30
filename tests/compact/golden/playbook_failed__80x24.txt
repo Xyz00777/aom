@@ -1,0 +1,12 @@
+
+PLAY [Configure servers] **************************************************
+
+TASK [Install dependencies] **************************************************
+ok: [server1] (8.0s)
+[10:00:15] Install dependencies — (15.0s)  (1 ok)
+
+TASK [Configure application] **************************************************
+fatal: [server1] (5.0s): FAILED! => Configuration file syntax error at line 42
+[10:01:00] Configure application — (1m00s)  (1 failed)
+site.yml | 0/1 hosts | 2/2 tasks | 0:00:00 X failed
+  FAILED: server1 — Configure application

@@ -1,0 +1,12 @@
+---
+- name: Loop test playbook
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Echo each fruit
+      ansible.builtin.debug:
+        msg: "{{ item }}"
+      loop:
+        - apple
+        - banana
+        - cherry
