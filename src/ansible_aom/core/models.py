@@ -1003,10 +1003,15 @@ class RunState:
         task = play.tasks[task_id]
 
         for hostname, host_result in hosts_data.items():
-            ignore_errors = False
-            verbose_always = host_result.get("_ansible_verbose_always", {})
-            if isinstance(verbose_always, dict):
-                ignore_errors = verbose_always.get("ignore_errors", False)
+            # Ansible passes ``ignore_errors`` as a parameter to the
+            # ``v2_runner_on_failed`` callback; the aom_jsonl callback emits it
+            # at the top level of the host result. Older/synthetic payloads
+            # nested it under ``_ansible_verbose_always`` — honour both.
+            ignore_errors = bool(host_result.get("ignore_errors", False))
+            if not ignore_errors:
+                verbose_always = host_result.get("_ansible_verbose_always", {})
+                if isinstance(verbose_always, dict):
+                    ignore_errors = bool(verbose_always.get("ignore_errors", False))
 
             msg = host_result.get("msg", "")
 
