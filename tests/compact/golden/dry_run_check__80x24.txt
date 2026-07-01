@@ -4,4 +4,4 @@ PLAY [Preview changes] **************************************************
 TASK [Render template] **************************************************
 ok: [localhost] (3.0s)
 [10:00:06] Render template — (6.0s)  (1 ok)
-DRY RUN | preview.yml | 1/1 hosts | 1/1 tasks | 0:00:00 *
+DRY RUN | preview.yml | 1/1 hosts | 1/1 tasks | *1 +0 | 0:00:00 *

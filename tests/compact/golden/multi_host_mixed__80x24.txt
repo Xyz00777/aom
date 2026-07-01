@@ -22,6 +22,6 @@ host  ok  changed  skipped  failed  unreachable  on
 web1   1        1        0       0            1  O Deploy application
 web2   1        1        0       1            0  X Configure firewall
 web3   2        0        1       0            0  (idle)
-site.yml | 2/3 hosts | 3/3 tasks | 0:00:00 X failed
+site.yml | 2/3 hosts | 3/3 tasks | *4 +2 o1 X1 O1 | 0:00:00 X failed
   FAILED: web2 — Configure firewall
   UNREACHABLE: web1 — Deploy application

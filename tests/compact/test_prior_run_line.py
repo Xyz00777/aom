@@ -56,6 +56,28 @@ def test_prior_run_line_shown_when_prior_exists() -> None:
     assert "2h ago" in out
 
 
+def test_prior_run_line_prefers_observed_over_preflight_count() -> None:
+    """Dynamic-include playbooks: preflight sees 4 but the run had 110.
+
+    The hint should report the realistic observed total, not the
+    misleading static preflight count.
+    """
+    defs = [_play("Setup", ["web1"], 4)]
+    prior = PriorRun(
+        session_id="abc",
+        duration_seconds=50.0,
+        task_count=4,
+        host_count=1,
+        end_time=datetime.now(timezone.utc) - timedelta(hours=1),
+        observed_task_count=110,
+    )
+    out = format_preflight_summary(defs, prior_run=prior)
+    assert out is not None
+    # The "Last run" hint reports the observed total, not the preflight 4.
+    assert "Last run: 110 tasks" in out
+    assert "Last run: 4 tasks" not in out
+
+
 def test_prior_run_line_seconds_only_under_a_minute() -> None:
     defs = [_play("Setup", ["web1"], 1)]
     prior = PriorRun(

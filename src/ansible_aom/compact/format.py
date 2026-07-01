@@ -35,6 +35,7 @@ from ansible_aom.core.models import (
 from ansible_aom.core.tree import TreeProjection
 
 if TYPE_CHECKING:
+    from ansible_aom.core.inspect_model import StatusCounts
     from ansible_aom.session.history import PriorRun
 
 # =============================================================================
@@ -172,6 +173,8 @@ def format_status_bar(
     mode_label: str = "",
     liveness: LivenessState | None = None,
     remaining_seconds: float | None = None,
+    task_counts: "StatusCounts | None" = None,
+    estimated_total: bool = False,
 ) -> str:
     """Format the status bar for compact mode display.
 
@@ -230,10 +233,32 @@ def format_status_bar(
     parts.extend([_wrap(playbook, _DIM, colorize), hosts_seg])
 
     if tasks_total > 0:
-        tasks_seg = f"{tasks_completed}/{tasks_total} tasks"
+        # A loose-match prior-run estimate is marked with `~` so the total
+        # reads as projected rather than preflight-certain.
+        total_str = f"~{tasks_total}" if estimated_total else str(tasks_total)
+        tasks_seg = f"{tasks_completed}/{total_str} tasks"
         if tasks_completed == tasks_total:
             tasks_seg = _wrap(tasks_seg, _GREEN, colorize)
         parts.append(tasks_seg)
+
+    # Per-status outcome tally, same glyphs as `aom inspect`. ok + changed
+    # are always shown once any result has landed; skipped/failed/unreachable
+    # only when non-zero so a clean run stays terse.
+    if task_counts is not None and task_counts.total > 0:
+        icons = STATUS_ICONS_ASCII if ascii_mode else STATUS_ICONS
+        cells = [
+            _wrap(f"{icons[Status.OK]}{task_counts.ok}", _GREEN, colorize),
+            _wrap(f"{icons[Status.CHANGED]}{task_counts.changed}", _YELLOW, colorize),
+        ]
+        if task_counts.skipped:
+            cells.append(_wrap(f"{icons[Status.SKIPPED]}{task_counts.skipped}", _DIM, colorize))
+        if task_counts.failed:
+            cells.append(_wrap(f"{icons[Status.FAILED]}{task_counts.failed}", _RED, colorize))
+        if task_counts.unreachable:
+            cells.append(
+                _wrap(f"{icons[Status.UNREACHABLE]}{task_counts.unreachable}", _RED, colorize)
+            )
+        parts.append(" ".join(cells))
 
     if warnings > 0:
         parts.append(_wrap(f"{warn_glyph} {warnings}", _YELLOW, colorize))
@@ -853,9 +878,14 @@ def format_preflight_summary(
         lines.append(f"Tags: {', '.join(tags)}")
 
     if prior_run is not None:
-        tasks_word = "task" if prior_run.task_count == 1 else "tasks"
+        # Prefer the realistic observed task count (dynamic includes and
+        # all) over the static preflight ``task_count``, which badly
+        # under-counts an include-heavy playbook. Fall back to the
+        # preflight count for sessions recorded before event capture.
+        prior_task_count = prior_run.observed_task_count or prior_run.task_count
+        tasks_word = "task" if prior_task_count == 1 else "tasks"
         lines.append(
-            f"Last run: {prior_run.task_count} {tasks_word} in "
+            f"Last run: {prior_task_count} {tasks_word} in "
             f"{format_duration_compact(prior_run.duration_seconds)} "
             f"({format_age(prior_run.end_time)})"
         )

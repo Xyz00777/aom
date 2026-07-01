@@ -17,6 +17,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
+from ansible_aom.core.inspect_model import StatusCounts
 from ansible_aom.core.models import (
     HostRunState,
     PlayDefinition,
@@ -242,6 +243,49 @@ def _effective_status(hs: HostRunState) -> Status:
     two call sites from drifting apart.
     """
     return Status.CHANGED if hs.status == Status.OK and hs.changed else hs.status
+
+
+# Effective terminal status → the StatusCounts field it bumps. Non-terminal
+# states (PENDING/RUNNING) and COMPLETED are absent — they contribute nothing.
+_EFFECTIVE_FIELD: dict[Status, str] = {
+    Status.OK: "ok",
+    Status.CHANGED: "changed",
+    Status.FAILED: "failed",
+    Status.SKIPPED: "skipped",
+    Status.UNREACHABLE: "unreachable",
+}
+
+
+def run_state_host_counts(state: RunState) -> dict[str, StatusCounts]:
+    """Per-host terminal-status tally over every ``(host, task)`` pair.
+
+    Mirrors the ``aom inspect`` ``StatusCounts`` but is computed from the
+    live state tree so the compact view updates as results land. A host
+    still ``RUNNING``/``PENDING`` on a task contributes nothing; ``OK``
+    with the ``changed`` flag is promoted to CHANGED via
+    :func:`_effective_status`. Hosts that only ever ran non-terminal
+    tasks are absent from the result.
+    """
+    counts: dict[str, StatusCounts] = {}
+    for play in state.plays.values():
+        for task in play.tasks.values():
+            for hostname, hs in task.hosts.items():
+                field_name = _EFFECTIVE_FIELD.get(_effective_status(hs))
+                if field_name is None:
+                    continue
+                current = counts.get(hostname, StatusCounts())
+                counts[hostname] = replace(
+                    current, **{field_name: getattr(current, field_name) + 1}
+                )
+    return counts
+
+
+def run_state_status_counts(state: RunState) -> StatusCounts:
+    """Run-wide terminal-status tally (the per-host tallies merged)."""
+    total = StatusCounts()
+    for counts in run_state_host_counts(state).values():
+        total = total.merge(counts)
+    return total
 
 
 def _host_leaf_label(hostname: str, hs: HostRunState, total: int | None = None) -> str:

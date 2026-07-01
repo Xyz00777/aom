@@ -64,7 +64,7 @@ from ansible_aom.core.log_filter import (
     should_hide_host_result,
 )
 from ansible_aom.core.models import RunState, Status
-from ansible_aom.core.tree import TreeProjection
+from ansible_aom.core.tree import TreeProjection, run_state_status_counts
 
 if TYPE_CHECKING:
     from ansible_aom.session.history import PriorRun
@@ -498,6 +498,24 @@ class CompactRenderer:
     def note_subprocess_active(self, active: bool) -> None:
         self._heartbeat.note_cpu_sample(time.monotonic(), active)
 
+    def _task_total_with_prior(self, base_total: int) -> tuple[int, bool]:
+        """Fold the matching prior run's observed task count into the total.
+
+        Preflight ``--list-tasks`` can't see dynamic ``include_tasks``, so
+        ``base_total`` (preflight + what's been seen so far) under-counts a
+        role-heavy playbook. A matching prior run *observed* the real total,
+        so seed the denominator with it. Returns ``(total, estimated)``: the
+        total is flagged as an estimate only for a *loose* prior match whose
+        count still exceeds the live signal — a strict match is trusted as a
+        plain number, and once real progress overtakes the estimate the live
+        count wins and the flag drops.
+        """
+        prior = self._prior_run
+        prior_total = prior.observed_task_count if prior else 0
+        total = max(base_total, prior_total)
+        estimated = prior is not None and not prior.exact_match and prior_total > base_total
+        return total, estimated
+
     def _render_status_panel(self) -> None:
         """Compute and push the current panel (status bar + tree + hosts).
 
@@ -594,6 +612,8 @@ class CompactRenderer:
             for path, start in self._running_task_starts.values():
                 add_in_flight(self._estimate, progress, path, now_wall - start)
             remaining_seconds = project_remaining(self._estimate, progress)
+        base_total = max(count_total_tasks(self._definitions), self._tasks_seen)
+        tasks_total, estimated_total = self._task_total_with_prior(base_total)
         status_bar = format_status_bar(
             playbook=self._playbook,
             hosts_completed=hosts_completed,
@@ -603,14 +623,13 @@ class CompactRenderer:
             elapsed_seconds=elapsed,
             remaining_seconds=remaining_seconds,
             tasks_completed=self._tasks_completed,
-            tasks_total=max(
-                count_total_tasks(self._definitions),
-                self._tasks_seen,
-            ),
+            tasks_total=tasks_total,
+            estimated_total=estimated_total,
             ascii_mode=self._ascii_mode,
             colorize=self._colorize,
             mode_label=self._mode_label,
             liveness=self._heartbeat.state(time.monotonic()),
+            task_counts=run_state_status_counts(self._state),
         )
 
         # --- Regions 2 & 3: tree + host rows -------------------------------
@@ -819,11 +838,12 @@ class CompactRenderer:
         # cancellation the count snaps back to the preflight-only total,
         # which can be smaller than the runtime-announced count
         # (dynamic include_tasks). User-reported `30/4 tasks` regression.
-        tasks_total = (
+        base_total = (
             count_total_tasks_seen(self._definitions, self._state)
             if self._state
             else count_total_tasks(self._definitions)
         )
+        tasks_total, estimated_total = self._task_total_with_prior(base_total)
         tasks_completed = count_completed_tasks(self._state) if self._state else 0
 
         # Format final status bar
@@ -836,6 +856,8 @@ class CompactRenderer:
             elapsed_seconds=elapsed,
             tasks_completed=tasks_completed,
             tasks_total=tasks_total,
+            estimated_total=estimated_total,
+            task_counts=run_state_status_counts(self._state) if self._state else None,
             ascii_mode=self._ascii_mode,
             colorize=self._colorize,
             mode_label=self._mode_label,
