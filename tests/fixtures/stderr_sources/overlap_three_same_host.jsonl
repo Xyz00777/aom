@@ -1,0 +1,7 @@
+{"_event": "aom_connection_acquired", "connection_id": "conn-001", "host": "web1", "task_id": "t1", "timestamp": "2026-07-01T10:00:00Z"}
+{"_event": "aom_connection_acquired", "connection_id": "conn-002", "host": "web1", "task_id": "t2", "timestamp": "2026-07-01T10:00:01Z"}
+{"_event": "aom_connection_acquired", "connection_id": "conn-003", "host": "web1", "task_id": "t3", "timestamp": "2026-07-01T10:00:02Z"}
+{"_event": "aom_stderr_line", "source": "connection", "host": "web1", "level": 3, "line": "<web1> EXEC /bin/sh -c 'echo hello'"}
+{"_event": "aom_connection_released", "connection_id": "conn-001", "host": "web1", "task_id": "t1", "timestamp": "2026-07-01T10:00:05Z"}
+{"_event": "aom_connection_released", "connection_id": "conn-002", "host": "web1", "task_id": "t2", "timestamp": "2026-07-01T10:00:06Z"}
+{"_event": "aom_connection_released", "connection_id": "conn-003", "host": "web1", "task_id": "t3", "timestamp": "2026-07-01T10:00:07Z"}

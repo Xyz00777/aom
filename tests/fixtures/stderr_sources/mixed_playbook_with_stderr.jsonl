@@ -1,0 +1,10 @@
+{"_event": "v2_playbook_on_start", "_timestamp": "2026-07-01T10:00:00Z", "playbook": {"file": "site.yml"}}
+{"_event": "aom_stderr_line", "source": "run_level", "host": null, "level": 1, "line": "Using /etc/ansible/ansible.cfg as config file"}
+{"_event": "aom_stderr_line", "source": "plugin_loading", "host": null, "level": 3, "line": "Loading callback plugin ansible.posix.jsonl of type stdout, v2.0"}
+{"_event": "v2_playbook_on_play_start", "_timestamp": "2026-07-01T10:00:01Z", "play": {"id": "p1", "name": "all"}}
+{"_event": "aom_connection_acquired", "connection_id": "conn-001", "host": "web1", "task_id": "t1", "timestamp": "2026-07-01T10:00:02Z"}
+{"_event": "v2_playbook_on_task_start", "_timestamp": "2026-07-01T10:00:02Z", "task": {"id": "t1", "name": "ping", "path": "site.yml:1"}}
+{"_event": "aom_stderr_line", "source": "ssh_debug", "host": "web1", "level": 4, "line": "<web1> SSH: ansible.cfg set ssh_args: (-C)"}
+{"_event": "aom_connection_released", "connection_id": "conn-001", "host": "web1", "task_id": "t1", "timestamp": "2026-07-01T10:00:05Z"}
+{"_event": "v2_runner_on_ok", "_timestamp": "2026-07-01T10:00:05Z", "task": {"id": "t1", "name": "ping"}, "hosts": {"web1": {"ok": true, "changed": false}}}
+{"_event": "v2_playbook_on_stats", "_timestamp": "2026-07-01T10:00:10Z", "stats": {"web1": {"ok": 1, "changed": 0, "failures": 0, "unreachable": 0, "skipped": 0}}}

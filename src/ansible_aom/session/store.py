@@ -23,6 +23,7 @@ from typing import Any
 
 from ansible_aom import __version__ as _AOM_VERSION
 from ansible_aom.core import diagnostics
+from ansible_aom.core.stderr_classifier import classify
 from ansible_aom.core.timestamp import parse_iso_timestamp
 
 logger = logging.getLogger(__name__)
@@ -239,8 +240,7 @@ class SessionManager:
 
     Sessions are stored during execution at:
         ~/.local/state/aom/sessions/{uuidv7}/
-        ├── events.jsonl      # All JSONL events
-        ├── stderr.log        # Captured stderr
+        ├── events.jsonl      # All JSONL events (incl. aom_stderr_line)
         └── meta.json         # Session metadata
 
     After completion, sessions are consolidated to:
@@ -262,7 +262,6 @@ class SessionManager:
         self._playbook = playbook
         self._session_id: str | None = None
         self._events_file: Path | None = None
-        self._stderr_file: Path | None = None
         self._meta_file: Path | None = None
         self._start_time: datetime | None = None
         self._active_sessions: dict[str, dict[str, Any]] = {}
@@ -283,7 +282,7 @@ class SessionManager:
     def start_session(self, playbook: str, ansible_args: list[str] | None = None) -> str:
         """Create a new session and return the session ID (UUIDv7).
 
-        Creates the session directory structure with events.jsonl, stderr.log,
+        Creates the session directory structure with events.jsonl
         and meta.json files.
 
         Args:
@@ -311,14 +310,10 @@ class SessionManager:
         session_path.chmod(0o755)
 
         self._events_file = session_path / "events.jsonl"
-        self._stderr_file = session_path / "stderr.log"
         self._meta_file = session_path / "meta.json"
 
         self._events_file.touch()
         self._events_file.chmod(0o644)
-
-        self._stderr_file.touch()
-        self._stderr_file.chmod(0o644)
 
         meta = {
             "playbook": playbook,
@@ -326,6 +321,10 @@ class SessionManager:
             "start_time": self._start_time.isoformat().replace("+00:00", "Z"),
             "version": "1.2",
             "session_id": session_id,
+            # v1 (Phase 1 / Task 1.1): explicit meta.json schema marker.
+            # Distinct from ``version`` (AOM package). ``load_session``
+            # defaults a missing field to ``1`` for legacy sessions.
+            "_schema_version": 2,
         }
         with open(self._meta_file, "w") as f:
             json.dump(meta, f)
@@ -334,7 +333,6 @@ class SessionManager:
         self._active_sessions[session_id] = {
             "session_path": session_path,
             "events_file": self._events_file,
-            "stderr_file": self._stderr_file,
             "meta_file": self._meta_file,
             "start_time": self._start_time,
             "playbook": playbook,
@@ -358,18 +356,41 @@ class SessionManager:
             f.write(json.dumps(event) + "\n")
 
     def record_stderr(self, session_id: str, line: str) -> None:
-        """Record a stderr line.
+        """Classify *line* and persist it as an ``aom_stderr_line`` event.
 
-        Args:
-            session_id: The session ID
-            line: The stderr line to record
+        Phase 4.4: stderr is no longer written to ``stderr.log``. Each line
+        is run through the v1 :func:`classify` (see
+        :mod:`ansible_aom.core.stderr_classifier`) and appended to
+        ``events.jsonl`` as a synthetic ``aom_stderr_line`` event. The
+        contract matches the shape the parser emits from
+        ``_handle_plaintext`` so ``load_session()`` can derive
+        ``session["stderr"]`` from a single source of truth.
+
+        The store layer does not have access to the parser's connection
+        tracking map, so ``connection_id`` is recorded as ``None`` and
+        ``attribution_confidence`` defaults to ``"unique"`` — the same
+        defaults the parser uses before connection tracking is wired in
+        (Task 4.3). The original line text (ANSI-stripped or otherwise)
+        is preserved verbatim in the ``line`` field.
         """
         if session_id not in self._active_sessions:
             raise ValueError(f"Session {session_id} not found")
 
-        stderr_file = self._active_sessions[session_id]["stderr_file"]
-        with open(stderr_file, "a", encoding="utf-8") as f:
-            f.write(line + "\n")
+        classified = classify(line)
+        stderr_event: dict[str, Any] = {
+            "_event": "aom_stderr_line",
+            "_timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "line": line,
+            "source": classified.source.value,
+            "level": classified.level.value,
+            "host": classified.host,
+            "connection_id": None,
+            "attribution_confidence": "unique",
+        }
+
+        events_file = self._active_sessions[session_id]["events_file"]
+        with open(events_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(stderr_event) + "\n")
 
     def flush(self, session_id: str) -> None:
         """Wait until queued events for *session_id* hit disk.
@@ -728,7 +749,6 @@ def load_session(session_id: str, session_dir: Path) -> dict[str, Any] | None:
 
     meta_file = session_path / "meta.json"
     events_file = session_path / "events.jsonl"
-    stderr_file = session_path / "stderr.log"
 
     result: dict[str, Any] = {}
 
@@ -738,6 +758,29 @@ def load_session(session_id: str, session_dir: Path) -> dict[str, Any] | None:
                 result = json.load(f)
         except json.JSONDecodeError:
             result = {"playbook": "", "status": ""}
+    else:
+        # v1 (Phase 8 / Task 8.2): crash-recovery contract. When
+        # ``meta.json`` is missing the run was almost certainly
+        # interrupted mid-write (kernel OOM, power loss, SIGKILL)
+        # between ``start_session`` creating the directory and
+        # ``end_session`` rewriting the meta dict. The event stream in
+        # ``events.jsonl`` is the authoritative record of what
+        # happened, so we degrade gracefully: warn loudly, return
+        # what we have (empty meta + parsed events), and let
+        # ``aom replay`` / ``aom inspect`` continue. Replay reads
+        # ``status`` with a "completed" default (drivers/replay.py),
+        # inspect treats empty ``playbook`` as "no name available".
+        logger.warning(
+            "Session %s is missing meta.json; replaying from events.jsonl only. "
+            "The run was likely interrupted before end_session completed.",
+            session_id,
+        )
+
+    # v1 (Phase 1 / Task 1.1): default missing ``_schema_version`` to ``1``
+    # so legacy sessions pre-dating the meta-schema bump load with an
+    # explicit version consumers can branch on.
+    if "_schema_version" not in result:
+        result["_schema_version"] = 1
 
     events = []
     malformed_lines = 0
@@ -756,11 +799,16 @@ def load_session(session_id: str, session_dir: Path) -> dict[str, Any] | None:
     result["events"] = events
     result["malformed_lines"] = malformed_lines
 
-    if stderr_file.exists():
-        with open(stderr_file) as f:
-            result["stderr"] = f.read().splitlines()
-    else:
-        result["stderr"] = []
+    # Phase 4 (v1 verbosity): stderr is now embedded in events.jsonl as
+    # ``aom_stderr_line`` synthetic events. Extract them here so callers
+    # that read ``result["stderr"]`` (inspect text, TUI) keep working
+    # without changes. Legacy sessions without ``aom_stderr_line`` events
+    # produce an empty list.
+    stderr_lines: list[str] = []
+    for ev in result.get("events", []):
+        if ev.get("_event") == "aom_stderr_line":
+            stderr_lines.append(ev.get("line", ""))
+    result["stderr"] = stderr_lines
 
     # diagnostics.json arrived in phase 5 — older sessions don't have it.
     # Missing or unreadable → None, so callers can branch on presence

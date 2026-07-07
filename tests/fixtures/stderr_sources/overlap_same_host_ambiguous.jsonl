@@ -1,0 +1,5 @@
+{"_event": "aom_connection_acquired", "connection_id": "conn-001", "host": "web1", "task_id": "t1", "timestamp": "2026-07-01T10:00:00Z"}
+{"_event": "aom_connection_acquired", "connection_id": "conn-002", "host": "web1", "task_id": "t2", "timestamp": "2026-07-01T10:00:02Z"}
+{"_event": "aom_stderr_line", "source": "ssh_debug", "host": "web1", "level": 4, "line": "<web1> SSH: ANSIBLE_REMOTE_PORT set: (-o)(Port=22)"}
+{"_event": "aom_connection_released", "connection_id": "conn-001", "host": "web1", "task_id": "t1", "timestamp": "2026-07-01T10:00:05Z"}
+{"_event": "aom_connection_released", "connection_id": "conn-002", "host": "web1", "task_id": "t2", "timestamp": "2026-07-01T10:00:06Z"}

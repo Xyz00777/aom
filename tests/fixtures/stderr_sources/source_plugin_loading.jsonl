@@ -1,0 +1,1 @@
+{"_event": "aom_stderr_line", "source": "plugin_loading", "host": null, "level": 3, "line": "Loading callback plugin ansible.posix.jsonl of type stdout, v2.0 from /x/y.py"}
