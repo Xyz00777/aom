@@ -1,11 +1,10 @@
 # PreParseResult Assembly
 
-> 2 nodes · cohesion 1.00
+> 1 nodes · cohesion 1.00
 
 ## Key Concepts
 
 - **.test_preparse_result_assembly()** (5 connections) — `tests/unit/test_parser.py`
-- **TC-088: PreParseResult contains both plays and play_hosts.** (1 connections) — `tests/unit/test_parser.py`
 
 ## Relationships
 
@@ -19,8 +18,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 3 (50%)
-- INFERRED: 3 (50%)
+- EXTRACTED: 2 (40%)
+- INFERRED: 3 (60%)
 - AMBIGUOUS: 0 (0%)
 
 ---

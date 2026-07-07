@@ -34,8 +34,8 @@
 ## Relationships
 
 - [[Compact Renderer Implementation]] (2 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
 - [[Play Definition Tree Population]] (2 shared connections)
+- [[Role Group Task Models]] (1 shared connections)
 - [[Task Definition Live Refresh]] (1 shared connections)
 - [[State Machine Invariants]] (1 shared connections)
 - [[Run State Completion Recap]] (1 shared connections)

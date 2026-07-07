@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **TestFinalCompletionIndicator** (13 connections) — `tests/compact/test_status_bar_colors.py`
+- **TestFinalCompletionIndicator** (12 connections) — `tests/compact/test_status_bar_colors.py`
 - **._final_line()** (6 connections) — `tests/compact/test_status_bar_colors.py`
 - **.test_cancelled_indicator_is_yellow()** (2 connections) — `tests/compact/test_status_bar_colors.py`
 - **.test_completed_indicator_is_green()** (2 connections) — `tests/compact/test_status_bar_colors.py`
@@ -17,7 +17,6 @@
 - [[Run State Completion Recap]] (3 shared connections)
 - [[Compact Renderer Implementation]] (2 shared connections)
 - [[Role Group Task Models]] (1 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
 - [[Status Bar Color Tests]] (1 shared connections)
 
 ## Source Files
@@ -26,8 +25,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 22 (79%)
-- INFERRED: 6 (21%)
+- EXTRACTED: 22 (81%)
+- INFERRED: 5 (19%)
 - AMBIGUOUS: 0 (0%)
 
 ---

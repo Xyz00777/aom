@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **TestProjectionLifecycle** (12 connections) — `tests/compact/test_tree_projection_lifecycle.py`
+- **TestProjectionLifecycle** (11 connections) — `tests/compact/test_tree_projection_lifecycle.py`
 - **_seed_sticky_gap_state()** (9 connections) — `tests/compact/test_tree_projection_lifecycle.py`
 - **.test_perf_020_event_keeps_projection_alive_and_refreshes_cache()** (6 connections) — `tests/compact/test_tree_projection_lifecycle.py`
 - **test_tree_projection_lifecycle.py** (5 connections) — `tests/compact/test_tree_projection_lifecycle.py`
@@ -25,7 +25,6 @@
 - [[Task Definition Live Refresh]] (3 shared connections)
 - [[Play Definition Tree Population]] (3 shared connections)
 - [[Role Group Task Models]] (1 shared connections)
-- [[Tree Projection Logic]] (1 shared connections)
 
 ## Source Files
 
@@ -33,8 +32,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 38 (72%)
-- INFERRED: 15 (28%)
+- EXTRACTED: 38 (73%)
+- INFERRED: 14 (27%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -28,36 +28,164 @@ Date: 2026-06-30 · Goal: Lock down the open questions in the verbosity-handling
 
 ## Locked design decisions (post-research revisions)
 
-After Phase 0 research (4 parallel agents) on 2026-06-30, the following revisions to the brainstorm plan are locked in:
+After Phase 0 research (5 parallel agents) on 2026-06-30, the following revisions to the brainstorm plan are locked in:
 
-- **`aom_verbose_line` synthetic event — DROPPED.** The research found that at caplevel ≥ 4 in ansible-core 2.20.4, the only `Display.v*()` call sites are in `ssh.py:Connection._add_args()` (all matching prefix `SSH: `). The brainstorm's multi-prefix heuristic was hallucinated. Building a 1-prefix classifier for a new event type is over-engineering. No new event type, no new schema, no new TUI tab.
-- **Inspect TUI live refresh — DROPPED.** The inspect TUI stays a static browser (its current behavior). User presses `r` to manually reload. No `<C-r>` auto-refresh toggle. This matches the existing code and avoids adding 15 LOC of polling for a feature the user explicitly doesn't want.
+### Storage decision: synthetic events in `events.jsonl`, drop `stderr.log`
 
-**The user wants verbose stderr logs to be visible in `aom inspect` without any flag.** The verification report (`raw-pty-tab-verification.md`, 2026-06-30) found:
+After user feedback: **drop the `stderr.log` file entirely.** Stop writing it. Every stderr line becomes a synthetic `aom_stderr_line` event in `events.jsonl` with classification fields. One canonical log file, one read path for inspect. No backward compatibility (per user: "still in active development, this is okay").
 
-| Access path | Shows `stderr.log` content? |
-|-------------|------------------------------|
-| `aom inspect <sid>` (TUI, no flags) | **No.** Three-pane layout (Runs / Tasks / Detail). Detail pane shows only per-task `module_stderr`, not `stderr.log`. No tab, no panel, no keybind. |
-| `aom inspect --text` (no flags) | **Partial.** Last 20 lines, only for failed sessions. No flag to expand. |
-| `aom inspect --debug` | **No.** Shows `pty_bytes` counter, not content. |
-| `aom inspect --json` | **No.** |
+Synthetic event schema:
+```json
+{
+  "_event": "aom_stderr_line",
+  "_timestamp": "2026-06-30T12:34:56.789012Z",
+  "source": "ssh_debug",
+  "host": "web1",
+  "level": 4,
+  "line": "SSH: ANSIBLE_REMOTE_PORT/remote_port/ansible_port set: (-o)(Port=22)"
+}
+```
 
-**The data is already on disk** at `~/.local/state/aom/sessions/<sid>/stderr.log` and **already loaded** into `session["stderr"]` by `load_session()` (`store.py:759-763`). The gap is purely in the UI layer. The `stderr.log` contains: ansible warnings, preflight errors, SSH debug (at `-vvvv`), callback loading, connection locks, and all other stderr from `ansible-playbook` outside the JSONL stream.
+| Field | Type | Meaning |
+|---|---|---|
+| `_event` | str | Discriminator: `"aom_stderr_line"` |
+| `_timestamp` | str (ISO 8601 UTC) | When AOM received the line |
+| `source` | str (enum) | One of 12 values (see below) |
+| `host` | str \| null | Extracted from `<hostname>` prefix if present, else null |
+| `level` | int | Verbosity caplevel (0=always, 1-5) |
+| `line` | str | Raw stderr line text |
 
-**This means Phase 7 (inspect TUI) MUST add a "Raw PTY" panel.** This was incorrectly marked as "verify" in earlier decisions — there is nothing to verify because the feature does not exist. It must be built. Revised plan:
+### Classifier: 12 source values, 30 regex rules
 
-- **Add a "Raw PTY" panel to the inspect TUI** (or repurpose the Detail pane to be tabbed). The panel reads `session["stderr"]` (already loaded) and displays it in full. No truncation, no filtering.
-- **Add a `--show-stderr` flag to `aom inspect --text`** that prints the full `stderr.log` (or removes the 20-line cap and the `status == "failed"` gate by default).
-- **The data plumbing is done.** Only the UI work is new.
+Source enum (`StderrSource`):
+- `warning`, `deprecation`, `error` — always-emitted
+- `ssh_debug` (caplevel 4+), `ssh_info` (caplevel 2-3) — SSH connection
+- `connection` (caplevel 2-3), `connection_lifecycle` (caplevel 3) — generic connection
+- `plugin_loading` (caplevel 3), `inventory` (caplevel 2) — startup
+- `vault`, `prompt` — interactive
+- `run_level` — fallback (config, retry file, play count, etc.)
 
-**Implication for the 8-phase plan:**
+Run-level vs task-level (for `V` keybind filtering):
+- **Run-level** (visible at run focus): `warning`, `deprecation`, `error`, `plugin_loading`, `inventory`, `vault`, `prompt`, `run_level`
+- **Task-level** (only visible at task/play focus when host matches): `ssh_debug`, `ssh_info`, `connection`, `connection_lifecycle`
 
-- **Phase 4 (storage extension)** — remove the `aom_verbose_line` event emission, the prefix classifier, the `core/verbose_heuristic.py` constant, and the TUI run-level "Verbose" tab. Keep: `hosts.<host>.verbose` block, redaction wiring, `--capture-verbose` flag.
-- **Phase 7 (inspect TUI)** — **add a "Raw PTY" panel** (the missing feature). Remove the run-level "Verbose" tab (different concept, no longer needed). Keep: `V` keybind for `hosts.<host>.verbose`, focus indicator, `V` flash, tabbed DetailBlock for host-level data, lazy-render budget (Q32). Remove the `<C-r>` auto-refresh toggle.
-- **Q3.3 spec note (live streaming inspect)** — rewrite to: "Inspect TUI is a static browser. It loads session data on mount and reloads on `r` keypress. Live updates during a running session require manual `r` reload."
-- **Q13 (stderr lines) in the brainstorm** — superseded. The `aom_verbose_line` event is gone. The "Raw PTY" panel in Phase 7 surfaces the full `stderr.log`.
+Full regex table in `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md` Section 4. First match wins.
 
-## Q&A log
+### Reuse existing classification
+
+AOM's `core/parser.py:_handle_plaintext` already classifies `[WARNING]:` / `[DEPRECATION WARNING]:` patterns (lines 167-281). The existing `WarningEntry` dataclass (lines 72-79 of `core/models.py`) is a good model. The new classifier slots into the `else` branch at line 283, before `_plaintext_lines.append(line)`. The warning/deprecation logic is reused; new logic adds the other 10 source values.
+
+### What `V` shows at each focus level
+
+| Focus level | Show synthetic events where... |
+|---|---|
+| **Run** | `source IN (run-level sources)` — warnings, deprecations, errors, plugin loading, inventory, vault, prompts, run_level fallback. **Excludes** `ssh_debug`, `ssh_info`, `connection`, `connection_lifecycle` (task-level noise). |
+| **Play** | All run-level + task-level events where the JSONL event time window falls within the play |
+| **Task** | All run-level + task-level events for the specific task×host (filtered by `host` field) |
+
+This correctly handles `strategy: free` because **the `host` field on each event is what scopes it**, not timestamps. A `ssh_debug` event with `host: "web1"` is part of web1's task, not web2's, even if they interleave on stderr.
+
+### Implementation outline
+
+**`core/stderr_classifier.py` (new, ~80 LOC)**:
+- `StderrSource` enum (12 values)
+- `CLASSIFIER_RULES` list (30 tuples: source, regex, has_host)
+- `classify(line: str) -> StderrEvent` — try each regex, return first match with extracted host
+- `StderrEvent` dataclass: `source`, `host`, `level`, `line`
+
+**`core/parser.py:_handle_plaintext` (modified, +5 LOC)**:
+- Reuse warning/deprecation handling (existing code at lines 256-281)
+- Add new else branch: emit `aom_stderr_line` event via session sink
+- Drop the `_plaintext_lines.append(line)` fallback (or keep it for backward compat with replays that look at _plaintext_lines)
+
+**`session/store.py:record_stderr` (modified, -3 LOC)**:
+- Remove the file write entirely
+- Replace with: pass the line to the classifier and emit a synthetic event to `events.jsonl`
+
+**`inspect/text.py` and `inspect/text.py:_render_stderr_tail` (modified)**:
+- Read from `events.jsonl` (filter for `_event == "aom_stderr_line"`)
+- Apply focus-level filter (run-level only, or scoped to play/task)
+- Remove the `status == "failed"` gate and the 20-line cap
+
+**`tui/screens/inspect.py` (Phase 7)**:
+- Add "Verbose" panel that reads `aom_stderr_line` events
+- Filter by focus level using the table above
+- Use the existing `V` keybind (already in the plan) to toggle the panel
+
+### Open architectural questions
+
+From the taxonomy report Section 5:
+- **`VERBOSE_TO_STDERR=False`** would route verbose to stdout. Out of scope; document the assumption.
+- **`display.debug()`** goes to stdout, not stderr. Out of scope for v1; debug messages are captured by JSONL if relevant.
+- **`banner()`** writes to stdout (PLAY/TASK headers). Already captured by JSONL via `v2_playbook_on_play_start` and `_task_start` events. No action needed.
+- **Deduplication**: ansible deduplicates warnings, so the classifier sees fewer lines than expected. Fine; the event count matches what's on disk.
+
+### Implication for the 8-phase plan
+
+| Phase | Change |
+|---|---|
+| **Phase 4** (storage) | Drop `stderr.log`. Add `aom_stderr_line` synthetic event emission. Add `core/stderr_classifier.py` (~80 LOC). Update `store.py:record_stderr` to emit event instead of writing file. Update read side: `session["stderr"]` no longer exists; consumers read from `events.jsonl` filtered for `aom_stderr_line`. |
+| **Phase 4** (sub-task) | Add test fixtures: JSONL event samples with `aom_stderr_line` events at each source. |
+| **Phase 7** (TUI) | Add "Verbose" panel to inspect TUI. Filter by focus level (run-level vs task-level×host). |
+| **Phase 7** (CLI) | Update `aom inspect --text` to read from `events.jsonl`, apply focus-level filter, remove 20-line cap and `status == "failed"` gate. |
+| **Phase 7** (sub-task) | Add `--task` / `--play` scoping flags to `aom inspect --text` so the user can filter from the CLI too. |
+
+### Connection tracking: custom JSONL callback plugin
+
+After the `strategy: free` + `async` discussion, the v1 design needs a way to track which task owns a stderr line on a given host. The research (`connection-id-feasibility.md`) found that ansible-core's `connection_lock()`/`connection_unlock()` are never called, so there's no per-connection signal in stderr. Solution: ship a custom JSONL callback plugin that emits connection-tracking events on AOM's behalf.
+
+**Decision: ship `src/ansible_aom/callbacks/aom_connection.py` as a JSONL callback plugin.** AOM auto-loads it via `ANSIBLE_CALLBACK_PLUGINS` when wrapping `ansible-playbook`. No user action required.
+
+The callback plugin (extends `CallbackBase`):
+- `v2_runner_on_start(task, host)` → emit `aom_connection_acquired` with `connection_id: <UUID>`, `task_uuid`, `host`, `ts`
+- `v2_runner_on_ok/failed/unreachable/skipped(result)` → emit `aom_connection_released` with the same `connection_id`, status
+- All other callback methods pass through (no override)
+
+AOM's PTY parser sees these events interleaved with `v2_runner_on_*` JSONL events. When a stderr line arrives with `host: "web1"`, AOM looks at the most recent `aom_connection_acquired` for `web1` and tags the line with that `connection_id`. The line is then scoped to the correct task.
+
+**Irreducible limit** (the only failure case): when two `aom_connection_acquired` events for the **same host** truly overlap in time (true concurrent execution on the same host, only possible with `async: poll: 0` + `strategy: free`). AOM attributes the stderr line to the **most recent** acquired connection for the host. The synthetic event gets a `attribution_confidence: "ambiguous" | "unique"` flag. The inspect TUI shows a small `?` indicator next to ambiguous lines; the user can drill in via the JSONL event timeline to disambiguate manually.
+
+**Updated synthetic event schema** (adds `connection_id` and `attribution_confidence`):
+```json
+{
+  "_event": "aom_stderr_line",
+  "_timestamp": "2026-06-30T12:34:56.789012Z",
+  "source": "ssh_debug",
+  "host": "web1",
+  "level": 4,
+  "connection_id": "C-a3f9b2e1",
+  "attribution_confidence": "unique",
+  "line": "SSH: ANSIBLE_REMOTE_PORT set: (-o)(Port=22)"
+}
+```
+
+For **run-level events** (no host, e.g., warnings, plugin loading), `connection_id` is `null` and `attribution_confidence` is `"unique"` (the line is unambiguously run-level).
+
+### Updated `V` keybind behavior
+
+| Focus | Filter |
+|---|---|
+| **Run** | `host IS NULL` (run-level events only, regardless of `connection_id`) |
+| **Play** | `host IS NULL` OR (`host IN (hosts in this play)` AND line's `_timestamp` falls in play window) |
+| **Task** | `host IS NULL` OR (`host == focused host` AND `connection_id == focused task's connection_id`); show ambiguous lines (different `connection_id` but same host) with `?` indicator |
+
+This correctly handles:
+- `strategy: free` alone (lines tagged by host, multiple hosts see their own)
+- `async` alone (lines tagged by host; same host may have multiple connections, but the most-recent-acquired heuristic handles it)
+- `strategy: free` + `async` (most-recent-acquired is the best we can do; ambiguous flag surfaces the limit honestly)
+- The `host` field already works because the callback's `v2_runner_on_start` carries the host
+- The `connection_id` works because the callback generates a unique UUID per acquisition
+
+### Updated phase plan (additions)
+
+| Phase | Change |
+|---|---|
+| **Phase 4** (storage) | New: `src/ansible_aom/callbacks/aom_connection.py` (~80-100 LOC). New event types: `aom_connection_acquired`, `aom_connection_released`. New fields on `aom_stderr_line`: `connection_id`, `attribution_confidence`. Parser maintains a `(host, connection_id, acquired_at)` map. |
+| **Phase 4** (sub-task) | Test fixtures: callback plugin unit tests + integration test with overlapping async tasks. |
+| **Phase 5** (CLI) | Auto-set `ANSIBLE_CALLBACK_PLUGINS=~/.local/share/aom/callbacks` when AOM runs ansible-playbook. No user-visible flag. |
+| **Phase 7** (TUI) | "Verbose" panel groups by `connection_id` when present. Ambiguous lines get a `?` indicator. `--task` / `--play` filters use `connection_id` matching. |
+
+
 
 ### Q1 — What does "v1" mean in this context?
 - Asked: A (this minor release), B (feature branch), C (smallest subset), D (post-QC-pass doc baseline)?
@@ -160,11 +288,11 @@ After Phase 0 research (4 parallel agents) on 2026-06-30, the following revision
 - Flags: none.
 
 ## Open flags (pending input)
-- **Verify `aom inspect prune` exists and is tested.** ~~Doc 2 line 380.~~ **RESOLVED 2026-06-30**: PASS. `inspect/cli.py:70-74`, `--days` default 30, integration test at `test_inspect_cli.py:58`, unit test at `test_cli.py:551`. See `aom-codebase-verification.md` Task 1.
-- **Verify `--yes` doesn't already exist as a global flag.** ~~Doc 2 line 381.~~ **RESOLVED 2026-06-30**: PASS. Only exists on `rerun` subcommand (`rerun/cli.py:301-304`). Top-level `cli.py` parser has no global `--yes`. Phase 0 (pre-flight) needs the flag added. See `aom-codebase-verification.md` Task 2.
+- **Verify `aom inspect prune` exists and is tested.** ~~Doc 2 line 380.~~ **RESOLVED 2026-06-30**: PASS. `src/ansible_aom/inspect/cli.py:70-74`, `--days` default 30, integration test at `tests/integration/test_inspect_cli.py:58`, unit test at `tests/unit/test_cli.py:551`. See `aom-codebase-verification.md` Task 1.
+- **Verify `--yes` doesn't already exist as a global flag.** ~~Doc 2 line 381.~~ **RESOLVED 2026-06-30**: PASS. Only exists on `rerun` subcommand (`src/ansible_aom/rerun/cli.py:301-304`). Top-level `cli.py` parser has no global `--yes`. Phase 0 (pre-flight) needs the flag added. See `aom-codebase-verification.md` Task 2.
 - **Verify pre-commit / CI hook setup before adding `scripts/verify_anchors.py`.** ~~Doc 2 line 382.~~ **RESOLVED 2026-06-30**: PASS. 5 hooks: ruff-format, ruff-check, mypy (all pre-commit), pytest (pre-push only), graphify-refresh. New script slots in as a local hook entry. See `aom-codebase-verification.md` Task 3.
-- **Confirm inspect TUI's existing refresh rate is ≤ 1s.** ~~Per Q3.3 flag.~~ **RESOLVED 2026-06-30 (with revision)**: The inspect TUI is a **static browser** — no polling. Only the live TUI (`tui/app.py:468`) has a 200ms tick. The Q3.3 spec note assumed the inspect TUI polls, which is wrong. See "Design revisions" below.
-- **Confirm `core/redaction.py:280-283` is the real Layer 4 location.** ~~Doc 2 line 113.~~ **RESOLVED 2026-06-30**: PASS. Lines 279-283 (comment on 279, code on 280-283). The `redact_event` function spans 216-285 and is unwired. See `aom-codebase-verification.md` Task 5.
+- **Confirm inspect TUI's existing refresh rate is ≤ 1s.** ~~Per Q3.3 flag.~~ **RESOLVED 2026-06-30 (with revision)**: The inspect TUI is a **static browser** — no polling. Only the live TUI (`src/ansible_aom/tui/app.py:468`) has a 200ms tick. The Q3.3 spec note assumed the inspect TUI polls, which is wrong. See "Design revisions" below.
+- **Confirm `src/ansible_aom/core/redaction.py:280-283` is the real Layer 4 location.** ~~Doc 2 line 113.~~ **RESOLVED 2026-06-30**: PASS. Lines 279-283 (comment on 279, code on 280-283). The `redact_event` function spans 216-285 and is unwired. See `aom-codebase-verification.md` Task 5.
 
 ## Phase 0 (research) — Findings 2026-06-30
 
@@ -192,7 +320,7 @@ Three research agents ran in parallel against actual source. Reports at `.sisyph
 - Re-loads on `r` keypress (`action_reload_runs`)
 - Does NOT have `set_interval` or `set_timer` calls
 
-The **live TUI** (`tui/app.py:468`) does poll at 200ms — but that's the playbook-monitoring TUI, not the inspect TUI.
+The **live TUI** (`src/ansible_aom/tui/app.py:468`) does poll at 200ms — but that's the playbook-monitoring TUI, not the inspect TUI.
 
 **Implication for the v1 plan:**
 - "Live streaming inspect" (Q23) doesn't need a polling loop. The inspect TUI already reloads on `r`. For a true streaming experience, add a `<C-r>` (auto-refresh) mode that calls `_reload_runs()` on a 1s timer when active.
@@ -215,7 +343,7 @@ The **live TUI** (`tui/app.py:468`) does poll at 200ms — but that's the playbo
 ### Finding 4 — All 5 verification tasks PASS
 
 The 5 open-flags from the brainstorm are all correct. The AOM codebase matches the docs. The only delta:
-- `core/redaction.py:279-283` (off-by-1 from cited 280-283; comment on 279, code on 280-283).
+- `src/ansible_aom/core/redaction.py:279-283` (off-by-1 from cited 280-283; comment on 279, code on 280-283).
 - `--yes` needs adding to global parser (Phase 0 work).
 - Pre-commit setup is well-defined; `scripts/verify_anchors.py` slots in as a new local hook.
 

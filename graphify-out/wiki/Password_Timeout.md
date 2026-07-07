@@ -1,24 +1,21 @@
 # Password Timeout
 
-> 8 nodes · cohesion 0.25
+> 5 nodes · cohesion 0.25
 
 ## Key Concepts
 
-- **TestPasswordTimeout** (8 connections) — `tests/integration/test_error_handling.py`
+- **TestPasswordTimeout** (6 connections) — `tests/integration/test_error_handling.py`
+- **.test_password_timeout_retry_option()** (3 connections) — `tests/integration/test_error_handling.py`
+- **TC-484 to TC-487: Watchdog timer tests.** (2 connections) — `tests/integration/test_error_handling.py`
 - **.test_password_timeout_cancels_with_error()** (2 connections) — `tests/integration/test_error_handling.py`
 - **.test_password_timeout_default_is_60_seconds()** (2 connections) — `tests/integration/test_error_handling.py`
-- **.test_password_timeout_retry_option()** (2 connections) — `tests/integration/test_error_handling.py`
-- **TC-452: Password Timeout - 60 Second Limit.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-452: Password timeout defaults to 60 seconds.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-453: Password timeout cancels with error message.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-454: User can retry after timeout.** (1 connections) — `tests/integration/test_error_handling.py`
 
 ## Relationships
 
+- [[Watchdog Timer]] (1 shared connections)
 - [[PTY Stream Parser]] (1 shared connections)
-- [[State Machine Module]] (1 shared connections)
-- [[Execution State Transitions]] (1 shared connections)
 - [[Error Handling Tests]] (1 shared connections)
+- [[Crash Recovery Notification]] (1 shared connections)
 
 ## Source Files
 
@@ -26,8 +23,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 15 (83%)
-- INFERRED: 3 (17%)
+- EXTRACTED: 14 (93%)
+- INFERRED: 1 (7%)
 - AMBIGUOUS: 0 (0%)
 
 ---

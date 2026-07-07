@@ -1,6 +1,6 @@
 # Status
 
-> God node · 273 connections · `src/ansible_aom/core/models.py`
+> God node · 288 connections · `src/ansible_aom/core/models.py`
 
 **Community:** [[Role Group Task Models]]
 
@@ -10,6 +10,7 @@
 - [[models.py]] `EXTRACTED`
 
 ### inherits
+- [[Enum]] `EXTRACTED`
 - [[Enum]] `EXTRACTED`
 
 ### rationale_for
@@ -27,24 +28,24 @@
 - [[.get_status_icon()]] `EXTRACTED`
 
 ### uses
+- [[RunState]] `INFERRED`
 - [[CompactRenderer]] `INFERRED`
-- [[TreeProjection]] `INFERRED`
-- [[TreeLine]] `INFERRED`
 - [[JsonRenderer]] `INFERRED`
+- [[TreeProjection]] `INFERRED`
+- [[TestPtyStreamParserStderrLineEmission]] `INFERRED`
 - [[TaskTree]] `INFERRED`
-- [[HostRow]] `INFERRED`
+- [[TreeLine]] `INFERRED`
 - [[TestJsonLineStreamBasics]] `INFERRED`
 - [[TestHideStateFlag]] `INFERRED`
 - [[TestListTasksEdgeCases]] `INFERRED`
+- [[RendererMirrorMachine]] `INFERRED`
 - [[TestListTasksParser]] `INFERRED`
 - [[TestPtyStreamParserPhases]] `INFERRED`
-- [[RendererMirrorMachine]] `INFERRED`
 - [[TestTaskDefinition]] `INFERRED`
 - [[TestTaskMatching]] `INFERRED`
 - [[TestListHostsEdgeCases]] `INFERRED`
 - [[TestHostRunState]] `INFERRED`
 - [[TestPlayRunState]] `INFERRED`
-- [[TestHostRows]] `INFERRED`
 - [[TestStatusBarFormat]] `INFERRED`
 - [[TestRunState]] `INFERRED`
 

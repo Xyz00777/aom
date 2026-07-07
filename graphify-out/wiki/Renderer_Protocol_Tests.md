@@ -30,7 +30,6 @@
 - [[Compact Renderer Implementation]] (2 shared connections)
 - [[AOM TUI Application]] (2 shared connections)
 - [[Role Group Task Models]] (1 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
 - [[JSON Renderer]] (1 shared connections)
 - [[CLI Interface Tests]] (1 shared connections)
 

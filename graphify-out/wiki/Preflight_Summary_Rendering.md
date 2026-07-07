@@ -8,9 +8,9 @@
 - **test_preflight_summary.py** (14 connections) — `tests/compact/test_preflight_summary.py`
 - **_td()** (7 connections) — `tests/compact/test_preflight_summary.py`
 - **_td_tagged()** (7 connections) — `tests/compact/test_preflight_summary.py`
-- **test_prior_run_line.py** (7 connections) — `tests/compact/test_prior_run_line.py`
 - **_play()** (7 connections) — `tests/compact/test_prior_run_line.py`
 - **test_format_preflight_summary_counts_role_grouped_tasks()** (6 connections) — `tests/compact/test_preflight_summary.py`
+- **test_prior_run_line.py** (6 connections) — `tests/compact/test_prior_run_line.py`
 - **test_collect_tags_handles_role_group_definition()** (5 connections) — `tests/compact/test_preflight_summary.py`
 - **test_format_preflight_summary_handles_no_resolved_hosts()** (5 connections) — `tests/compact/test_preflight_summary.py`
 - **test_format_preflight_summary_pluralization()** (5 connections) — `tests/compact/test_preflight_summary.py`
@@ -35,8 +35,8 @@
 
 - [[Play Definition Tree Population]] (12 shared connections)
 - [[Compact Renderer Formatters]] (5 shared connections)
-- [[Run History Mining]] (4 shared connections)
 - [[Task Definition Live Refresh]] (3 shared connections)
+- [[Run History Mining]] (3 shared connections)
 - [[Duration Formatting Helpers]] (2 shared connections)
 - [[Role Group Task Models]] (2 shared connections)
 - [[Total Task Counting]] (1 shared connections)
@@ -50,7 +50,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 83 (64%)
+- EXTRACTED: 82 (64%)
 - INFERRED: 46 (36%)
 - AMBIGUOUS: 0 (0%)
 

@@ -7,12 +7,12 @@
 - **MonkeyPatch** (27 connections)
 - **ensure_inventory_arg()** (9 connections) — `src/ansible_aom/cli.py`
 - **detect_default_inventory()** (7 connections) — `src/ansible_aom/cli.py`
-- **.test_add_warning_from_worker_lands_on_status_bar()** (6 connections) — `tests/tui/test_live_refresh.py`
-- **.test_completion_nonzero_marks_title_with_cross()** (6 connections) — `tests/tui/test_live_refresh.py`
-- **.test_completion_zero_marks_title_with_check()** (6 connections) — `tests/tui/test_live_refresh.py`
-- **.test_three_task_starts_appear_in_tree()** (6 connections) — `tests/tui/test_live_refresh.py`
-- **.test_tick_drains_pending_log_lines()** (6 connections) — `tests/tui/test_live_refresh.py`
-- **.test_tick_refreshes_widgets_after_event()** (6 connections) — `tests/tui/test_live_refresh.py`
+- **.test_add_warning_from_worker_lands_on_status_bar()** (7 connections) — `tests/tui/test_live_refresh.py`
+- **.test_completion_nonzero_marks_title_with_cross()** (7 connections) — `tests/tui/test_live_refresh.py`
+- **.test_completion_zero_marks_title_with_check()** (7 connections) — `tests/tui/test_live_refresh.py`
+- **.test_three_task_starts_appear_in_tree()** (7 connections) — `tests/tui/test_live_refresh.py`
+- **.test_tick_drains_pending_log_lines()** (7 connections) — `tests/tui/test_live_refresh.py`
+- **.test_tick_refreshes_widgets_after_event()** (7 connections) — `tests/tui/test_live_refresh.py`
 - **TestEnsureInventoryArg** (6 connections) — `tests/unit/test_cli_inventory_autodetect.py`
 - **TestDetectDefaultInventory** (5 connections) — `tests/unit/test_cli_inventory_autodetect.py`
 - **.test_handles_inventory_file_long_form()** (5 connections) — `tests/unit/test_cli_inventory_autodetect.py`
@@ -53,8 +53,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 129 (96%)
-- INFERRED: 6 (4%)
+- EXTRACTED: 129 (91%)
+- INFERRED: 12 (9%)
 - AMBIGUOUS: 0 (0%)
 
 ---

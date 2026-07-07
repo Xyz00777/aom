@@ -1,6 +1,6 @@
 # Warning Color Formatting
 
-> 9 nodes · cohesion 0.44
+> 7 nodes · cohesion 0.44
 
 ## Key Concepts
 
@@ -8,10 +8,8 @@
 - **_printed()** (6 connections) — `tests/compact/test_warning_color.py`
 - **_renderer()** (6 connections) — `tests/compact/test_warning_color.py`
 - **test_warning_with_synthesised_prefix_also_colored()** (4 connections) — `tests/compact/test_warning_color.py`
-- **test_deprecation_wrapped_in_magenta()** (3 connections) — `tests/compact/test_warning_color.py`
 - **test_warning_without_color_when_colorize_off()** (3 connections) — `tests/compact/test_warning_color.py`
-- **test_warning_wrapped_in_magenta()** (3 connections) — `tests/compact/test_warning_color.py`
-- **Warnings emitted to the log must be coloured magenta (ansible's default callback** (1 connections) — `tests/compact/test_warning_color.py`
+- **Warnings emitted to the log must be coloured yellow and deprecations orange so t** (1 connections) — `tests/compact/test_warning_color.py`
 - **add_warning falls through to a `[WARNING] msg` synthesis when the     raw text d** (1 connections) — `tests/compact/test_warning_color.py`
 
 ## Relationships
@@ -24,7 +22,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 34 (100%)
+- EXTRACTED: 28 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

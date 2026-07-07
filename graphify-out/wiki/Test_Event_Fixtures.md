@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **conftest.py** (26 connections) — `tests/conftest.py`
+- **conftest.py** (25 connections) — `tests/conftest.py`
 - **deprecated_removed_line()** (2 connections) — `tests/conftest.py`
 - **event_play_start()** (2 connections) — `tests/conftest.py`
 - **event_playbook_start()** (2 connections) — `tests/conftest.py`
@@ -33,7 +33,6 @@
 
 ## Relationships
 
-- [[Run History Mining]] (1 shared connections)
 - [[Deprecation Warning Line]] (1 shared connections)
 - [[Runner OK Event]] (1 shared connections)
 - [[Runner Changed Event]] (1 shared connections)
@@ -50,7 +49,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 72 (100%)
+- EXTRACTED: 71 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

@@ -1,6 +1,6 @@
 # Conftest Fixture Validation
 
-> 18 nodes · cohesion 0.11
+> 9 nodes · cohesion 0.11
 
 ## Key Concepts
 
@@ -13,15 +13,6 @@
 - **.test_password_prompt_vault_fixture()** (3 connections) — `tests/unit/test_pty_stream.py`
 - **.test_recap_line_fixture()** (3 connections) — `tests/unit/test_pty_stream.py`
 - **.test_warning_line_fixture()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **Verify all conftest fixtures work correctly.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **password_prompt_ssh fixture is valid.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **password_prompt_vault fixture is valid.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **password_prompt_become fixture is valid.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **deprecation_warning_line fixture is valid.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **deprecated_removed_line fixture is valid.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **warning_line fixture is valid.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **recap_line fixture is valid.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **jsonl_line fixture is valid.** (1 connections) — `tests/unit/test_pty_stream.py`
 
 ## Relationships
 
@@ -35,8 +26,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 35 (76%)
-- INFERRED: 11 (24%)
+- EXTRACTED: 26 (70%)
+- INFERRED: 11 (30%)
 - AMBIGUOUS: 0 (0%)
 
 ---

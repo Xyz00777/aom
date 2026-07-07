@@ -1,16 +1,14 @@
 # Renderer Render Methods
 
-> 7 nodes · cohesion 0.29
+> 5 nodes · cohesion 0.29
 
 ## Key Concepts
 
-- **.render()** (4 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
+- **.render()** (5 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
+- **._format_elapsed_time()** (4 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
 - **Text** (3 connections)
 - **.render()** (3 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **._format_elapsed_time()** (3 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
 - **Render the debug panel.          Returns:             Rich Text object with all** (1 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **Render the summary panel.          Returns:             Rich Text object with pl** (1 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
-- **Format elapsed time.          Returns:             Formatted time string (H:MM:S** (1 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
 
 ## Relationships
 
@@ -25,8 +23,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 16 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 15 (94%)
+- INFERRED: 1 (6%)
 - AMBIGUOUS: 0 (0%)
 
 ---

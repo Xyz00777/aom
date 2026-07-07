@@ -118,6 +118,7 @@ select = ["E", "F", "W", "I"]
 "tests/unit/test_redaction.py" = ["E501", "F401"]
 "tests/unit/test_runner_eof_watchdog.py" = ["E501", "F401"]
 "tests/unit/test_runtime_role_task_count.py" = ["E501"]
+"tests/unit/test_stderr_classifier.py" = ["E501", "F401"]
 "tests/unit/test_template_variable_names.py" = ["F401"]
 "tests/unit/test_tree_classify_and_role_labels.py" = ["E501", "F401", "F841"]
 "tests/unit/test_tree_nested_roles.py" = ["E501"]
@@ -135,10 +136,17 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
-# The bundled ansible callback plugin subclasses GPL ansible code that
-# has no type stubs; it runs inside the ansible subprocess, never imported
+# The bundled ansible callback plugins subclass GPL ansible code that
+# has no type stubs; they run inside the ansible subprocess, never imported
 # by AOM, so strict typing buys nothing here.
 module = "ansible_aom.ansible.callback.*"
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+# The connection-tracking callback plugin also subclasses ansible code
+# and runs inside the subprocess.
+module = "ansible_aom.callbacks.*"
 disallow_untyped_defs = false
 disallow_untyped_calls = false
 

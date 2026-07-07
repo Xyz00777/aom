@@ -1,10 +1,10 @@
 # Renderer Parity Invariant
 
-> 18 nodes · cohesion 0.17
+> 17 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **reduce_state_for_parity()** (8 connections) — `src/ansible_aom/core/parity.py`
+- **reduce_state_for_parity()** (10 connections) — `src/ansible_aom/core/parity.py`
 - **test_renderer_parity.py** (7 connections) — `tests/integration/test_renderer_parity.py`
 - **test_all_renderers_agree_on_reduced_state()** (7 connections) — `tests/integration/test_renderer_parity.py`
 - **_drive_compact()** (6 connections) — `tests/integration/test_renderer_parity.py`
@@ -15,7 +15,6 @@
 - **parity.py** (3 connections) — `src/ansible_aom/core/parity.py`
 - **_empty_host_counts()** (2 connections) — `src/ansible_aom/core/parity.py`
 - **Reduce a ``RunState`` into a renderer-agnostic dict.  This is the canonical "wha** (1 connections) — `src/ansible_aom/core/parity.py`
-- **Project ``state`` into a renderer-agnostic dict.      Shape::          {** (1 connections) — `src/ansible_aom/core/parity.py`
 - **Cross-renderer parity invariant.  Feed the same recorded JSONL stream through al** (1 connections) — `tests/integration/test_renderer_parity.py`
 - **For each fixture, all three renderers must reduce to the same dict.** (1 connections) — `tests/integration/test_renderer_parity.py`
 - **Sanity check the shape on a known-good fixture.      Locks in the keys other con** (1 connections) — `tests/integration/test_renderer_parity.py`
@@ -27,7 +26,6 @@
 
 - [[Replay Determinism Tests]] (2 shared connections)
 - [[Playbook Event Parsing]] (1 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
 - [[Compact Renderer Implementation]] (1 shared connections)
 - [[JSON Renderer]] (1 shared connections)
 - [[AOM TUI Application]] (1 shared connections)
@@ -40,8 +38,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 51 (85%)
-- INFERRED: 9 (15%)
+- EXTRACTED: 51 (84%)
+- INFERRED: 10 (16%)
 - AMBIGUOUS: 0 (0%)
 
 ---

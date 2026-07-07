@@ -1,6 +1,6 @@
 # Phase State Machine
 
-> 8 nodes · cohesion 0.25
+> 4 nodes · cohesion 0.25
 
 ## Key Concepts
 
@@ -8,10 +8,6 @@
 - **.test_cannot_go_backwards_from_execution()** (3 connections) — `tests/unit/test_pty_stream.py`
 - **.test_phase_properties_immutability()** (3 connections) — `tests/unit/test_pty_stream.py`
 - **.test_phase_transition_order()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **Test phase state machine transitions.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Phases transition in correct order: PRE -> EXECUTION -> POST.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Cannot transition from EXECUTION back to PRE_RUN_PROMPTS.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Phase properties return correct values in each state.** (1 connections) — `tests/unit/test_pty_stream.py`
 
 ## Relationships
 
@@ -25,8 +21,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 15 (71%)
-- INFERRED: 6 (29%)
+- EXTRACTED: 11 (65%)
+- INFERRED: 6 (35%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -1,10 +1,10 @@
 # Renderer Factory Function
 
-> 27 nodes · cohesion 0.08
+> 23 nodes · cohesion 0.08
 
 ## Key Concepts
 
-- **create_renderer()** (23 connections) — `src/ansible_aom/renderer/factory.py`
+- **create_renderer()** (26 connections) — `src/ansible_aom/renderer/factory.py`
 - **_resolve_mode()** (5 connections) — `src/ansible_aom/renderer/factory.py`
 - **.test_factory_creates_compact_renderer_by_default()** (3 connections) — `tests/integration/test_compact_renderer.py`
 - **.test_factory_creates_compact_renderer_when_tui_false()** (3 connections) — `tests/integration/test_compact_renderer.py`
@@ -15,8 +15,6 @@
 - **.test_factory_returns_renderer_for_compact_mode()** (3 connections) — `tests/unit/test_cli.py`
 - **.test_factory_returns_renderer_for_tui_mode()** (3 connections) — `tests/unit/test_cli.py`
 - **test_factory_tui_mode_still_wins_over_format()** (3 connections) — `tests/unit/test_json_renderer.py`
-- **RenderFormat** (2 connections)
-- **RenderMode** (2 connections)
 - **test_factory_compact_format_explicit_returns_compact_renderer()** (2 connections) — `tests/unit/test_json_renderer.py`
 - **test_factory_default_format_is_compact()** (2 connections) — `tests/unit/test_json_renderer.py`
 - **test_factory_returns_json_renderer_for_json_format()** (2 connections) — `tests/unit/test_json_renderer.py`
@@ -24,12 +22,11 @@
 - **tui_mode=False creates CompactRenderer.** (1 connections) — `tests/integration/test_compact_renderer.py`
 - **tui_mode=True creates Textual AOMApp.** (1 connections) — `tests/integration/test_compact_renderer.py`
 - **Renderer factory.  One entry point — :func:`create_renderer` — that picks the co** (1 connections) — `src/ansible_aom/renderer/factory.py`
-- **Create the renderer selected by ``mode``.      Args:         mode: ``"compact"``** (1 connections) — `src/ansible_aom/renderer/factory.py`
-- **Pick a single ``RenderMode`` from the user-facing parameter set.      Priority:** (1 connections) — `src/ansible_aom/renderer/factory.py`
 - **TC-005: create_renderer(tui_mode=True) returns AOMApp.** (1 connections) — `tests/unit/test_cli.py`
 - **TC-005: create_renderer(tui_mode=False) returns CompactRenderer.** (1 connections) — `tests/unit/test_cli.py`
 - **TC-005: create_renderer() defaults to compact renderer.** (1 connections) — `tests/unit/test_cli.py`
-- *... and 2 more nodes in this community*
+- **create_renderer(is_tty=False) constructs a non-TTY CompactRenderer.** (1 connections) — `tests/unit/test_cli.py`
+- **tui_mode=True returns AOMApp regardless of format (CLI prevents this combo).** (1 connections) — `tests/unit/test_json_renderer.py`
 
 ## Relationships
 
@@ -52,8 +49,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 48 (63%)
-- INFERRED: 28 (37%)
+- EXTRACTED: 42 (58%)
+- INFERRED: 31 (42%)
 - AMBIGUOUS: 0 (0%)
 
 ---

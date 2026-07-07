@@ -1,14 +1,14 @@
 # Pane Focus Navigation
 
-> 17 nodes · cohesion 0.12
+> 14 nodes · cohesion 0.12
 
 ## Key Concepts
 
 - **_NavTree** (12 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **._focus_pane_id()** (7 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **._refresh_pane_focus_classes()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **._current_pane()** (4 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **.focus_detail()** (4 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._focus_pane_id()** (8 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._current_pane()** (7 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **.focus_detail()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._refresh_pane_focus_classes()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **.action_focus_next_pane()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **.action_focus_prev_pane()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **.focus_runs()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
@@ -18,9 +18,6 @@
 - **.action_deeper()** (2 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **.action_expand_all()** (2 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **.action_shallower()** (2 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **Tree that adds Left / Right bindings for hierarchical navigation.      Default T** (1 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **Expand every node in the tree (root downward).** (1 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **Collapse every node in the tree, then keep top-level plays visible.          Ful** (1 connections) — `src/ansible_aom/tui/screens/inspect.py`
 
 ## Relationships
 
@@ -36,7 +33,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 53 (93%)
+- EXTRACTED: 57 (93%)
 - INFERRED: 4 (7%)
 - AMBIGUOUS: 0 (0%)
 

@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **TestPerEventLogColors** (16 connections) — `tests/compact/test_status_bar_colors.py`
+- **TestPerEventLogColors** (15 connections) — `tests/compact/test_status_bar_colors.py`
 - **._logged()** (8 connections) — `tests/compact/test_status_bar_colors.py`
 - **._renderer()** (8 connections) — `tests/compact/test_status_bar_colors.py`
 - **.test_skipping_line_is_cyan()** (4 connections) — `tests/compact/test_status_bar_colors.py`
@@ -21,7 +21,6 @@
 - [[Compact Renderer Implementation]] (3 shared connections)
 - [[Run State Completion Recap]] (3 shared connections)
 - [[Role Group Task Models]] (1 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
 - [[Status Bar Color Tests]] (1 shared connections)
 
 ## Source Files
@@ -30,8 +29,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 47 (89%)
-- INFERRED: 6 (11%)
+- EXTRACTED: 47 (90%)
+- INFERRED: 5 (10%)
 - AMBIGUOUS: 0 (0%)
 
 ---

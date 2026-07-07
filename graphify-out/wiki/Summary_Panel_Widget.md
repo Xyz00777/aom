@@ -1,10 +1,10 @@
 # Summary Panel Widget
 
-> 19 nodes · cohesion 0.11
+> 11 nodes · cohesion 0.11
 
 ## Key Concepts
 
-- **SummaryPanel** (14 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
+- **SummaryPanel** (15 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
 - **Widget** (3 connections)
 - **.get_status_icon()** (3 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
 - **summary_panel.py** (2 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
@@ -15,14 +15,6 @@
 - **.set_play_name()** (2 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
 - **.set_tasks_progress()** (2 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
 - **Summary panel widget for AOM TUI.  Play-level overview with stats. See SPECIFICA** (1 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
-- **Format a host status line with icons.          Args:             hostname: The h** (1 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
-- **Get the icon for a status.          Args:             status: The status to get** (1 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
-- **Summary panel showing play-level stats.** (1 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
-- **Initialize the summary panel widget.          Args:             name: Widget nam** (1 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
-- **Set the current play name.          Args:             name: The play name** (1 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
-- **Set hosts progress.          Args:             completed: Number of completed ho** (1 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
-- **Set tasks progress.          Args:             completed: Number of completed ta** (1 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
-- **Set elapsed time in seconds.          Args:             seconds: Elapsed time in** (1 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
 
 ## Relationships
 
@@ -38,8 +30,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 41 (95%)
-- INFERRED: 2 (5%)
+- EXTRACTED: 34 (94%)
+- INFERRED: 2 (6%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -5,8 +5,8 @@
 ## Key Concepts
 
 - **TestWarningPatternsEdgeCases** (14 connections) — `tests/unit/test_warnings.py`
-- **test_warnings.py** (11 connections) — `tests/unit/test_warnings.py`
 - **TestWarningEntrySourceField** (11 connections) — `tests/unit/test_warnings.py`
+- **test_warnings.py** (10 connections) — `tests/unit/test_warnings.py`
 - **TestWarningEntryTimestamp** (10 connections) — `tests/unit/test_warnings.py`
 - **.test_source_field_can_be_set()** (3 connections) — `tests/unit/test_warnings.py`
 - **.test_source_field_controller_for_pty_warnings()** (3 connections) — `tests/unit/test_warnings.py`
@@ -38,7 +38,6 @@
 - [[Status Bar Warning Panels]] (5 shared connections)
 - [[Warnings Display Config]] (4 shared connections)
 - [[App Configuration Settings]] (4 shared connections)
-- [[Run History Mining]] (1 shared connections)
 - [[Parser Warnings List]] (1 shared connections)
 - [[Warning Pattern Classification]] (1 shared connections)
 - [[WarningEntry Dataclass]] (1 shared connections)
@@ -50,7 +49,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 65 (69%)
+- EXTRACTED: 64 (69%)
 - INFERRED: 29 (31%)
 - AMBIGUOUS: 0 (0%)
 

@@ -4,9 +4,9 @@
 
 ## Key Concepts
 
-- **TestTemplateVariableNameMismatch** (15 connections) — `tests/unit/test_template_variable_names.py`
-- **_play_def()** (7 connections) — `tests/unit/test_template_variable_names.py`
-- **_td()** (7 connections) — `tests/unit/test_template_variable_names.py`
+- **TestTemplateVariableNameMismatch** (19 connections) — `tests/unit/test_template_variable_names.py`
+- **_play_def()** (11 connections) — `tests/unit/test_template_variable_names.py`
+- **_td()** (11 connections) — `tests/unit/test_template_variable_names.py`
 - **.test_completed_template_task_dropped_from_tree()** (6 connections) — `tests/unit/test_template_variable_names.py`
 - **.test_host_leaf_under_resolved_template_task()** (6 connections) — `tests/unit/test_template_variable_names.py`
 - **.test_no_duplicate_for_template_and_resolved_name()** (6 connections) — `tests/unit/test_template_variable_names.py`
@@ -23,12 +23,10 @@
 
 ## Relationships
 
-- [[Play Definition Tree Population]] (7 shared connections)
-- [[Run State Summary Panel]] (6 shared connections)
+- [[Play Definition Tree Population]] (2 shared connections)
 - [[Task Definition Live Refresh]] (2 shared connections)
 - [[Role Group Task Models]] (2 shared connections)
 - [[Run State Completion Recap]] (2 shared connections)
-- [[Tree Projection Logic]] (1 shared connections)
 
 ## Source Files
 
@@ -36,8 +34,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 56 (80%)
-- INFERRED: 14 (20%)
+- EXTRACTED: 70 (85%)
+- INFERRED: 12 (15%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -1,6 +1,6 @@
 # Parser Edge Cases
 
-> 22 nodes · cohesion 0.09
+> 11 nodes · cohesion 0.09
 
 ## Key Concepts
 
@@ -15,17 +15,6 @@
 - **.test_unicode_in_plaintext()** (3 connections) — `tests/unit/test_pty_stream.py`
 - **.test_very_long_line()** (3 connections) — `tests/unit/test_pty_stream.py`
 - **.test_whitespace_line_handled()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **Edge cases and boundary conditions.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Empty lines don't crash parser.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Whitespace-only lines handled gracefully.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **JSON without _event field returns empty.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Malformed JSON doesn't crash parser.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **JSON with trailing newline handled.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Multiple stats events handled (shouldn't happen but test).** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Password prompts with extra text still match.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Warning patterns are case-sensitive.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Unicode characters in plaintext handled.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Very long lines handled without crash.** (1 connections) — `tests/unit/test_pty_stream.py`
 
 ## Relationships
 
@@ -39,8 +28,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 43 (77%)
-- INFERRED: 13 (23%)
+- EXTRACTED: 32 (71%)
+- INFERRED: 13 (29%)
 - AMBIGUOUS: 0 (0%)
 
 ---

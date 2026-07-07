@@ -1,6 +1,6 @@
 # Session Replay Driver
 
-> 35 nodes · cohesion 0.07
+> 34 nodes · cohesion 0.07
 
 ## Key Concepts
 
@@ -13,11 +13,10 @@
 - **test_replay_driver_missing_session_returns_1()** (5 connections) — `tests/unit/test_event_source.py`
 - **.drive()** (4 connections) — `src/ansible_aom/drivers/replay.py`
 - **test_replay_driver_satisfies_event_source()** (4 connections) — `tests/unit/test_event_source.py`
-- **.__init__()** (2 connections) — `src/ansible_aom/drivers/replay.py`
+- **.__init__()** (3 connections) — `src/ansible_aom/drivers/replay.py`
 - **.set_definitions()** (2 connections) — `tests/unit/test_event_source.py`
 - **.update_state()** (2 connections) — `tests/unit/test_event_source.py`
 - **test_event_source_is_runtime_checkable()** (2 connections) — `tests/unit/test_event_source.py`
-- **Re-stream a previously recorded session through a :class:`Renderer`.      Mirror** (1 connections) — `src/ansible_aom/drivers/replay.py`
 - **.session_id()** (1 connections) — `src/ansible_aom/drivers/replay.py`
 - **.add_warning()** (1 connections) — `tests/unit/test_event_source.py`
 - **.handle_completion()** (1 connections) — `tests/unit/test_event_source.py`
@@ -29,7 +28,8 @@
 - **.print_log()** (1 connections) — `tests/unit/test_event_source.py`
 - **.set_prior_run()** (1 connections) — `tests/unit/test_event_source.py`
 - **.start()** (1 connections) — `tests/unit/test_event_source.py`
-- *... and 10 more nodes in this community*
+- **.stop()** (1 connections) — `tests/unit/test_event_source.py`
+- *... and 9 more nodes in this community*
 
 ## Relationships
 

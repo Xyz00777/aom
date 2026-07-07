@@ -4,8 +4,8 @@
 
 ## Key Concepts
 
-- **test_callback_env.py** (3 connections) — `tests/unit/test_callback_env.py`
-- **TestCallbackEnv** (3 connections) — `tests/unit/test_callback_env.py`
+- **TestCallbackEnv** (8 connections) — `tests/unit/test_callback_env.py`
+- **test_callback_env.py** (4 connections) — `tests/unit/test_callback_env.py`
 - **TestBundledCallbackDir** (2 connections) — `tests/unit/test_callback_env.py`
 - **Unit tests for the runner's stdout-callback selection.  AOM prefers its bundled** (1 connections) — `tests/unit/test_callback_env.py`
 - **.test_resolves_to_existing_dir_with_plugin()** (1 connections) — `tests/unit/test_callback_env.py`
@@ -22,7 +22,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 12 (100%)
+- EXTRACTED: 18 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

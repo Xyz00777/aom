@@ -1,18 +1,18 @@
 # Help Overlay TUI
 
-> 6 nodes · cohesion 0.33
+> 5 nodes · cohesion 0.33
 
 ## Key Concepts
 
-- **HelpOverlay** (5 connections) — `src/ansible_aom/tui/screens/help.py`
-- **help.py** (2 connections) — `src/ansible_aom/tui/screens/help.py`
-- **.action_dismiss()** (2 connections) — `src/ansible_aom/tui/screens/help.py`
-- **.compose()** (2 connections) — `src/ansible_aom/tui/screens/help.py`
+- **HelpOverlay** (13 connections) — `src/ansible_aom/tui/screens/help.py`
+- **.compose()** (8 connections) — `src/ansible_aom/tui/screens/help.py`
+- **help.py** (3 connections) — `src/ansible_aom/tui/screens/help.py`
+- **.action_dismiss()** (3 connections) — `src/ansible_aom/tui/screens/help.py`
 - **Help overlay for AOM TUI.  Triggered by '?' key. See SPECIFICATION.md Section 10** (1 connections) — `src/ansible_aom/tui/screens/help.py`
-- **Help overlay showing keybindings.      Displays all keybindings grouped by conte** (1 connections) — `src/ansible_aom/tui/screens/help.py`
 
 ## Relationships
 
+- [[AOM TUI Application]] (1 shared connections)
 - [[TUI Keybindings Config]] (1 shared connections)
 - [[Playbook Event Parsing]] (1 shared connections)
 - [[Inspect TUI Widget Data]] (1 shared connections)
@@ -23,8 +23,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 12 (92%)
-- INFERRED: 1 (8%)
+- EXTRACTED: 16 (57%)
+- INFERRED: 12 (43%)
 - AMBIGUOUS: 0 (0%)
 
 ---

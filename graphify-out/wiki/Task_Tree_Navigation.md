@@ -1,10 +1,10 @@
 # Task Tree Navigation
 
-> 10 nodes · cohesion 0.33
+> 9 nodes · cohesion 0.33
 
 ## Key Concepts
 
-- **TaskTreeNode** (18 connections) — `src/ansible_aom/core/inspect_model.py`
+- **TaskTreeNode** (23 connections) — `src/ansible_aom/core/inspect_model.py`
 - **._failure_pairs()** (7 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **._focus_failure_at()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **._add_node()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
@@ -13,7 +13,6 @@
 - **._current_failure_index()** (4 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **._iter_failures()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **._should_auto_expand()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **Hierarchical view of a session's tasks.      Levels: run → play → group → task →** (1 connections) — `src/ansible_aom/core/inspect_model.py`
 
 ## Relationships
 
@@ -31,8 +30,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 48 (87%)
-- INFERRED: 7 (13%)
+- EXTRACTED: 49 (83%)
+- INFERRED: 10 (17%)
 - AMBIGUOUS: 0 (0%)
 
 ---

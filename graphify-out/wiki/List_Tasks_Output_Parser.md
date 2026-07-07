@@ -1,6 +1,6 @@
 # List Tasks Output Parser
 
-> 43 nodes · cohesion 0.05
+> 22 nodes · cohesion 0.05
 
 ## Key Concepts
 
@@ -26,10 +26,6 @@
 - **.test_task_indent_recognition()** (3 connections) — `tests/unit/test_parser.py`
 - **.test_task_tags_extraction()** (3 connections) — `tests/unit/test_parser.py`
 - **.test_task_without_role()** (3 connections) — `tests/unit/test_parser.py`
-- **TC-114: import_tasks IS expanded — tasks appear inline in --list-tasks.** (1 connections) — `tests/unit/test_parser.py`
-- **TC-116: pre_tasks and post_tasks appear as regular tasks.** (1 connections) — `tests/unit/test_parser.py`
-- **TC-117: Unnamed tasks use their module/action as the name.** (1 connections) — `tests/unit/test_parser.py`
-- *... and 18 more nodes in this community*
 
 ## Relationships
 
@@ -40,6 +36,7 @@
 - [[PreParseResult Assembly]] (1 shared connections)
 - [[Playbook Header Parsing]] (1 shared connections)
 - [[Preflight Definition Assembly]] (1 shared connections)
+- [[Task Definition Live Refresh]] (1 shared connections)
 
 ## Source Files
 
@@ -48,8 +45,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 66 (58%)
-- INFERRED: 48 (42%)
+- EXTRACTED: 44 (47%)
+- INFERRED: 49 (53%)
 - AMBIGUOUS: 0 (0%)
 
 ---

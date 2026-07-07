@@ -1,19 +1,15 @@
 # CPU Sampling Probing
 
-> 10 nodes · cohesion 0.22
+> 6 nodes · cohesion 0.22
 
 ## Key Concepts
 
+- **TestSampleSubprocessActive** (7 connections) — `tests/unit/test_runner_heartbeat.py`
+- **_get_psutil()** (6 connections) — `src/ansible_aom/ansible/runner.py`
 - **_sample_subprocess_active()** (6 connections) — `src/ansible_aom/ansible/runner.py`
-- **TestSampleSubprocessActive** (6 connections) — `tests/unit/test_runner_heartbeat.py`
-- **_get_psutil()** (5 connections) — `src/ansible_aom/ansible/runner.py`
-- **_probe_psutil()** (4 connections) — `src/ansible_aom/ansible/runner.py`
+- **_probe_psutil()** (5 connections) — `src/ansible_aom/ansible/runner.py`
 - **.test_returns_bool_for_own_pid()** (2 connections) — `tests/unit/test_runner_heartbeat.py`
 - **.test_returns_false_for_nonexistent_pid()** (2 connections) — `tests/unit/test_runner_heartbeat.py`
-- **Subprocess-probe ``import psutil``; return ``(module, None)`` on     success or** (1 connections) — `src/ansible_aom/ansible/runner.py`
-- **Return the cached psutil module, or None if probing failed.      Lazy: the first** (1 connections) — `src/ansible_aom/ansible/runner.py`
-- **Return True if pid or any descendant used CPU since the last call.      Uses ``p** (1 connections) — `src/ansible_aom/ansible/runner.py`
-- **The CPU sampler degrades gracefully and never raises.** (1 connections) — `tests/unit/test_runner_heartbeat.py`
 
 ## Relationships
 
@@ -30,8 +26,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 23 (79%)
-- INFERRED: 6 (21%)
+- EXTRACTED: 21 (75%)
+- INFERRED: 7 (25%)
 - AMBIGUOUS: 0 (0%)
 
 ---

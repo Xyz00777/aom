@@ -8,8 +8,8 @@
 - **drivers/protocol.py (EventSource Protocol)** (4 connections) — `ARCHITECTURE.md`
 - **cli.py composition root** (3 connections) — `ARCHITECTURE.md`
 - **Two-port architecture (Renderer + EventSource)** (3 connections) — `ARCHITECTURE.md`
+- **File locations** (3 connections) — `README.md`
 - **drivers/replay.py (ReplayDriver)** (2 connections) — `ARCHITECTURE.md`
-- **File locations** (2 connections) — `README.md`
 - **Session diff (UUID→path→name matching)** (2 connections) — `SPECIFICATION.md`
 - **AOM project identity** (1 connections) — `AGENTS.md`
 - **session/summary.py** (1 connections) — `ARCHITECTURE.md`
@@ -32,8 +32,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 14 (54%)
-- INFERRED: 12 (46%)
+- EXTRACTED: 15 (56%)
+- INFERRED: 12 (44%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -1,18 +1,20 @@
 # Inspect Data Model Builders
 
-> 50 nodes · cohesion 0.07
+> 42 nodes · cohesion 0.07
 
 ## Key Concepts
 
-- **StatusCounts** (37 connections) — `src/ansible_aom/core/inspect_model.py`
+- **StatusCounts** (40 connections) — `src/ansible_aom/core/inspect_model.py`
+- **build_task_tree()** (28 connections) — `src/ansible_aom/core/inspect_model.py`
 - **test_inspect_model.py** (28 connections) — `tests/unit/test_inspect_model.py`
-- **build_task_tree()** (26 connections) — `src/ansible_aom/core/inspect_model.py`
-- **inspect_model.py** (18 connections) — `src/ansible_aom/core/inspect_model.py`
+- **inspect_model.py** (21 connections) — `src/ansible_aom/core/inspect_model.py`
 - **build_run_summary()** (14 connections) — `src/ansible_aom/core/inspect_model.py`
 - **build_detail_block()** (13 connections) — `src/ansible_aom/core/inspect_model.py`
 - **_load_fixture()** (13 connections) — `tests/unit/test_inspect_model.py`
+- **_make_loop_item()** (7 connections) — `src/ansible_aom/core/inspect_model.py`
 - **build_run_summaries()** (5 connections) — `src/ansible_aom/core/inspect_model.py`
-- **_parse_iso()** (4 connections) — `src/ansible_aom/core/inspect_model.py`
+- **_parse_iso()** (5 connections) — `src/ansible_aom/core/inspect_model.py`
+- **LoopItem** (4 connections) — `src/ansible_aom/core/inspect_model.py`
 - **.add_event()** (4 connections) — `src/ansible_aom/core/inspect_model.py`
 - **test_detail_block_loop_failure()** (4 connections) — `tests/unit/test_inspect_model.py`
 - **test_detail_block_ok_task_no_failure_items()** (4 connections) — `tests/unit/test_inspect_model.py`
@@ -26,10 +28,8 @@
 - **test_task_tree_real_event_shape()** (4 connections) — `tests/unit/test_inspect_model.py`
 - **test_task_tree_string_task_field()** (4 connections) — `tests/unit/test_inspect_model.py`
 - **_group_key()** (3 connections) — `src/ansible_aom/core/inspect_model.py`
-- **LoopItem** (3 connections) — `src/ansible_aom/core/inspect_model.py`
-- **_make_loop_item()** (3 connections) — `src/ansible_aom/core/inspect_model.py`
 - **test_run_summaries_sorted_newest_first()** (3 connections) — `tests/unit/test_inspect_model.py`
-- *... and 25 more nodes in this community*
+- *... and 17 more nodes in this community*
 
 ## Relationships
 
@@ -39,7 +39,6 @@
 - [[Task Tree Navigation]] (3 shared connections)
 - [[Design Specs Plans]] (3 shared connections)
 - [[Session Roundtrip Invariants]] (3 shared connections)
-- [[Run History Mining]] (2 shared connections)
 - [[Session List View]] (2 shared connections)
 - [[Pane Focus Navigation]] (1 shared connections)
 
@@ -50,8 +49,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 177 (69%)
-- INFERRED: 80 (31%)
+- EXTRACTED: 173 (66%)
+- INFERRED: 90 (34%)
 - AMBIGUOUS: 0 (0%)
 
 ---

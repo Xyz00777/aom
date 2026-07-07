@@ -4,11 +4,11 @@
 
 ## Key Concepts
 
-- **TestStatusEnum** (22 connections) — `tests/unit/test_models.py`
-- **test_models.py** (17 connections) — `tests/unit/test_models.py`
-- **TestDefinitionVsStateSeparation** (16 connections) — `tests/unit/test_models.py`
-- **TestLinearForceCompletion** (16 connections) — `tests/unit/test_models.py`
-- **TestWarningTypeEnum** (16 connections) — `tests/unit/test_models.py`
+- **TestStatusEnum** (21 connections) — `tests/unit/test_models.py`
+- **test_models.py** (18 connections) — `tests/unit/test_models.py`
+- **TestDefinitionVsStateSeparation** (15 connections) — `tests/unit/test_models.py`
+- **TestLinearForceCompletion** (15 connections) — `tests/unit/test_models.py`
+- **TestWarningTypeEnum** (15 connections) — `tests/unit/test_models.py`
 - **.test_free_strategy_not_affected()** (5 connections) — `tests/unit/test_models.py`
 - **.test_meta_task_force_completed_under_linear()** (5 connections) — `tests/unit/test_models.py`
 - **.test_real_terminal_hosts_preserved()** (5 connections) — `tests/unit/test_models.py`
@@ -37,9 +37,8 @@
 - [[Role Group Task Models]] (14 shared connections)
 - [[Task Definition Live Refresh]] (13 shared connections)
 - [[Play Definition Tree Population]] (9 shared connections)
-- [[Run State Summary Panel]] (9 shared connections)
 - [[Status Bar Warning Panels]] (5 shared connections)
-- [[Run History Mining]] (1 shared connections)
+- [[Run State Summary Panel]] (1 shared connections)
 
 ## Source Files
 
@@ -47,8 +46,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 118 (67%)
-- INFERRED: 57 (33%)
+- EXTRACTED: 119 (69%)
+- INFERRED: 53 (31%)
 - AMBIGUOUS: 0 (0%)
 
 ---

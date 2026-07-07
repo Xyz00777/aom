@@ -9,12 +9,12 @@
 - **test_footer_prints_short_id_and_inspect_hint()** (2 connections) — `tests/unit/test_runner_session_footer.py`
 - **test_footer_suppressed_when_no_session_id()** (2 connections) — `tests/unit/test_runner_session_footer.py`
 - **test_footer_suppressed_when_stderr_not_tty()** (2 connections) — `tests/unit/test_runner_session_footer.py`
-- **Print the end-of-run hint that points users at ``aom inspect``.      Suppressed** (1 connections) — `src/ansible_aom/ansible/runner.py`
+- **Return the env overrides that select AOM's stdout callback.      Prefers the bun** (1 connections) — `src/ansible_aom/ansible/runner.py`
 - **The runner prints a `Session …  aom inspect` footer on termination.** (1 connections) — `tests/unit/test_runner_session_footer.py`
 
 ## Relationships
 
-- [[Runner Session Recording]] (1 shared connections)
+- [[Runner Session Recording]] (2 shared connections)
 - [[Playbook Run Integration Tests]] (1 shared connections)
 
 ## Source Files

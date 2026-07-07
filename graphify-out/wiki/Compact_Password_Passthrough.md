@@ -1,6 +1,6 @@
 # Compact Password Passthrough
 
-> 12 nodes · cohesion 0.17
+> 6 nodes · cohesion 0.17
 
 ## Key Concepts
 
@@ -10,12 +10,6 @@
 - **.test_password_prompt_multiple_types()** (3 connections) — `tests/unit/test_pty_stream.py`
 - **.test_password_prompt_not_json_event()** (3 connections) — `tests/unit/test_pty_stream.py`
 - **.test_password_prompt_sets_pending_state()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **TC-144, TC-145: Compact mode password pass-through.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-144: Password prompt sets pending state for UI handling.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-144: All password types set correct pending state.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Exact prompt text stored for UI display.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Password prompts don't generate JSON events.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Clearing prompt allows detecting next password prompt.** (1 connections) — `tests/unit/test_pty_stream.py`
 
 ## Relationships
 
@@ -29,8 +23,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 23 (74%)
-- INFERRED: 8 (26%)
+- EXTRACTED: 17 (68%)
+- INFERRED: 8 (32%)
 - AMBIGUOUS: 0 (0%)
 
 ---

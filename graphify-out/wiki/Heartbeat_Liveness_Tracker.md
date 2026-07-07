@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **HeartbeatTracker** (26 connections) — `src/ansible_aom/core/heartbeat.py`
+- **HeartbeatTracker** (27 connections) — `src/ansible_aom/core/heartbeat.py`
 - **test_heartbeat.py** (22 connections) — `tests/unit/test_heartbeat.py`
 - **test_cpu_active_too_long_ago_does_not_promote_to_live()** (3 connections) — `tests/unit/test_heartbeat.py`
 - **test_cpu_activity_keeps_state_working_past_stuck_threshold()** (3 connections) — `tests/unit/test_heartbeat.py`
@@ -47,8 +47,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 66 (61%)
-- INFERRED: 43 (39%)
+- EXTRACTED: 66 (60%)
+- INFERRED: 44 (40%)
 - AMBIGUOUS: 0 (0%)
 
 ---

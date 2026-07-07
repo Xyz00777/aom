@@ -1,12 +1,12 @@
 # Playbook Parser Integration Tests
 
-> 56 nodes · cohesion 0.05
+> 29 nodes · cohesion 0.05
 
 ## Key Concepts
 
-- **test_playbook_parser.py** (27 connections) — `tests/integration/test_playbook_parser.py`
-- **parse_jsonl_output()** (20 connections) — `tests/integration/test_playbook_parser.py`
-- **run_ansible_playbook()** (18 connections) — `tests/integration/test_playbook_parser.py`
+- **parse_jsonl_output()** (37 connections) — `tests/integration/test_playbook_parser.py`
+- **test_playbook_parser.py** (35 connections) — `tests/integration/test_playbook_parser.py`
+- **run_ansible_playbook()** (35 connections) — `tests/integration/test_playbook_parser.py`
 - **TestEmptyPlaybook** (9 connections) — `tests/integration/test_playbook_parser.py`
 - **TestMultiHostMixed** (9 connections) — `tests/integration/test_playbook_parser.py`
 - **TestMultiplePlays** (9 connections) — `tests/integration/test_playbook_parser.py`
@@ -29,12 +29,11 @@
 - **.test_parser_detects_changed_status()** (4 connections) — `tests/integration/test_playbook_parser.py`
 - **.test_host_status_ok()** (4 connections) — `tests/integration/test_playbook_parser.py`
 - **.test_parser_phases_correct()** (4 connections) — `tests/integration/test_playbook_parser.py`
-- *... and 31 more nodes in this community*
+- *... and 4 more nodes in this community*
 
 ## Relationships
 
 - [[Role Group Task Models]] (28 shared connections)
-- [[Run State Summary Panel]] (10 shared connections)
 - [[PTY Stream Parser]] (10 shared connections)
 - [[Become Password Prompt]] (1 shared connections)
 - [[JSONL Event Parsing]] (1 shared connections)
@@ -50,7 +49,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 215 (86%)
+- EXTRACTED: 230 (86%)
 - INFERRED: 36 (14%)
 - AMBIGUOUS: 0 (0%)
 

@@ -1,6 +1,6 @@
 # Terminal Row Counting
 
-> 27 nodes · cohesion 0.11
+> 26 nodes · cohesion 0.11
 
 ## Key Concepts
 
@@ -21,7 +21,6 @@
 - **test_row_count_short_line_one_row()** (2 connections) — `tests/compact/test_row_count.py`
 - **test_row_count_two_lines_two_rows()** (2 connections) — `tests/compact/test_row_count.py`
 - **test_row_count_two_lines_with_trailing_newline()** (2 connections) — `tests/compact/test_row_count.py`
-- **How many terminal rows `text` occupies at the given terminal `width`.      Each** (1 connections) — `src/ansible_aom/compact/display.py`
 - **Tests for width-aware row counting (roadmap #12).  `_row_count` decides how many** (1 connections) — `tests/compact/test_row_count.py`
 - **ANSI codes are excluded from the wrap calculation; visible chars     are what co** (1 connections) — `tests/compact/test_row_count.py`
 - **After update() in a narrow terminal, _status_rows reflects wrapped rows.      SI** (1 connections) — `tests/compact/test_row_count.py`
@@ -29,7 +28,8 @@
 - **A line exactly `width` chars long fits on one row (no wrap).** (1 connections) — `tests/compact/test_row_count.py`
 - **First line wraps to 2 rows, second line takes 1 row → 3 total.** (1 connections) — `tests/compact/test_row_count.py`
 - **A 50-char line in a 24-col terminal wraps to ceil(50/24) = 3 rows.** (1 connections) — `tests/compact/test_row_count.py`
-- *... and 2 more nodes in this community*
+- **Empty strings between newlines are still rows the cursor crosses.** (1 connections) — `tests/compact/test_row_count.py`
+- *... and 1 more nodes in this community*
 
 ## Relationships
 
@@ -44,8 +44,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 53 (64%)
-- INFERRED: 30 (36%)
+- EXTRACTED: 52 (63%)
+- INFERRED: 30 (37%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -216,6 +216,23 @@ If a conventional inventory file sits in your current directory and
 you didn't pass `-i`, AOM prepends `-i <file>` for you. Pass any
 inventory flag explicitly and AOM keeps its hands off.
 
+### Disk usage
+
+Verbose and setup capture bloat sessions in proportion to the host
+count. A 200-host run with `--capture-verbose --capture-setup` lands
+around `~50MB` of `events.jsonl`. At that rate, 100 sessions stack up
+to roughly `5GB` under `~/.local/state/aom/sessions/`.
+
+Reclaim space by pruning old runs:
+
+```bash
+aom inspect prune --days 30    # delete sessions older than 30 days
+```
+
+The prune command is safe to run on a schedule; it only removes
+session directories whose recorded start time is older than the
+threshold.
+
 ## Project layout
 
 - `src/ansible_aom/` — source. See [`ARCHITECTURE.md`](ARCHITECTURE.md)

@@ -1,13 +1,13 @@
 # Hide State Gating Tests
 
-> 64 nodes · cohesion 0.09
+> 55 nodes · cohesion 0.09
 
 ## Key Concepts
 
-- **_renderer()** (32 connections) — `tests/compact/test_hide_state.py`
-- **_task_start()** (30 connections) — `tests/compact/test_hide_state.py`
-- **_logged()** (28 connections) — `tests/compact/test_hide_state.py`
-- **test_hide_state.py** (24 connections) — `tests/compact/test_hide_state.py`
+- **_renderer()** (34 connections) — `tests/compact/test_hide_state.py`
+- **_task_start()** (32 connections) — `tests/compact/test_hide_state.py`
+- **_logged()** (30 connections) — `tests/compact/test_hide_state.py`
+- **test_hide_state.py** (25 connections) — `tests/compact/test_hide_state.py`
 - **_ok()** (12 connections) — `tests/compact/test_hide_state.py`
 - **TestHideChanged** (9 connections) — `tests/compact/test_hide_state.py`
 - **_skipped()** (8 connections) — `tests/compact/test_hide_state.py`
@@ -15,6 +15,7 @@
 - **TestHideStatePreservesFailedItemMessage** (8 connections) — `tests/compact/test_hide_state.py`
 - **TestHideStateRunStateUnaffected** (7 connections) — `tests/compact/test_hide_state.py`
 - **_aom_jsonl_item_event()** (6 connections) — `tests/compact/test_hide_state.py`
+- **_failed()** (6 connections) — `tests/compact/test_hide_state.py`
 - **_play_start()** (6 connections) — `tests/compact/test_hide_state.py`
 - **.test_failed_lines_still_print_when_changed_hidden()** (6 connections) — `tests/compact/test_hide_state.py`
 - **.test_ok_lines_still_print_when_changed_hidden()** (6 connections) — `tests/compact/test_hide_state.py`
@@ -28,12 +29,10 @@
 - **.test_no_hide_states_prints_all_lines()** (6 connections) — `tests/compact/test_hide_state.py`
 - **.test_failed_hidden_still_updates_state()** (6 connections) — `tests/compact/test_hide_state.py`
 - **.test_ok_hidden_still_updates_state()** (6 connections) — `tests/compact/test_hide_state.py`
-- **.test_skipped_hidden_still_updates_state()** (6 connections) — `tests/compact/test_hide_state.py`
-- *... and 39 more nodes in this community*
+- *... and 30 more nodes in this community*
 
 ## Relationships
 
-- [[Run State Summary Panel]] (15 shared connections)
 - [[Compact Renderer Implementation]] (13 shared connections)
 
 ## Source Files

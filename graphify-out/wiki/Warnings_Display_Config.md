@@ -1,6 +1,6 @@
 # Warnings Display Config
 
-> 38 nodes · cohesion 0.08
+> 37 nodes · cohesion 0.08
 
 ## Key Concepts
 
@@ -23,13 +23,13 @@
 - **.test_warnings_config_model_validation()** (3 connections) — `tests/unit/test_warnings.py`
 - **.test_warnings_config_show_deprecations_false()** (3 connections) — `tests/unit/test_warnings.py`
 - **.test_warnings_config_show_warnings_false()** (3 connections) — `tests/unit/test_warnings.py`
-- **Warning display configuration.** (1 connections) — `src/ansible_aom/core/config.py`
 - **Tests for WarningsConfig model - Section 8.** (1 connections) — `tests/unit/test_config.py`
 - **WarningsConfig has show_warnings=True by default.** (1 connections) — `tests/unit/test_config.py`
 - **WarningsConfig has show_deprecations=True by default.** (1 connections) — `tests/unit/test_config.py`
 - **show_warnings can be set to False.** (1 connections) — `tests/unit/test_config.py`
 - **show_deprecations can be set to False.** (1 connections) — `tests/unit/test_config.py`
-- *... and 13 more nodes in this community*
+- **Both warning flags can be disabled.** (1 connections) — `tests/unit/test_config.py`
+- *... and 12 more nodes in this community*
 
 ## Relationships
 
@@ -40,11 +40,11 @@
 - [[Status Bar Warning Panels]] (2 shared connections)
 - [[Role Group Task Models]] (2 shared connections)
 - [[Compact Display Module Layout]] (1 shared connections)
-- [[JSON Output Renderer]] (1 shared connections)
 - [[Config Loading Screen]] (1 shared connections)
 - [[Config Loading Tests]] (1 shared connections)
 - [[Redaction Config Model]] (1 shared connections)
 - [[StatusBarConfig Model]] (1 shared connections)
+- [[Parser Warnings List]] (1 shared connections)
 
 ## Source Files
 
@@ -54,8 +54,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 75 (53%)
-- INFERRED: 67 (47%)
+- EXTRACTED: 74 (52%)
+- INFERRED: 67 (48%)
 - AMBIGUOUS: 0 (0%)
 
 ---

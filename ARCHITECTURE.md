@@ -154,6 +154,11 @@ src/ansible_aom/
 
 > `.aom/` / `~/.local/state/aom/` are runtime artifact directories, **not** source.
 > They are read/written via `session/store.py`.
+>
+> **Disk usage:** a 200-host run with `--capture-verbose --capture-setup`
+> lands around `~50MB` of `events.jsonl`; 100 such sessions stack up to
+> roughly `5GB` under `~/.local/state/aom/sessions/`. Reclaim space with
+> `aom inspect prune --days N`.
 
 ---
 

@@ -1,10 +1,10 @@
 # Compact Renderer Formatters
 
-> 18 nodes · cohesion 0.14
+> 12 nodes · cohesion 0.14
 
 ## Key Concepts
 
-- **format.py** (23 connections) — `src/ansible_aom/compact/format.py`
+- **format.py** (24 connections) — `src/ansible_aom/compact/format.py`
 - **_wrap()** (17 connections) — `src/ansible_aom/compact/format.py`
 - **collect_tags()** (8 connections) — `src/ansible_aom/compact/format.py`
 - **format_status_bar()** (5 connections) — `src/ansible_aom/compact/format.py`
@@ -15,12 +15,6 @@
 - **_collect_role_group_tags()** (3 connections) — `src/ansible_aom/compact/format.py`
 - **test_truncate_visible_plain_mode_emits_no_sgr()** (3 connections) — `tests/compact/test_tree_render.py`
 - **Pure formatters for the compact renderer.  Every public function here takes doma** (1 connections) — `src/ansible_aom/compact/format.py`
-- **Format the status bar for compact mode display.      Args:         playbook: Pat** (1 connections) — `src/ansible_aom/compact/format.py`
-- **Render non-zero status count cells.      Order: ok, changed, skipped, failed, un** (1 connections) — `src/ansible_aom/compact/format.py`
-- **Format a host summary line with status icons.      Only includes non-zero counts** (1 connections) — `src/ansible_aom/compact/format.py`
-- **Right-align ``value`` in a fixed-width cell; dim zero values.      A literal zer** (1 connections) — `src/ansible_aom/compact/format.py`
-- **``text`` wrapped in an SGR sequence, or plain ``text`` if not colorising.** (1 connections) — `src/ansible_aom/compact/format.py`
-- **Truncate to `width` visible chars while preserving any open SGR     state by app** (1 connections) — `src/ansible_aom/compact/format.py`
 - **Regression guard: when colorize=False, `_truncate_visible` must     not inject `** (1 connections) — `tests/compact/test_tree_render.py`
 
 ## Relationships
@@ -45,8 +39,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 71 (85%)
-- INFERRED: 13 (15%)
+- EXTRACTED: 66 (84%)
+- INFERRED: 13 (16%)
 - AMBIGUOUS: 0 (0%)
 
 ---

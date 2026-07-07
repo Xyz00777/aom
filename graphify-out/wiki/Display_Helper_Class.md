@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **TestDisplayClass** (17 connections) — `tests/integration/test_compact_renderer.py`
+- **TestDisplayClass** (16 connections) — `tests/integration/test_compact_renderer.py`
 - **.test_display_class_exists()** (2 connections) — `tests/integration/test_compact_renderer.py`
 - **.test_display_has_clear_method()** (2 connections) — `tests/integration/test_compact_renderer.py`
 - **.test_display_has_print_log_method()** (2 connections) — `tests/integration/test_compact_renderer.py`
@@ -27,7 +27,6 @@
 - [[Role Group Task Models]] (1 shared connections)
 - [[Task Definition Live Refresh]] (1 shared connections)
 - [[Play Definition Tree Population]] (1 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
 - [[Compact Renderer Integration Tests]] (1 shared connections)
 
 ## Source Files
@@ -36,8 +35,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 27 (75%)
-- INFERRED: 9 (25%)
+- EXTRACTED: 27 (77%)
+- INFERRED: 8 (23%)
 - AMBIGUOUS: 0 (0%)
 
 ---

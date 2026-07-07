@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **TestHostStatusIndicators** (17 connections) — `tests/integration/test_compact_renderer.py`
+- **TestHostStatusIndicators** (16 connections) — `tests/integration/test_compact_renderer.py`
 - **.format_host_summary()** (7 connections) — `tests/integration/test_compact_renderer.py`
 - **.test_host_summary_with_failures()** (4 connections) — `tests/integration/test_compact_renderer.py`
 - **.test_host_summary_all_ok()** (3 connections) — `tests/integration/test_compact_renderer.py`
@@ -26,7 +26,6 @@
 - [[Role Group Task Models]] (1 shared connections)
 - [[Task Definition Live Refresh]] (1 shared connections)
 - [[Play Definition Tree Population]] (1 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
 - [[Compact Renderer Integration Tests]] (1 shared connections)
 
 ## Source Files
@@ -35,8 +34,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 38 (81%)
-- INFERRED: 9 (19%)
+- EXTRACTED: 38 (83%)
+- INFERRED: 8 (17%)
 - AMBIGUOUS: 0 (0%)
 
 ---

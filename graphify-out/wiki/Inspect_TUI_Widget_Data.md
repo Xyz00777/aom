@@ -1,35 +1,35 @@
 # Inspect TUI Widget Data
 
-> 43 nodes · cohesion 0.06
+> 35 nodes · cohesion 0.06
 
 ## Key Concepts
 
-- **inspect.py** (14 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **DetailBlock** (12 connections) — `src/ansible_aom/core/inspect_model.py`
-- **RunSummary** (11 connections) — `src/ansible_aom/core/inspect_model.py`
+- **inspect.py** (17 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **DetailBlock** (15 connections) — `src/ansible_aom/core/inspect_model.py`
+- **RunSummary** (14 connections) — `src/ansible_aom/core/inspect_model.py`
 - **_ConfirmDelete** (11 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **_DetailLog** (10 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **ComposeResult** (9 connections)
+- **._update_detail()** (9 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **_RunRow** (9 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **_RunsListView** (9 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **_HelpScreen** (7 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **.compose()** (7 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **_render_run_lines()** (7 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **.compose()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **.__init__()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **._render_detail_block()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **_stats_label()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **.focus_tasks()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **.__init__()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **._update_detail()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **.compose()** (4 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **.compose()** (4 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **_summarise_hosts()** (4 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **.compose()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **.action_step_back()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **_fmt_duration_short()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **.compose()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **.action_delete_session()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **.on_list_view_selected()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **.__init__()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **_stats_label_plain()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- *... and 18 more nodes in this community*
+- **.on_tree_node_highlighted()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- *... and 10 more nodes in this community*
 
 ## Relationships
 
@@ -53,8 +53,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 148 (80%)
-- INFERRED: 38 (20%)
+- EXTRACTED: 151 (77%)
+- INFERRED: 44 (23%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -4,9 +4,9 @@
 
 ## Key Concepts
 
-- **TestStaleRunningCleanup** (13 connections) — `tests/unit/test_stale_running_cleanup.py`
 - **_make_state_with_stale_running()** (11 connections) — `tests/unit/test_stale_running_cleanup.py`
-- **test_stale_running_cleanup.py** (5 connections) — `tests/unit/test_stale_running_cleanup.py`
+- **TestStaleRunningCleanup** (11 connections) — `tests/unit/test_stale_running_cleanup.py`
+- **test_stale_running_cleanup.py** (4 connections) — `tests/unit/test_stale_running_cleanup.py`
 - **.test_host_rows_no_stale_running_after_stats()** (4 connections) — `tests/unit/test_stale_running_cleanup.py`
 - **.test_completed_hosts_preserved_after_stats_cleanup()** (3 connections) — `tests/unit/test_stale_running_cleanup.py`
 - **.test_task_status_cleared_after_stats_cleanup()** (3 connections) — `tests/unit/test_stale_running_cleanup.py`
@@ -22,11 +22,8 @@
 ## Relationships
 
 - [[Run State Completion Recap]] (7 shared connections)
-- [[Play Definition Tree Population]] (3 shared connections)
-- [[Run State Summary Panel]] (2 shared connections)
-- [[Run History Mining]] (1 shared connections)
+- [[Play Definition Tree Population]] (2 shared connections)
 - [[Role Group Task Models]] (1 shared connections)
-- [[Tree Projection Logic]] (1 shared connections)
 
 ## Source Files
 
@@ -34,8 +31,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 38 (78%)
-- INFERRED: 11 (22%)
+- EXTRACTED: 37 (80%)
+- INFERRED: 9 (20%)
 - AMBIGUOUS: 0 (0%)
 
 ---

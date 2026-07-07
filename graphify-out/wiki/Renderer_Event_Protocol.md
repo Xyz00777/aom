@@ -1,12 +1,12 @@
 # Renderer Event Protocol
 
-> 40 nodes · cohesion 0.05
+> 25 nodes · cohesion 0.05
 
 ## Key Concepts
 
-- **Renderer** (28 connections) — `src/ansible_aom/renderer/protocol.py`
+- **Renderer** (30 connections) — `src/ansible_aom/renderer/protocol.py`
+- **.__init__()** (8 connections) — `src/ansible_aom/tui/app.py`
 - **EventSource** (7 connections) — `src/ansible_aom/drivers/protocol.py`
-- **.__init__()** (6 connections) — `src/ansible_aom/tui/app.py`
 - **.drive()** (3 connections) — `src/ansible_aom/drivers/live.py`
 - **.drive()** (3 connections) — `src/ansible_aom/drivers/protocol.py`
 - **protocol.py** (2 connections) — `src/ansible_aom/drivers/protocol.py`
@@ -29,7 +29,6 @@
 - **A producer of run events for a :class:`Renderer`.      Implementations own the f** (1 connections) — `src/ansible_aom/drivers/protocol.py`
 - **Drive ``renderer`` to completion and return the run's exit code.          Contra** (1 connections) — `src/ansible_aom/drivers/protocol.py`
 - **Renderer Protocol — the display-side port of the architecture.  See ``ARCHITECTU** (1 connections) — `src/ansible_aom/renderer/protocol.py`
-- *... and 15 more nodes in this community*
 
 ## Relationships
 
@@ -44,7 +43,6 @@
 - [[Run History Mining]] (1 shared connections)
 - [[Run Config Key Normalization]] (1 shared connections)
 - [[Playbook Event Parsing]] (1 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
 
 ## Source Files
 
@@ -55,8 +53,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 94 (96%)
-- INFERRED: 4 (4%)
+- EXTRACTED: 82 (94%)
+- INFERRED: 5 (6%)
 - AMBIGUOUS: 0 (0%)
 
 ---

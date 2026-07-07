@@ -5,9 +5,9 @@
 ## Key Concepts
 
 - **RunDiagnostics** (15 connections) — `src/ansible_aom/core/diagnostics.py`
+- **_FakeSink** (8 connections) — `tests/unit/test_aom_trace_events.py`
+- **_feed_many()** (8 connections) — `tests/unit/test_aom_trace_events.py`
 - **test_aom_trace_events.py** (7 connections) — `tests/unit/test_aom_trace_events.py`
-- **_FakeSink** (7 connections) — `tests/unit/test_aom_trace_events.py`
-- **_feed_many()** (7 connections) — `tests/unit/test_aom_trace_events.py`
 - **set_last_run_diagnostics()** (3 connections) — `src/ansible_aom/core/diagnostics.py`
 - **_execution_parser()** (3 connections) — `tests/unit/test_aom_trace_events.py`
 - **test_trace_events_emits_every_100th_event_under_debug()** (3 connections) — `tests/unit/test_aom_trace_events.py`
@@ -25,7 +25,7 @@
 
 ## Relationships
 
-- [[Diagnostics and Profiler]] (4 shared connections)
+- [[Diagnostics and Profiler]] (5 shared connections)
 - [[Runner Session Recording]] (3 shared connections)
 - [[PTY Stream Parser]] (2 shared connections)
 - [[Playbook Run Integration Tests]] (1 shared connections)
@@ -38,8 +38,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 57 (95%)
-- INFERRED: 3 (5%)
+- EXTRACTED: 57 (92%)
+- INFERRED: 5 (8%)
 - AMBIGUOUS: 0 (0%)
 
 ---

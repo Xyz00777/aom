@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **TestPasswordPromptPatterns** (19 connections) — `tests/integration/test_compact_renderer.py`
+- **TestPasswordPromptPatterns** (18 connections) — `tests/integration/test_compact_renderer.py`
 - **.password_patterns()** (2 connections) — `tests/integration/test_compact_renderer.py`
 - **.test_become_default_password_pattern()** (2 connections) — `tests/integration/test_compact_renderer.py`
 - **.test_become_password_pattern()** (2 connections) — `tests/integration/test_compact_renderer.py`
@@ -31,7 +31,6 @@
 - [[Role Group Task Models]] (1 shared connections)
 - [[Task Definition Live Refresh]] (1 shared connections)
 - [[Play Definition Tree Population]] (1 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
 - [[Compact Renderer Integration Tests]] (1 shared connections)
 
 ## Source Files
@@ -40,8 +39,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 35 (80%)
-- INFERRED: 9 (20%)
+- EXTRACTED: 35 (81%)
+- INFERRED: 8 (19%)
 - AMBIGUOUS: 0 (0%)
 
 ---

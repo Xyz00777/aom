@@ -6,7 +6,7 @@
 
 - **format_failure_recap()** (14 connections) — `src/ansible_aom/compact/format.py`
 - **TestFormatFailureRecap** (13 connections) — `tests/compact/test_completion_recap.py`
-- **TestFailureRecapColors** (12 connections) — `tests/compact/test_status_bar_colors.py`
+- **TestFailureRecapColors** (11 connections) — `tests/compact/test_status_bar_colors.py`
 - **._state_with()** (9 connections) — `tests/compact/test_status_bar_colors.py`
 - **.test_empty_state_returns_no_lines()** (3 connections) — `tests/compact/test_completion_recap.py`
 - **.test_failed_label_is_visible()** (3 connections) — `tests/compact/test_completion_recap.py`
@@ -21,7 +21,6 @@
 ## Relationships
 
 - [[Run State Completion Recap]] (16 shared connections)
-- [[Run State Summary Panel]] (5 shared connections)
 - [[Role Group Task Models]] (3 shared connections)
 - [[Compact Renderer Formatters]] (2 shared connections)
 - [[Compact Renderer Implementation]] (2 shared connections)
@@ -36,8 +35,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 40 (55%)
-- INFERRED: 33 (45%)
+- EXTRACTED: 40 (56%)
+- INFERRED: 32 (44%)
 - AMBIGUOUS: 0 (0%)
 
 ---

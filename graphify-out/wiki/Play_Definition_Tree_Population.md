@@ -1,55 +1,54 @@
 # Play Definition Tree Population
 
-> 256 nodes · cohesion 0.01
+> 211 nodes · cohesion 0.01
 
 ## Key Concepts
 
-- **PlayDefinition** (333 connections) — `src/ansible_aom/core/models.py`
-- **.from_run_state()** (187 connections) — `src/ansible_aom/core/tree.py`
-- **TreeLine** (63 connections) — `src/ansible_aom/core/tree.py`
-- **HostRow** (37 connections) — `src/ansible_aom/core/tree.py`
-- **test_tree_projection.py** (27 connections) — `tests/unit/test_tree_projection.py`
-- **TestHostRows** (23 connections) — `tests/unit/test_tree_projection.py`
-- **TestPlayDefinition** (21 connections) — `tests/unit/test_models.py`
-- **TestTaskCompletionLifecycle** (19 connections) — `tests/unit/test_tree_projection.py`
-- **TestMultiPlayTruncationWithRoleFooters** (18 connections) — `tests/unit/test_tree_projection.py`
-- **TestSubtreeRoleCounting** (18 connections) — `tests/unit/test_tree_projection.py`
-- **TestRoleLabelsAfterTruncation** (16 connections) — `tests/unit/test_tree_projection.py`
-- **TestTreeLinesBasic** (16 connections) — `tests/unit/test_tree_projection.py`
-- **TestCrossPlayLookupIsolation** (15 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
-- **TestDynamicChildrenAsPendingInTree** (15 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
-- **TestMultiLevelInnerFooters** (15 connections) — `tests/unit/test_tree_projection.py`
-- **TestTreeLinesPruning** (15 connections) — `tests/unit/test_tree_projection.py`
-- **TestTreeLinesRolesAndFanOut** (15 connections) — `tests/unit/test_tree_projection.py`
-- **TestTreePopulationFromDefinitions** (14 connections) — `tests/tui/test_live_refresh.py`
-- **TestRuntimeRoleTaskCount** (14 connections) — `tests/unit/test_runtime_role_task_count.py`
-- **TestStickyFallbackTreeRender** (14 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
-- **TestIncludeStubHiding** (14 connections) — `tests/unit/test_tree_projection.py`
+- **PlayDefinition** (340 connections) — `src/ansible_aom/core/models.py`
+- **test_tree_projection.py** (26 connections) — `tests/unit/test_tree_projection.py`
+- **TestPlayDefinition** (20 connections) — `tests/unit/test_models.py`
+- **TestHostRows** (19 connections) — `tests/unit/test_tree_projection.py`
+- **TestTaskCompletionLifecycle** (15 connections) — `tests/unit/test_tree_projection.py`
+- **TestMultiPlayTruncationWithRoleFooters** (14 connections) — `tests/unit/test_tree_projection.py`
 - **._many_tasks_state()** (14 connections) — `tests/unit/test_tree_projection.py`
-- **TestTreeLineHasTailAfter** (14 connections) — `tests/unit/test_tree_projection.py`
-- **TestVisibility** (14 connections) — `tests/unit/test_tree_projection.py`
-- **TestTreeKindIncludesMore** (13 connections) — `tests/unit/test_tree_projection.py`
-- *... and 231 more nodes in this community*
+- **TestSubtreeRoleCounting** (14 connections) — `tests/unit/test_tree_projection.py`
+- **TestTreePopulationFromDefinitions** (13 connections) — `tests/tui/test_live_refresh.py`
+- **TestCrossPlayLookupIsolation** (13 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
+- **TestDynamicChildrenAsPendingInTree** (13 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
+- **TestRuntimeRoleTaskCount** (12 connections) — `tests/unit/test_runtime_role_task_count.py`
+- **TestStickyFallbackTreeRender** (12 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
+- **TestRoleLabelsAfterTruncation** (12 connections) — `tests/unit/test_tree_projection.py`
+- **TestTreeLinesBasic** (12 connections) — `tests/unit/test_tree_projection.py`
+- **TestMultiLevelInnerFooters** (11 connections) — `tests/unit/test_tree_projection.py`
+- **._nested_state()** (11 connections) — `tests/unit/test_tree_projection.py`
+- **TestTreeLinesPruning** (11 connections) — `tests/unit/test_tree_projection.py`
+- **TestTreeLinesRolesAndFanOut** (11 connections) — `tests/unit/test_tree_projection.py`
+- **TestClassifyRunningWithEmptyHosts** (10 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
+- **._multi_host_state()** (10 connections) — `tests/unit/test_tree_projection.py`
+- **TestIncludeStubHiding** (10 connections) — `tests/unit/test_tree_projection.py`
+- **TestTreeLineHasTailAfter** (10 connections) — `tests/unit/test_tree_projection.py`
+- **TestVisibility** (10 connections) — `tests/unit/test_tree_projection.py`
+- **test_tree_classify_and_role_labels.py** (9 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
+- *... and 186 more nodes in this community*
 
 ## Relationships
 
-- [[Task Definition Live Refresh]] (127 shared connections)
-- [[Role Group Task Models]] (120 shared connections)
-- [[Run State Summary Panel]] (111 shared connections)
-- [[Run State Completion Recap]] (86 shared connections)
-- [[Tree Projection Logic]] (39 shared connections)
+- [[Role Group Task Models]] (115 shared connections)
+- [[Task Definition Live Refresh]] (111 shared connections)
+- [[Run State Completion Recap]] (63 shared connections)
 - [[Compact Renderer Integration Tests]] (18 shared connections)
-- [[Two-Cut Tree Truncation]] (17 shared connections)
-- [[Tree Block Animation]] (16 shared connections)
-- [[Ungrouped Role Tree Tests]] (15 shared connections)
 - [[Include Role Discovery]] (13 shared connections)
 - [[Preflight Summary Rendering]] (12 shared connections)
-- [[Host Overview Table]] (12 shared connections)
+- [[Dynamic Include Expansion]] (11 shared connections)
+- [[Total Task Counting]] (9 shared connections)
+- [[AOM TUI Application]] (9 shared connections)
+- [[Data Model Unit Tests]] (9 shared connections)
+- [[Run State Summary Panel]] (8 shared connections)
+- [[Two-Cut Tree Truncation]] (6 shared connections)
 
 ## Source Files
 
 - `src/ansible_aom/core/models.py`
-- `src/ansible_aom/core/tree.py`
 - `tests/tui/test_live_refresh.py`
 - `tests/unit/test_invariants_runstate_renderer.py`
 - `tests/unit/test_loop_item_count.py`
@@ -62,8 +61,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 1137 (60%)
-- INFERRED: 746 (40%)
+- EXTRACTED: 875 (61%)
+- INFERRED: 562 (39%)
 - AMBIGUOUS: 0 (0%)
 
 ---

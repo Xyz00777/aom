@@ -1,12 +1,12 @@
 # CLI Main Entry Point
 
-> 34 nodes · cohesion 0.07
+> 32 nodes · cohesion 0.07
 
 ## Key Concepts
 
-- **cli.py** (14 connections) — `src/ansible_aom/cli.py`
+- **cli.py** (15 connections) — `src/ansible_aom/cli.py`
 - **LiveDriver** (14 connections) — `src/ansible_aom/drivers/live.py`
-- **main()** (10 connections) — `src/ansible_aom/cli.py`
+- **main()** (12 connections) — `src/ansible_aom/cli.py`
 - **detect_duplicate_playbook()** (8 connections) — `src/ansible_aom/cli.py`
 - **test_cli_duplicate_playbook.py** (7 connections) — `tests/unit/test_cli_duplicate_playbook.py`
 - **_run_compact()** (5 connections) — `src/ansible_aom/cli.py`
@@ -25,11 +25,11 @@
 - **test_detect_duplicate_playbook_handles_empty_args()** (2 connections) — `tests/unit/test_cli_duplicate_playbook.py`
 - **test_detect_duplicate_playbook_returns_false_when_no_repeat()** (2 connections) — `tests/unit/test_cli_duplicate_playbook.py`
 - **CLI entry point for AOM.  This module provides the main command-line interface f** (1 connections) — `src/ansible_aom/cli.py`
-- **Spawn the streaming renderer (compact ANSI or end-of-run JSON) via a LiveDriver.** (1 connections) — `src/ansible_aom/cli.py`
 - **True if `playbook` appears (path-normalised) in `ansible_args`.      Catches the** (1 connections) — `src/ansible_aom/cli.py`
 - **Entry point for running AOM as a module: python -m ansible_aom.** (1 connections) — `src/ansible_aom/__main__.py`
 - **.ansible_args()** (1 connections) — `src/ansible_aom/drivers/live.py`
-- *... and 9 more nodes in this community*
+- **.playbook()** (1 connections) — `src/ansible_aom/drivers/live.py`
+- *... and 7 more nodes in this community*
 
 ## Relationships
 
@@ -57,8 +57,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 94 (84%)
-- INFERRED: 18 (16%)
+- EXTRACTED: 94 (83%)
+- INFERRED: 19 (17%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -1,10 +1,10 @@
 # Terminal Display Manager
 
-> 44 nodes · cohesion 0.06
+> 41 nodes · cohesion 0.06
 
 ## Key Concepts
 
-- **Display** (73 connections) — `src/ansible_aom/compact/display.py`
+- **Display** (74 connections) — `src/ansible_aom/compact/display.py`
 - **TestDegradedModeEntry** (9 connections) — `tests/compact/test_small_terminal.py`
 - **TestDegradedModeFallthrough** (7 connections) — `tests/compact/test_small_terminal.py`
 - **TestSynchronizedOutput** (5 connections) — `tests/compact/test_display_ansi.py`
@@ -29,7 +29,7 @@
 - **.test_clear_in_degraded_mode_is_a_noop()** (2 connections) — `tests/compact/test_small_terminal.py`
 - **.test_print_log_in_degraded_mode_emits_plain_text()** (2 connections) — `tests/compact/test_small_terminal.py`
 - **.test_update_in_degraded_mode_emits_no_dec_frame()** (2 connections) — `tests/compact/test_small_terminal.py`
-- *... and 19 more nodes in this community*
+- *... and 16 more nodes in this community*
 
 ## Relationships
 
@@ -55,8 +55,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 83 (50%)
-- INFERRED: 84 (50%)
+- EXTRACTED: 80 (48%)
+- INFERRED: 85 (52%)
 - AMBIGUOUS: 0 (0%)
 
 ---

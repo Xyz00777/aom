@@ -4,16 +4,16 @@
 
 ## Key Concepts
 
-- **_renderer()** (16 connections) — `tests/compact/test_loop_item_streaming.py`
-- **_task_start()** (15 connections) — `tests/compact/test_loop_item_streaming.py`
-- **test_loop_item_streaming.py** (13 connections) — `tests/compact/test_loop_item_streaming.py`
-- **_all_text()** (13 connections) — `tests/compact/test_loop_item_streaming.py`
+- **_renderer()** (20 connections) — `tests/compact/test_loop_item_streaming.py`
+- **_task_start()** (19 connections) — `tests/compact/test_loop_item_streaming.py`
+- **test_loop_item_streaming.py** (15 connections) — `tests/compact/test_loop_item_streaming.py`
+- **_all_text()** (15 connections) — `tests/compact/test_loop_item_streaming.py`
 - **TestItemEventTypeIsAuthoritative** (9 connections) — `tests/compact/test_loop_item_streaming.py`
 - **_aom_jsonl_item_event()** (8 connections) — `tests/compact/test_loop_item_streaming.py`
 - **_item_event()** (8 connections) — `tests/compact/test_loop_item_streaming.py`
+- **_logged()** (8 connections) — `tests/compact/test_loop_item_streaming.py`
 - **.test_streamed_items_not_duplicated_by_aggregate()** (7 connections) — `tests/compact/test_loop_item_streaming.py`
 - **TestItemEventRendersImmediately** (7 connections) — `tests/compact/test_loop_item_streaming.py`
-- **_logged()** (6 connections) — `tests/compact/test_loop_item_streaming.py`
 - **.test_aggregate_still_expands_without_streamed_items()** (6 connections) — `tests/compact/test_loop_item_streaming.py`
 - **.test_ok_item_still_uses_changed_flag()** (6 connections) — `tests/compact/test_loop_item_streaming.py`
 - **.test_changed_item_streams_one_line()** (5 connections) — `tests/compact/test_loop_item_streaming.py`
@@ -41,7 +41,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 181 (98%)
+- EXTRACTED: 195 (98%)
 - INFERRED: 4 (2%)
 - AMBIGUOUS: 0 (0%)
 

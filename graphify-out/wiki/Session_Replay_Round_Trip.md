@@ -1,10 +1,10 @@
 # Session Replay Round Trip
 
-> 34 nodes · cohesion 0.10
+> 33 nodes · cohesion 0.10
 
 ## Key Concepts
 
-- **replay_session()** (23 connections) — `src/ansible_aom/drivers/replay.py`
+- **replay_session()** (31 connections) — `src/ansible_aom/drivers/replay.py`
 - **_make_session()** (13 connections) — `tests/unit/test_replay.py`
 - **test_replay.py** (7 connections) — `tests/unit/test_replay.py`
 - **.test_replay_uses_meta_status_failed_when_recorded_failed()** (6 connections) — `tests/integration/test_replay.py`
@@ -29,7 +29,7 @@
 - **TestReplayNegativeDelta** (3 connections) — `tests/unit/test_replay.py`
 - **TestReplaySessionBasic** (3 connections) — `tests/unit/test_replay.py`
 - **.test_returns_minus_one_when_session_missing()** (3 connections) — `tests/unit/test_replay.py`
-- *... and 9 more nodes in this community*
+- *... and 8 more nodes in this community*
 
 ## Relationships
 
@@ -49,8 +49,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 106 (76%)
-- INFERRED: 33 (24%)
+- EXTRACTED: 106 (73%)
+- INFERRED: 40 (27%)
 - AMBIGUOUS: 0 (0%)
 
 ---

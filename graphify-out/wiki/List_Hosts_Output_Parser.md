@@ -1,17 +1,18 @@
 # List Hosts Output Parser
 
-> 42 nodes · cohesion 0.05
+> 23 nodes · cohesion 0.05
 
 ## Key Concepts
 
-- **parse_list_hosts_output()** (25 connections) — `src/ansible_aom/core/parser.py`
+- **parse_list_hosts_output()** (27 connections) — `src/ansible_aom/core/parser.py`
+- **.test_list_hosts_no_duplicate_hosts()** (4 connections) — `tests/unit/test_parser.py`
+- **.test_list_hosts_stderr_not_in_result()** (4 connections) — `tests/unit/test_parser.py`
 - **.test_parallel_parse_does_not_corrupt_data()** (4 connections) — `tests/unit/test_parser.py`
 - **.test_list_hosts_all_inventory()** (3 connections) — `tests/unit/test_parser.py`
 - **.test_list_hosts_dynamic_inventory_timeout()** (3 connections) — `tests/unit/test_parser.py`
 - **.test_list_hosts_dynamic_pattern_empty_hosts()** (3 connections) — `tests/unit/test_parser.py`
 - **.test_list_hosts_dynamic_pattern_fallback()** (3 connections) — `tests/unit/test_parser.py`
 - **.test_list_hosts_multiple_plays_hosts()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_list_hosts_no_duplicate_hosts()** (3 connections) — `tests/unit/test_parser.py`
 - **.test_list_hosts_pattern_filtering()** (3 connections) — `tests/unit/test_parser.py`
 - **.test_list_hosts_play_number_sequential()** (3 connections) — `tests/unit/test_parser.py`
 - **.test_list_hosts_with_limit()** (3 connections) — `tests/unit/test_parser.py`
@@ -24,12 +25,8 @@
 - **.test_parse_play_line_pattern()** (3 connections) — `tests/unit/test_parser.py`
 - **.test_playbook_header_skipped()** (3 connections) — `tests/unit/test_parser.py`
 - **.test_skip_non_host_lines()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_list_hosts_stderr_not_in_result()** (3 connections) — `tests/unit/test_parser.py`
-- **Parse --list-hosts output into structured data.      Returns list of dicts with** (2 connections) — `src/ansible_aom/core/parser.py`
-- **TC-087: Parallel parsing produces same results as sequential.** (1 connections) — `tests/unit/test_parser.py`
-- **TC-089: When --list-hosts returns empty, hosts will come from         runner eve** (1 connections) — `tests/unit/test_parser.py`
-- **TC-089: Partial/corrupted output still returns any parseable plays.** (1 connections) — `tests/unit/test_parser.py`
-- *... and 17 more nodes in this community*
+- **TC-101: Multiple plays with different host sets.** (2 connections) — `tests/unit/test_parser.py`
+- **TC-116: Play names may contain special section designations.** (2 connections) — `tests/unit/test_parser.py`
 
 ## Relationships
 
@@ -46,8 +43,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 64 (59%)
-- INFERRED: 44 (41%)
+- EXTRACTED: 48 (51%)
+- INFERRED: 46 (49%)
 - AMBIGUOUS: 0 (0%)
 
 ---

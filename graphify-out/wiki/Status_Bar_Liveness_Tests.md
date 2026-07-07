@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **LivenessState** (27 connections) — `src/ansible_aom/core/heartbeat.py`
+- **LivenessState** (28 connections) — `src/ansible_aom/core/heartbeat.py`
 - **test_status_bar_liveness.py** (18 connections) — `tests/compact/test_status_bar_liveness.py`
 - **test_live_cpu_annotated_with_cpu_marker()** (3 connections) — `tests/compact/test_status_bar_liveness.py`
 - **test_live_pty_has_no_reason_annotation()** (3 connections) — `tests/compact/test_status_bar_liveness.py`
@@ -47,8 +47,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 55 (59%)
-- INFERRED: 39 (41%)
+- EXTRACTED: 55 (58%)
+- INFERRED: 40 (42%)
 - AMBIGUOUS: 0 (0%)
 
 ---

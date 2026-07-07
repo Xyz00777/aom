@@ -4,10 +4,10 @@
 
 ## Key Concepts
 
-- **TestUngroupedRoleTasksInTree** (14 connections) — `tests/unit/test_tree_ungrouped_roles.py`
-- **TestRolePrefixStripping** (12 connections) — `tests/unit/test_tree_ungrouped_roles.py`
+- **TestUngroupedRoleTasksInTree** (12 connections) — `tests/unit/test_tree_ungrouped_roles.py`
 - **_play_def()** (11 connections) — `tests/unit/test_tree_ungrouped_roles.py`
-- **TestPendingPlayUngroupedRoles** (10 connections) — `tests/unit/test_tree_ungrouped_roles.py`
+- **TestRolePrefixStripping** (10 connections) — `tests/unit/test_tree_ungrouped_roles.py`
+- **TestPendingPlayUngroupedRoles** (8 connections) — `tests/unit/test_tree_ungrouped_roles.py`
 - **._state_with_ungrouped_role_running()** (8 connections) — `tests/unit/test_tree_ungrouped_roles.py`
 - **.test_pending_play_shows_ungrouped_role_header()** (6 connections) — `tests/unit/test_tree_ungrouped_roles.py`
 - **.test_runtime_play_counts_ungrouped_role_tasks_in_label()** (6 connections) — `tests/unit/test_tree_ungrouped_roles.py`
@@ -33,11 +33,9 @@
 
 ## Relationships
 
-- [[Play Definition Tree Population]] (15 shared connections)
 - [[Task Definition Live Refresh]] (12 shared connections)
-- [[Run State Summary Panel]] (12 shared connections)
 - [[Role Group Task Models]] (6 shared connections)
-- [[Tree Projection Logic]] (3 shared connections)
+- [[Play Definition Tree Population]] (4 shared connections)
 
 ## Source Files
 
@@ -45,8 +43,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 109 (80%)
-- INFERRED: 27 (20%)
+- EXTRACTED: 109 (84%)
+- INFERRED: 21 (16%)
 - AMBIGUOUS: 0 (0%)
 
 ---

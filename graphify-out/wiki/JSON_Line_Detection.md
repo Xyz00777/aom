@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **TestLogPanelJsonLineDetection** (16 connections) — `tests/tui/test_panels.py`
+- **TestLogPanelJsonLineDetection** (15 connections) — `tests/tui/test_panels.py`
 - **.test_json_line_detection_startswith_brace()** (2 connections) — `tests/tui/test_panels.py`
 - **.test_json_line_parsing_attempts_parse()** (2 connections) — `tests/tui/test_panels.py`
 - **.test_json_within_text_not_parsed()** (2 connections) — `tests/tui/test_panels.py`
@@ -24,7 +24,6 @@
 - [[Status Bar Warning Panels]] (3 shared connections)
 - [[Run State Completion Recap]] (3 shared connections)
 - [[Role Group Task Models]] (2 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
 
 ## Source Files
 
@@ -32,8 +31,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 27 (77%)
-- INFERRED: 8 (23%)
+- EXTRACTED: 27 (79%)
+- INFERRED: 7 (21%)
 - AMBIGUOUS: 0 (0%)
 
 ---

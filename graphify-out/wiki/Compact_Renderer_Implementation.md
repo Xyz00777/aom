@@ -1,21 +1,22 @@
 # Compact Renderer Implementation
 
-> 108 nodes · cohesion 0.02
+> 102 nodes · cohesion 0.02
 
 ## Key Concepts
 
-- **CompactRenderer** (269 connections) — `src/ansible_aom/compact/renderer.py`
+- **CompactRenderer** (288 connections) — `src/ansible_aom/compact/renderer.py`
 - **TestCompactRendererInteractivePrompt** (10 connections) — `tests/unit/test_interactive_prompt.py`
 - **test_renderer_stats.py** (9 connections) — `tests/compact/test_renderer_stats.py`
+- **.start()** (8 connections) — `src/ansible_aom/compact/renderer.py`
 - **TestPauseSecondsLogged** (8 connections) — `tests/unit/test_compact_pause_visibility.py`
-- **.start()** (7 connections) — `src/ansible_aom/compact/renderer.py`
+- **test_warning_visibility.py** (7 connections) — `tests/compact/test_warning_visibility.py`
 - **.stop()** (6 connections) — `src/ansible_aom/compact/renderer.py`
-- **test_warning_visibility.py** (6 connections) — `tests/compact/test_warning_visibility.py`
+- **test_long_output_cap.py** (6 connections) — `tests/compact/test_long_output_cap.py`
+- **renderer.py** (5 connections) — `src/ansible_aom/compact/renderer.py`
 - **_pause_task_event()** (5 connections) — `tests/unit/test_compact_pause_visibility.py`
 - **.collect_stats()** (4 connections) — `src/ansible_aom/compact/renderer.py`
 - **.handle_interactive_prompt()** (4 connections) — `src/ansible_aom/compact/renderer.py`
 - **.handle_password_prompt()** (4 connections) — `src/ansible_aom/compact/renderer.py`
-- **test_long_output_cap.py** (4 connections) — `tests/compact/test_long_output_cap.py`
 - **_ok_event()** (4 connections) — `tests/compact/test_renderer_stats.py`
 - **.test_pause_short_action_name_also_caught()** (4 connections) — `tests/unit/test_compact_pause_visibility.py`
 - **.test_pause_with_string_seconds_handled()** (4 connections) — `tests/unit/test_compact_pause_visibility.py`
@@ -28,8 +29,7 @@
 - **test_add_warning_dedupes_repeated_messages()** (3 connections) — `tests/compact/test_warning_visibility.py`
 - **test_add_warning_message_is_prefixed_for_classification()** (3 connections) — `tests/compact/test_warning_visibility.py`
 - **.test_handle_completion_accepts_exit_code_and_state()** (3 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_non_tty_completion_prints_final_summary()** (3 connections) — `tests/integration/test_compact_renderer.py`
-- *... and 83 more nodes in this community*
+- *... and 77 more nodes in this community*
 
 ## Relationships
 
@@ -58,8 +58,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 276 (53%)
-- INFERRED: 245 (47%)
+- EXTRACTED: 279 (52%)
+- INFERRED: 262 (48%)
 - AMBIGUOUS: 0 (0%)
 
 ---

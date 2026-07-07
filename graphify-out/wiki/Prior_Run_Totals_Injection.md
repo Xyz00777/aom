@@ -5,8 +5,8 @@
 ## Key Concepts
 
 - **TestCompactInjection** (6 connections) — `tests/unit/test_prior_run_loop_totals_injection.py`
-- **test_prior_run_loop_totals_injection.py** (5 connections) — `tests/unit/test_prior_run_loop_totals_injection.py`
 - **TestTuiInjection** (5 connections) — `tests/unit/test_prior_run_loop_totals_injection.py`
+- **test_prior_run_loop_totals_injection.py** (4 connections) — `tests/unit/test_prior_run_loop_totals_injection.py`
 - **_prior_with_totals()** (4 connections) — `tests/unit/test_prior_run_loop_totals_injection.py`
 - **.test_set_prior_run_copies_loop_totals_into_state()** (3 connections) — `tests/unit/test_prior_run_loop_totals_injection.py`
 - **.test_set_prior_run_copies_loop_totals_into_run_state()** (3 connections) — `tests/unit/test_prior_run_loop_totals_injection.py`
@@ -15,8 +15,8 @@
 
 ## Relationships
 
-- [[Run History Mining]] (4 shared connections)
 - [[Compact Renderer Implementation]] (4 shared connections)
+- [[Run History Mining]] (3 shared connections)
 - [[AOM TUI Application]] (3 shared connections)
 
 ## Source Files
@@ -25,8 +25,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 20 (69%)
-- INFERRED: 9 (31%)
+- EXTRACTED: 19 (68%)
+- INFERRED: 9 (32%)
 - AMBIGUOUS: 0 (0%)
 
 ---

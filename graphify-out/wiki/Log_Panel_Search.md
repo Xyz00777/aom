@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **TestLogPanelSearchOverlay** (20 connections) — `tests/tui/test_panels.py`
+- **TestLogPanelSearchOverlay** (19 connections) — `tests/tui/test_panels.py`
 - **.test_search_case_sensitive_toggle()** (2 connections) — `tests/tui/test_panels.py`
 - **.test_search_empty_result()** (2 connections) — `tests/tui/test_panels.py`
 - **.test_search_f3_navigation_next()** (2 connections) — `tests/tui/test_panels.py`
@@ -32,7 +32,6 @@
 - [[Status Bar Warning Panels]] (3 shared connections)
 - [[Run State Completion Recap]] (3 shared connections)
 - [[Role Group Task Models]] (2 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
 
 ## Source Files
 
@@ -40,8 +39,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 43 (84%)
-- INFERRED: 8 (16%)
+- EXTRACTED: 43 (86%)
+- INFERRED: 7 (14%)
 - AMBIGUOUS: 0 (0%)
 
 ---

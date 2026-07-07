@@ -1,6 +1,6 @@
 # UUIDv7 Session Generation
 
-> 14 nodes · cohesion 0.18
+> 12 nodes · cohesion 0.18
 
 ## Key Concepts
 
@@ -16,8 +16,6 @@
 - **UUIDv7 values are time-sortable (earlier timestamps produce smaller UUIDs).** (1 connections) — `tests/integration/test_session.py`
 - **First 8 characters of UUIDv7 can be used for display.** (1 connections) — `tests/integration/test_session.py`
 - **UUIDv7 embeds timestamp in first segment.** (1 connections) — `tests/integration/test_session.py`
-- **Create a new session and return the session ID (UUIDv7).          Creates the se** (1 connections) — `src/ansible_aom/session/store.py`
-- **Generate a UUIDv7 session ID.      UUIDv7 is time-sortable, which allows session** (1 connections) — `src/ansible_aom/session/store.py`
 
 ## Relationships
 
@@ -31,8 +29,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 27 (75%)
-- INFERRED: 9 (25%)
+- EXTRACTED: 25 (74%)
+- INFERRED: 9 (26%)
 - AMBIGUOUS: 0 (0%)
 
 ---

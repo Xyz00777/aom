@@ -1,13 +1,14 @@
 # CLI Argument Parser
 
-> 68 nodes · cohesion 0.03
+> 53 nodes · cohesion 0.03
 
 ## Key Concepts
 
-- **create_parser()** (50 connections) — `src/ansible_aom/cli.py`
+- **create_parser()** (83 connections) — `src/ansible_aom/cli.py`
 - **TestHideStateFlag** (29 connections) — `tests/unit/test_cli.py`
 - **TestFormatFlag** (17 connections) — `tests/unit/test_cli.py`
 - **TestNoRecordParserFlag** (5 connections) — `tests/unit/test_no_record.py`
+- **.test_hide_state_rejects_unknown_in_comma_separated()** (4 connections) — `tests/unit/test_cli.py`
 - **.test_inventory_flag_passed_through()** (3 connections) — `tests/unit/test_cli.py`
 - **.test_limit_flag_passed_through()** (3 connections) — `tests/unit/test_cli.py`
 - **.test_unknown_args_passed_through()** (3 connections) — `tests/unit/test_cli.py`
@@ -28,35 +29,31 @@
 - **.test_hide_state_default_is_empty()** (3 connections) — `tests/unit/test_cli.py`
 - **.test_hide_state_does_not_appear_in_ansible_args()** (3 connections) — `tests/unit/test_cli.py`
 - **.test_hide_state_error_includes_choices()** (3 connections) — `tests/unit/test_cli.py`
-- **.test_hide_state_is_repeatable()** (3 connections) — `tests/unit/test_cli.py`
-- *... and 43 more nodes in this community*
+- *... and 28 more nodes in this community*
 
 ## Relationships
 
-- [[CLI Interface Tests]] (20 shared connections)
+- [[CLI Interface Tests]] (21 shared connections)
 - [[Run State Completion Recap]] (6 shared connections)
 - [[AOM TUI Application]] (3 shared connections)
 - [[CLI Main Entry Point]] (2 shared connections)
 - [[Compact Renderer Implementation]] (2 shared connections)
 - [[Role Group Task Models]] (2 shared connections)
-- [[Run State Summary Panel]] (2 shared connections)
 - [[JSON Renderer]] (2 shared connections)
 - [[Replay CLI Subcommand]] (1 shared connections)
 - [[Shell Completion Helpers]] (1 shared connections)
 - [[No Record Flag]] (1 shared connections)
-- [[Redaction Always Active]] (1 shared connections)
 
 ## Source Files
 
 - `src/ansible_aom/cli.py`
 - `tests/unit/test_cli.py`
 - `tests/unit/test_no_record.py`
-- `tests/unit/test_redaction.py`
 
 ## Audit Trail
 
-- EXTRACTED: 141 (57%)
-- INFERRED: 106 (43%)
+- EXTRACTED: 126 (48%)
+- INFERRED: 138 (52%)
 - AMBIGUOUS: 0 (0%)
 
 ---

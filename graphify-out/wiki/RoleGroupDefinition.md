@@ -1,6 +1,6 @@
 # RoleGroupDefinition
 
-> God node · 162 connections · `src/ansible_aom/core/models.py`
+> God node · 153 connections · `src/ansible_aom/core/models.py`
 
 **Community:** [[Role Group Task Models]]
 
@@ -9,16 +9,16 @@
 ### calls
 - [[._many_tasks_state()]] `INFERRED`
 - [[_two_level_state()]] `INFERRED`
-- [[._single_play_single_role_state()]] `INFERRED`
 - [[test_format_tree_block_renders_two_level_truncation()]] `INFERRED`
 - [[group_roles()]] `INFERRED`
 - [[._nested_state()]] `INFERRED`
+- [[._single_play_single_role_state()]] `INFERRED`
 - [[.test_mixed_consecutive_and_nested_roles()]] `INFERRED`
 - [[.test_nested_role_renders_as_sub_branch()]] `INFERRED`
 - [[.test_runtime_podman_prefix_does_not_duplicate_role_header()]] `INFERRED`
+- [[._multi_task_role_with_completed_task()]] `INFERRED`
 - [[.test_regression_flat_role_tasks_unchanged()]] `INFERRED`
 - [[._multi_play_completed_state()]] `INFERRED`
-- [[._multi_task_role_with_completed_task()]] `INFERRED`
 - [[.test_arbitrary_depth_renders_correctly()]] `INFERRED`
 - [[.test_task_label_strips_role_prefix_and_pending_visible()]] `INFERRED`
 - [[.test_tui_widget_walks_recursively()]] `INFERRED`
@@ -45,14 +45,15 @@
 - [[_collect_role_group_tags()]] `EXTRACTED`
 
 ### uses
+- [[RunState]] `INFERRED`
 - [[PtyStreamParser]] `INFERRED`
-- [[TreeProjection]] `INFERRED`
 - [[StreamPhase]] `INFERRED`
 - [[JsonLineStream]] `INFERRED`
-- [[TreeLine]] `INFERRED`
-- [[TaskTree]] `INFERRED`
+- [[TreeProjection]] `INFERRED`
 - [[PreParseResult]] `INFERRED`
-- [[HostRow]] `INFERRED`
+- [[TestPtyStreamParserStderrLineEmission]] `INFERRED`
+- [[TaskTree]] `INFERRED`
+- [[TreeLine]] `INFERRED`
 - [[TestJsonLineStreamBasics]] `INFERRED`
 - [[TestListTasksEdgeCases]] `INFERRED`
 - [[TestListTasksParser]] `INFERRED`
@@ -62,7 +63,6 @@
 - [[TestListHostsEdgeCases]] `INFERRED`
 - [[TestHostRunState]] `INFERRED`
 - [[TestPlayRunState]] `INFERRED`
-- [[TestHostRows]] `INFERRED`
 - [[TestRunState]] `INFERRED`
 - [[TestStatusEnum]] `INFERRED`
 

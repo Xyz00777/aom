@@ -1,21 +1,14 @@
 # Version String Parsing
 
-> 6 nodes · cohesion 0.33
+> 1 nodes · cohesion 0.33
 
 ## Key Concepts
 
-- **_parse_version()** (6 connections) — `tests/unit/test_posix_callback.py`
-- **.test_ansible_core_version_parse_function()** (3 connections) — `tests/unit/test_posix_callback.py`
-- **.test_ansible_posix_version_parse_function()** (3 connections) — `tests/unit/test_posix_callback.py`
-- **TC-069: Version parsing handles various formats.** (1 connections) — `tests/unit/test_posix_callback.py`
-- **Parse a version string to tuple for comparison.      Args:         version_str:** (1 connections) — `tests/unit/test_posix_callback.py`
-- **TC-070: Version parsing handles various formats.** (1 connections) — `tests/unit/test_posix_callback.py`
+- **Tests for TC-071: JSONL Environment Variable.      TC-071 is the contract that A** (1 connections) — `tests/unit/test_posix_callback.py`
 
 ## Relationships
 
-- [[Ansible Core Version Check]] (2 shared connections)
-- [[Ansible Posix Version Check]] (2 shared connections)
-- [[Ansible Posix Install Prompt]] (1 shared connections)
+- [[JSONL Environment Variable]] (1 shared connections)
 
 ## Source Files
 
@@ -23,7 +16,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 15 (100%)
+- EXTRACTED: 1 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

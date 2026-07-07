@@ -15,7 +15,6 @@
 - [[Run State Completion Recap]] (3 shared connections)
 - [[Compact Renderer Implementation]] (1 shared connections)
 - [[Role Group Task Models]] (1 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
 - [[JSON Renderer]] (1 shared connections)
 - [[AOM TUI Application]] (1 shared connections)
 - [[CLI Interface Tests]] (1 shared connections)

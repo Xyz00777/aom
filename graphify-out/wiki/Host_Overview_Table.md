@@ -1,6 +1,6 @@
 # Host Overview Table
 
-> 22 nodes · cohesion 0.26
+> 20 nodes · cohesion 0.26
 
 ## Key Concepts
 
@@ -21,8 +21,6 @@
 - **test_unreachable_column_hidden_when_no_unreachable()** (6 connections) — `tests/compact/test_host_table.py`
 - **test_unreachable_column_visible_when_any_host_has_unreachable()** (6 connections) — `tests/compact/test_host_table.py`
 - **_rows()** (3 connections) — `tests/compact/test_host_table.py`
-- **Render the per-host overview as a column-aligned table.      Header row + one ro** (1 connections) — `src/ansible_aom/compact/format.py`
-- **Strip SGR escapes so visible-length comparisons are accurate.** (1 connections) — `src/ansible_aom/compact/format.py`
 - **Per-host overview renders as a column-aligned table rather than a flat row of co** (1 connections) — `tests/compact/test_host_table.py`
 - **Synthesise OK/CHANGED/SKIPPED/FAILED/UNREACHABLE results for a host.** (1 connections) — `tests/compact/test_host_table.py`
 - **Split rows on whitespace runs after stripping SGR — coarse but     enough to ass** (1 connections) — `tests/compact/test_host_table.py`
@@ -30,14 +28,12 @@
 ## Relationships
 
 - [[Run State Completion Recap]] (15 shared connections)
-- [[Play Definition Tree Population]] (12 shared connections)
 - [[Compact Renderer Formatters]] (5 shared connections)
 - [[Tree Render Snapshot Tests]] (5 shared connections)
 - [[Panel Refresh Snapshot]] (2 shared connections)
-- [[Run State Summary Panel]] (2 shared connections)
 - [[Running Animation Frames]] (1 shared connections)
-- [[Tree Projection Logic]] (1 shared connections)
 - [[Tree Block Animation]] (1 shared connections)
+- [[Play Definition Tree Population]] (1 shared connections)
 
 ## Source Files
 
@@ -46,8 +42,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 96 (58%)
-- INFERRED: 70 (42%)
+- EXTRACTED: 94 (57%)
+- INFERRED: 70 (43%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -4,8 +4,8 @@
 
 ## Key Concepts
 
+- **assemble_definitions()** (14 connections) — `src/ansible_aom/ansible/preflight.py`
 - **test_preflight.py** (12 connections) — `tests/unit/test_preflight.py`
-- **assemble_definitions()** (10 connections) — `src/ansible_aom/ansible/preflight.py`
 - **_trim_stderr()** (8 connections) — `src/ansible_aom/ansible/preflight.py`
 - **test_assemble_definitions_combines_tasks_and_hosts()** (5 connections) — `tests/unit/test_preflight.py`
 - **test_assemble_definitions_invokes_role_grouping()** (3 connections) — `tests/unit/test_preflight.py`
@@ -46,8 +46,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 47 (66%)
-- INFERRED: 24 (34%)
+- EXTRACTED: 47 (63%)
+- INFERRED: 28 (37%)
 - AMBIGUOUS: 0 (0%)
 
 ---

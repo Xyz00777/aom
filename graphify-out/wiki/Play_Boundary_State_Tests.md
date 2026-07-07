@@ -4,11 +4,11 @@
 
 ## Key Concepts
 
-- **TestPlayBoundaryState** (16 connections) — `tests/unit/test_play_boundary_state.py`
+- **TestPlayBoundaryState** (15 connections) — `tests/unit/test_play_boundary_state.py`
 - **_two_play_state()** (13 connections) — `tests/unit/test_play_boundary_state.py`
 - **_start_play()** (11 connections) — `tests/unit/test_play_boundary_state.py`
 - **_start_task()** (11 connections) — `tests/unit/test_play_boundary_state.py`
-- **test_play_boundary_state.py** (9 connections) — `tests/unit/test_play_boundary_state.py`
+- **test_play_boundary_state.py** (8 connections) — `tests/unit/test_play_boundary_state.py`
 - **_ts()** (8 connections) — `tests/unit/test_play_boundary_state.py`
 - **.test_terminal_runner_events_route_to_task_owner_play()** (7 connections) — `tests/unit/test_play_boundary_state.py`
 - **.test_free_strategy_prior_play_not_force_finalised()** (6 connections) — `tests/unit/test_play_boundary_state.py`
@@ -32,11 +32,9 @@
 
 ## Relationships
 
-- [[Run State Summary Panel]] (6 shared connections)
 - [[Run State Completion Recap]] (3 shared connections)
 - [[Task Definition Live Refresh]] (2 shared connections)
 - [[Play Definition Tree Population]] (2 shared connections)
-- [[Run History Mining]] (1 shared connections)
 - [[Role Group Task Models]] (1 shared connections)
 
 ## Source Files
@@ -45,8 +43,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 127 (94%)
-- INFERRED: 8 (6%)
+- EXTRACTED: 126 (95%)
+- INFERRED: 7 (5%)
 - AMBIGUOUS: 0 (0%)
 
 ---

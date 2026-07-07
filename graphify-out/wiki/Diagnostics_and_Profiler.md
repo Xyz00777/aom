@@ -1,6 +1,6 @@
 # Diagnostics and Profiler
 
-> 28 nodes · cohesion 0.06
+> 29 nodes · cohesion 0.06
 
 ## Key Concepts
 
@@ -26,14 +26,14 @@
 - **psutil_disabled_reason()** (1 connections) — `src/ansible_aom/core/diagnostics.py`
 - **Opt-in diagnostics / observability layer for AOM.  Pure module — reads ``os.envi** (1 connections) — `src/ansible_aom/core/diagnostics.py`
 - **Test-only: undo all module state so each test gets a fresh install.      Cancels** (1 connections) — `src/ansible_aom/core/diagnostics.py`
+- **Publish the just-finished run's diagnostics for post-hoc readers.      Phase 5 u** (1 connections) — `src/ansible_aom/core/diagnostics.py`
 - **Return True iff ``value`` is set and not a known falsy literal.** (1 connections) — `src/ansible_aom/core/diagnostics.py`
 - **Parse ``AOM_WATCHDOG`` into a positive int, else None.** (1 connections) — `src/ansible_aom/core/diagnostics.py`
-- **Install diagnostics based on ``env`` (defaults to ``os.environ``).      Idempote** (1 connections) — `src/ansible_aom/core/diagnostics.py`
-- *... and 3 more nodes in this community*
+- *... and 4 more nodes in this community*
 
 ## Relationships
 
-- [[Run Diagnostics Accumulator]] (4 shared connections)
+- [[Run Diagnostics Accumulator]] (5 shared connections)
 - [[Diagnostics Record Building]] (3 shared connections)
 - [[Design Specs Plans]] (2 shared connections)
 - [[Debug Diagnostics Summary]] (1 shared connections)
@@ -45,7 +45,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 83 (100%)
+- EXTRACTED: 84 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

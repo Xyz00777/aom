@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **collect_failed_hosts()** (12 connections) — `src/ansible_aom/session/summary.py`
+- **collect_failed_hosts()** (13 connections) — `src/ansible_aom/session/summary.py`
 - **TestCollectFailedHosts** (9 connections) — `tests/unit/test_session_collectors.py`
 - **.test_multi_host_failure_event()** (4 connections) — `tests/unit/test_session_collectors.py`
 - **.test_unreachable_events_ignored_by_failed_collector()** (4 connections) — `tests/unit/test_session_collectors.py`
@@ -33,8 +33,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 34 (67%)
-- INFERRED: 17 (33%)
+- EXTRACTED: 34 (65%)
+- INFERRED: 18 (35%)
 - AMBIGUOUS: 0 (0%)
 
 ---

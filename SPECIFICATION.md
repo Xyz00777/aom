@@ -1861,6 +1861,22 @@ A single JSONL file with metadata header:
 - Keep last 100 sessions OR last 30 days (configurable)
 - Cleanup on each run
 
+**Disk usage:**
+
+Verbose and setup capture bloat sessions in proportion to the host
+count. A 200-host run with `--capture-verbose --capture-setup` lands
+around `~50MB` of `events.jsonl`. At that rate, 100 sessions stack up
+to roughly `5GB` under `~/.local/state/aom/sessions/`.
+
+Reclaim space with `aom inspect prune --days N`:
+
+```bash
+aom inspect prune --days 30    # delete sessions older than 30 days
+```
+
+The prune command is safe to schedule; it only removes session
+directories whose recorded start time is older than the threshold.
+
 **File Permissions:**
 - Session files are created with mode 0o644 (world-readable)
 - Artifact files (.aom) are created with mode 0o600 (user-only) as they may contain sensitive playbook names

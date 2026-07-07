@@ -1,6 +1,6 @@
 # App Configuration Settings
 
-> 83 nodes · cohesion 0.03
+> 81 nodes · cohesion 0.03
 
 ## Key Concepts
 
@@ -29,7 +29,7 @@
 - **.test_log_max_lines_is_int()** (3 connections) — `tests/unit/test_config.py`
 - **.test_redaction_is_redaction_config()** (3 connections) — `tests/unit/test_config.py`
 - **.test_session_keep_count_is_int()** (3 connections) — `tests/unit/test_config.py`
-- *... and 58 more nodes in this community*
+- *... and 56 more nodes in this community*
 
 ## Relationships
 
@@ -54,7 +54,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 168 (57%)
+- EXTRACTED: 166 (57%)
 - INFERRED: 125 (43%)
 - AMBIGUOUS: 0 (0%)
 

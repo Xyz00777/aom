@@ -8,7 +8,7 @@
 - **main()** (9 connections) — `src/ansible_aom/rerun/cli.py`
 - **_build_rerun_command()** (4 connections) — `src/ansible_aom/rerun/cli.py`
 - **_default_runner()** (4 connections) — `src/ansible_aom/rerun/cli.py`
-- **_strip_limit_args()** (3 connections) — `src/ansible_aom/rerun/cli.py`
+- **_strip_limit_args()** (4 connections) — `src/ansible_aom/rerun/cli.py`
 - **CLI entry point for ``aom rerun``.  Reads a recorded session, derives a host lis** (1 connections) — `src/ansible_aom/rerun/cli.py`
 - **Drop any pre-existing ``--limit`` / ``-l`` from the args list.      Handles thre** (1 connections) — `src/ansible_aom/rerun/cli.py`
 - **Construct the (playbook, ansible_args) pair to spawn for the rerun.      The ses** (1 connections) — `src/ansible_aom/rerun/cli.py`
@@ -32,8 +32,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 32 (91%)
-- INFERRED: 3 (9%)
+- EXTRACTED: 32 (89%)
+- INFERRED: 4 (11%)
 - AMBIGUOUS: 0 (0%)
 
 ---

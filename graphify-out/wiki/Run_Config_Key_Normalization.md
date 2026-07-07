@@ -1,16 +1,16 @@
 # Run Config Key Normalization
 
-> 80 nodes · cohesion 0.06
+> 78 nodes · cohesion 0.06
 
 ## Key Concepts
 
-- **Path** (419 connections)
+- **Path** (416 connections)
 - **build_run_config_key()** (37 connections) — `src/ansible_aom/core/run_config.py`
-- **find_previous_run()** (30 connections) — `src/ansible_aom/session/history.py`
-- **test_history.py** (15 connections) — `tests/unit/test_history.py`
+- **find_previous_run()** (31 connections) — `src/ansible_aom/session/history.py`
+- **test_history.py** (14 connections) — `tests/unit/test_history.py`
 - **test_run_config.py** (13 connections) — `tests/unit/test_run_config.py`
+- **test_inspect_cli.py** (12 connections) — `tests/integration/test_inspect_cli.py`
 - **_write_session()** (12 connections) — `tests/unit/test_history.py`
-- **test_inspect_cli.py** (9 connections) — `tests/integration/test_inspect_cli.py`
 - **test_history_roundtrip.py** (8 connections) — `tests/integration/test_history_roundtrip.py`
 - **test_runner_pushes_prior_run_into_renderer()** (7 connections) — `tests/integration/test_history_roundtrip.py`
 - **test_history_loop_totals.py** (7 connections) — `tests/unit/test_history_loop_totals.py`
@@ -29,15 +29,15 @@
 - **test_session_then_history_roundtrip()** (5 connections) — `tests/integration/test_history_roundtrip.py`
 - **test_mines_loop_total_per_task_path_and_host()** (5 connections) — `tests/unit/test_history_loop_totals.py`
 - **test_filters_out_mismatched_host_count()** (5 connections) — `tests/unit/test_history.py`
-- *... and 55 more nodes in this community*
+- *... and 53 more nodes in this community*
 
 ## Relationships
 
 - [[Include Role Discovery]] (58 shared connections)
-- [[Session Recording Tests]] (41 shared connections)
+- [[Session Recording Tests]] (38 shared connections)
 - [[Three-Pane Inspect App]] (30 shared connections)
 - [[Inspect CLI Commands]] (24 shared connections)
-- [[Run History Mining]] (18 shared connections)
+- [[Run History Mining]] (17 shared connections)
 - [[Session Replay Round Trip]] (16 shared connections)
 - [[Interactive Prompt Tests]] (15 shared connections)
 - [[Inventory Auto Detection]] (15 shared connections)
@@ -59,7 +59,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 658 (86%)
+- EXTRACTED: 664 (86%)
 - INFERRED: 109 (14%)
 - AMBIGUOUS: 0 (0%)
 

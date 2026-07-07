@@ -5,8 +5,8 @@
 ## Key Concepts
 
 - **_session()** (17 connections) — `tests/unit/test_session_collectors.py`
-- **collect_changed_hosts()** (9 connections) — `src/ansible_aom/session/summary.py`
-- **collect_unreachable_hosts()** (9 connections) — `src/ansible_aom/session/summary.py`
+- **collect_changed_hosts()** (10 connections) — `src/ansible_aom/session/summary.py`
+- **collect_unreachable_hosts()** (10 connections) — `src/ansible_aom/session/summary.py`
 - **TestCollectChangedHosts** (6 connections) — `tests/unit/test_session_collectors.py`
 - **TestCollectUnreachableHosts** (6 connections) — `tests/unit/test_session_collectors.py`
 - **test_session_collectors.py** (5 connections) — `tests/unit/test_session_collectors.py`
@@ -38,8 +38,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 62 (74%)
-- INFERRED: 22 (26%)
+- EXTRACTED: 62 (72%)
+- INFERRED: 24 (28%)
 - AMBIGUOUS: 0 (0%)
 
 ---

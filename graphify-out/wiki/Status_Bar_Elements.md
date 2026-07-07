@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **TestStatusBarAvailableElements** (19 connections) — `tests/tui/test_panels.py`
+- **TestStatusBarAvailableElements** (18 connections) — `tests/tui/test_panels.py`
 - **.test_current_task_displays_correctly()** (2 connections) — `tests/tui/test_panels.py`
 - **.test_elapsed_time_displays_correctly()** (2 connections) — `tests/tui/test_panels.py`
 - **.test_host_count_displays_correctly()** (2 connections) — `tests/tui/test_panels.py`
@@ -30,7 +30,6 @@
 - [[Status Bar Warning Panels]] (3 shared connections)
 - [[Run State Completion Recap]] (3 shared connections)
 - [[Role Group Task Models]] (2 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
 
 ## Source Files
 
@@ -38,8 +37,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 39 (83%)
-- INFERRED: 8 (17%)
+- EXTRACTED: 39 (85%)
+- INFERRED: 7 (15%)
 - AMBIGUOUS: 0 (0%)
 
 ---

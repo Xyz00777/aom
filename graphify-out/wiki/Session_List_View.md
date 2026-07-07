@@ -6,9 +6,9 @@
 
 - **._load_tasks_for()** (8 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **._reload_runs()** (7 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **.on_mount()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **._visible_summaries()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **.action_toggle_failed()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **.on_mount()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **._refresh_list()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **._select_session()** (4 connections) — `src/ansible_aom/tui/screens/inspect.py`
 - **.action_show_first_failure()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
@@ -31,8 +31,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 42 (89%)
-- INFERRED: 5 (11%)
+- EXTRACTED: 43 (90%)
+- INFERRED: 5 (10%)
 - AMBIGUOUS: 0 (0%)
 
 ---

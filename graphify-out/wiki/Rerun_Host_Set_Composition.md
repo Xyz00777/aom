@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **_compose_host_set()** (12 connections) — `src/ansible_aom/rerun/cli.py`
+- **_compose_host_set()** (13 connections) — `src/ansible_aom/rerun/cli.py`
 - **test_rerun_cli.py** (11 connections) — `tests/unit/test_rerun_cli.py`
 - **TestComposeHostSet** (8 connections) — `tests/unit/test_rerun_cli.py`
 - **_session_dict()** (7 connections) — `tests/unit/test_rerun_cli.py`
@@ -38,8 +38,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 56 (79%)
-- INFERRED: 15 (21%)
+- EXTRACTED: 56 (78%)
+- INFERRED: 16 (22%)
 - AMBIGUOUS: 0 (0%)
 
 ---
