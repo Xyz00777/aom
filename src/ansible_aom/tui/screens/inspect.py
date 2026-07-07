@@ -33,7 +33,11 @@ Other shortcuts:
 from __future__ import annotations
 
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
+from types import EllipsisType
+from typing import Literal
 
 from rich.text import Text
 from textual.app import App, ComposeResult
@@ -41,7 +45,9 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.css.query import NoMatches
 from textual.screen import ModalScreen
+from textual.timer import Timer
 from textual.widgets import Footer, Header, Label, ListItem, ListView, RichLog, Static, Tree
+from textual.widgets._static import VisualType
 
 from ansible_aom.core.inspect_model import (
     DetailBlock,
@@ -51,6 +57,7 @@ from ansible_aom.core.inspect_model import (
     build_detail_block,
     build_run_summary,
     build_task_tree,
+    build_verbose_lines,
 )
 from ansible_aom.session.store import list_sessions, load_session
 
@@ -65,6 +72,26 @@ def _fmt_duration_short(seconds: float | None) -> str:
         return f"{minutes}m{sec:02d}s"
     hours, mins = divmod(minutes, 60)
     return f"{hours}h{mins:02d}m"
+
+
+def _render_stdout_lines(stdout: str, *, full: bool) -> tuple[list[str], bool]:
+    """Render stdout with the Q32 lazy-load guardrail.
+
+    Preview mode caps the body at the first 100 lines and measures that pass
+    against the 100ms budget explicitly, instead of letting the RichLog body
+    balloon during layout.
+    """
+    rendered = stdout.splitlines()
+    if full or len(rendered) <= _DETAIL_STDOUT_PREVIEW_LINES:
+        return [f"  {line}" for line in rendered], False
+
+    started = perf_counter()
+    preview: list[str] = []
+    for line in rendered[:_DETAIL_STDOUT_PREVIEW_LINES]:
+        preview.append(f"  {line}")
+        if perf_counter() - started > _DETAIL_RENDER_BUDGET_SECONDS:
+            return preview, True
+    return preview, len(rendered) > len(preview)
 
 
 _STATUS_ICON = {
@@ -91,6 +118,42 @@ _STATUS_COLOR = {
     "skipped": "cyan",
 }
 
+_DETAIL_RENDER_BUDGET_SECONDS = 0.1
+_DETAIL_STDOUT_PREVIEW_LINES = 100
+
+
+@dataclass(frozen=True)
+class VerboseScope:
+    """Selection filter for the verbose panel.
+
+    ``level`` is the user-facing scope label; the remaining fields carry
+    the focused run / play / task / host identifiers that task 7.2 will
+    use to read and filter the captured verbose stream.
+    """
+
+    level: Literal["run", "play", "task"]
+    session_id: str
+    play_name: str | None = None
+    task_id: str | None = None
+    task_name: str | None = None
+    host: str | None = None
+
+
+class _FooterStatus(Static):
+    """One-line status strip above the Textual footer."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.current_text = str(args[0]) if args else ""
+
+    def update(self, content: VisualType | EllipsisType = ..., *, layout: bool = True) -> None:
+        if isinstance(content, EllipsisType):
+            super().update("", layout=layout)
+            return
+        self.current_text = str(content)
+        super().update(content, layout=layout)
+
+
 # Per-run-status colour for the icon column on Runs rows.
 _RUN_STATUS_COLOR = {
     "completed": "green",
@@ -115,23 +178,18 @@ def _copy_to_clipboard(app: App, text: str) -> None:
     app.copy_to_clipboard(text)
     try:
         import pyperclip  # type: ignore[import-untyped]
-        from pyperclip import PyperclipException
-
-        pyperclip.copy(text)
     except ImportError:
         # pyperclip isn't installed (optional extra). OSC52 above
         # already pushed the text to the terminal.
         pass
-    except PyperclipException:
-        # pyperclip is installed but no usable backend (no xclip/xsel/
-        # wl-copy on Linux, no pbcopy in macOS sandbox, etc.). Non-fatal
-        # because OSC52 above already pushed the text.
-        pass
-        # pyperclip is an optional extra; any backend failure (no
-        # xclip/xsel/wl-copy on Linux, no pbcopy on macOS sandbox, etc.)
-        # is non-fatal because Textual's OSC52 path already pushed the
-        # text to the terminal above.
-        pass
+    else:
+        try:
+            pyperclip.copy(text)
+        except Exception:
+            # pyperclip is installed but no usable backend (no xclip/xsel/
+            # wl-copy on Linux, no pbcopy in macOS sandbox, etc.). Non-fatal
+            # because OSC52 above already pushed the text to the terminal.
+            pass
 
 
 def _stats_label(stats: StatusCounts) -> str:
@@ -276,6 +334,10 @@ Inside Tasks tree
 Runs filter
   f           toggle failed-only
 
+Verbose
+  V           open Verbose for the focused run / play / task
+              ↳ Esc returns to the pane you came from
+
 Failures
   g           jump to first failure
   n / N       next / previous failure
@@ -288,6 +350,9 @@ Session management
 Clipboard
   R           copy rerun command to clipboard
   y           yank Detail to clipboard
+
+Detail
+  L           load the full Detail body after lazy previewing
 
 Other
   ?           this help
@@ -348,7 +413,7 @@ class _DetailLog(RichLog):
     def action_step_back(self) -> None:
         app = self.app
         if isinstance(app, InspectApp):
-            app.focus_tasks()
+            app.focus_previous_pane()
 
 
 class _NavTree(Tree):
@@ -447,6 +512,18 @@ class InspectApp(App):
     Screen { background: ansi_default; }
     Header, Footer { background: ansi_default; }
 
+    #footer-bar {
+        dock: bottom;
+        height: 2;
+        background: ansi_default;
+    }
+    #focus-footer {
+        height: 1;
+        background: ansi_default;
+        color: $text;
+        text-wrap: nowrap;
+    }
+
     Horizontal { height: 1fr; }
 
     /* Equal-weight panes — adapt naturally to terminal width.
@@ -515,6 +592,8 @@ class InspectApp(App):
         # Clipboard
         Binding("R", "copy_rerun", "Rerun"),
         Binding("y", "yank_detail", "Yank"),
+        Binding("V", "open_verbose", "Verbose", show=True),
+        Binding("L", "load_full_detail", "Load full", show=False),
     ]
 
     _PANE_ORDER: tuple[str, ...] = ("runs-pane", "tasks-pane", "detail-pane")
@@ -538,12 +617,18 @@ class InspectApp(App):
         self._current_tree: TaskTreeNode | None = None
         self._focused_task: TaskTreeNode | None = None
         self._focused_host: TaskTreeNode | None = None
+        self._detail_return_pane_id: str | None = None
+        self._verbose_scope: VerboseScope | None = None
+        self._verbose_flash: str | None = None
+        self._verbose_flash_timer: Timer | None = None
         self._detail_text: str = "Select a task to see details."
+        self._detail_focus_key: tuple[object, ...] | None = None
+        self._detail_force_full = False
         # Cache key for the last detail body we rendered: (task_id,
         # host_label, session_id). Re-rendering only when the key changes
         # protects us from the burst of tree-highlight messages Textual
         # fires when the cursor moves over the same node multiple times.
-        self._detail_key: tuple[object, object, object] | None = None
+        self._detail_key: tuple[object, ...] | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -553,7 +638,9 @@ class InspectApp(App):
             with Vertical(id="tasks-pane"):
                 yield _NavTree("Tasks", id="tasks-tree")
             yield _DetailLog(id="detail-pane", markup=True, wrap=True, auto_scroll=False)
-        yield Footer()
+        with Vertical(id="footer-bar"):
+            yield _FooterStatus("focus: —", id="focus-footer")
+            yield Footer()
 
     def on_mount(self) -> None:
         tree = self.query_one("#tasks-tree", _NavTree)
@@ -572,6 +659,7 @@ class InspectApp(App):
             self._load_tasks_for(sid)
         # Visual focus indicator
         self._refresh_pane_focus_classes()
+        self._refresh_footer()
 
     # ── Pane focus ──────────────────────────────────────────────────────
 
@@ -611,6 +699,101 @@ class InspectApp(App):
                 pane.add_class("--focused-pane")
             else:
                 pane.remove_class("--focused-pane")
+        self._refresh_footer()
+
+    def _footer_scope(self) -> VerboseScope | None:
+        pane = self._current_pane()
+        if pane == "runs-pane":
+            if not self.selected_session_id:
+                return None
+            return VerboseScope(level="run", session_id=self.selected_session_id)
+        if pane == "detail-pane" and self._verbose_scope is not None:
+            return self._verbose_scope
+        if pane != "tasks-pane":
+            return None
+
+        try:
+            tree = self.query_one("#tasks-tree", _NavTree)
+        except NoMatches:
+            return None
+        cursor = tree.cursor_node
+        data = getattr(cursor, "data", None)
+        if not isinstance(data, TaskTreeNode):
+            return None
+
+        session_id = self.selected_session_id or ""
+        if data.kind == "play":
+            return VerboseScope(level="play", session_id=session_id, play_name=data.label)
+        if data.kind == "group":
+            play = self._ancestor_tree_node(cursor, "play")
+            return VerboseScope(
+                level="play",
+                session_id=session_id,
+                play_name=play.label if play else None,
+            )
+        if data.kind not in ("task", "host"):
+            return None
+
+        task_node = data if data.kind == "task" else self._ancestor_tree_node(cursor, "task")
+        if task_node is None:
+            return None
+        play = self._ancestor_tree_node(cursor, "play")
+        host = (
+            data.label
+            if data.kind == "host"
+            else self._focused_host.label
+            if self._focused_host
+            else None
+        )
+        return VerboseScope(
+            level="task",
+            session_id=session_id,
+            play_name=play.label if play else None,
+            task_id=task_node.task_id or "",
+            task_name=task_node.label,
+            host=host,
+        )
+
+    def _footer_context(self, scope: VerboseScope) -> str:
+        if scope.level == "run":
+            return "current session"
+        if scope.level == "play":
+            return scope.play_name or "(unnamed play)"
+        if scope.host and scope.task_name:
+            return f"{scope.host} / {scope.task_name}"
+        if scope.task_name:
+            return scope.task_name
+        if scope.host:
+            return scope.host
+        return "(selected task)"
+
+    def _footer_text(self) -> str:
+        scope = self._footer_scope()
+        parts = [
+            "focus: —" if scope is None else f"focus: {scope.level} ({self._footer_context(scope)})"
+        ]
+        if self._verbose_flash is not None:
+            parts.append(self._verbose_flash)
+        return " | ".join(parts)
+
+    def _refresh_footer(self) -> None:
+        try:
+            footer = self.query_one("#focus-footer", _FooterStatus)
+        except NoMatches:
+            return
+        footer.update(self._footer_text())
+
+    def _clear_verbose_flash(self) -> None:
+        self._verbose_flash = None
+        self._verbose_flash_timer = None
+        self._refresh_footer()
+
+    def _set_verbose_flash(self, scope: VerboseScope) -> None:
+        self._verbose_flash = f"V: verbose for {self._footer_context(scope)}"
+        if self._verbose_flash_timer is not None:
+            self._verbose_flash_timer.stop()
+        self._verbose_flash_timer = self.set_timer(1.5, self._clear_verbose_flash)
+        self._refresh_footer()
 
     def on_descendant_focus(self, _event) -> None:  # noqa: ANN001
         self._refresh_pane_focus_classes()
@@ -631,8 +814,17 @@ class InspectApp(App):
             tree.cursor_line = 0
         self._focus_pane_id("tasks-pane")
 
-    def focus_detail(self) -> None:
+    def focus_detail(self, *, return_to: str | None = "tasks-pane") -> None:
+        self._detail_return_pane_id = return_to or "tasks-pane"
         self._focus_pane_id("detail-pane")
+        self._update_detail()
+
+    def focus_previous_pane(self) -> None:
+        target = self._detail_return_pane_id or "tasks-pane"
+        self._detail_return_pane_id = None
+        self._verbose_scope = None
+        self._focus_pane_id(target)
+        self._update_detail()
 
     def action_focus_next_pane(self) -> None:
         current = self._current_pane() or self._PANE_ORDER[0]
@@ -643,6 +835,95 @@ class InspectApp(App):
         current = self._current_pane() or self._PANE_ORDER[0]
         idx = self._PANE_ORDER.index(current)
         self._focus_pane_id(self._PANE_ORDER[(idx - 1) % len(self._PANE_ORDER)])
+
+    def _ancestor_tree_node(self, node, kind: str):  # noqa: ANN001
+        current = node
+        while current is not None:
+            data = getattr(current, "data", None)
+            if isinstance(data, TaskTreeNode) and data.kind == kind:
+                return data
+            current = getattr(current, "parent", None)
+        return None
+
+    def _verbose_scope_from_focus(self) -> VerboseScope | None:
+        pane = self._current_pane()
+        if pane == "runs-pane":
+            if not self.selected_session_id:
+                return None
+            return VerboseScope(level="run", session_id=self.selected_session_id)
+        if pane != "tasks-pane":
+            return None
+
+        try:
+            tree = self.query_one("#tasks-tree", _NavTree)
+        except NoMatches:
+            return None
+        cursor = tree.cursor_node
+        data = getattr(cursor, "data", None)
+        if not isinstance(data, TaskTreeNode):
+            return None
+
+        session_id = self.selected_session_id or ""
+        if data.kind == "play":
+            return VerboseScope(level="play", session_id=session_id, play_name=data.label)
+        if data.kind == "group":
+            play = self._ancestor_tree_node(cursor, "play")
+            return VerboseScope(
+                level="play",
+                session_id=session_id,
+                play_name=play.label if play else None,
+            )
+        if data.kind not in ("task", "host"):
+            return None
+
+        task_node = data if data.kind == "task" else self._ancestor_tree_node(cursor, "task")
+        if task_node is None:
+            return None
+        play = self._ancestor_tree_node(cursor, "play")
+        host = (
+            data.label
+            if data.kind == "host"
+            else self._focused_host.label
+            if self._focused_host
+            else None
+        )
+        return VerboseScope(
+            level="task",
+            session_id=session_id,
+            play_name=play.label if play else None,
+            task_id=task_node.task_id or "",
+            task_name=task_node.label,
+            host=host,
+        )
+
+    def _render_verbose_placeholder(self, scope: VerboseScope) -> str:
+        lines: list[str] = ["[bold]VERBOSE[/]", "─" * 40]
+        lines.append(f"SCOPE  {scope.level}")
+        session = self._current_session or {}
+        if scope.level == "run":
+            playbook = session.get("playbook") or "(no playbook)"
+            lines.append(f"RUN    {playbook}")
+        else:
+            if scope.play_name:
+                lines.append(f"PLAY   {scope.play_name}")
+            if scope.task_name:
+                lines.append(f"TASK   {scope.task_name}")
+            if scope.host:
+                lines.append(f"HOST   {scope.host}")
+        lines.append("")
+        body = build_verbose_lines(
+            session,
+            level=scope.level,
+            play_name=scope.play_name,
+            task_id=scope.task_id,
+            host=scope.host,
+        )
+        if body:
+            lines.extend(body)
+        else:
+            lines.append("(no verbose lines matched this scope)")
+        lines.append("Press Esc to return to the previous pane.")
+        return "\n".join(lines)
 
     # ── Runs pane ────────────────────────────────────────────────────────
 
@@ -786,6 +1067,7 @@ class InspectApp(App):
             self._focused_task = None
             self._focused_host = None
         self._update_detail()
+        self._refresh_footer()
 
     def on_tree_node_selected(self, _event) -> None:  # noqa: ANN001
         """Enter on a Task node → drill into the Detail pane."""
@@ -793,7 +1075,7 @@ class InspectApp(App):
 
     # ── Detail pane ──────────────────────────────────────────────────────
 
-    def _render_detail_block(self, block: DetailBlock) -> str:
+    def _render_detail_block(self, block: DetailBlock, *, full_stdout: bool = False) -> str:
         """Render the per-task detail body.
 
         Everything here is specific to the focused (task, host) pair —
@@ -845,8 +1127,11 @@ class InspectApp(App):
 
         if block.module_stdout:
             lines.append("[bold]stdout[/]")
-            for line in block.module_stdout.splitlines():
-                lines.append(f"  {line}")
+            stdout_lines, truncated = _render_stdout_lines(block.module_stdout, full=full_stdout)
+            lines.extend(stdout_lines)
+            if truncated:
+                lines.append("")
+                lines.append("[dim]press L to load full[/]")
             lines.append("")
 
         if block.warnings:
@@ -871,19 +1156,42 @@ class InspectApp(App):
 
     def _update_detail(self) -> None:
         detail = self.query_one("#detail-pane", _DetailLog)
+        if self._verbose_scope is not None:
+            verbose_focus_key: tuple[object, ...] = ("verbose", self._verbose_scope)
+            if verbose_focus_key != self._detail_focus_key:
+                self._detail_focus_key = verbose_focus_key
+                self._detail_force_full = False
+            verbose_key: tuple[object, ...] = (
+                "verbose",
+                self._verbose_scope,
+                self._detail_force_full,
+            )
+            if verbose_key == self._detail_key:
+                return
+            self._detail_key = verbose_key
+            self._detail_text = self._render_verbose_placeholder(self._verbose_scope)
+            detail.clear()
+            detail.write(self._detail_text)
+            detail.scroll_home(animate=False)
+            return
         # Skip the rebuild when the focused (task, host) pair has not
         # actually changed. Tree highlight messages fire for every cursor
         # tick — including ones that select the same node we're already
         # showing — and re-rendering a long error log each time was the
         # second half of the stutter the user reported.
-        key = (
+        detail_focus_key: tuple[object, ...] = (
+            "detail",
             None if self._focused_task is None else self._focused_task.task_id,
             None if self._focused_host is None else self._focused_host.label,
             None if self._current_session is None else self._current_session.get("session_id"),
         )
-        if key == self._detail_key:
+        if detail_focus_key != self._detail_focus_key:
+            self._detail_focus_key = detail_focus_key
+            self._detail_force_full = False
+        detail_key: tuple[object, ...] = (*detail_focus_key, self._detail_force_full)
+        if detail_key == self._detail_key:
             return
-        self._detail_key = key
+        self._detail_key = detail_key
 
         detail.clear()
         if self._current_session is None or self._focused_task is None:
@@ -891,7 +1199,7 @@ class InspectApp(App):
             detail.write(self._detail_text)
             return
         block = build_detail_block(self._current_session, self._focused_task, self._focused_host)
-        self._detail_text = self._render_detail_block(block)
+        self._detail_text = self._render_detail_block(block, full_stdout=self._detail_force_full)
         # One write, not one per line: each write does its own measure +
         # console.render + virtual-size update, so per-line writes add a
         # ~100 µs overhead that becomes seconds on long stderr. The body
@@ -1034,6 +1342,22 @@ class InspectApp(App):
     def action_yank_detail(self) -> None:
         _copy_to_clipboard(self.app, self._detail_text)
         self.notify("Detail yanked to clipboard")
+
+    def action_open_verbose(self) -> None:
+        scope = self._verbose_scope_from_focus()
+        if scope is None:
+            return
+        self._verbose_scope = scope
+        self._set_verbose_flash(scope)
+        self.focus_detail(return_to=self._current_pane())
+
+    def action_load_full_detail(self) -> None:
+        if self._verbose_scope is not None:
+            return
+        if self._focused_task is None or self._current_session is None:
+            return
+        self._detail_force_full = True
+        self._update_detail()
 
     def action_help(self) -> None:
         self.push_screen(_HelpScreen())

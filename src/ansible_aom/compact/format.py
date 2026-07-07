@@ -52,6 +52,7 @@ _DIM = "\x1b[2m"
 _BOLD = "\x1b[1m"
 _GREEN = "\x1b[32m"
 _YELLOW = "\x1b[33m"
+_ORANGE = "\x1b[38;5;208m"
 _RED = "\x1b[31m"
 _MAGENTA = "\x1b[35m"
 _CYAN = "\x1b[36m"
@@ -160,12 +161,21 @@ _MODE_FLAGS: tuple[tuple[frozenset[str], str, str], ...] = (
 )
 
 
-def _compute_mode_label(args: list[str], colorize: bool) -> str:
+def _compute_mode_label(
+    args: list[str],
+    colorize: bool,
+    *,
+    recording: bool = False,
+    capture_verbose: bool = False,
+) -> str:
     """Render the status-bar mode chip(s) from ansible-playbook args.
 
-    Multiple chips render space-joined (`DRY RUN DIFF`). Each chip is
-    colour-wrapped only if ``colorize`` is True so non-TTY consumers
-    still see the label without escape codes around it.
+    Recording is the leftmost chip when enabled. Verbose capture upgrades
+    that chip from ``● REC`` to ``● REC+VC``. Check/diff chips follow in
+    their existing order, space-joined (``DRY RUN DIFF``).
+
+    Each chip is colour-wrapped only if ``colorize`` is True so non-TTY
+    consumers still see the label without escape codes around it.
 
     The detection is conservative: only literal flag aliases (no
     ``--check=foo`` style suffixes — those don't exist for these
@@ -173,6 +183,9 @@ def _compute_mode_label(args: list[str], colorize: bool) -> str:
     arg can't trigger a false chip.
     """
     chips: list[str] = []
+    if recording:
+        label = "● REC+VC" if capture_verbose else "● REC"
+        chips.append(_wrap(label, _GREEN, colorize))
     args_set = set(args)
     for aliases, label, color in _MODE_FLAGS:
         if args_set & aliases:

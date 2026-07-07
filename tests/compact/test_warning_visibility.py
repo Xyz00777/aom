@@ -66,6 +66,19 @@ def test_add_warning_dedupes_repeated_messages():
     assert renderer._warnings_count == 3
 
 
+def test_add_warning_hidden_by_config_still_bumps_counter():
+    renderer = CompactRenderer(is_tty=False, show_warnings=False, show_deprecations=False)
+    renderer.start("site.yml", [])
+
+    with patch.object(renderer._display, "print_log") as mock_print:
+        renderer.add_warning("hidden warning", is_deprecation=False)
+        renderer.add_warning("hidden deprecation", is_deprecation=True)
+
+    mock_print.assert_not_called()
+    assert renderer._warnings_count == 1
+    assert renderer._deprecations_count == 1
+
+
 def test_add_warning_distinct_messages_each_print():
     renderer = CompactRenderer(is_tty=False)
     renderer.start("site.yml", [])

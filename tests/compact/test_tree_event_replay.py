@@ -186,7 +186,6 @@ def test_tree_after_completion_no_race_window() -> None:
 
     # At this point, task-0000 has all hosts OK but status=RUNNING.
     # _classify must still return "completed" via host check.
-    tree = projection.tree_lines(budget=40)
     block = format_tree_block(
         projection,
         budget=40,

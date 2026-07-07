@@ -36,6 +36,7 @@ from ansible_aom.compact.format import (
     _GREEN,
     _MAGENTA,
     _MSG_DISPLAY_CAP,  # noqa: F401 — re-export
+    _ORANGE,
     _RED,
     _RESET,  # noqa: F401 — re-export
     _SGR_RE,  # noqa: F401 — re-export
@@ -188,6 +189,11 @@ def _extract_error_msg(result: dict) -> str:
     return ""
 
 
+def _first_line(value: str) -> str:
+    """Return the first line from a possibly multiline string."""
+    return value.splitlines()[0] if value else ""
+
+
 class CompactRenderer:
     """ANSI-based compact renderer satisfying the Renderer Protocol.
 
@@ -202,7 +208,16 @@ class CompactRenderer:
         _start_time: Timestamp when rendering started.
     """
 
-    def __init__(self, is_tty: bool = True, hide_states: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        is_tty: bool = True,
+        hide_states: list[str] | None = None,
+        record: bool = False,
+        capture_verbose: bool = False,
+        show_failed_hint: bool = True,
+        show_warnings: bool = True,
+        show_deprecations: bool = True,
+    ) -> None:
         """Initialize the compact renderer.
 
         Args:
@@ -219,6 +234,11 @@ class CompactRenderer:
         self._playbook: str = ""
         self._args: list[str] = []
         self._start_time: float = 0.0
+        self._recording = record
+        self._capture_verbose = capture_verbose
+        self._show_failed_hint = show_failed_hint
+        self._show_warnings = show_warnings
+        self._show_deprecations = show_deprecations
         self._warnings_count: int = 0
         self._deprecations_count: int = 0
         self._definitions: list = []
@@ -340,7 +360,12 @@ class CompactRenderer:
         self._playbook = playbook
         self._args = args
         self._start_time = time.time()
-        self._mode_label = _compute_mode_label(args, self._colorize)
+        self._mode_label = _compute_mode_label(
+            args,
+            self._colorize,
+            recording=self._recording,
+            capture_verbose=self._capture_verbose,
+        )
 
         # Reset the incremental counters so a re-used renderer instance
         # (e.g. ``aom replay`` driving a fresh run on the same object)
@@ -867,6 +892,13 @@ class CompactRenderer:
         if message in self._seen_warning_messages:
             return
         self._seen_warning_messages.add(message)
+
+        if is_deprecation:
+            if not self._show_deprecations:
+                return
+        elif not self._show_warnings:
+            return
+
         # The parser keeps the raw `[WARNING]: ...` / `[DEPRECATION WARNING]: ...`
         # prefix on the message. Don't double it up.
         if message.startswith("["):
@@ -874,10 +906,8 @@ class CompactRenderer:
         else:
             prefix = "DEPRECATION" if is_deprecation else "WARNING"
             text = f"[{prefix}] {message}"
-        # Match ansible's default callback colouring: warnings and
-        # deprecations render in magenta so they stand out from ordinary
-        # ok/changed/skipping log lines.
-        self._display.print_log(_wrap(text, _MAGENTA, self._colorize))
+        color = _ORANGE if is_deprecation else _YELLOW
+        self._display.print_log(_wrap(text, color, self._colorize))
 
     def handle_completion(self, exit_code: int, state: str) -> None:
         """Handle playbook completion (success/failure/crash).
@@ -1470,9 +1500,12 @@ class CompactRenderer:
                     continue
                 if suffix:
                     self._current_task_inline_duration_hosts.add(host)
-                msg = _extract_error_msg(result)
                 prefix = f"fatal: [{host}]{suffix}: FAILED!"
-                text = f"{prefix} => {msg}" if msg else prefix
+                if self._show_failed_hint:
+                    msg = _first_line(_extract_error_msg(result))
+                    text = f"{prefix} => {msg}" if msg else prefix
+                else:
+                    text = prefix
                 lines.append(
                     _wrap(
                         text,
@@ -1490,9 +1523,12 @@ class CompactRenderer:
             for host, result in self._hosts_dict(event).items():
                 if suffix:
                     self._current_task_inline_duration_hosts.add(host)
-                msg = _extract_error_msg(result)
                 prefix = f"fatal: [{host}]{suffix}: UNREACHABLE!"
-                text = f"{prefix} => {msg}" if msg else prefix
+                if self._show_failed_hint:
+                    msg = _first_line(_extract_error_msg(result))
+                    text = f"{prefix} => {msg}" if msg else prefix
+                else:
+                    text = prefix
                 lines.append(
                     _wrap(
                         text,

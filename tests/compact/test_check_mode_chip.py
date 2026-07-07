@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from ansible_aom.compact.renderer import (
     _CYAN,
+    _GREEN,
     _YELLOW,
     _compute_mode_label,
     format_status_bar,
@@ -52,6 +53,27 @@ class TestComputeModeLabel:
         assert "DRY RUN" in label
         assert "\x1b[" not in label
 
+    def test_recording_label_is_present_by_default(self):
+        label = _compute_mode_label([], colorize=False, recording=True)
+        assert label == "● REC"
+
+    def test_recording_label_is_green_when_colorized(self):
+        label = _compute_mode_label([], colorize=True, recording=True)
+        assert _GREEN in label and "● REC" in label
+
+    def test_verbose_capture_upgrades_recording_label(self):
+        label = _compute_mode_label([], colorize=False, recording=True, capture_verbose=True)
+        assert label == "● REC+VC"
+
+    def test_recording_label_precedes_check_and_diff(self):
+        label = _compute_mode_label(
+            ["--check", "--diff"],
+            colorize=False,
+            recording=True,
+            capture_verbose=True,
+        )
+        assert label == "● REC+VC DRY RUN DIFF"
+
 
 class TestStatusBarMode:
     def test_mode_label_lands_first_when_set(self):
@@ -67,6 +89,19 @@ class TestStatusBarMode:
         # The chip should appear before the playbook path in the joined line.
         assert line.startswith("DRY RUN")
         assert "site.yml" in line.split("DRY RUN", 1)[1]
+
+    def test_recording_label_lands_first_when_set(self):
+        line = format_status_bar(
+            "site.yml",
+            0,
+            1,
+            0,
+            0,
+            10.0,
+            mode_label="● REC+VC",
+        )
+        assert line.startswith("● REC+VC")
+        assert "site.yml" in line.split("● REC+VC", 1)[1]
 
     def test_no_mode_label_is_unchanged(self):
         without = format_status_bar("site.yml", 0, 1, 0, 0, 10.0)

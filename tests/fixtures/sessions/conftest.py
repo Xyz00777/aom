@@ -42,8 +42,10 @@ def load_session_dict(name: str) -> dict:
     events = [
         json.loads(line) for line in (src / "events.jsonl").read_text().splitlines() if line.strip()
     ]
-    stderr_file = src / "stderr.log"
-    stderr = stderr_file.read_text().splitlines() if stderr_file.exists() else []
+    # Phase 4 (v1 verbosity): stderr is now embedded in events.jsonl as
+    # ``aom_stderr_line`` synthetic events. Extract them here so the
+    # returned dict matches ``load_session()`` output.
+    stderr = [ev.get("line", "") for ev in events if ev.get("_event") == "aom_stderr_line"]
     return {
         **meta,
         "events": events,

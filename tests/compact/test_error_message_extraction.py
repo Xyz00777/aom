@@ -44,6 +44,21 @@ def test_failed_msg_field_shown():
     assert any("FAILED! => Permission denied" in line for line in lines)
 
 
+def test_failed_msg_multiline_uses_first_line_only():
+    """Multiline ``msg`` values are clipped to the first line."""
+    r = _renderer()
+    r._emit_event_log(
+        {
+            "_event": "v2_runner_on_failed",
+            "hosts": {"web1": {"msg": "Permission denied\nplease check SSH", "failed": True}},
+        }
+    )
+    lines = _logged(r)
+    fatal_lines = [line for line in lines if "FAILED!" in line]
+    assert any("FAILED! => Permission denied" in line for line in fatal_lines)
+    assert not any("please check SSH" in line for line in fatal_lines)
+
+
 def test_failed_module_stderr_fallback():
     """Fall back to ``module_stderr`` when ``msg`` is empty."""
     r = _renderer()
@@ -133,9 +148,9 @@ def test_failed_msg_takes_precedence_over_module_stderr():
         }
     )
     lines = _logged(r)
-    fatal_lines = [l for l in lines if "FAILED!" in l]
-    assert all("FAILED! => primary error" in l for l in fatal_lines)
-    assert all("secondary stderr" not in l for l in fatal_lines)
+    fatal_lines = [line for line in lines if "FAILED!" in line]
+    assert all("FAILED! => primary error" in line for line in fatal_lines)
+    assert all("secondary stderr" not in line for line in fatal_lines)
 
 
 def test_failed_no_msg_key():
@@ -161,7 +176,7 @@ def test_failed_all_error_fields_empty():
         }
     )
     lines = _logged(r)
-    fatal_lines = [l for l in lines if "FAILED!" in l]
+    fatal_lines = [line for line in lines if "FAILED!" in line]
     assert fatal_lines, "expected at least one FAILED! line"
     for line in fatal_lines:
         assert " => " not in line, f"unexpected '=>' in empty-msg line: {line!r}"
@@ -180,9 +195,9 @@ def test_failed_module_stderr_truncated():
         }
     )
     out = _logged(r)
-    fatal = [l for l in out if "FAILED!" in l]
-    assert any("…(truncated" in l for l in fatal)
-    assert not any(huge in l for l in fatal)
+    fatal = [line for line in out if "FAILED!" in line]
+    assert any("…(truncated" in line for line in fatal)
+    assert not any(huge in line for line in fatal)
 
 
 # =============================================================================
@@ -201,6 +216,21 @@ def test_unreachable_msg_field_shown():
     )
     lines = _logged(r)
     assert any("UNREACHABLE! => host unreachable" in line for line in lines)
+
+
+def test_unreachable_msg_multiline_uses_first_line_only():
+    """Multiline unreachable ``msg`` values are clipped to the first line."""
+    r = _renderer()
+    r._emit_event_log(
+        {
+            "_event": "v2_runner_on_unreachable",
+            "hosts": {"web1": {"msg": "connection refused\nssh service down"}},
+        }
+    )
+    lines = _logged(r)
+    unreachable_lines = [line for line in lines if "UNREACHABLE!" in line]
+    assert any("UNREACHABLE! => connection refused" in line for line in unreachable_lines)
+    assert not any("ssh service down" in line for line in unreachable_lines)
 
 
 def test_unreachable_module_stderr_fallback():
@@ -226,7 +256,7 @@ def test_unreachable_all_error_fields_empty():
         }
     )
     lines = _logged(r)
-    unreachable_lines = [l for l in lines if "UNREACHABLE!" in l]
+    unreachable_lines = [line for line in lines if "UNREACHABLE!" in line]
     assert unreachable_lines, "expected at least one UNREACHABLE! line"
     for line in unreachable_lines:
         assert " => " not in line, f"unexpected '=>' in empty-msg line: {line!r}"
