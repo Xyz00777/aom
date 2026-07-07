@@ -21,7 +21,10 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from os import _Environ
 
 import pexpect
 
@@ -61,6 +64,28 @@ def _bundled_callback_dir() -> Path | None:
     return None
 
 
+def _bundled_connection_callback_dir() -> Path | None:
+    """Resolve the directory holding AOM's bundled ``aom_connection`` callback.
+
+    This is the notification-type callback that emits
+    ``aom_connection_acquired``/``aom_connection_released`` JSONL events
+    for the parser's connection-id map. It lives in a separate package
+    (``ansible_aom/callbacks/``) so the connection-tracking surface can
+    evolve independently of the stdout-callback (``ansible_aom/ansible/
+    callback/``) surface.
+
+    Returns the dir when it exists and contains the plugin file, else
+    None. A missing connection callback is non-fatal — the run just
+    loses per-host connection-id attribution, which is observability,
+    not control flow. ANSIBLE's default plugin search path is used as
+    the fallback in that case.
+    """
+    callbacks_pkg = Path(__file__).resolve().parent.parent / "callbacks"
+    if (callbacks_pkg / "aom_connection.py").is_file():
+        return callbacks_pkg
+    return None
+
+
 def _callback_env() -> dict[str, str]:
     """Return the env overrides that select AOM's stdout callback.
 
@@ -68,14 +93,35 @@ def _callback_env() -> dict[str, str]:
     events live); falls back to ``ansible.posix.jsonl`` when the bundled
     dir can't be resolved, so a packaging glitch costs only live item
     streaming — never the whole run.
+
+    Also includes the bundled ``aom_connection`` notification callback
+    in ``ANSIBLE_CALLBACK_PLUGINS`` so the connection-tracking plugin
+    loads automatically — no user-visible flag. The connection-callback
+    dir is listed first in the search path so its plugin resolves
+    before the upstream ones (avoids any future name collision).
     """
-    callback_dir = _bundled_callback_dir()
-    if callback_dir is not None:
-        return {
-            "ANSIBLE_CALLBACK_PLUGINS": str(callback_dir),
-            "ANSIBLE_STDOUT_CALLBACK": "aom_jsonl",
-        }
-    return {"ANSIBLE_STDOUT_CALLBACK": "ansible.posix.jsonl"}
+    stdout_dir = _bundled_callback_dir()
+    conn_dir = _bundled_connection_callback_dir()
+
+    # Build the plugin search path. Connection-callback dir is listed
+    # first so it resolves before any upstream plugin with the same
+    # short name (defensive; today there is no such collision).
+    plugin_dirs: list[Path] = []
+    if conn_dir is not None:
+        plugin_dirs.append(conn_dir)
+    if stdout_dir is not None:
+        plugin_dirs.append(stdout_dir)
+
+    env: dict[str, str] = {}
+    if plugin_dirs:
+        env["ANSIBLE_CALLBACK_PLUGINS"] = os.pathsep.join(str(d) for d in plugin_dirs)
+
+    if stdout_dir is not None:
+        env["ANSIBLE_STDOUT_CALLBACK"] = "aom_jsonl"
+    else:
+        env["ANSIBLE_STDOUT_CALLBACK"] = "ansible.posix.jsonl"
+
+    return env
 
 
 def _default_session_dir() -> Path:
@@ -411,7 +457,7 @@ def run_playbook(
             child = pexpect.spawn(
                 executable,
                 args=args,
-                env=env,
+                env=cast("_Environ[str]", env),
                 encoding="utf-8",
                 codec_errors="surrogateescape",
                 timeout=timeout,
@@ -563,7 +609,9 @@ def _drive(
             break
 
         if idx == newline_idx:
-            line = (child.before or "") + (child.after or "")
+            before: str = cast("str", child.before or "")
+            after: str = cast("str", child.after or "")
+            line = before + after
             _trace("newline", line=line[:200])
             # pexpect's `before` carries the entire unread chunk since
             # the last match; when that chunk spans multiple JSONL
@@ -648,14 +696,18 @@ def _drive(
                 diag.note_stall(stall_count if stall_count > 0 else 0)
             timeout_count += 1
             if timeout_count >= cpu_sample_every:
-                renderer.note_subprocess_active(_sample_subprocess_active(child.pid))
+                pid = child.pid
+                if pid is not None:
+                    renderer.note_subprocess_active(_sample_subprocess_active(pid))
                 timeout_count = 0
             continue
         else:
             # Password prompt fired. Build the prompt text from the
             # pre-match content (which may contain prior plaintext we
             # haven't routed yet) and the matched prompt itself.
-            prompt = (child.before or "") + (child.after or "")
+            prompt_before: str = cast("str", child.before or "")
+            prompt_after: str = cast("str", child.after or "")
+            prompt = prompt_before + prompt_after
             _trace("password-pattern", prompt=prompt[:200])
             renderer.note_pty_bytes()
             password = renderer.handle_password_prompt(prompt)
@@ -842,8 +894,15 @@ def _flush_pending(
     ``\\n``-separated events that arrived in the same PTY read. Feed each
     non-empty line individually; ``PtyStreamParser.feed_line`` can only
     parse one JSON object per call.
+
+    R17: also drain ``child.buffer`` (pexpect's internal unread accumulator).
+    After the newline branch resets ``child.before = ""`` and the
+    ``isalive()`` check fires, ``child.buffer`` may still hold events that
+    arrived in the same PTY read but after the matched ``\\n``. Without this,
+    trailing events are silently dropped when the child exits between
+    ``expect()`` returning and the ``isalive()`` check.
     """
-    leftover = child.before or ""
+    leftover = (child.before or "") + (_peek_unread(child) or "")
     if not leftover.strip():
         return
     for sub_line in leftover.splitlines():

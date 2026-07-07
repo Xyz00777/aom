@@ -28,6 +28,11 @@ def create_renderer(
     format: RenderFormat | None = None,
     mode: RenderMode | None = None,
     hide_states: list[str] | None = None,
+    record: bool = False,
+    capture_verbose: bool = False,
+    show_failed_hint: bool = True,
+    show_warnings: bool = True,
+    show_deprecations: bool = True,
 ) -> Renderer:
     """Create the renderer selected by ``mode``.
 
@@ -49,6 +54,16 @@ def create_renderer(
             log (e.g. ``["ok", "skipped"]``). Forwarded to
             ``CompactRenderer``; ignored by ``AOMApp`` and
             ``JsonRenderer``.
+        record: Whether the compact renderer is actively recording this
+            run. When true, the status bar shows the recording chip.
+        capture_verbose: Whether verbose capture is enabled. When true,
+            the recording chip upgrades from ``● REC`` to ``● REC+VC``.
+        show_failed_hint: Whether compact mode should show the first line
+            of failed/unreachable ``msg`` beneath the task summary.
+        show_warnings: Whether compact mode should surface warnings in
+            the live log.
+        show_deprecations: Whether compact mode should surface
+            deprecations in the live log.
 
     Returns:
         A :class:`Renderer` instance: :class:`CompactRenderer`,
@@ -67,7 +82,15 @@ def create_renderer(
 
     from ansible_aom.compact.renderer import CompactRenderer
 
-    return CompactRenderer(is_tty=is_tty, hide_states=hide_states or [])
+    return CompactRenderer(
+        is_tty=is_tty,
+        hide_states=hide_states or [],
+        record=record,
+        capture_verbose=capture_verbose,
+        show_failed_hint=show_failed_hint,
+        show_warnings=show_warnings,
+        show_deprecations=show_deprecations,
+    )
 
 
 def _resolve_mode(

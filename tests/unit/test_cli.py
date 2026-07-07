@@ -340,6 +340,39 @@ class TestRendererFactory:
         assert isinstance(renderer, CompactRenderer)
         assert renderer._display.is_tty is False
 
+    def test_factory_forwards_recording_flags_to_compact_renderer(self):
+        """Compact renderer gets recording + verbose-capture state from the factory."""
+        from ansible_aom.compact.renderer import CompactRenderer
+        from ansible_aom.renderer.factory import create_renderer
+
+        renderer = create_renderer(tui_mode=False, record=True, capture_verbose=True)
+        assert isinstance(renderer, CompactRenderer)
+        assert renderer._recording is True
+        assert renderer._capture_verbose is True
+
+    def test_factory_forwards_failed_hint_flag_to_compact_renderer(self):
+        """Compact renderer gets the failed-hint toggle from the factory."""
+        from ansible_aom.compact.renderer import CompactRenderer
+        from ansible_aom.renderer.factory import create_renderer
+
+        renderer = create_renderer(tui_mode=False, show_failed_hint=False)
+        assert isinstance(renderer, CompactRenderer)
+        assert renderer._show_failed_hint is False
+
+    def test_factory_forwards_warning_flags_to_compact_renderer(self):
+        """Compact renderer gets warning visibility toggles from the factory."""
+        from ansible_aom.compact.renderer import CompactRenderer
+        from ansible_aom.renderer.factory import create_renderer
+
+        renderer = create_renderer(
+            tui_mode=False,
+            show_warnings=False,
+            show_deprecations=False,
+        )
+        assert isinstance(renderer, CompactRenderer)
+        assert renderer._show_warnings is False
+        assert renderer._show_deprecations is False
+
 
 class TestBasicCLIInvocation:
     """Tests for TC-006: Basic CLI Invocation."""
@@ -1310,8 +1343,75 @@ class TestHideStateFlag:
         assert "'Skip'" in captured.err
 
 
+class TestYesFlag:
+    """Tests for global --yes flag."""
+
+    def test_yes_flag_defaults_false(self):
+        """--yes defaults to False when not provided."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["playbook.yml"])
+        assert args.yes is False
+
+    def test_yes_long_form(self):
+        """--yes sets yes=True."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--yes", "playbook.yml"])
+        assert args.yes is True
+
+    def test_yes_short_form(self):
+        """-y sets yes=True."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["-y", "playbook.yml"])
+        assert args.yes is True
+
+    def test_yes_does_not_appear_in_ansible_args(self):
+        """--yes is consumed by argparse, not forwarded to ansible-playbook."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--yes", "playbook.yml", "-i", "inv.ini"])
+        assert args.yes is True
+        assert args.ansible_args == ["-i", "inv.ini"]
+
+    def test_yes_short_does_not_appear_in_ansible_args(self):
+        """-y is consumed by argparse, not forwarded to ansible-playbook."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["-y", "playbook.yml", "-i", "inv.ini"])
+        assert args.yes is True
+        assert args.ansible_args == ["-i", "inv.ini"]
+
+    def test_yes_help_text_mentions_yes(self):
+        """Help text for --yes mentions the flag."""
+        import io
+
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        buf = io.StringIO()
+        parser.print_help(buf)
+        out = buf.getvalue()
+        assert "--yes" in out or "-y" in out
+        assert "prompts" in out
+
+
 class TestHideStateCompactPlumbing:
     """--hide-state propagates from CLI to create_renderer/run_playbook."""
+
+    @staticmethod
+    def _write_live_config(tmp_path: Path, show_failed_hint: bool) -> None:
+        config_dir = tmp_path / ".config" / "aom"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        config_dir.joinpath("aom_config.yaml").write_text(
+            f"live:\n  show_failed_hint: {str(show_failed_hint).lower()}\n"
+        )
 
     def test_hide_state_propagates_to_renderer(self):
         """aom --hide-state ok playbook.yml → create_renderer gets hide_states=["ok"]."""
@@ -1358,3 +1458,465 @@ class TestHideStateCompactPlumbing:
 
         _args, kwargs = mock_create.call_args
         assert kwargs.get("hide_states") == []
+
+    def test_capture_verbose_propagates_to_renderer(self):
+        """--capture-verbose should reach compact renderer creation."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
+            patch("ansible_aom.renderer.factory.create_renderer") as mock_create,
+            patch("sys.argv", ["aom", "--capture-verbose", "playbook.yml"]),
+        ):
+            assert main() == 0
+
+        _args, kwargs = mock_create.call_args
+        assert kwargs.get("capture_verbose") is True
+        assert kwargs.get("record") is True
+
+    def test_no_failed_hint_propagates_to_renderer(self):
+        """--no-failed-hint should disable failed hints in compact mode only."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
+            patch("ansible_aom.renderer.factory.create_renderer") as mock_create,
+            patch("sys.argv", ["aom", "--no-failed-hint", "playbook.yml"]),
+        ):
+            assert main() == 0
+
+        _args, kwargs = mock_create.call_args
+        assert kwargs.get("show_failed_hint") is False
+
+    def test_config_disables_failed_hint(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        """[live] show_failed_hint: false should disable compact hints."""
+        from ansible_aom.cli import main
+
+        self._write_live_config(tmp_path, show_failed_hint=False)
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("os.getcwd", lambda: str(tmp_path))
+
+        with (
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
+            patch("ansible_aom.renderer.factory.create_renderer") as mock_create,
+            patch("sys.argv", ["aom", "playbook.yml"]),
+        ):
+            assert main() == 0
+
+        _args, kwargs = mock_create.call_args
+        assert kwargs.get("show_failed_hint") is False
+
+    def test_cli_no_failed_hint_overrides_enabled_config(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """--no-failed-hint still wins when config enables hints."""
+        from ansible_aom.cli import main
+
+        self._write_live_config(tmp_path, show_failed_hint=True)
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("os.getcwd", lambda: str(tmp_path))
+
+        with (
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
+            patch("ansible_aom.renderer.factory.create_renderer") as mock_create,
+            patch("sys.argv", ["aom", "--no-failed-hint", "playbook.yml"]),
+        ):
+            assert main() == 0
+
+        _args, kwargs = mock_create.call_args
+        assert kwargs.get("show_failed_hint") is False
+
+
+class TestWarningVisibilityCompactPlumbing:
+    """--hide-warnings / --hide-deprecations propagate into compact mode."""
+
+    @staticmethod
+    def _write_live_config(
+        tmp_path: Path,
+        show_warnings: bool = True,
+        show_deprecations: bool = True,
+    ) -> None:
+        config_dir = tmp_path / ".config" / "aom"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        config_dir.joinpath("aom_config.yaml").write_text(
+            "live:\n"
+            f"  show_warnings: {str(show_warnings).lower()}\n"
+            f"  show_deprecations: {str(show_deprecations).lower()}\n"
+        )
+
+    def test_cli_hide_warnings_overrides_enabled_config(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from ansible_aom.cli import main
+
+        self._write_live_config(tmp_path, show_warnings=True, show_deprecations=True)
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("os.getcwd", lambda: str(tmp_path))
+
+        with (
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
+            patch("ansible_aom.renderer.factory.create_renderer") as mock_create,
+            patch("sys.argv", ["aom", "--hide-warnings", "playbook.yml"]),
+        ):
+            assert main() == 0
+
+        _args, kwargs = mock_create.call_args
+        assert kwargs.get("show_warnings") is False
+        assert kwargs.get("show_deprecations") is True
+
+    def test_cli_hide_deprecations_overrides_enabled_config(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from ansible_aom.cli import main
+
+        self._write_live_config(tmp_path, show_warnings=True, show_deprecations=True)
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("os.getcwd", lambda: str(tmp_path))
+
+        with (
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
+            patch("ansible_aom.renderer.factory.create_renderer") as mock_create,
+            patch("sys.argv", ["aom", "--hide-deprecations", "playbook.yml"]),
+        ):
+            assert main() == 0
+
+        _args, kwargs = mock_create.call_args
+        assert kwargs.get("show_warnings") is True
+        assert kwargs.get("show_deprecations") is False
+
+    def test_config_disables_warning_visibility(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        from ansible_aom.cli import main
+
+        self._write_live_config(tmp_path, show_warnings=False, show_deprecations=False)
+        monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+        monkeypatch.setattr("os.getcwd", lambda: str(tmp_path))
+
+        with (
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
+            patch("ansible_aom.renderer.factory.create_renderer") as mock_create,
+            patch("sys.argv", ["aom", "playbook.yml"]),
+        ):
+            assert main() == 0
+
+        _args, kwargs = mock_create.call_args
+        assert kwargs.get("show_warnings") is False
+        assert kwargs.get("show_deprecations") is False
+
+
+class TestCaptureVerboseFlag:
+    """Task 5.2: --capture-verbose turns on JSONL capture of verbose blocks."""
+
+    def test_capture_verbose_defaults_false(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["playbook.yml"])
+        assert args.capture_verbose is False
+
+    def test_capture_verbose_long_form(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["--capture-verbose", "playbook.yml"])
+        assert args.capture_verbose is True
+
+    def test_capture_verbose_does_not_leak_to_ansible_args(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["--capture-verbose", "playbook.yml", "-i", "inv.ini"])
+        assert args.capture_verbose is True
+        assert args.ansible_args == ["-i", "inv.ini"]
+
+    def test_capture_verbose_help_text_mentions_flag(self):
+        import io
+
+        from ansible_aom.cli import create_parser
+
+        buf = io.StringIO()
+        create_parser().print_help(buf)
+        out = buf.getvalue()
+        assert "--capture-verbose" in out
+
+
+class TestCaptureSetupFlag:
+    """Task 5.2: --capture-setup keeps ansible.builtin.setup output."""
+
+    def test_capture_setup_defaults_false(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["playbook.yml"])
+        assert args.capture_setup is False
+
+    def test_capture_setup_long_form(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["--capture-setup", "playbook.yml"])
+        assert args.capture_setup is True
+
+    def test_capture_setup_does_not_leak_to_ansible_args(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["--capture-setup", "playbook.yml", "-i", "inv.ini"])
+        assert args.capture_setup is True
+        assert args.ansible_args == ["-i", "inv.ini"]
+
+
+class TestNoRedactFlag:
+    """Task 5.2: --no-redact disables redaction (with safety gates; see QC-003)."""
+
+    def test_no_redact_defaults_false(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["playbook.yml"])
+        assert args.no_redact is False
+
+    def test_no_redact_long_form(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["--no-redact", "--yes", "playbook.yml"])
+        assert args.no_redact is True
+
+    def test_no_redact_does_not_leak_to_ansible_args(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["--no-redact", "--yes", "playbook.yml", "-i", "inv.ini"])
+        assert args.no_redact is True
+        assert args.ansible_args == ["-i", "inv.ini"]
+
+    def test_no_redact_non_tty_without_yes_refuses_with_exit_2(self, capsys):
+        """QC-003: --no-redact in non-TTY mode without --yes refuses with exit 2."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("sys.argv", ["aom", "--no-redact", "playbook.yml"]),
+            patch("sys.stdin.isatty", return_value=False),
+        ):
+            assert main() == 2
+        captured = capsys.readouterr()
+        assert "--no-redact" in captured.err
+        assert "--yes" in captured.err
+
+    def test_no_redact_non_tty_with_yes_proceeds(self):
+        """QC-003: --no-redact --yes in non-TTY mode proceeds (CI escape hatch)."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("sys.argv", ["aom", "--no-redact", "--yes", "playbook.yml"]),
+            patch("sys.stdin.isatty", return_value=False),
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
+            patch("ansible_aom.renderer.factory.create_renderer"),
+        ):
+            assert main() == 0
+
+    def test_no_redact_tty_with_yes_proceeds_without_prompt(self):
+        """TTY + --yes → skip the prompt, proceed."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("sys.argv", ["aom", "--no-redact", "--yes", "playbook.yml"]),
+            patch("sys.stdin.isatty", return_value=True),
+            patch("ansible_aom.ansible.runner.run_playbook", return_value=0),
+            patch("ansible_aom.renderer.factory.create_renderer"),
+        ):
+            assert main() == 0
+
+    def test_no_redact_tty_with_no_answer_returns_2(self):
+        """TTY + no --yes + user answers 'n' → refuse with exit 2."""
+        from ansible_aom.cli import main
+
+        with (
+            patch("sys.argv", ["aom", "--no-redact", "playbook.yml"]),
+            patch("sys.stdin.isatty", return_value=True),
+            patch("ansible_aom.cli.open", side_effect=OSError("no tty")),
+        ):
+            assert main() == 2
+
+    def test_no_redact_help_text_warns_dangerous(self):
+        import io
+
+        from ansible_aom.cli import create_parser
+
+        buf = io.StringIO()
+        create_parser().print_help(buf)
+        out = buf.getvalue()
+        assert "--no-redact" in out
+        # The help should warn this is dangerous / requires --yes, so a
+        # casual reader doesn't add it to a CI script.
+        lowered = out.lower()
+        assert "danger" in lowered or "redact" in lowered
+
+
+class TestNoFailedHintFlag:
+    """Task 5.2: --no-failed-hint suppresses the failed-hint in compact log."""
+
+    def test_no_failed_hint_defaults_false(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["playbook.yml"])
+        assert args.no_failed_hint is False
+
+    def test_no_failed_hint_long_form(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["--no-failed-hint", "playbook.yml"])
+        assert args.no_failed_hint is True
+
+    def test_no_failed_hint_does_not_leak_to_ansible_args(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["--no-failed-hint", "playbook.yml", "-i", "inv.ini"])
+        assert args.no_failed_hint is True
+        assert args.ansible_args == ["-i", "inv.ini"]
+
+
+class TestHideWarningsFlag:
+    """Task 5.2: --hide-warnings hides warnings from the live compact log."""
+
+    def test_hide_warnings_defaults_false(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["playbook.yml"])
+        assert args.hide_warnings is False
+
+    def test_hide_warnings_long_form(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["--hide-warnings", "playbook.yml"])
+        assert args.hide_warnings is True
+
+    def test_hide_warnings_does_not_leak_to_ansible_args(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["--hide-warnings", "playbook.yml", "-i", "inv.ini"])
+        assert args.hide_warnings is True
+        assert args.ansible_args == ["-i", "inv.ini"]
+
+
+class TestHideDeprecationsFlag:
+    """Task 5.2: --hide-deprecations hides deprecation warnings."""
+
+    def test_hide_deprecations_defaults_false(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["playbook.yml"])
+        assert args.hide_deprecations is False
+
+    def test_hide_deprecations_long_form(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["--hide-deprecations", "playbook.yml"])
+        assert args.hide_deprecations is True
+
+    def test_hide_deprecations_does_not_leak_to_ansible_args(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["--hide-deprecations", "playbook.yml", "-i", "inv.ini"])
+        assert args.hide_deprecations is True
+        assert args.ansible_args == ["-i", "inv.ini"]
+
+
+class TestConfigPathFlag:
+    """Task 5.2: --config PATH sets the highest-precedence config layer.
+
+    The flag is consumed by argparse (does not leak to ansible_args) but
+    `core/config_layer.py` also reads ``sys.argv`` directly for the same
+    path — both paths must agree so the global parser addition doesn't
+    break the layered config loader.
+    """
+
+    def test_config_defaults_none(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["playbook.yml"])
+        assert args.config_path is None
+
+    def test_config_accepts_path(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(["--config", "/tmp/aom.yaml", "playbook.yml"])
+        assert args.config_path == "/tmp/aom.yaml"
+
+    def test_config_does_not_leak_to_ansible_args(self):
+        from ansible_aom.cli import create_parser
+
+        args = create_parser().parse_args(
+            ["--config", "/tmp/aom.yaml", "playbook.yml", "-i", "inv.ini"]
+        )
+        assert args.config_path == "/tmp/aom.yaml"
+        assert args.ansible_args == ["-i", "inv.ini"]
+
+    def test_config_path_is_visible_to_config_layer_argv_lookup(self):
+        """The legacy argv lookup in core/config_layer.py must still find it.
+
+        Even though argparse now consumes --config and stores it on
+        args.config_path, the config_layer._cli_config_path() helper
+        still reads sys.argv directly. Verify both representations agree
+        so the layered config loader continues to work.
+        """
+        from ansible_aom.cli import create_parser
+        from ansible_aom.core.config_layer import _cli_config_path
+
+        with patch("sys.argv", ["aom", "--config", "/tmp/aom.yaml", "playbook.yml"]):
+            args = create_parser().parse_args()
+            assert args.config_path == "/tmp/aom.yaml"
+            assert _cli_config_path() == "/tmp/aom.yaml"
+
+    def test_config_help_text_mentions_flag(self):
+        import io
+
+        from ansible_aom.cli import create_parser
+
+        buf = io.StringIO()
+        create_parser().print_help(buf)
+        out = buf.getvalue()
+        assert "--config" in out
+
+
+class TestVerboseCaptureFlagsPlumbArgsCorrectly:
+    """All seven new flags propagate to args without consuming playbook position."""
+
+    def test_all_flags_compose_with_each_other(self):
+        """--capture-verbose --capture-setup --no-redact --yes --no-failed-hint
+        --hide-warnings --hide-deprecations --config all parse together."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(
+            [
+                "--capture-verbose",
+                "--capture-setup",
+                "--no-redact",
+                "--yes",
+                "--no-failed-hint",
+                "--hide-warnings",
+                "--hide-deprecations",
+                "--config",
+                "/tmp/cfg.yaml",
+                "playbook.yml",
+                "-i",
+                "inv.ini",
+            ]
+        )
+        assert args.capture_verbose is True
+        assert args.capture_setup is True
+        assert args.no_redact is True
+        assert args.yes is True
+        assert args.no_failed_hint is True
+        assert args.hide_warnings is True
+        assert args.hide_deprecations is True
+        assert args.config_path == "/tmp/cfg.yaml"
+        assert args.playbook == "playbook.yml"
+        # None of the AOM-level flags leaks to ansible_args.
+        assert args.ansible_args == ["-i", "inv.ini"]
+
+    def test_yes_unchanged_from_task_5_1(self):
+        """Task 5.1's --yes flag is untouched by this change."""
+        from ansible_aom.cli import create_parser
+
+        parser = create_parser()
+        args = parser.parse_args(["--yes", "playbook.yml"])
+        assert args.yes is True
+        args2 = parser.parse_args(["-y", "playbook.yml"])
+        assert args2.yes is True
+        args3 = parser.parse_args(["playbook.yml"])
+        assert args3.yes is False

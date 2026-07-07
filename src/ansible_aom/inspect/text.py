@@ -9,7 +9,7 @@ two render the same information for the same session.
 
 from __future__ import annotations
 
-from typing import Iterable, Iterator
+from typing import Iterable, Iterator, Literal
 
 from ansible_aom.core.inspect_model import (
     DetailBlock,
@@ -19,6 +19,7 @@ from ansible_aom.core.inspect_model import (
     build_detail_block,
     build_run_summary,
     build_task_tree,
+    build_verbose_lines,
 )
 
 
@@ -149,23 +150,93 @@ def _render_failures(session: dict, tree: TaskTreeNode) -> list[str]:
     return lines
 
 
-def _render_stderr_tail(session: dict, max_lines: int = 20) -> list[str]:
-    tail: list[str] = (session.get("stderr") or [])[-max_lines:]
-    if not tail:
+def _render_verbose(
+    session: dict, *, play_name: str | None = None, task_name: str | None = None
+) -> list[str]:
+    """Render the verbose/stderr section from ``aom_stderr_line`` events.
+
+    Uses ``build_verbose_lines`` to scope lines by play and task.
+    With no scope (the default), shows all run-level lines. With
+    ``play_name``, shows run-level plus task-level lines for that play.
+    With ``task_name``, shows run-level plus lines for the matching task
+    (resolved via the task tree).
+
+    The old ``_render_stderr_tail`` was gated on ``status == "failed"``
+    and capped at 20 lines. This replacement shows verbose output for
+    every session and removes the cap.
+    """
+    level: Literal["run", "play", "task"] = "run"
+    play = play_name
+    task_id: str | None = None
+    host: str | None = None
+
+    if task_name:
+        level = "task"
+        tree = build_task_tree(session)
+        for node in _iter_tree(tree):
+            if node.kind == "task" and node.label == task_name and node.task_id:
+                task_id = node.task_id
+                for child in node.children:
+                    if child.kind == "host":
+                        host = child.label
+                        break
+                break
+        if not play:
+            play = _play_name_for_task(tree, task_id)
+    elif play_name:
+        level = "play"
+
+    lines = build_verbose_lines(session, level=level, play_name=play, task_id=task_id, host=host)
+    if not lines:
         return []
-    return ["stderr.log (tail)", "─" * 17, *tail]
+
+    header = "Verbose"
+    if play_name and not task_name:
+        header = f"Verbose (play: {play_name})"
+    elif task_name:
+        scope = f"task: {task_name}"
+        if play_name:
+            scope = f"play: {play_name}, {scope}"
+        header = f"Verbose ({scope})"
+
+    return ["", header, "─" * len(header)] + [f"  {line}" for line in lines]
 
 
-def render_session(session: dict) -> str:
-    """Render a session dict as plain text. ANSI-free, deterministic."""
+def _iter_tree(node: TaskTreeNode) -> Iterator[TaskTreeNode]:
+    """Yield all nodes in the tree depth-first."""
+    yield node
+    for child in node.children:
+        yield from _iter_tree(child)
+
+
+def _play_name_for_task(tree: TaskTreeNode, task_id: str | None) -> str | None:
+    """Find the play name containing the given task_id."""
+    if not task_id:
+        return None
+    for play in tree.children:
+        if play.kind != "play":
+            continue
+        for node in _iter_tree(play):
+            if node.kind == "task" and node.task_id == task_id:
+                return play.label
+    return None
+
+
+def render_session(
+    session: dict, *, play_name: str | None = None, task_name: str | None = None
+) -> str:
+    """Render a session dict as plain text. ANSI-free, deterministic.
+
+    When ``play_name`` or ``task_name`` are given, the verbose section is
+    scoped to that play or task. Failures are always shown (they are not
+    affected by scope).
+    """
     summary = build_run_summary(session)
     tree = build_task_tree(session)
     parts: list[str] = []
     parts.extend(_render_header(summary))
     parts.extend(_render_failures(session, tree))
-    if summary.status == "failed":
-        parts.append("")
-        parts.extend(_render_stderr_tail(session))
+    parts.extend(_render_verbose(session, play_name=play_name, task_name=task_name))
     return "\n".join(parts) + "\n"
 
 
