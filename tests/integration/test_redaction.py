@@ -55,6 +55,38 @@ def default_config() -> RedactionConfig:
     return RedactionConfig()
 
 
+@pytest.fixture
+def custom_ansible_key_pattern() -> RedactionConfig:
+    """User-config that opts the ``ansible_*`` connection fields back in.
+
+    QC-002: ``ansible_ssh_pass`` is no longer in the Layer 1 exact-match
+    set. To preserve the old behavior of redacting ansible connection
+    credentials, the user adds a ``custom_key_patterns`` regex. This
+    fixture returns such a config.
+    """
+    return RedactionConfig(
+        custom_key_patterns=[r"^ansible_(?:.*_)?pass(?:word)?$"],
+    )
+
+
+@pytest.fixture
+def generic_secret_key_pattern() -> RedactionConfig:
+    """User-config that extends Layer 1 to the old GENERIC_SECRET_FIELDS set.
+
+    QC-002: only ``api_key``, ``secret``, ``token``, ``private_key`` are in
+    the exact-match set. To opt in to the broader old list (``api_token``,
+    ``secret_key``, ``auth_token``, ``access_token``, ``credential``,
+    ``credentials``), the user adds a ``custom_key_patterns`` regex.
+    """
+    return RedactionConfig(
+        custom_key_patterns=[
+            r".*_token$",
+            r".*_key$",
+            r"^credentials?$",
+        ],
+    )
+
+
 def _ansible_event_with_res(res: dict[str, Any]) -> dict[str, Any]:
     """Build a realistic ``v2_runner_on_*`` event dict containing ``res``.
 
@@ -217,8 +249,16 @@ class TestLayer1NoLogOnLoopItems:
 class TestLayer2PasswordFieldsOnEvents:
     """Layer 2 — password-like keys in res are replaced with ``********``."""
 
-    def test_known_ansible_password_fields_redacted(self, default_config: RedactionConfig) -> None:
-        """All ``ANSIBLE_PASSWORD_FIELDS`` get redacted inside ``res``."""
+    def test_known_ansible_password_fields_redacted(
+        self, custom_ansible_key_pattern: RedactionConfig
+    ) -> None:
+        """``ansible_*`` fields are redacted when a user-config regex matches them.
+
+        QC-002: under the new model, ``ansible_ssh_pass`` etc. are NOT
+        auto-redacted — the user must opt in via a ``custom_key_patterns``
+        regex like ``^ansible_.*_pass(word)?$``. This test exercises that
+        extension path.
+        """
         event = _ansible_event_with_res(
             {
                 "ansible_ssh_pass": "ssh-secret",
@@ -230,7 +270,7 @@ class TestLayer2PasswordFieldsOnEvents:
             }
         )
 
-        result = redact_event(event, default_config)
+        result = redact_event(event, custom_ansible_key_pattern)
 
         res = result["res"]
         assert res["ansible_ssh_pass"] == REDACTED
@@ -244,8 +284,16 @@ class TestLayer2PasswordFieldsOnEvents:
         assert "ssh-secret" not in str(res)
         assert "conn-secret" not in str(res)
 
-    def test_generic_secret_fields_redacted(self, default_config: RedactionConfig) -> None:
-        """All ``GENERIC_SECRET_FIELDS`` (api_key, token, etc.) redacted."""
+    def test_generic_secret_fields_redacted(
+        self, generic_secret_key_pattern: RedactionConfig
+    ) -> None:
+        """Layer 1 + user-config patterns redact the generic secret set.
+
+        QC-002: only ``api_key``, ``secret``, ``token``, ``private_key`` are
+        in the exact-match set. ``api_token``, ``secret_key``, ``auth_token``,
+        ``access_token``, ``credential``, ``credentials`` are added by the
+        user via a ``custom_key_patterns`` regex.
+        """
         event = _ansible_event_with_res(
             {
                 "api_key": "sk_live_abc",
@@ -262,7 +310,7 @@ class TestLayer2PasswordFieldsOnEvents:
             }
         )
 
-        result = redact_event(event, default_config)
+        result = redact_event(event, generic_secret_key_pattern)
 
         res = result["res"]
         for sensitive_key in (
@@ -279,14 +327,22 @@ class TestLayer2PasswordFieldsOnEvents:
             assert res[sensitive_key] == REDACTED, (
                 f"Field '{sensitive_key}' should have been redacted"
             )
-        # credentials dict is redacted wholesale (it's a known sensitive key),
-        # so its inner password is also gone.
+        # credentials dict is redacted wholesale (the user-pattern matches
+        # its key), so its inner password is also gone.
         assert res["credentials"] == REDACTED
         assert "admin" not in str(res["credentials"])
         assert res["name"] == "should-stay"
 
-    def test_password_match_regex_field_redacted(self, default_config: RedactionConfig) -> None:
-        """Fields matching ``PASSWORD_MATCH`` regex (e.g. ``db_password``) redacted."""
+    def test_password_match_regex_field_redacted(
+        self, generic_secret_key_pattern: RedactionConfig
+    ) -> None:
+        """``PASSWORD_MATCH``-shaped fields (e.g. ``db_password``) redacted via user pattern.
+
+        QC-002: the PASSWORD_MATCH regex is no longer consulted by the core
+        redaction. To catch ``db_password``, ``user_passphrase``,
+        ``admin_passwd``, etc., the user adds a ``custom_key_patterns``
+        regex matching the PASSWORD_MATCH shape.
+        """
         event = _ansible_event_with_res(
             {
                 "password": "p1",
@@ -297,7 +353,16 @@ class TestLayer2PasswordFieldsOnEvents:
             }
         )
 
-        result = redact_event(event, default_config)
+        # User-config regex matching the PASSWORD_MATCH shape (lowercased).
+        pwd_match_re = r"^(?:.+[-_\s])?pass(?:[-_\s]?(?:word|phrase|wrd|wd))?(?:[-_\s].+)?$"
+        cfg = RedactionConfig(
+            custom_key_patterns=[
+                *generic_secret_key_pattern.custom_key_patterns,
+                pwd_match_re,
+            ],
+        )
+
+        result = redact_event(event, cfg)
 
         res = result["res"]
         assert res["password"] == REDACTED
@@ -341,9 +406,14 @@ class TestLayer2PasswordFieldsOnEvents:
         assert res["password"] == REDACTED
 
     def test_nested_passwords_in_realistic_dict_redacted(
-        self, default_config: RedactionConfig
+        self, generic_secret_key_pattern: RedactionConfig
     ) -> None:
-        """A realistic nested res dict with passwords at multiple depths."""
+        """A realistic nested res dict with passwords at multiple depths.
+
+        QC-002: ``client_key_password`` is not in the Layer 1 exact-match
+        set. The user adds a ``custom_key_patterns`` regex to opt in to
+        ``.*_password$``-shaped keys at any depth.
+        """
         event = _ansible_event_with_res(
             {
                 "changed": True,
@@ -371,7 +441,13 @@ class TestLayer2PasswordFieldsOnEvents:
             }
         )
 
-        result = redact_event(event, default_config)
+        cfg = RedactionConfig(
+            custom_key_patterns=[
+                *generic_secret_key_pattern.custom_key_patterns,
+                r".*_password$",
+            ],
+        )
+        result = redact_event(event, cfg)
 
         res = result["res"]
         # Non-sensitive fields preserved.
@@ -527,9 +603,13 @@ class TestLayer4InvocationModuleArgs:
     """Layer 4 — ``res.invocation.module_args`` is recursively redacted (-vvv output)."""
 
     def test_module_args_password_and_nested_secrets_redacted(
-        self, default_config: RedactionConfig
+        self, generic_secret_key_pattern: RedactionConfig
     ) -> None:
-        """Realistic ``module_args`` with mixed sensitive and benign fields."""
+        """Realistic ``module_args`` with mixed sensitive and benign fields.
+
+        QC-002: ``db_password`` is not in the Layer 1 exact-match set.
+        The user extends the config with ``.*_password$`` to opt in.
+        """
         event = _ansible_event_with_res(
             {
                 "invocation": {
@@ -547,7 +627,13 @@ class TestLayer4InvocationModuleArgs:
             }
         )
 
-        result = redact_event(event, default_config)
+        cfg = RedactionConfig(
+            custom_key_patterns=[
+                *generic_secret_key_pattern.custom_key_patterns,
+                r".*_password$",
+            ],
+        )
+        result = redact_event(event, cfg)
 
         ma = result["res"]["invocation"]["module_args"]
         # Benign fields preserved.
@@ -624,11 +710,18 @@ class TestLayer4InvocationModuleArgs:
 class TestFullPipelineOnRealisticEvent:
     """All four layers fired in sequence on a realistic ansible event dict."""
 
-    def test_layers_compose_on_verbose_deploy_event(self, default_config: RedactionConfig) -> None:
-        """A single event that exercises Layers 1, 2, 3, and 4 in turn.
+    def test_layers_compose_on_verbose_deploy_event(
+        self, generic_secret_key_pattern: RedactionConfig
+    ) -> None:
+        """All 4 layers compose on a realistic ``-vvv`` deploy event.
+
+        QC-002: ``secret_key`` and ``db_password`` are no longer in the
+        Layer 1 exact-match set; the test uses a ``custom_key_patterns``
+        config to opt in to the ``*_key$`` and ``*_password$`` shapes.
 
         This event has:
-        * Layer 2 candidates: ``password``, ``api_key``, ``secret_key`` at top level.
+        * Layer 2 candidates: ``password``, ``api_key`` (Layer 1) plus
+          ``secret_key`` and ``db_password`` (user pattern).
         * Layer 3 candidates: ``cmd`` (CLI args + URL), ``stdout`` (URL).
         * Layer 4 candidates: ``invocation.module_args`` nested password.
         * Layer 1 is NOT triggered (``_ansible_no_log=False``).
@@ -656,7 +749,13 @@ class TestFullPipelineOnRealisticEvent:
             },
         }
 
-        result = redact_event(event, default_config)
+        cfg = RedactionConfig(
+            custom_key_patterns=[
+                *generic_secret_key_pattern.custom_key_patterns,
+                r".*_password$",
+            ],
+        )
+        result = redact_event(event, cfg)
         res = result["res"]
 
         # Layer 1 did NOT fire — res is not the censored marker.
@@ -833,8 +932,16 @@ class TestCustomConfigOnRealisticEvents:
         assert "api-leak" not in str(res)
 
     def test_custom_whitelist_extends_default(self) -> None:
-        """``whitelist`` items are skipped by Layer 2 even if they match the regex."""
-        config = RedactionConfig(whitelist=["session_passphrase"])
+        """``whitelist`` items are skipped by Layer 1/2 even if they match.
+
+        QC-002: ``real_password`` is not in the Layer 1 exact-match set.
+        Add a ``custom_key_patterns`` regex to opt in to ``*_password$``,
+        then verify the whitelisted entry still escapes redaction.
+        """
+        config = RedactionConfig(
+            whitelist=["session_passphrase"],
+            custom_key_patterns=[r".*_password$"],
+        )
         event = _ansible_event_with_res(
             {
                 "session_passphrase": "should-not-be-redacted",

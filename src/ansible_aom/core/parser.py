@@ -13,7 +13,7 @@ import json as stdlib_json
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum, auto
 from typing import Any, Callable, cast
 
@@ -28,6 +28,7 @@ from ansible_aom.core.models import (
     WarningType,
 )
 from ansible_aom.core.state_machine import MAX_LOG_LINES
+from ansible_aom.core.stderr_classifier import classify
 
 logger = logging.getLogger(__name__)
 
@@ -193,13 +194,18 @@ class PtyStreamParser:
         self._warnings: list[WarningEntry] = []
         self._plaintext_lines: list[str] = []
         self._current_timestamp: datetime | None = None
+        # Connection tracking: host -> ordered list of active connection_ids.
+        # Populated by aom_connection_acquired / aom_connection_released events
+        # flowing through feed_line. Used by _handle_plaintext to attach the
+        # most-recent connection_id and determine attribution_confidence.
+        self._active_connections: dict[str, list[str]] = {}
 
     def feed_line(self, line: str) -> list[JsonlEvent]:
         """Parse a line and return zero or more events."""
         line_stripped = line.rstrip("\n\r")
 
         if self.phase == StreamPhase.PRE_RUN_PROMPTS:
-            self._handle_plaintext(line_stripped)
+            events = self._handle_plaintext(line_stripped)
 
             if self._is_jsonl_start_event(line_stripped):
                 self.phase = StreamPhase.EXECUTION
@@ -210,7 +216,12 @@ class PtyStreamParser:
                     self._pending_password_prompt = line_stripped
                     return []
 
-            return []
+            # Lines starting with { that aren't a start event are malformed
+            # JSON (e.g. truncated carry). Return empty — not stderr.
+            if line_stripped.startswith("{"):
+                return []
+
+            return events
 
         if self.phase == StreamPhase.EXECUTION:
             if self._is_jsonl_stats_event(line_stripped):
@@ -219,15 +230,22 @@ class PtyStreamParser:
                 return self._parse_and_return(line_stripped)
 
             if self._is_json(line_stripped):
-                return self._parse_and_return(line_stripped)
+                parsed = self._parse_and_return(line_stripped)
+                if parsed:
+                    self._handle_connection_event(parsed[0])
+                return parsed
 
             if self.RECAP_PATTERN.match(line_stripped):
                 self.phase = StreamPhase.POST_RUN_RECAP
                 self._in_recap = True
                 return []
 
-            self._handle_plaintext(line_stripped)
-            return []
+            # Lines starting with { that failed _is_json are malformed JSON
+            # (e.g. truncated carry). Return empty — they are not stderr.
+            if line_stripped.startswith("{"):
+                return []
+
+            return self._handle_plaintext(line_stripped)
 
         if self.phase == StreamPhase.POST_RUN_RECAP:
             self._recap_lines.append(line_stripped)
@@ -253,7 +271,7 @@ class PtyStreamParser:
             pass
         return []
 
-    def _handle_plaintext(self, line: str) -> None:
+    def _handle_plaintext(self, line: str) -> list[JsonlEvent]:
         """Classify and handle non-JSON lines from PTY stream.
 
         Real ansible-playbook output is colorised — warnings come through
@@ -261,8 +279,17 @@ class PtyStreamParser:
         Strip them before pattern-matching so the WARNING_PATTERNS regexes
         (anchored at line start) still match, and store the stripped form
         so downstream UI doesn't have to re-strip.
+
+        Returns:
+            A list containing a synthetic ``aom_stderr_line`` event for
+            non-warning plaintext lines, or an empty list for warnings
+            (which are handled via the existing ``drain_warnings`` path).
         """
         clean = _ANSI_SGR_RE.sub("", line)
+        # Empty or whitespace-only lines are not stderr — return empty.
+        if not clean or not clean.strip():
+            return []
+
         for pattern in self.WARNING_PATTERNS:
             if re.match(pattern, clean):
                 warning_type = WarningType.WARNING
@@ -278,7 +305,23 @@ class PtyStreamParser:
                         timestamp=datetime.now(),
                     )
                 )
-                return
+                return []
+
+        # Classify the line via stderr_classifier and emit a synthetic
+        # aom_stderr_line event so the session recording captures it.
+        classified = classify(clean)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        conn_id, confidence = self._resolve_connection(classified.host)
+        stderr_event: JsonlEvent = {
+            "_event": "aom_stderr_line",
+            "_timestamp": now_iso,
+            "line": line,
+            "source": classified.source.value,
+            "level": classified.level.value,
+            "host": classified.host,
+            "connection_id": conn_id,
+            "attribution_confidence": confidence,
+        }
 
         self._plaintext_lines.append(line)
         # R2: cap plaintext_lines at MAX_LOG_LINES so a long noisy run
@@ -287,6 +330,58 @@ class PtyStreamParser:
         # diagnostics in runner.py.
         if len(self._plaintext_lines) > MAX_LOG_LINES:
             del self._plaintext_lines[: len(self._plaintext_lines) - MAX_LOG_LINES]
+
+        return [stderr_event]
+
+    def _handle_connection_event(self, event: JsonlEvent) -> None:
+        """Update connection tracking state from a connection event.
+
+        Intercepts ``aom_connection_acquired`` and ``aom_connection_released``
+        events that flow through ``feed_line`` in EXECUTION phase. Maintains
+        ``_active_connections`` as a host -> ordered list of active
+        connection_ids so ``_handle_plaintext`` can look up the most-recent
+        connection for a host and determine attribution confidence.
+        """
+        event_type = event.get("_event")
+        host = event.get("host")
+        conn_id = event.get("connection_id")
+        if host is None or conn_id is None:
+            return
+
+        if event_type == "aom_connection_acquired":
+            self._active_connections.setdefault(host, []).append(conn_id)
+        elif event_type == "aom_connection_released":
+            conns = self._active_connections.get(host)
+            if conns and conn_id in conns:
+                conns.remove(conn_id)
+                if not conns:
+                    del self._active_connections[host]
+
+    def _resolve_connection(self, host: str | None) -> tuple[str | None, str]:
+        """Resolve connection_id and attribution_confidence for a stderr line.
+
+        Args:
+            host: The host extracted by the classifier, or None for run-level lines.
+
+        Returns:
+            A ``(connection_id, attribution_confidence)`` pair. Run-level lines
+            (host is None) always get ``(None, "unique")``. Lines with a host
+            that has exactly one active connection get that connection_id and
+            ``"unique"``. Lines with a host that has multiple overlapping active
+            connections get the most-recent connection_id and ``"ambiguous"``.
+            Lines with a host that has no active connections get ``(None, "unique")``.
+        """
+        if host is None:
+            return None, "unique"
+
+        conns = self._active_connections.get(host)
+        if not conns:
+            return None, "unique"
+
+        if len(conns) == 1:
+            return conns[0], "unique"
+
+        return conns[-1], "ambiguous"
 
     def _is_jsonl_start_event(self, line: str) -> bool:
         """Check if line is a JSONL start event.

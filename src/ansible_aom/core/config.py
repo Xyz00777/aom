@@ -19,10 +19,23 @@ class StatusBarConfig(BaseModel):
 
 
 class RedactionConfig(BaseModel):
-    """Secret redaction configuration."""
+    """Secret redaction configuration.
+
+    Layered model (see ``core/redaction.py``):
+    - Layer 1 hard-coded exact-match keys: ``password``, ``vault_password``,
+      ``api_key``, ``private_key``, ``token``, ``secret``, ``passwd``,
+      ``ssh_pass`` (locked in :data:`EXACT_MATCH_SECRET_KEYS`).
+    - Layer 2 user-config: ``custom_fields`` (exact, case-insensitive) and
+      ``custom_key_patterns`` (regex matched against lowercased keys).
+    - ``whitelist`` is added to the default ``DEFAULT_PASSPHRASE_WHITELIST``
+      (e.g. ``passenger_version``) to prevent false positives.
+    - ``custom_patterns`` is regex applied to string values in
+      ``sanitize_string`` (URL, CLI, user-defined shapes).
+    """
 
     whitelist: list[str] = Field(default_factory=list)
     custom_fields: list[str] = Field(default_factory=list)
+    custom_key_patterns: list[str] = Field(default_factory=list)
     custom_patterns: list[dict[str, str]] = Field(default_factory=list)
 
 

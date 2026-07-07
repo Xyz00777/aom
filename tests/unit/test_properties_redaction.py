@@ -38,7 +38,15 @@ from ansible_aom.core.redaction import (
 # Strategies                                                                  #
 # --------------------------------------------------------------------------- #
 
-_DEFAULT_CONFIG = RedactionConfig()
+# QC-002: only Layer 1 exact-match keys are auto-redacted. To preserve the
+# property-test coverage of the broader PASSWORD_MATCH-style keys (db_password,
+# admin-password, mypass), the test uses a RedactionConfig that adds a
+# user-config ``custom_key_patterns`` regex matching any PASSWORD_MATCH-shaped
+# key. This is the documented opt-in path; the new model rejects implicit
+# suffix matching without explicit config.
+_PASSWORD_SHAPED_RE = r"^(?:.+[-_\s])?pass(?:[-_\s]?(?:word|phrase|wrd|wd))?(?:[-_\s].+)?$"
+
+_DEFAULT_CONFIG = RedactionConfig(custom_key_patterns=[_PASSWORD_SHAPED_RE])
 
 
 def _password_shaped_key() -> st.SearchStrategy[str]:

@@ -246,9 +246,7 @@ def _reserve_host_run_state(
         )
         return False
     if state._total_host_run_states >= MAX_TOTAL_HOST_RUN_STATES:
-        state.truncated_events["total_hosts"] = (
-            state.truncated_events.get("total_hosts", 0) + 1
-        )
+        state.truncated_events["total_hosts"] = state.truncated_events.get("total_hosts", 0) + 1
         logger.warning(
             "MAX_TOTAL_HOST_RUN_STATES=%d reached; dropping host %r on task %r",
             MAX_TOTAL_HOST_RUN_STATES,
@@ -493,9 +491,7 @@ class RunState:
             # check — refreshing an existing play's window metadata
             # isn't a memory growth.
             if len(self.plays) >= MAX_PLAYS:
-                self.truncated_events["plays"] = (
-                    self.truncated_events.get("plays", 0) + 1
-                )
+                self.truncated_events["plays"] = self.truncated_events.get("plays", 0) + 1
                 logger.warning(
                     "MAX_PLAYS=%d reached; dropping play %r (%d plays dropped so far)",
                     MAX_PLAYS,
@@ -912,9 +908,7 @@ class RunState:
             # renderer. Re-emits of an existing task_id refresh the
             # entry below and never hit this branch.
             if len(play.tasks) >= MAX_TASKS_PER_PLAY:
-                self.truncated_events["tasks"] = (
-                    self.truncated_events.get("tasks", 0) + 1
-                )
+                self.truncated_events["tasks"] = self.truncated_events.get("tasks", 0) + 1
                 logger.warning(
                     "MAX_TASKS_PER_PLAY=%d reached in play %r; dropping task %r",
                     MAX_TASKS_PER_PLAY,
@@ -1054,9 +1048,7 @@ class RunState:
             # can be the first sighting of a task for a given play,
             # so this is also a possible cap-hit site.
             if len(play.tasks) >= MAX_TASKS_PER_PLAY:
-                self.truncated_events["tasks"] = (
-                    self.truncated_events.get("tasks", 0) + 1
-                )
+                self.truncated_events["tasks"] = self.truncated_events.get("tasks", 0) + 1
                 logger.warning(
                     "MAX_TASKS_PER_PLAY=%d reached in play %r; dropping task %r",
                     MAX_TASKS_PER_PLAY,
@@ -1187,8 +1179,7 @@ class RunState:
                 task.hosts[hostname] = new_hs
 
         if not any(
-            hs.status
-            in (Status.RUNNING, Status.FAILED, Status.UNREACHABLE)
+            hs.status in (Status.RUNNING, Status.FAILED, Status.UNREACHABLE)
             for hs in task.hosts.values()
         ):
             task.status = Status.COMPLETED
@@ -1241,8 +1232,7 @@ class RunState:
                 task.hosts[hostname] = new_hs
 
         if not any(
-            hs.status
-            in (Status.RUNNING, Status.FAILED, Status.UNREACHABLE)
+            hs.status in (Status.RUNNING, Status.FAILED, Status.UNREACHABLE)
             for hs in task.hosts.values()
         ):
             task.status = Status.COMPLETED
@@ -1273,8 +1263,7 @@ class RunState:
                 task.hosts[hostname] = new_hs
 
         if not any(
-            hs.status
-            in (Status.RUNNING, Status.FAILED, Status.UNREACHABLE)
+            hs.status in (Status.RUNNING, Status.FAILED, Status.UNREACHABLE)
             for hs in task.hosts.values()
         ):
             task.status = Status.COMPLETED
@@ -1309,8 +1298,7 @@ class RunState:
         self.status = Status.FAILED
 
         if not any(
-            hs.status
-            in (Status.RUNNING, Status.FAILED, Status.UNREACHABLE)
+            hs.status in (Status.RUNNING, Status.FAILED, Status.UNREACHABLE)
             for hs in task.hosts.values()
         ):
             task.status = Status.COMPLETED

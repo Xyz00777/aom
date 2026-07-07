@@ -636,3 +636,116 @@ def build_detail_block(
         warnings=warnings,
         raw_event=raw_event,
     )
+
+
+def _task_ids_by_play(session: dict) -> dict[str, set[str]]:
+    """Return ``play_name -> task_id`` membership from the task tree."""
+    tree = build_task_tree(session)
+    memberships: dict[str, set[str]] = {}
+
+    for play in tree.children:
+        task_ids: set[str] = set()
+        stack = list(play.children)
+        while stack:
+            node = stack.pop()
+            if node.kind == "task" and node.task_id:
+                task_ids.add(node.task_id)
+            stack.extend(node.children)
+        memberships.setdefault(play.label, set()).update(task_ids)
+
+    return memberships
+
+
+def _connection_ids_by_task_host(events: list[dict]) -> dict[tuple[str, str], str]:
+    """Return the connection id for each (task_id, host) pair."""
+    connections: dict[tuple[str, str], str] = {}
+    for event in events:
+        if event.get("_event") != "aom_connection_acquired":
+            continue
+        conn_id = event.get("connection_id")
+        task_id = event.get("task_id") or event.get("task_uuid")
+        host = event.get("host")
+        if (
+            not isinstance(conn_id, str)
+            or not isinstance(task_id, str)
+            or not isinstance(host, str)
+        ):
+            continue
+        connections.setdefault((task_id, host), conn_id)
+    return connections
+
+
+def _connection_task_ids(events: list[dict]) -> dict[str, str]:
+    """Return ``connection_id -> task_id`` mappings from connection events."""
+    task_ids: dict[str, str] = {}
+    for event in events:
+        if event.get("_event") != "aom_connection_acquired":
+            continue
+        conn_id = event.get("connection_id")
+        task_id = event.get("task_id") or event.get("task_uuid")
+        if isinstance(conn_id, str) and isinstance(task_id, str):
+            task_ids.setdefault(conn_id, task_id)
+    return task_ids
+
+
+def build_verbose_lines(
+    session: dict,
+    *,
+    level: Literal["run", "play", "task"],
+    play_name: str | None = None,
+    task_id: str | None = None,
+    host: str | None = None,
+) -> tuple[str, ...]:
+    """Build the verbose-panel body for one session and focus scope.
+
+    Scope rules are explicit and deterministic:
+
+    - ``run``: only ``aom_stderr_line`` events whose source is
+      ``run_level``.
+    - ``play``: run-level lines plus task-level lines whose connection
+      maps to a task inside the selected play window.
+    - ``task``: run-level lines plus task-level lines for the focused
+      ``(task_id, host)`` connection.
+
+    Ambiguous attribution is surfaced with a leading ``?``.
+    """
+    events = list(session.get("events", []))
+    if not events:
+        return ()
+
+    play_task_ids = _task_ids_by_play(session)
+    connection_task_ids = _connection_task_ids(events)
+    connection_ids = _connection_ids_by_task_host(events)
+
+    selected_connection_id: str | None = None
+    if level == "task" and task_id and host:
+        selected_connection_id = connection_ids.get((task_id, host))
+
+    selected_play_task_ids = play_task_ids.get(play_name or "", set())
+
+    lines: list[str] = []
+    for event in events:
+        if event.get("_event") != "aom_stderr_line":
+            continue
+
+        source = event.get("source")
+        connection_id = event.get("connection_id")
+
+        include = False
+        if source == "run_level":
+            include = True
+        elif level == "play" and isinstance(connection_id, str):
+            task_for_connection = connection_task_ids.get(connection_id)
+            include = bool(task_for_connection and task_for_connection in selected_play_task_ids)
+        elif level == "task" and isinstance(connection_id, str):
+            include = connection_id == selected_connection_id
+
+        if not include:
+            continue
+
+        line = str(event.get("line", ""))
+        if event.get("attribution_confidence") == "ambiguous":
+            line = f"? {line}"
+        lines.append(line)
+
+    return tuple(lines)

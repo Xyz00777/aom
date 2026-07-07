@@ -252,7 +252,12 @@ class TestRecursiveRedaction:
     """Tests for TC-158: Recursive dict/list redaction."""
 
     def test_nested_dict_redaction(self, default_config: RedactionConfig) -> None:
-        """TC-158: Password fields at any depth are redacted."""
+        """TC-158: Exact-match secret keys at any depth are redacted.
+
+        QC-002 note: only keys in the exact-match set (Layer 1) are
+        auto-redacted. ``top_level_password`` and other suffix patterns
+        require a user-config ``custom_key_patterns`` to be added.
+        """
         data = {
             "level1": {
                 "level2": {
@@ -261,13 +266,13 @@ class TestRecursiveRedaction:
                 },
                 "api_key": "key123",
             },
-            "top_level_password": "another_secret",
+            "vault_password": "another_secret",
         }
         result = redact_dict(data, default_config)
         assert result["level1"]["level2"]["password"] == REDACTED
         assert result["level1"]["level2"]["other_field"] == "visible"
         assert result["level1"]["api_key"] == REDACTED
-        assert result["top_level_password"] == REDACTED
+        assert result["vault_password"] == REDACTED
 
     def test_nested_list_with_dicts(self, default_config: RedactionConfig) -> None:
         """TC-158: Password fields in list items are redacted."""
@@ -514,7 +519,13 @@ class TestInvocationModuleArgs:
     """Tests for TC-163: invocation.module_args redaction at -vvv."""
 
     def test_module_args_recursive_redaction(self, default_config: RedactionConfig) -> None:
-        """TC-163: Nested module args with passwords are redacted."""
+        """TC-163: Nested module args with exact-match secret keys are redacted.
+
+        QC-002 note: ``db_password`` is no longer auto-redacted — the user
+        must add a ``custom_key_patterns`` regex (e.g. ``.*_password$``)
+        or include ``db_password`` in ``custom_fields``. This test now
+        uses ``vault_password`` (an exact-match key) for the nested case.
+        """
         event = {
             "res": {
                 "invocation": {
@@ -523,7 +534,7 @@ class TestInvocationModuleArgs:
                         "password": "secret123",
                         "api_key": "key123",
                         "config": {
-                            "db_password": "db_secret",
+                            "vault_password": "db_secret",
                         },
                     }
                 }
@@ -534,24 +545,28 @@ class TestInvocationModuleArgs:
         assert result["res"]["invocation"]["module_args"]["password"] == REDACTED
         # api_key -> REDACTED
         assert result["res"]["invocation"]["module_args"]["api_key"] == REDACTED
-        # db_password -> REDACTED
-        assert result["res"]["invocation"]["module_args"]["config"]["db_password"] == REDACTED
+        # vault_password (nested exact-match) -> REDACTED
+        assert result["res"]["invocation"]["module_args"]["config"]["vault_password"] == REDACTED
         # name -> "nginx" (unchanged)
         assert result["res"]["invocation"]["module_args"]["name"] == "nginx"
 
     def test_deeply_nested_args(self, default_config: RedactionConfig) -> None:
-        """TC-163 edge case: Deeply nested module args."""
+        """TC-163 edge case: Deeply nested module args.
+
+        QC-002: ``secret_key`` is not in the exact-match set. The test
+        uses ``token`` (Layer 1) to keep the same recursion contract.
+        """
         event = {
             "res": {
                 "invocation": {
-                    "module_args": {"level1": {"level2": {"level3": {"secret_key": "hidden"}}}}
+                    "module_args": {"level1": {"level2": {"level3": {"token": "hidden"}}}}
                 }
             }
         }
         result = redact_event(event, default_config)
         # Deeply nested secrets should be redacted
         assert (
-            result["res"]["invocation"]["module_args"]["level1"]["level2"]["level3"]["secret_key"]
+            result["res"]["invocation"]["module_args"]["level1"]["level2"]["level3"]["token"]
             == REDACTED
         )
 
@@ -583,23 +598,27 @@ class TestInvocationModuleArgs:
 
 
 class TestRedactionAlwaysOn:
-    """Tests for TC-164: Redaction is always active, no opt-out."""
+    """Tests for TC-164: Redaction is gated, never silently off.
 
-    def test_no_no_redact_flag_exists(self) -> None:
-        """TC-164: No --no-redact command-line flag exists."""
-        # Verify there is no way to disable redaction
-        # This is a documentation/design test, not a runtime test
-        # The implementation should NOT have a --no-redact flag
+    v1 design (QC-003, Q4=B): ``--no-redact`` exists as a global flag
+    for local debugging, but the CLI prompts for confirmation in TTY
+    mode and refuses in non-interactive mode unless ``--yes`` is also
+    supplied. The always-on redaction property is preserved by these
+    safety gates, not by removing the flag itself.
+    """
+
+    def test_no_redact_flag_exists(self) -> None:
+        """v1: --no-redact is a real CLI flag (with safety gates; see other tests)."""
         from ansible_aom.cli import create_parser
 
         parser = create_parser()
         help_text = parser.format_help()
-        # Check that --no-redact is NOT in the help text
-        assert "--no-redact" not in help_text
+        assert "--no-redact" in help_text
+        # --no-redaction would be a confusing alias; keep the surface to
+        # a single canonical name.
         assert "--no-redaction" not in help_text
-        # Verify parsing --no-redact should error
-        with pytest.raises(SystemExit):
-            parser.parse_args(["--no-redact"])
+        args = parser.parse_args(["--no-redact", "playbook.yml"])
+        assert args.no_redact is True
 
     def test_redaction_cannot_be_disabled(self) -> None:
         """TC-164: Redaction cannot be disabled at runtime."""
@@ -646,19 +665,24 @@ class TestRedactionInTUIDisplay:
     """Tests for TC-166: Redaction in TUI display."""
 
     def test_all_panels_show_redacted(self, default_config: RedactionConfig) -> None:
-        """TC-166: All TUI panels show "********" for sensitive fields."""
+        """TC-166: All TUI panels show "********" for sensitive fields.
+
+        QC-002: ``secret_key`` is not in the Layer 1 exact-match set;
+        ``api_key`` is. This test now uses ``api_key`` for the nested
+        invocation.module_args case.
+        """
         # Tree view, log panel, summary panel should all show redacted
         event = {
             "res": {
                 "password": "secret",
                 "token": "token123",
-                "invocation": {"module_args": {"secret_key": "hidden"}},
+                "invocation": {"module_args": {"api_key": "hidden"}},
             }
         }
         result = redact_event(event, default_config)
         assert result["res"]["password"] == REDACTED
         assert result["res"]["token"] == REDACTED
-        assert result["res"]["invocation"]["module_args"]["secret_key"] == REDACTED
+        assert result["res"]["invocation"]["module_args"]["api_key"] == REDACTED
 
 
 class TestRedactionInInspectOutput:
@@ -684,11 +708,13 @@ class TestRedactionInJSONOutput:
         """TC-168: `aom inspect --json` shows redacted values."""
         import json
 
-        # JSON export should have passwords as "********"
+        # JSON export should have secret values as "********".
+        # QC-002: only Layer 1 exact-match keys are auto-redacted.
+        # ``api_token`` is not in the exact-match set — use ``api_key``.
         event = {
             "res": {
                 "password": "secret123",
-                "api_token": "token456",
+                "api_key": "token456",
             }
         }
         result = redact_event(event, default_config)
@@ -704,17 +730,22 @@ class TestRedactionInSessionArtifacts:
     """Tests for TC-169: Redaction in .aom session artifacts."""
 
     def test_artifact_file_redacted(self, default_config: RedactionConfig) -> None:
-        """TC-169: .aom session artifacts always redacted."""
+        """TC-169: .aom session artifacts always redacted.
+
+        QC-002: ``credential`` is not in the Layer 1 exact-match set;
+        use ``token`` (which is) to keep the same artifact-redaction
+        contract being tested.
+        """
         # Written artifact files should never contain plaintext passwords
         event = {
             "res": {
                 "password": "plaintext_secret",
-                "credential": "admin_creds",
+                "token": "admin_creds",
             }
         }
         result = redact_event(event, default_config)
         assert result["res"]["password"] == REDACTED
-        assert result["res"]["credential"] == REDACTED
+        assert result["res"]["token"] == REDACTED
 
 
 # =============================================================================
@@ -955,15 +986,22 @@ class TestRedactionHelperFunctions:
     """Tests for helper functions in redaction module."""
 
     def test_should_redact_function(self, default_config: RedactionConfig) -> None:
-        """should_redact() correctly identifies redactable fields."""
+        """should_redact() correctly identifies redactable fields.
+
+        QC-002: only Layer 1 exact-match keys are auto-redacted.
+        ``ansible_ssh_pass`` is no longer in the default set — the user
+        must add a ``custom_key_patterns`` regex (e.g. ``^ansible_.*_pass$``)
+        to opt in to the ``ansible_*`` prefix.
+        """
         # This tests the function signature:
         # def should_redact(key: str, config: RedactionConfig) -> bool
 
-        # Password keys -> True
+        # Exact-match keys (Layer 1) -> True
         assert should_redact("password", default_config) is True
         assert should_redact("api_key", default_config) is True
         assert should_redact("secret", default_config) is True
-        assert should_redact("ansible_ssh_pass", default_config) is True
+        assert should_redact("ssh_pass", default_config) is True
+        assert should_redact("vault_password", default_config) is True
 
         # Whitelist keys -> False
         assert should_redact("passenger_version", default_config) is False

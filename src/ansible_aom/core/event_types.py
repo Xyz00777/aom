@@ -119,6 +119,13 @@ class JsonlEvent(TypedDict, total=False):
       ``v2_playbook_on_stats`` in canonical output.
     - ``res``: result dict on runner events (used by
       :mod:`core.redaction`).
+    - ``line``: raw line text on ``aom_stderr_line`` synthetic events.
+    - ``source``: stderr source classification on ``aom_stderr_line``.
+    - ``level``: verbosity caplevel on ``aom_stderr_line``.
+    - ``connection_id``: connection UUID on ``aom_stderr_line`` (may be
+      ``None`` for run-level lines).
+    - ``attribution_confidence``: ``"unique"`` or ``"ambiguous"`` on
+      ``aom_stderr_line``.
     """
 
     _event: str
@@ -126,9 +133,14 @@ class JsonlEvent(TypedDict, total=False):
     playbook: dict[str, Any]
     play: JsonlPlay
     task: JsonlTask | str | None
-    host: str
+    host: str | None
     hosts: dict[str, JsonlHostResult]
     stats: dict[str, JsonlHostStats]
     custom_stats: dict[str, Any]
     global_custom_stats: dict[str, Any]
     res: dict[str, Any]
+    line: str
+    source: str
+    level: int
+    connection_id: str | None
+    attribution_confidence: str
