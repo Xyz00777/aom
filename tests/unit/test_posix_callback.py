@@ -87,12 +87,15 @@ class TestAnsiblePosixInstallPrompt:
     """
 
     def test_fallback_selects_ansible_posix_jsonl(self, monkeypatch) -> None:
-        """TC-068: When bundled dir unavailable, env selects ansible.posix.jsonl.
+        """TC-068: When bundled stdout dir unavailable, env selects ansible.posix.jsonl.
 
         The fallback IS the prompt response: we silently select the
-        upstream callback rather than blocking on user input.
+        upstream callback rather than blocking on user input. The
+        connection-callback dir (Task 5.3) is patched to None so this
+        test isolates the stdout-callback fallback path.
         """
         monkeypatch.setattr(runner, "_bundled_callback_dir", lambda: None)
+        monkeypatch.setattr(runner, "_bundled_connection_callback_dir", lambda: None)
 
         env = runner._callback_env()
 
@@ -255,9 +258,16 @@ class TestJsonlEnvironmentVariable:
         assert merged["ANSIBLE_STDOUT_CALLBACK"] == "ansible.posix.jsonl"
 
     def test_callback_env_bundled_sets_callback_plugins(self, monkeypatch) -> None:
-        """TC-071: Bundled selection includes ANSIBLE_CALLBACK_PLUGINS path."""
+        """TC-071: Bundled stdout selection includes ANSIBLE_CALLBACK_PLUGINS path.
+
+        Task 5.3: the connection-callback dir is also injected when it
+        resolves. We patch it to None here so the test asserts the
+        pre-5.3 single-dir contract; the multi-dir contract is covered
+        in tests/unit/test_callback_env.py::TestCallbackEnv.
+        """
         fake_dir = Path("/bundled/callback")
         monkeypatch.setattr(runner, "_bundled_callback_dir", lambda: fake_dir)
+        monkeypatch.setattr(runner, "_bundled_connection_callback_dir", lambda: None)
 
         env = runner._callback_env()
 
@@ -269,8 +279,11 @@ class TestJsonlEnvironmentVariable:
 
         We rely on ansible's default plugin search path for
         ansible.posix.jsonl — no need to inject a custom plugins dir.
+        Task 5.3: the connection-callback dir is patched to None so this
+        test isolates the stdout-callback fallback contract.
         """
         monkeypatch.setattr(runner, "_bundled_callback_dir", lambda: None)
+        monkeypatch.setattr(runner, "_bundled_connection_callback_dir", lambda: None)
 
         env = runner._callback_env()
 

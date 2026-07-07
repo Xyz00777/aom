@@ -102,10 +102,12 @@ class TestPtyStreamParserSurvivesMojibake:
         parser.feed_line(start_event)
         assert parser.phase == StreamPhase.EXECUTION
 
-        # Inject a line of pure mojibake.
+        # Inject a line of pure mojibake — it's legitimate stderr plaintext
+        # and should emit an aom_stderr_line event, not crash.
         garbage = _decode_pexpect_style(b"\xc3\x28\xff\xfe random bytes")
         out = parser.feed_line(garbage)
-        assert out == []
+        assert len(out) == 1
+        assert out[0]["_event"] == "aom_stderr_line"
         assert parser.phase == StreamPhase.EXECUTION  # phase preserved
 
         # Next valid event still routes correctly.

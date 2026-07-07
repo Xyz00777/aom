@@ -98,7 +98,13 @@ def test_drive_exits_promptly_when_child_dead_but_pty_open() -> None:
     child = _FakeChildIsaliveDead(line_count=100_000)
     start = time.monotonic()
     exit_code = _drive(
-        child, parser, RunState(playbook="x"), renderer, timeout=0.01, sink=sink, diag=None  # noqa: F841
+        child,
+        parser,
+        RunState(playbook="x"),
+        renderer,
+        timeout=0.01,
+        sink=sink,
+        diag=None,  # noqa: F841
     )
     elapsed = time.monotonic() - start
 

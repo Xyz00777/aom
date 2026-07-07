@@ -1389,6 +1389,7 @@ class TestFreeStrategyMetaTaskVisibility:
     - tests/unit/test_play_boundary_state.py::test_meta_task_force_completed_across_plays
     - tests/unit/test_models.py::TestLinearForceCompletion::test_meta_task_force_completed_under_linear
     """
+
     def test_meta_task_emits_no_events_under_free_strategy(self) -> None:
         """Linear: meta task emits task_start + gets force-completed by next task_start."""
         # Use the existing linear scenario as the documented reality.
@@ -1403,29 +1404,49 @@ class TestFreeStrategyMetaTaskVisibility:
                 hosts="all",
                 resolved_hosts=["ipa1"],
                 tasks=[
-                    TaskDefinition(name="Reset connection", role=None, tags=[], play_id="1", play_order=0, task_order=0),
-                    TaskDefinition(name="Next task", role=None, tags=[], play_id="1", play_order=0, task_order=1),
+                    TaskDefinition(
+                        name="Reset connection",
+                        role=None,
+                        tags=[],
+                        play_id="1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="Next task",
+                        role=None,
+                        tags=[],
+                        play_id="1",
+                        play_order=0,
+                        task_order=1,
+                    ),
                 ],
             )
         ]
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"})
-        state.handle_event({
-            "_event": "v2_playbook_on_play_start",
-            "_timestamp": "2026-05-23T10:00:01Z",
-            "play": {"id": "play-1", "name": "test"},
-        })
-        state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-05-23T10:00:02Z",
-            "task": {"id": "uuid-meta", "name": "Reset connection"},
-            "play": {"id": "play-1"},
-        })
-        state.handle_event({
-            "_event": "v2_playbook_on_task_start",
-            "_timestamp": "2026-05-23T10:01:00Z",
-            "task": {"id": "uuid-next", "name": "Next task"},
-            "play": {"id": "play-1"},
-        })
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:01Z",
+                "play": {"id": "play-1", "name": "test"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:02Z",
+                "task": {"id": "uuid-meta", "name": "Reset connection"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:01:00Z",
+                "task": {"id": "uuid-next", "name": "Next task"},
+                "play": {"id": "play-1"},
+            }
+        )
 
         play = state.plays["play-1"]
         meta_task = play.tasks["uuid-meta"]
@@ -1449,14 +1470,41 @@ class TestRunnerTaskCompletionPromotion:
         state = RunState(playbook="test.yml")
         state.definitions = [
             PlayDefinition(
-                id="1", name="test", hosts="all", resolved_hosts=["web1"],
-                tasks=[TaskDefinition(name="task", role=None, tags=[], play_id="1", play_order=0, task_order=0)],
+                id="1",
+                name="test",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="task", role=None, tags=[], play_id="1", play_order=0, task_order=0
+                    )
+                ],
             )
         ]
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"})
-        state.handle_event({"_event": "v2_playbook_on_play_start", "_timestamp": "2026-05-23T10:00:01Z", "play": {"id": "play-1", "name": "test"}})
-        state.handle_event({"_event": "v2_playbook_on_task_start", "_timestamp": "2026-05-23T10:00:02Z", "task": {"id": "t1", "name": "task"}, "play": {"id": "play-1"}})
-        state.handle_event({"_event": "v2_runner_on_ok", "_timestamp": "2026-05-23T10:00:03Z", "task": {"id": "t1", "name": "task"}, "hosts": {"web1": {"ok": True, "changed": False}}})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:01Z",
+                "play": {"id": "play-1", "name": "test"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:02Z",
+                "task": {"id": "t1", "name": "task"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-23T10:00:03Z",
+                "task": {"id": "t1", "name": "task"},
+                "hosts": {"web1": {"ok": True, "changed": False}},
+            }
+        )
         task = state.plays["play-1"].tasks["t1"]
         assert task.status == Status.COMPLETED, (
             "task.status must be COMPLETED after the only host reaches OK; "
@@ -1468,15 +1516,42 @@ class TestRunnerTaskCompletionPromotion:
         state = RunState(playbook="test.yml")
         state.definitions = [
             PlayDefinition(
-                id="1", name="test", hosts="all", resolved_hosts=["web1", "web2"],
-                tasks=[TaskDefinition(name="task", role=None, tags=[], play_id="1", play_order=0, task_order=0)],
+                id="1",
+                name="test",
+                hosts="all",
+                resolved_hosts=["web1", "web2"],
+                tasks=[
+                    TaskDefinition(
+                        name="task", role=None, tags=[], play_id="1", play_order=0, task_order=0
+                    )
+                ],
             )
         ]
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"})
-        state.handle_event({"_event": "v2_playbook_on_play_start", "_timestamp": "2026-05-23T10:00:01Z", "play": {"id": "play-1", "name": "test"}})
-        state.handle_event({"_event": "v2_playbook_on_task_start", "_timestamp": "2026-05-23T10:00:02Z", "task": {"id": "t1", "name": "task"}, "play": {"id": "play-1"}})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:01Z",
+                "play": {"id": "play-1", "name": "test"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:02Z",
+                "task": {"id": "t1", "name": "task"},
+                "play": {"id": "play-1"},
+            }
+        )
         # web1 OK, web2 still RUNNING
-        state.handle_event({"_event": "v2_runner_on_ok", "_timestamp": "2026-05-23T10:00:03Z", "task": {"id": "t1", "name": "task"}, "hosts": {"web1": {"ok": True, "changed": False}}})
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-23T10:00:03Z",
+                "task": {"id": "t1", "name": "task"},
+                "hosts": {"web1": {"ok": True, "changed": False}},
+            }
+        )
         task = state.plays["play-1"].tasks["t1"]
         assert task.status == Status.RUNNING, (
             "task.status must remain RUNNING while at least one host is RUNNING."
@@ -1487,14 +1562,44 @@ class TestRunnerTaskCompletionPromotion:
         state = RunState(playbook="test.yml")
         state.definitions = [
             PlayDefinition(
-                id="1", name="test", hosts="all", resolved_hosts=["web1", "web2"],
-                tasks=[TaskDefinition(name="task", role=None, tags=[], play_id="1", play_order=0, task_order=0)],
+                id="1",
+                name="test",
+                hosts="all",
+                resolved_hosts=["web1", "web2"],
+                tasks=[
+                    TaskDefinition(
+                        name="task", role=None, tags=[], play_id="1", play_order=0, task_order=0
+                    )
+                ],
             )
         ]
         state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-23T10:00:00Z"})
-        state.handle_event({"_event": "v2_playbook_on_play_start", "_timestamp": "2026-05-23T10:00:01Z", "play": {"id": "play-1", "name": "test"}})
-        state.handle_event({"_event": "v2_playbook_on_task_start", "_timestamp": "2026-05-23T10:00:02Z", "task": {"id": "t1", "name": "task"}, "play": {"id": "play-1"}})
-        state.handle_event({"_event": "v2_runner_on_ok", "_timestamp": "2026-05-23T10:00:03Z", "task": {"id": "t1", "name": "task"}, "hosts": {"web1": {"ok": True, "changed": False}, "web2": {"ok": True, "changed": False}}})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-23T10:00:01Z",
+                "play": {"id": "play-1", "name": "test"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-23T10:00:02Z",
+                "task": {"id": "t1", "name": "task"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-23T10:00:03Z",
+                "task": {"id": "t1", "name": "task"},
+                "hosts": {
+                    "web1": {"ok": True, "changed": False},
+                    "web2": {"ok": True, "changed": False},
+                },
+            }
+        )
         task = state.plays["play-1"].tasks["t1"]
         assert task.status == Status.COMPLETED, (
             "task.status must be COMPLETED once all hosts reach terminal status."

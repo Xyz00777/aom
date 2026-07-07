@@ -118,9 +118,7 @@ def test_post_stats_watchdog_drops_to_quiet_after_end_time() -> None:
     # we just need the side-effect (end_time set) to observe the
     # watchdog transition.
     state.handle_event(json.loads(_stats_line()))
-    assert state.end_time is not None, (
-        "test prerequisite: stats event must populate end_time"
-    )
+    assert state.end_time is not None, "test prerequisite: stats event must populate end_time"
 
     child = _RecordingChild(
         [

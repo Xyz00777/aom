@@ -107,15 +107,19 @@ class TestR6SurrogateescapeRoundTrip:
         # json.loads back to the same surrogate-bearing str; encoding
         # with surrogateescape must yield the original bytes.
         recorded = _read_jsonl(events_file)
-        # Two events: the synthetic start event plus the failed event
-        # whose msg carries the surrogate-escaped bytes.
-        assert len(recorded) == 2
-        assert [e["_event"] for e in recorded] == [
+        # Phase 4.4: preflight errors are now recorded as
+        # ``aom_stderr_line`` events, so a session may contain those
+        # in addition to the JSONL events the fake ansible emitted.
+        # Filter to the JSONL events the runner is supposed to forward
+        # via ``record_event`` to assert on the R6 round-trip contract.
+        jsonl_events = [e for e in recorded if e["_event"] != "aom_stderr_line"]
+        assert len(jsonl_events) == 2
+        assert [e["_event"] for e in jsonl_events] == [
             "v2_playbook_on_start",
             "v2_runner_on_failed",
         ]
 
-        msg_str = recorded[1]["hosts"]["web1"]["msg"]
+        msg_str = jsonl_events[1]["hosts"]["web1"]["msg"]
         # No raw replacement char (U+FFFD) — the surrogate codepoints
         # are preserved instead, so we can recover the bytes.
         assert "\ufffd" not in msg_str

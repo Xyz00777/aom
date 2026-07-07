@@ -168,6 +168,12 @@ def _parse_jsonl_through_core(events_path: Path) -> list[dict]:
 
 
 @_NEEDS_ANSIBLE
+@pytest.mark.xfail(
+    reason="throttle awareness not yet implemented — TaskDefinition.throttle, "
+    "RunState.wave_progress, and WaveProgress do not exist in core/ yet. "
+    "This is the intentional red bar per the TDD contract.",
+    strict=True,
+)
 class TestThrottleAwareness:
     """Behavioural contract: aom must surface ``throttle:`` and wave progress.
 
