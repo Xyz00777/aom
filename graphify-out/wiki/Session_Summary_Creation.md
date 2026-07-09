@@ -1,31 +1,35 @@
 # Session Summary Creation
 
-> 4 nodes · cohesion 0.50
+> 11 nodes · cohesion 0.18
 
 ## Key Concepts
 
-- **summary.py** (5 connections) — `src/ansible_aom/session/summary.py`
-- **create_session_summary()** (4 connections) — `src/ansible_aom/session/summary.py`
-- **Pure post-mortem projections of a loaded session.  These functions take a sessio** (1 connections) — `src/ansible_aom/session/summary.py`
-- **Create a human-readable summary of a session.      Args:         session: Sessio** (1 connections) — `src/ansible_aom/session/summary.py`
+- **R1 — JSONL Carry Buffer Implementation Plan** (10 connections) — `docs/superpowers/plans/2026-05-12-r1-jsonl-carry-buffer.md`
+- **2026-05-12-r1-jsonl-carry-buffer.md** (1 connections) — `docs/superpowers/plans/2026-05-12-r1-jsonl-carry-buffer.md`
+- **Done** (1 connections) — `docs/superpowers/plans/2026-05-12-r1-jsonl-carry-buffer.md`
+- **File Map** (1 connections) — `docs/superpowers/plans/2026-05-12-r1-jsonl-carry-buffer.md`
+- **Pre-flight** (1 connections) — `docs/superpowers/plans/2026-05-12-r1-jsonl-carry-buffer.md`
+- **Task 1: Pin two-chunk join behaviour with a failing test** (1 connections) — `docs/superpowers/plans/2026-05-12-r1-jsonl-carry-buffer.md`
+- **Task 2: Pin many-chunk slow-drip behaviour** (1 connections) — `docs/superpowers/plans/2026-05-12-r1-jsonl-carry-buffer.md`
+- **Task 3: Pin overflow-drop behaviour at the 1 MB cap** (1 connections) — `docs/superpowers/plans/2026-05-12-r1-jsonl-carry-buffer.md`
+- **Task 4: Sanity check — well-formed lines bypass the carry path** (1 connections) — `docs/superpowers/plans/2026-05-12-r1-jsonl-carry-buffer.md`
+- **Task 5: Pin unknown-event fall-through in `RunState.handle_event`** (1 connections) — `docs/superpowers/plans/2026-05-12-r1-jsonl-carry-buffer.md`
+- **Task 6: Final verification** (1 connections) — `docs/superpowers/plans/2026-05-12-r1-jsonl-carry-buffer.md`
 
 ## Relationships
 
-- [[Host Collection Helpers]] (2 shared connections)
-- [[Failed Host Collection]] (1 shared connections)
-- [[Playbook Event Parsing]] (1 shared connections)
-- [[Inspect CLI Commands]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `src/ansible_aom/session/summary.py`
+- `docs/superpowers/plans/2026-05-12-r1-jsonl-carry-buffer.md`
 
 ## Audit Trail
 
-- EXTRACTED: 10 (91%)
-- INFERRED: 1 (9%)
+- EXTRACTED: 20 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

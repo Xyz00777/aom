@@ -1,0 +1,1 @@
+{"_event": "aom_stderr_line", "source": "ssh_debug", "host": "web1", "level": 4, "line": "<web1> SSH: ansible.cfg set ssh_args: (-C)(-o)(ControlMaster=auto)"}

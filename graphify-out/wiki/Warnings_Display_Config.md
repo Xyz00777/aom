@@ -1,63 +1,55 @@
 # Warnings Display Config
 
-> 38 nodes · cohesion 0.08
+> 51 nodes · cohesion 0.05
 
 ## Key Concepts
 
-- **WarningsConfig** (45 connections) — `src/ansible_aom/core/config.py`
-- **TestWarningsConfig** (17 connections) — `tests/unit/test_warnings.py`
-- **TestWarningsConfig** (13 connections) — `tests/unit/test_config.py`
-- **.test_warnings_config_both_false()** (3 connections) — `tests/unit/test_config.py`
-- **.test_warnings_config_can_disable_deprecations()** (3 connections) — `tests/unit/test_config.py`
-- **.test_warnings_config_can_disable_warnings()** (3 connections) — `tests/unit/test_config.py`
-- **.test_warnings_config_default_show_deprecations_true()** (3 connections) — `tests/unit/test_config.py`
-- **.test_warnings_config_default_show_warnings_true()** (3 connections) — `tests/unit/test_config.py`
-- **.test_warnings_config_show_deprecations_is_bool()** (3 connections) — `tests/unit/test_config.py`
-- **.test_warnings_config_show_warnings_is_bool()** (3 connections) — `tests/unit/test_config.py`
-- **.test_warnings_config_both_false()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_warnings_config_both_true_explicit()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_warnings_config_default_values()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_warnings_config_from_dict()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_warnings_config_json_serialization()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_warnings_config_model_dump()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_warnings_config_model_validation()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_warnings_config_show_deprecations_false()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_warnings_config_show_warnings_false()** (3 connections) — `tests/unit/test_warnings.py`
-- **Warning display configuration.** (1 connections) — `src/ansible_aom/core/config.py`
-- **Tests for WarningsConfig model - Section 8.** (1 connections) — `tests/unit/test_config.py`
-- **WarningsConfig has show_warnings=True by default.** (1 connections) — `tests/unit/test_config.py`
-- **WarningsConfig has show_deprecations=True by default.** (1 connections) — `tests/unit/test_config.py`
-- **show_warnings can be set to False.** (1 connections) — `tests/unit/test_config.py`
-- **show_deprecations can be set to False.** (1 connections) — `tests/unit/test_config.py`
-- *... and 13 more nodes in this community*
+- **RedactionConfig** (47 connections)
+- **TestSanitizationAppliedFields** (8 connections) — `tests/unit/test_redaction.py`
+- **TestLayer1AnsibleNoLog** (7 connections) — `tests/unit/test_redaction.py`
+- **TestRedactionIntegration** (7 connections) — `tests/unit/test_redaction.py`
+- **TestInvocationModuleArgs** (6 connections) — `tests/unit/test_redaction.py`
+- **TestRedactionConfigModel** (6 connections) — `tests/unit/test_redaction.py`
+- **.test_deeply_nested_args()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_module_args_list_values()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_module_args_recursive_redaction()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_no_log_censors_result_field()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_no_log_loop_items_individually_censored()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_no_log_mixed_loop_items()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_no_log_replaces_entire_result()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_empty_event_handling()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_full_event_redaction()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_layer1_takes_precedence()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_non_dict_value_handling()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_all_fields_together()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_cmd_field_sanitized()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_msg_field_sanitized()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_stderr_field_sanitized()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_stdout_field_sanitized()** (4 connections) — `tests/unit/test_redaction.py`
+- **custom_config()** (3 connections) — `tests/unit/test_redaction.py`
+- **.test_config_with_values()** (3 connections) — `tests/unit/test_redaction.py`
+- **.test_default_config_has_empty_lists()** (3 connections) — `tests/unit/test_redaction.py`
+- *... and 26 more nodes in this community*
 
 ## Relationships
 
-- [[App Configuration Settings]] (9 shared connections)
-- [[App Config Model Tests]] (5 shared connections)
-- [[Warning Classification Tests]] (4 shared connections)
-- [[Pydantic Model Basics]] (2 shared connections)
-- [[Status Bar Warning Panels]] (2 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
-- [[Compact Display Module Layout]] (1 shared connections)
-- [[JSON Output Renderer]] (1 shared connections)
-- [[Config Loading Screen]] (1 shared connections)
-- [[Config Loading Tests]] (1 shared connections)
-- [[Redaction Config Model]] (1 shared connections)
-- [[StatusBarConfig Model]] (1 shared connections)
+- [TUI Tree View Tests](TUI_Tree_View_Tests.md) (15 shared connections)
+- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (12 shared connections)
+- [Rerun Round Trip Tests](Rerun_Round_Trip_Tests.md) (11 shared connections)
+- [Status Bar Elements](Status_Bar_Elements.md) (7 shared connections)
+- [Run State Summary Panel](Run_State_Summary_Panel.md) (5 shared connections)
+- [Community 463](Community_463.md) (4 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/config.py`
-- `tests/unit/test_config.py`
-- `tests/unit/test_warnings.py`
+- `tests/unit/test_redaction.py`
 
 ## Audit Trail
 
-- EXTRACTED: 75 (53%)
-- INFERRED: 67 (47%)
+- EXTRACTED: 161 (88%)
+- INFERRED: 21 (12%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

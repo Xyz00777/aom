@@ -30,7 +30,9 @@ from __future__ import annotations
 import statistics
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+
+from ansible_aom.core.event_types import JsonlEvent
+from ansible_aom.core.timestamp import parse_iso_timestamp
 
 # Need this many host-task duration samples before P25 is meaningful.
 # Below this we report sample count but no percentile.
@@ -65,7 +67,7 @@ class OverheadStats:
     overhead_share: float | None
 
 
-def analyze_overhead(events: list[dict[str, Any]]) -> OverheadStats:
+def analyze_overhead(events: list[JsonlEvent]) -> OverheadStats:
     """Return the overhead summary for a recorded session's events.
 
     Args:
@@ -95,12 +97,14 @@ def analyze_overhead(events: list[dict[str, Any]]) -> OverheadStats:
             pb_end = ts
             continue
         if kind == "v2_playbook_on_task_start" and ts is not None:
-            task_id = event.get("task", {}).get("id")
+            task = event.get("task")
+            task_id = task.get("id") if isinstance(task, dict) else None
             if task_id:
                 task_starts[task_id] = ts
             continue
         if kind in _RUNNER_RESULT_EVENTS and ts is not None:
-            task_id = event.get("task", {}).get("id")
+            task = event.get("task")
+            task_id = task.get("id") if isinstance(task, dict) else None
             if not task_id or task_id not in task_starts:
                 continue
             duration = (ts - task_starts[task_id]).total_seconds()
@@ -154,8 +158,7 @@ def _parse_iso8601(ts: str) -> datetime | None:
     analysis is best-effort; one bad timestamp shouldn't poison the run.
     """
     try:
-        # Python's fromisoformat accepts "Z" suffix since 3.11.
-        return datetime.fromisoformat(ts)
+        return parse_iso_timestamp(ts)
     except ValueError:
         return None
 

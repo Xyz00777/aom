@@ -11,9 +11,12 @@ Both halves of the replay subcommand live here:
 * :class:`ReplayDriver` wraps that loop behind the :class:`EventSource`
   protocol so ``cli.py`` only sees the two-protocol composition root.
 
-Replay deliberately reproduces ONLY what's in ``events.jsonl``. AOM-
-emitted artefacts that never made it into the JSONL stream are not
-replayed:
+Replay deliberately reproduces only the **live** stream of JSONL
+events that the original run produced (the ``v2_*`` ansible callbacks
+plus ``aom_connection_*`` lifecycle events). AOM-emitted artefacts
+that were never part of the live renderer stream are skipped on
+replay, even when they live in ``events.jsonl`` for post-mortem
+inspection:
 
 * ``renderer.add_warning(...)`` calls (preflight errors, R3
   recording-disabled warning, deprecation surfacing).
@@ -21,7 +24,13 @@ replayed:
   renderer rebuilds its tree from ``v2_playbook_on_play_start`` /
   ``v2_playbook_on_task_start`` events).
 * Password-prompt log lines emitted by the runner.
-* stderr lines from ``stderr.log``.
+* ``aom_stderr_line`` synthetic events (Phase 4 — the stderr stream
+  that used to live in ``stderr.log``). They are recorded for
+  ``aom inspect`` but are not part of the live renderer view, so
+  replay skips them too. This keeps record→replay round-trips stable:
+  a preflight ``aom_stderr_line`` written by ``record_stderr`` (which
+  the runner does not forward to ``update_state``) would otherwise
+  appear in the replayed sequence but not the recorded one.
 
 Document this in ``aom replay --help`` (see :func:`cli_main`).
 """
@@ -37,6 +46,7 @@ from typing import Callable
 
 import argcomplete
 
+from ansible_aom.core.timestamp import parse_iso_timestamp
 from ansible_aom.renderer.factory import create_renderer
 from ansible_aom.renderer.protocol import Renderer
 from ansible_aom.session.store import load_session
@@ -47,9 +57,7 @@ def _parse_timestamp(value: object) -> datetime | None:
     if not isinstance(value, str) or not value:
         return None
     try:
-        # Replace trailing Z with +00:00 because fromisoformat (pre-3.11
-        # was strict; 3.11+ accepts Z but be explicit anyway).
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parse_iso_timestamp(value)
     except ValueError:
         return None
 
@@ -85,7 +93,12 @@ def replay_session(
         return 1
 
     playbook = session.get("playbook", "")
-    events = list(session.get("events", []))
+    # Phase 4: ``aom_stderr_line`` synthetic events live in events.jsonl
+    # for post-mortem inspection but are NOT part of the live renderer
+    # stream (the runner's ``record_stderr`` writes them without calling
+    # ``update_state``). Replay must skip them so the replayed event
+    # sequence matches the recorded one.
+    events = [e for e in session.get("events", []) if e.get("_event") != "aom_stderr_line"]
 
     renderer.start(playbook, [])
     interrupted = False

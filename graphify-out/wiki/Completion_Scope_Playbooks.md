@@ -1,39 +1,33 @@
 # Completion Scope Playbooks
 
-> 10 nodes · cohesion 0.22
+> 6 nodes · cohesion 0.33
 
 ## Key Concepts
 
-- **Integration Playbook 1: Happy Path** (7 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
-- **Integration Playbook 12: Interrupt & Signals** (4 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
-- **Cross-Play Completion Scope (same-play only)** (2 connections) — `.sisyphus/notepads/implementation/decisions.md`
-- **Strategy Detection (linear/free/lockstep)** (2 connections) — `.sisyphus/notepads/implementation/decisions.md`
-- **v2_runner_on_start** (2 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
-- **COMPLETED state** (2 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
-- **IDLE state** (2 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
-- **RUNNING state** (2 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
-- **tests/playbooks/01-single-task-success/site.yml** (1 connections) — `tests/playbooks/01-single-task-success/site.yml`
-- **tests/playbooks/02-single-task-changed/site.yml** (1 connections) — `tests/playbooks/02-single-task-changed/site.yml`
+- **Integration Playbook 6: Handlers & Conditionals** (3 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **tests/playbooks/05-skipped-tasks/site.yml** (2 connections) — `tests/playbooks/05-skipped-tasks/site.yml`
+- **tests/playbooks/09-handler-tasks/site.yml** (2 connections) — `tests/playbooks/09-handler-tasks/site.yml`
+- **v2_playbook_on_handler_task_start** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **v2_runner_on_skipped** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **tests/playbooks/29-tags/site.yml** (1 connections) — `tests/playbooks/29-tags/site.yml`
 
 ## Relationships
 
-- [[Compact Display Module Layout]] (2 shared connections)
-- [[Integration Test Playbooks]] (2 shared connections)
-- [[Integration Event Hooks]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
 - `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
-- `.sisyphus/notepads/implementation/decisions.md`
-- `tests/playbooks/01-single-task-success/site.yml`
-- `tests/playbooks/02-single-task-changed/site.yml`
+- `tests/playbooks/05-skipped-tasks/site.yml`
+- `tests/playbooks/09-handler-tasks/site.yml`
+- `tests/playbooks/29-tags/site.yml`
 
 ## Audit Trail
 
-- EXTRACTED: 19 (76%)
-- INFERRED: 6 (24%)
-- AMBIGUOUS: 0 (0%)
+- EXTRACTED: 2 (20%)
+- INFERRED: 6 (60%)
+- AMBIGUOUS: 2 (20%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

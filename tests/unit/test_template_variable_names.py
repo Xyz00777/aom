@@ -344,3 +344,266 @@ class TestTemplateVariableNameMismatch:
             f"completed template task should not appear in tree, got: "
             f"{[(ln.label, ln.status) for ln in template_tasks]}"
         )
+
+    def test_template_variable_with_punctuation_suffix(self):
+        """Regression: preflight name `Ensure {{ user }}'s home exists` must
+        match the runtime name `Ensure angie-sidecar's home exists` even
+        though punctuation (`'s`) is glued onto the resolved value. Without
+        the fix the punctuation becomes a separate skeleton word after
+        Jinja stripping and no longer matches the runtime token."""
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    _td("Ensure {{ user }}'s home exists", pid="1", order=0),
+                ],
+            ),
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "Ensure angie-sidecar's home exists"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t1", "name": "Ensure angie-sidecar's home exists"},
+                "host": "web1",
+            }
+        )
+
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+
+        task_lines = [ln for ln in lines if ln.kind == "task"]
+        assert len(task_lines) == 1, (
+            f"expected exactly 1 task line (no preflight duplicate), got {len(task_lines)}: "
+            f"{[(ln.label, ln.status) for ln in task_lines]}"
+        )
+        assert "{{ user }}" not in task_lines[0].label, (
+            f"preflight template name must be resolved away, got: {task_lines[0].label!r}"
+        )
+        assert "angie-sidecar's home exists" in task_lines[0].label
+        assert task_lines[0].status == Status.RUNNING
+
+    def test_template_variable_with_punctuation_prefix(self):
+        """Regression: preflight name `Deploy for {{ user }}!` must match
+        runtime name `Deploy for angie-sidecar!` — punctuation (`!`) glued
+        onto the resolved value must not break the match."""
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    _td("Deploy for {{ user }}!", pid="1", order=0),
+                ],
+            ),
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "Deploy for angie-sidecar!"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t1", "name": "Deploy for angie-sidecar!"},
+                "host": "web1",
+            }
+        )
+
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+
+        task_lines = [ln for ln in lines if ln.kind == "task"]
+        assert len(task_lines) == 1, (
+            f"expected exactly 1 task line (no preflight duplicate), got {len(task_lines)}: "
+            f"{[(ln.label, ln.status) for ln in task_lines]}"
+        )
+        assert "{{ user }}" not in task_lines[0].label
+        assert "angie-sidecar!" in task_lines[0].label
+        assert task_lines[0].status == Status.RUNNING
+
+    def test_template_variable_in_middle_with_punctuation(self):
+        """Two template variables with no extra punctuation still match —
+        guards against regression while fixing the punctuation edge case."""
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    _td("Copy {{ src }} to {{ dest }}", pid="1", order=0),
+                ],
+            ),
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "Copy /etc/a to /etc/b"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t1", "name": "Copy /etc/a to /etc/b"},
+                "host": "web1",
+            }
+        )
+
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+
+        task_lines = [ln for ln in lines if ln.kind == "task"]
+        assert len(task_lines) == 1, (
+            f"expected exactly 1 task line (no preflight duplicate), got {len(task_lines)}: "
+            f"{[(ln.label, ln.status) for ln in task_lines]}"
+        )
+        assert "{{" not in task_lines[0].label
+        assert task_lines[0].status == Status.RUNNING
+
+    def test_empty_skeleton_does_not_swallow_unrelated_task(self):
+        """Regression: a preflight task whose name is entirely a Jinja
+        template (e.g. ``{{ var }}``) must NOT greedily claim the first
+        runtime task it sees. When the preflight list is
+        ``["{{ var }}", "Plain task A", "Plain task B"]`` and runtime
+        completes A then starts B, the tree must show Plain task B and
+        must NOT show ``{{ var }}`` as a pending orphan. Plain task A
+        completed so it is correctly dropped from the tree."""
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            _play_def(
+                "p1",
+                "deploy",
+                [
+                    _td("{{ var }}", pid="1", order=0),
+                    _td("Plain task A", pid="1", order=1),
+                    _td("Plain task B", pid="1", order=2),
+                ],
+            ),
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "play-1", "name": "deploy"},
+            }
+        )
+        # Plain task A completes
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "Plain task A"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t1", "name": "Plain task A"},
+                "play": {"id": "play-1"},
+                "hosts": {"web1": {"changed": False}},
+            }
+        )
+        # Plain task B starts running
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:04Z",
+                "task": {"id": "t2", "name": "Plain task B"},
+                "play": {"id": "play-1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:05Z",
+                "task": {"id": "t2", "name": "Plain task B"},
+                "host": "web1",
+            }
+        )
+
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+
+        task_lines = [ln for ln in lines if ln.kind == "task"]
+        task_labels = [ln.label for ln in task_lines]
+        # Plain task B must appear in the tree (running)
+        assert any("Plain task B" in label for label in task_labels), (
+            f"Plain task B must appear in the tree, got tasks: "
+            f"{[(ln.label, ln.status) for ln in task_lines]}"
+        )
+        # {{ var }} must NOT appear as a task — it has no runtime match
+        # and should be dropped (unmatched preflight with no static
+        # fragments cannot claim a runtime slot)
+        template_tasks = [ln for ln in task_lines if "{{ var }}" in ln.label]
+        assert len(template_tasks) == 0, (
+            f"{{ var }} preflight should not appear in tree, got: "
+            f"{[(ln.label, ln.status) for ln in template_tasks]}"
+        )
+
+    def test_empty_skeleton_is_template_match_returns_false(self):
+        """Direct unit test: ``_is_template_match("{{ var }}", "Plain task A")``
+        must return False. A preflight name that is entirely a Jinja
+        expression has no static fragments to anchor the match, so it must
+        not wildcard-match any runtime name."""
+        from ansible_aom.core.tree_projection import _is_template_match
+
+        assert _is_template_match("{{ var }}", "Plain task A") is False, (
+            "Empty-skeleton preflight must not wildcard-match an unrelated runtime name"
+        )
+
+    def test_empty_skeleton_against_itself_returns_false(self):
+        """Direct unit test: ``_is_template_match("{{ var }}", "{{ var }}")``
+        must return False. Even when both names are the same Jinja
+        expression, there are no static fragments to anchor, so this
+        function correctly declines to match. The exact-equality path in
+        ``_pick_runtime`` handles the case where preflight and runtime
+        names are literally identical."""
+        from ansible_aom.core.tree_projection import _is_template_match
+
+        assert _is_template_match("{{ var }}", "{{ var }}") is False, (
+            "Empty-skeleton preflight must not match even an identical runtime name; "
+            "exact-equality handles that case"
+        )

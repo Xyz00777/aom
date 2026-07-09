@@ -1,66 +1,53 @@
 # CLI Main Entry Point
 
-> 34 nodes · cohesion 0.07
+> 48 nodes · cohesion 0.08
 
 ## Key Concepts
 
-- **cli.py** (14 connections) — `src/ansible_aom/cli.py`
-- **LiveDriver** (14 connections) — `src/ansible_aom/drivers/live.py`
-- **main()** (10 connections) — `src/ansible_aom/cli.py`
-- **detect_duplicate_playbook()** (8 connections) — `src/ansible_aom/cli.py`
-- **test_cli_duplicate_playbook.py** (7 connections) — `tests/unit/test_cli_duplicate_playbook.py`
-- **_run_compact()** (5 connections) — `src/ansible_aom/cli.py`
-- **_run_tui()** (5 connections) — `src/ansible_aom/cli.py`
-- **_HideStateAction** (4 connections) — `src/ansible_aom/cli.py`
-- **.__call__()** (4 connections) — `src/ansible_aom/cli.py`
-- **._run_playbook_worker()** (3 connections) — `src/ansible_aom/tui/app.py`
-- **test_detect_duplicate_playbook_distinguishes_different_files()** (3 connections) — `tests/unit/test_cli_duplicate_playbook.py`
-- **test_detect_duplicate_playbook_handles_path_normalisation()** (3 connections) — `tests/unit/test_cli_duplicate_playbook.py`
-- **test_cli_limit_merge.py** (3 connections) — `tests/unit/test_cli_limit_merge.py`
-- **test_live_driver_satisfies_event_source()** (3 connections) — `tests/unit/test_event_source.py`
-- **__main__.py** (2 connections) — `src/ansible_aom/__main__.py`
-- **live.py** (2 connections) — `src/ansible_aom/drivers/live.py`
-- **.__init__()** (2 connections) — `src/ansible_aom/drivers/live.py`
-- **test_detect_duplicate_playbook_finds_exact_repeat()** (2 connections) — `tests/unit/test_cli_duplicate_playbook.py`
-- **test_detect_duplicate_playbook_handles_empty_args()** (2 connections) — `tests/unit/test_cli_duplicate_playbook.py`
-- **test_detect_duplicate_playbook_returns_false_when_no_repeat()** (2 connections) — `tests/unit/test_cli_duplicate_playbook.py`
-- **CLI entry point for AOM.  This module provides the main command-line interface f** (1 connections) — `src/ansible_aom/cli.py`
-- **Spawn the streaming renderer (compact ANSI or end-of-run JSON) via a LiveDriver.** (1 connections) — `src/ansible_aom/cli.py`
-- **True if `playbook` appears (path-normalised) in `ansible_args`.      Catches the** (1 connections) — `src/ansible_aom/cli.py`
-- **Entry point for running AOM as a module: python -m ansible_aom.** (1 connections) — `src/ansible_aom/__main__.py`
-- **.ansible_args()** (1 connections) — `src/ansible_aom/drivers/live.py`
-- *... and 9 more nodes in this community*
+- **_handle_timeout_branch()** (27 connections) — `src/ansible_aom/ansible/runner.py`
+- **_FakeSink** (21 connections) — `tests/unit/test_runner_stall_flush.py`
+- **_FakeChild** (20 connections) — `tests/unit/test_runner_stall_flush.py`
+- **test_runner_stall_flush.py** (10 connections) — `tests/unit/test_runner_stall_flush.py`
+- **TestStallFlushDoesNotBlock** (6 connections) — `tests/unit/test_runner_stall_flush.py`
+- **.test_renderer_crash_sends_empty_line_to_avoid_hang()** (5 connections) — `tests/unit/test_runner_stall_flush.py`
+- **TestMultilinePauseBlock** (5 connections) — `tests/unit/test_runner_stall_flush.py`
+- **.test_no_block_and_bare_colon_prior_does_not_fire()** (5 connections) — `tests/unit/test_runner_stall_flush.py`
+- **.test_prior_non_prompt_does_not_fire()** (5 connections) — `tests/unit/test_runner_stall_flush.py`
+- **TestSentinelPreventsRefiring** (5 connections) — `tests/unit/test_runner_stall_flush.py`
+- **.test_negative_stall_count_with_prior_prompt_still_skips()** (5 connections) — `tests/unit/test_runner_stall_flush.py`
+- **.test_prompt_path_emits_visible_breadcrumb()** (5 connections) — `tests/unit/test_runner_stall_flush.py`
+- **.test_quiet_child_just_ticks()** (5 connections) — `tests/unit/test_runner_stall_flush.py`
+- **.test_hint_only_fires_once()** (5 connections) — `tests/unit/test_runner_stall_flush.py`
+- **TestHighConfidencePromptPath** (4 connections) — `tests/unit/test_runner_stall_flush.py`
+- **.test_known_prompt_drains_buffer_and_calls_handler()** (4 connections) — `tests/unit/test_runner_stall_flush.py`
+- **.test_reconstructed_block_fires_prompt()** (4 connections) — `tests/unit/test_runner_stall_flush.py`
+- **.test_sentinel_blocks_reconstructed_block_refiring()** (4 connections) — `tests/unit/test_runner_stall_flush.py`
+- **TestPriorPlaintextPromptPath** (4 connections) — `tests/unit/test_runner_stall_flush.py`
+- **.test_prior_prompt_with_empty_buffer_fires()** (4 connections) — `tests/unit/test_runner_stall_flush.py`
+- **.test_negative_stall_count_skips_prompt_path()** (4 connections) — `tests/unit/test_runner_stall_flush.py`
+- **.test_at_threshold_flushes_buffer_as_log()** (4 connections) — `tests/unit/test_runner_stall_flush.py`
+- **.test_below_threshold_does_nothing_to_buffer()** (4 connections) — `tests/unit/test_runner_stall_flush.py`
+- **.test_flush_records_to_session_sink()** (4 connections) — `tests/unit/test_runner_stall_flush.py`
+- **TestStallHintBeforeFlush** (4 connections) — `tests/unit/test_runner_stall_flush.py`
+- *... and 23 more nodes in this community*
 
 ## Relationships
 
-- [[Inventory Auto Detection]] (4 shared connections)
-- [[AOM TUI Application]] (4 shared connections)
-- [[Limit Args Merging]] (3 shared connections)
-- [[Session Replay Driver]] (3 shared connections)
-- [[CLI Argument Parser]] (2 shared connections)
-- [[Replay CLI Subcommand]] (1 shared connections)
-- [[Source Hash Version]] (1 shared connections)
-- [[Shell Completion Helpers]] (1 shared connections)
-- [[Renderer Factory Function]] (1 shared connections)
-- [[Renderer Event Protocol]] (1 shared connections)
-- [[Run Config Key Normalization]] (1 shared connections)
+- [Tree Block Animation](Tree_Block_Animation.md) (9 shared connections)
+- [Interactive Prompt Tests](Interactive_Prompt_Tests.md) (1 shared connections)
+- [Renderer ETA Wiring](Renderer_ETA_Wiring.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/__main__.py`
-- `src/ansible_aom/cli.py`
-- `src/ansible_aom/drivers/live.py`
-- `src/ansible_aom/tui/app.py`
-- `tests/unit/test_cli_duplicate_playbook.py`
-- `tests/unit/test_cli_limit_merge.py`
-- `tests/unit/test_event_source.py`
+- `src/ansible_aom/ansible/runner.py`
+- `tests/unit/test_runner_stall_flush.py`
 
 ## Audit Trail
 
-- EXTRACTED: 94 (84%)
-- INFERRED: 18 (16%)
+- EXTRACTED: 167 (84%)
+- INFERRED: 32 (16%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

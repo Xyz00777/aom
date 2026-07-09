@@ -1,0 +1,2 @@
+{"_event": "aom_connection_acquired", "connection_id": "conn-001", "host": "web1", "task_id": "t1", "timestamp": "2026-07-01T10:00:00Z"}
+{"_event": "aom_connection_released", "connection_id": "conn-001", "host": "web1", "task_id": "t1", "timestamp": "2026-07-01T10:00:05Z"}

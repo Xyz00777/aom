@@ -1,62 +1,55 @@
 # Inventory Auto Detection
 
-> 25 nodes · cohesion 0.13
+> 33 nodes · cohesion 0.09
 
 ## Key Concepts
 
-- **MonkeyPatch** (27 connections)
-- **ensure_inventory_arg()** (9 connections) — `src/ansible_aom/cli.py`
-- **detect_default_inventory()** (7 connections) — `src/ansible_aom/cli.py`
-- **.test_add_warning_from_worker_lands_on_status_bar()** (6 connections) — `tests/tui/test_live_refresh.py`
-- **.test_completion_nonzero_marks_title_with_cross()** (6 connections) — `tests/tui/test_live_refresh.py`
-- **.test_completion_zero_marks_title_with_check()** (6 connections) — `tests/tui/test_live_refresh.py`
-- **.test_three_task_starts_appear_in_tree()** (6 connections) — `tests/tui/test_live_refresh.py`
-- **.test_tick_drains_pending_log_lines()** (6 connections) — `tests/tui/test_live_refresh.py`
-- **.test_tick_refreshes_widgets_after_event()** (6 connections) — `tests/tui/test_live_refresh.py`
-- **TestEnsureInventoryArg** (6 connections) — `tests/unit/test_cli_inventory_autodetect.py`
-- **TestDetectDefaultInventory** (5 connections) — `tests/unit/test_cli_inventory_autodetect.py`
-- **.test_handles_inventory_file_long_form()** (5 connections) — `tests/unit/test_cli_inventory_autodetect.py`
-- **test_cli_inventory_autodetect.py** (4 connections) — `tests/unit/test_cli_inventory_autodetect.py`
-- **.test_finds_inventory_ini_in_cwd()** (4 connections) — `tests/unit/test_cli_inventory_autodetect.py`
-- **.test_finds_yaml_inventory_when_only_one_present()** (4 connections) — `tests/unit/test_cli_inventory_autodetect.py`
-- **.test_prefers_inventory_ini_over_hosts()** (4 connections) — `tests/unit/test_cli_inventory_autodetect.py`
-- **.test_returns_none_when_no_known_file_present()** (4 connections) — `tests/unit/test_cli_inventory_autodetect.py`
-- **.test_leaves_args_unchanged_when_dash_i_present()** (4 connections) — `tests/unit/test_cli_inventory_autodetect.py`
-- **.test_leaves_args_unchanged_when_long_inventory_flag_present()** (4 connections) — `tests/unit/test_cli_inventory_autodetect.py`
-- **.test_leaves_args_unchanged_when_no_default_present()** (4 connections) — `tests/unit/test_cli_inventory_autodetect.py`
-- **.test_prepends_default_inventory_when_none_given()** (4 connections) — `tests/unit/test_cli_inventory_autodetect.py`
-- **If no -i/--inventory flag is set, prepend one pointing at the default file.** (1 connections) — `src/ansible_aom/cli.py`
-- **Return the first conventional inventory file found in CWD, or None.** (1 connections) — `src/ansible_aom/cli.py`
-- **Tests for inventory auto-detection.  When the user doesn't pass `-i` / `--invent** (1 connections) — `tests/unit/test_cli_inventory_autodetect.py`
-- **ansible-playbook also accepts --inventory-file as a synonym.** (1 connections) — `tests/unit/test_cli_inventory_autodetect.py`
+- **HelpOverlay** (20 connections) — `src/ansible_aom/tui/screens/help.py`
+- **TestHelpOverlayContent** (10 connections) — `tests/tui/test_help_screen.py`
+- **test_help_screen.py** (8 connections) — `tests/tui/test_help_screen.py`
+- **_render_overlay_text()** (8 connections) — `tests/tui/test_help_screen.py`
+- **TestHelpOverlayBindings** (7 connections) — `tests/tui/test_help_screen.py`
+- **TestHelpOverlayStructure** (6 connections) — `tests/tui/test_help_screen.py`
+- **TestHelpOverlayDismissAction** (5 connections) — `tests/tui/test_help_screen.py`
+- **TestHelpOverlayLineCount** (5 connections) — `tests/tui/test_help_screen.py`
+- **.test_includes_all_keybinding_contexts()** (4 connections) — `tests/tui/test_help_screen.py`
+- **.test_includes_command_reference_section()** (4 connections) — `tests/tui/test_help_screen.py`
+- **.test_includes_help_shortcut()** (4 connections) — `tests/tui/test_help_screen.py`
+- **.test_includes_navigation_section()** (4 connections) — `tests/tui/test_help_screen.py`
+- **.test_includes_quit_shortcut()** (4 connections) — `tests/tui/test_help_screen.py`
+- **.test_lists_keyboard_shortcuts()** (4 connections) — `tests/tui/test_help_screen.py`
+- **.action_show_help()** (3 connections) — `src/ansible_aom/tui/app.py`
+- **.test_dismiss_via_escape_key()** (3 connections) — `tests/tui/test_help_screen.py`
+- **.action_dismiss()** (2 connections) — `src/ansible_aom/tui/screens/help.py`
+- **.test_help_overlay_is_modal_screen()** (2 connections) — `tests/tui/test_help_screen.py`
+- **Push the help overlay on top of whatever screen is active.** (1 connections) — `src/ansible_aom/tui/app.py`
+- **Any** (1 connections)
+- **Help overlay showing keybindings, commands, and navigation.      Closes on Escap** (1 connections) — `src/ansible_aom/tui/screens/help.py`
+- **Unit tests for the TUI help overlay screen.  Tests cover the L2 help.py expansio** (1 connections) — `tests/tui/test_help_screen.py`
+- **The dismiss action must close the screen without returning a value.** (1 connections) — `tests/tui/test_help_screen.py`
+- **The expansion must be substantive — not a one-paragraph stub.** (1 connections) — `tests/tui/test_help_screen.py`
+- **Structural assertions about the HelpOverlay screen.** (1 connections) — `tests/tui/test_help_screen.py`
+- *... and 8 more nodes in this community*
 
 ## Relationships
 
-- [[Run Config Key Normalization]] (15 shared connections)
-- [[AOM TUI Application]] (8 shared connections)
-- [[Task Definition Live Refresh]] (6 shared connections)
-- [[CLI Main Entry Point]] (4 shared connections)
-- [[Golden Frame Tests]] (2 shared connections)
-- [[Diagnostics CLI Wiring]] (2 shared connections)
-- [[Playbook Run Integration Tests]] (1 shared connections)
-- [[RunState Persistence Shape]] (1 shared connections)
-- [[Shell Completion Helpers]] (1 shared connections)
-- [[Session ID Completion]] (1 shared connections)
-- [[Session Replay Driver]] (1 shared connections)
-- [[Session Diagnostics Writing]] (1 shared connections)
+- [Session Recording Tests](Session_Recording_Tests.md) (14 shared connections)
+- [Crash Recovery Auto-Save](Crash_Recovery_Auto-Save.md) (2 shared connections)
+- [State Machine Invariants](State_Machine_Invariants.md) (1 shared connections)
+- [Frame Parameter Handling](Frame_Parameter_Handling.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/cli.py`
-- `tests/tui/test_live_refresh.py`
-- `tests/unit/test_cli_inventory_autodetect.py`
+- `src/ansible_aom/tui/app.py`
+- `src/ansible_aom/tui/screens/help.py`
+- `tests/tui/test_help_screen.py`
 
 ## Audit Trail
 
-- EXTRACTED: 129 (96%)
-- INFERRED: 6 (4%)
+- EXTRACTED: 76 (64%)
+- INFERRED: 42 (36%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

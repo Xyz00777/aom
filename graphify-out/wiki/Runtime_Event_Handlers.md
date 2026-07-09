@@ -1,55 +1,61 @@
 # Runtime Event Handlers
 
-> 28 nodes · cohesion 0.10
+> 35 nodes · cohesion 0.06
 
 ## Key Concepts
 
-- **._handle_v2_playbook_on_task_start()** (14 connections) — `src/ansible_aom/core/models.py`
-- **._handle_v2_runner_on_start()** (12 connections) — `src/ansible_aom/core/models.py`
-- **._resolve_play_id()** (11 connections) — `src/ansible_aom/core/models.py`
-- **._task_dict()** (10 connections) — `src/ansible_aom/core/models.py`
-- **._handle_v2_runner_item_on()** (8 connections) — `src/ansible_aom/core/models.py`
-- **._handle_v2_runner_on_failed()** (8 connections) — `src/ansible_aom/core/models.py`
-- **._handle_v2_runner_on_ok()** (8 connections) — `src/ansible_aom/core/models.py`
-- **._handle_v2_runner_on_skipped()** (8 connections) — `src/ansible_aom/core/models.py`
-- **._handle_v2_runner_on_unreachable()** (8 connections) — `src/ansible_aom/core/models.py`
-- **._hosts_dict()** (8 connections) — `src/ansible_aom/core/models.py`
-- **._handle_v2_playbook_on_handler_task_start()** (5 connections) — `src/ansible_aom/core/models.py`
-- **._parent_role_from_cache()** (5 connections) — `src/ansible_aom/core/models.py`
-- **._resolve_play_for_task()** (3 connections) — `src/ansible_aom/core/models.py`
-- **._resolve_play_hosts()** (3 connections) — `src/ansible_aom/core/models.py`
-- **Handle v2_runner_on_skipped event.** (1 connections) — `src/ansible_aom/core/models.py`
-- **Handle v2_runner_on_unreachable event.** (1 connections) — `src/ansible_aom/core/models.py`
-- **Return the play_id that already owns this task_id, or ``None``.          Searche** (1 connections) — `src/ansible_aom/core/models.py`
-- **Resolve play_id from event, _current_play_id, or task ownership.          Resolu** (1 connections) — `src/ansible_aom/core/models.py`
-- **Return the parent role recorded in ``_role_cache`` for a runtime task.** (1 connections) — `src/ansible_aom/core/models.py`
-- **Handle v2_playbook_on_task_start event.** (1 connections) — `src/ansible_aom/core/models.py`
-- **Look up preflight resolved_hosts for a runtime play.          Preflight assigns** (1 connections) — `src/ansible_aom/core/models.py`
-- **Handle v2_playbook_on_handler_task_start event (same as task_start).** (1 connections) — `src/ansible_aom/core/models.py`
-- **Handle v2_runner_on_start event.** (1 connections) — `src/ansible_aom/core/models.py`
-- **Handle a per-item loop event (``v2_runner_item_on_*``).          These are addit** (1 connections) — `src/ansible_aom/core/models.py`
-- **Extract the ``task`` field as a dict.          ansible.posix.jsonl may emit ``ta** (1 connections) — `src/ansible_aom/core/models.py`
-- *... and 3 more nodes in this community*
+- **learnings.md** (26 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **v1 Verbosity — Learnings (R17: EOF flush drains child.buffer)** (5 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **v1 Verbosity — Learnings (Task 7.5: CLI text mode)** (4 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **v1 Verbosity — Learnings (Task F7: docs finalization)** (4 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **v1 Verbosity — Learnings (Task 6.1: compact REC+VC status chip)** (3 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **v1 Verbosity — Learnings (Task 6.2: compact failed-hint toggle)** (3 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **v1 Verbosity — Learnings (Task 6.2 follow-up: config wiring)** (3 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **v1 Verbosity — Learnings (Task 7.4: lazy-render budget)** (3 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **v1 Verbosity — Learnings (Task 8.6: README disk-usage section)** (3 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **v1 Verbosity — Learnings (Phase 4 / Task 4.2: stderr classifier)** (2 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **v1 Verbosity — Learnings (Task 6.3: warnings + deprecations live view)** (2 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **v1 Verbosity — Learnings (Task 7.1: inspect TUI V keybind plumbing)** (2 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Fix** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Followups (out of scope for Phase 3)** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Gotcha** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Gotchas** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Note** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Note** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Notes** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Notes** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Root cause** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Verification** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Verification** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Verification** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Verification** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- *... and 10 more nodes in this community*
 
 ## Relationships
 
-- [[Run State Summary Panel]] (14 shared connections)
-- [[Playbook Event Parsing]] (11 shared connections)
-- [[Run State Completion Recap]] (11 shared connections)
-- [[Run History Mining]] (8 shared connections)
-- [[Role Inference Indexes]] (3 shared connections)
-- [[Include Role Discovery]] (2 shared connections)
+- [Community 641](Community_641.md) (1 shared connections)
+- [Build Rerun Command](Build_Rerun_Command.md) (1 shared connections)
+- [Heartbeat Liveness Machine](Heartbeat_Liveness_Machine.md) (1 shared connections)
+- [Community 474](Community_474.md) (1 shared connections)
+- [Diagnostics Record Building](Diagnostics_Record_Building.md) (1 shared connections)
+- [Small Terminal Handling](Small_Terminal_Handling.md) (1 shared connections)
+- [Role Grouping Playbooks](Role_Grouping_Playbooks.md) (1 shared connections)
+- [ORJSON Parser Swap](ORJSON_Parser_Swap.md) (1 shared connections)
+- [Tree Projection Lifecycle](Tree_Projection_Lifecycle.md) (1 shared connections)
+- [Quit Keybinding](Quit_Keybinding.md) (1 shared connections)
+- [ANSI Rewind Correctness](ANSI_Rewind_Correctness.md) (1 shared connections)
+- [Community 640](Community_640.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/models.py`
+- `.sisyphus/notepads/v1-verbosity/learnings.md`
 
 ## Audit Trail
 
-- EXTRACTED: 123 (98%)
-- INFERRED: 2 (2%)
+- EXTRACTED: 83 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

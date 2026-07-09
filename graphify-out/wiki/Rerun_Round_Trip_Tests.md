@@ -1,51 +1,57 @@
 # Rerun Round Trip Tests
 
-> 28 nodes · cohesion 0.11
+> 35 nodes · cohesion 0.06
 
 ## Key Concepts
 
-- **test_rerun_roundtrip.py** (11 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **_make_capture_build_command()** (8 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **_record_live_session()** (8 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **_read_argv()** (6 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **.test_changes_only_limit_is_just_changed_hosts()** (6 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **.test_failed_limit_contains_only_failed_hosts()** (6 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **.test_unreachable_limit_includes_failed_and_unreachable()** (6 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **_mixed_outcome_events()** (4 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **TestRerunRoundtripRefusal** (4 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **.test_null_ansible_args_also_refused()** (4 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **_fake_ansible_command()** (3 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **TestRerunRoundtripChangesOnly** (3 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **TestRerunRoundtripFailed** (3 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **.test_missing_ansible_args_refuses_without_spawning()** (3 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **TestRerunRoundtripUnreachable** (3 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **_unreachable_events()** (3 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **End-to-end round-trip for ``aom rerun`` (Item #4).  Exercises the full pipeline:** (1 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **Read the captured argv lines emitted by the capture-shim.      When CPython is i** (1 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **Events flagging web2/web3 as failed, web1 as changed, web4 as ok.** (1 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **Events flagging web5 as unreachable plus web2/web3 as failed.** (1 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **Record → rerun --failed → assert spawn argv.** (1 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **``--unreachable`` returns failed ∪ unreachable hosts.** (1 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **``--changes-only`` requires runner_on_ok events with changed=true.** (1 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **Old-format session (no ansible_args) → exit 2, no spawn.** (1 connections) — `tests/integration/test_rerun_roundtrip.py`
-- **``ansible_args: null`` (hand-edited) is treated the same as missing.** (1 connections) — `tests/integration/test_rerun_roundtrip.py`
-- *... and 3 more nodes in this community*
+- **redact_dict()** (17 connections) — `src/ansible_aom/core/redaction.py`
+- **TestRecursiveRedaction** (7 connections) — `tests/unit/test_redaction.py`
+- **RedactionConfig** (5 connections)
+- **TestRedactionPerformance** (5 connections) — `tests/unit/test_redaction.py`
+- **TestWhitelistFalsePositives** (5 connections) — `tests/unit/test_redaction.py`
+- **_redact_list()** (4 connections) — `src/ansible_aom/core/redaction.py`
+- **TestConfigCustomFields** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_custom_fields_redacted()** (4 connections) — `tests/unit/test_redaction.py`
+- **TestConfigCustomWhitelist** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_custom_whitelist_not_redacted()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_empty_dict_list_handling()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_max_depth_truncation()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_nested_dict_redaction()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_nested_list_with_dicts()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_large_event_performance()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_max_depth_limits_recursion()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_default_whitelist_fields_not_redacted()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_custom_whitelist_from_config()** (3 connections) — `tests/unit/test_redaction.py`
+- **Recursively redact by KEY (Layers 1+2). Returns a new dict.      The recursion i** (1 connections) — `src/ansible_aom/core/redaction.py`
+- **Redact items within a list, recursing on dict items and sanitizing strings.** (1 connections) — `src/ansible_aom/core/redaction.py`
+- **Tests for TC-158: Recursive dict/list redaction.** (1 connections) — `tests/unit/test_redaction.py`
+- **TC-158: Exact-match secret keys at any depth are redacted.          QC-002 note:** (1 connections) — `tests/unit/test_redaction.py`
+- **TC-158: Password fields in list items are redacted.** (1 connections) — `tests/unit/test_redaction.py`
+- **TC-158 edge case: Max depth (10) truncation.** (1 connections) — `tests/unit/test_redaction.py`
+- **TC-158 edge: Empty dicts and lists handled correctly.** (1 connections) — `tests/unit/test_redaction.py`
+- *... and 10 more nodes in this community*
 
 ## Relationships
 
-- [[Run Config Key Normalization]] (8 shared connections)
-- [[Playbook Run Integration Tests]] (1 shared connections)
+- [Warnings Display Config](Warnings_Display_Config.md) (11 shared connections)
+- [Inspect TUI Widget Data](Inspect_TUI_Widget_Data.md) (5 shared connections)
+- [Run State Summary Panel](Run_State_Summary_Panel.md) (5 shared connections)
+- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (5 shared connections)
+- [TUI Tree View Tests](TUI_Tree_View_Tests.md) (3 shared connections)
+- [Status Bar Elements](Status_Bar_Elements.md) (1 shared connections)
+- [Community 463](Community_463.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_rerun_roundtrip.py`
+- `src/ansible_aom/core/redaction.py`
+- `tests/unit/test_redaction.py`
 
 ## Audit Trail
 
-- EXTRACTED: 92 (99%)
-- INFERRED: 1 (1%)
+- EXTRACTED: 82 (77%)
+- INFERRED: 25 (23%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

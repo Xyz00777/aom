@@ -1,54 +1,51 @@
 # Credential String Sanitization
 
-> 28 nodes · cohesion 0.08
+> 35 nodes · cohesion 0.09
 
 ## Key Concepts
 
-- **sanitize_string()** (15 connections) — `src/ansible_aom/core/redaction.py`
-- **TestURLCredentialSanitization** (6 connections) — `tests/unit/test_redaction.py`
-- **TestCLICredentialSanitization** (5 connections) — `tests/unit/test_redaction.py`
-- **TestConfigCustomPatterns** (5 connections) — `tests/unit/test_redaction.py`
-- **.test_cli_credentials_redacted()** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_variant_formats()** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_custom_pattern_redacts_matching_strings()** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_multiple_custom_patterns()** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_sanitize_string_function()** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_url_credentials_redacted()** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_url_encoded_password()** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_url_without_credentials_unchanged()** (4 connections) — `tests/unit/test_redaction.py`
-- **test_cli_credentials_are_stripped()** (3 connections) — `tests/unit/test_properties_redaction.py`
-- **test_url_credentials_are_stripped()** (3 connections) — `tests/unit/test_properties_redaction.py`
-- **Sanitize credentials in a single string using Layer 3 patterns.      Applies pat** (1 connections) — `src/ansible_aom/core/redaction.py`
-- **URL of form scheme://user:SECRET@host/ has SECRET removed by sanitize_string.** (1 connections) — `tests/unit/test_properties_redaction.py`
-- **CLI flag of form --password=SECRET has SECRET removed by sanitize_string.** (1 connections) — `tests/unit/test_properties_redaction.py`
-- **Tests for TC-160: URL credential sanitization.** (1 connections) — `tests/unit/test_redaction.py`
-- **TC-160: URL credentials are sanitized.** (1 connections) — `tests/unit/test_redaction.py`
-- **TC-160 edge case: URL-encoded passwords.** (1 connections) — `tests/unit/test_redaction.py`
-- **TC-160 edge: URLs without credentials remain unchanged.** (1 connections) — `tests/unit/test_redaction.py`
-- **Tests for TC-161: CLI argument credential sanitization.** (1 connections) — `tests/unit/test_redaction.py`
-- **TC-161: CLI credentials are sanitized.** (1 connections) — `tests/unit/test_redaction.py`
-- **TC-161 edge case: Variant CLI formats.** (1 connections) — `tests/unit/test_redaction.py`
-- **Tests for TC-173: Config custom_patterns for string sanitization.** (1 connections) — `tests/unit/test_redaction.py`
-- *... and 3 more nodes in this community*
+- **reconstruct_pause_prompt()** (17 connections) — `src/ansible_aom/core/prompts.py`
+- **TestReconstructPausePrompt** (15 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
+- **looks_like_interactive_prompt()** (8 connections) — `src/ansible_aom/core/prompts.py`
+- **prompts.py** (5 connections) — `src/ansible_aom/core/prompts.py`
+- **_strip_ansi()** (4 connections) — `src/ansible_aom/core/prompts.py`
+- **.test_ansi_colorized_block_is_rebuilt()** (4 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
+- **.test_folded_scalar_single_body_line_is_rebuilt()** (4 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
+- **.test_long_preview_anchors_on_marker_when_header_out_of_window()** (4 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
+- **.test_marker_only_block_without_header_is_rebuilt()** (4 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
+- **.test_header_beyond_lookback_is_none()** (3 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
+- **.test_header_preferred_over_marker_for_full_context()** (3 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
+- **.test_lone_colon_after_header_rebuilds_block()** (3 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
+- **.test_moderate_preview_includes_full_context_via_header()** (3 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
+- **.test_nearest_header_wins_for_second_pause()** (3 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
+- **.test_no_anchor_within_window_is_none()** (3 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
+- **.test_trailing_blank_line_is_none()** (3 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
+- **test_pause_prompt_reconstruction.py** (2 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
+- **.test_empty_list_is_none()** (2 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
+- **.test_no_header_in_window_is_none()** (2 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
+- **.test_tail_not_a_terminator_is_none()** (2 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
+- **Pure prompt-detection heuristics.  Two responsibilities, both pure (str in → boo** (1 connections) — `src/ansible_aom/core/prompts.py`
+- **Rebuild a multi-line ``ansible.builtin.pause`` block from recent plaintext.** (1 connections) — `src/ansible_aom/core/prompts.py`
+- **Remove SGR escape sequences from ``text``.** (1 connections) — `src/ansible_aom/core/prompts.py`
+- **True if ``pending`` (unread PTY buffer) looks like a child waiting on stdin.** (1 connections) — `src/ansible_aom/core/prompts.py`
+- **Tests for reconstruct_pause_prompt (multi-line ``|`` pause prompts).  A YAML ``|** (1 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
+- *... and 10 more nodes in this community*
 
 ## Relationships
 
-- [[Secret Redaction Configuration]] (17 shared connections)
-- [[Four-Layer Redaction System]] (2 shared connections)
-- [[Property Based Tests]] (2 shared connections)
+- [Golden Frame Tests](Golden_Frame_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/redaction.py`
-- `tests/unit/test_properties_redaction.py`
-- `tests/unit/test_redaction.py`
+- `src/ansible_aom/core/prompts.py`
+- `tests/unit/test_pause_prompt_reconstruction.py`
 
 ## Audit Trail
 
-- EXTRACTED: 60 (72%)
-- INFERRED: 23 (28%)
+- EXTRACTED: 71 (65%)
+- INFERRED: 38 (35%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

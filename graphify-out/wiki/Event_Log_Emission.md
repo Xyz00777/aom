@@ -1,57 +1,50 @@
 # Event Log Emission
 
-> 46 nodes · cohesion 0.06
+> 54 nodes · cohesion 0.09
 
 ## Key Concepts
 
-- **._emit_event_log()** (18 connections) — `src/ansible_aom/compact/renderer.py`
-- **.print_log()** (10 connections) — `src/ansible_aom/compact/renderer.py`
-- **._emit_previous_task_summary()** (8 connections) — `src/ansible_aom/compact/renderer.py`
-- **._announce_task()** (7 connections) — `src/ansible_aom/compact/renderer.py`
-- **._bump_task_counters()** (7 connections) — `src/ansible_aom/compact/renderer.py`
-- **._flush_pending_skips()** (7 connections) — `src/ansible_aom/compact/renderer.py`
-- **._format_loop_item_line()** (6 connections) — `src/ansible_aom/compact/renderer.py`
-- **._task_dict()** (6 connections) — `src/ansible_aom/compact/renderer.py`
-- **._count_completed_task()** (5 connections) — `src/ansible_aom/compact/renderer.py`
-- **._enter_terminal_event()** (5 connections) — `src/ansible_aom/compact/renderer.py`
-- **._inline_duration_suffix()** (5 connections) — `src/ansible_aom/compact/renderer.py`
-- **.set_definitions()** (5 connections) — `src/ansible_aom/compact/renderer.py`
-- **.update_state()** (5 connections) — `src/ansible_aom/compact/renderer.py`
-- **_truncate_msg()** (4 connections) — `src/ansible_aom/compact/format.py`
-- **.add_warning()** (4 connections) — `src/ansible_aom/compact/renderer.py`
-- **._build_status_suffix()** (4 connections) — `src/ansible_aom/compact/renderer.py`
-- **._format_duration()** (4 connections) — `src/ansible_aom/compact/renderer.py`
-- **._loop_item_lines()** (4 connections) — `src/ansible_aom/compact/renderer.py`
-- **._maybe_emit_pause_seconds_hint()** (4 connections) — `src/ansible_aom/compact/renderer.py`
-- **._reconcile_completed_tasks()** (4 connections) — `src/ansible_aom/compact/renderer.py`
-- **._record_running_start()** (4 connections) — `src/ansible_aom/compact/renderer.py`
-- **._event_time()** (3 connections) — `src/ansible_aom/compact/renderer.py`
-- **._hosts_dict()** (3 connections) — `src/ansible_aom/compact/renderer.py`
-- **Cap a JSONL ``msg`` field for live display.      The suffix includes the origina** (1 connections) — `src/ansible_aom/compact/format.py`
-- **Parse ``_timestamp`` from a JSONL event into a Unix float.          Returns ``No** (1 connections) — `src/ansible_aom/compact/renderer.py`
-- *... and 21 more nodes in this community*
+- **test_task_summary.py** (21 connections) — `tests/compact/test_task_summary.py`
+- **_last_summary_line()** (16 connections) — `tests/compact/test_task_summary.py`
+- **_play_start()** (16 connections) — `tests/compact/test_task_summary.py`
+- **_renderer()** (16 connections) — `tests/compact/test_task_summary.py`
+- **_task_start()** (16 connections) — `tests/compact/test_task_summary.py`
+- **_ok()** (10 connections) — `tests/compact/test_task_summary.py`
+- **.test_changed_ok_shows_both()** (8 connections) — `tests/compact/test_task_summary.py`
+- **TestTaskSummaryHideState** (8 connections) — `tests/compact/test_task_summary.py`
+- **.test_hide_changed_suppresses_changed_from_summary()** (8 connections) — `tests/compact/test_task_summary.py`
+- **.test_hide_ok_suppresses_ok_from_summary()** (8 connections) — `tests/compact/test_task_summary.py`
+- **.test_mixed_failed_ok_shows_both()** (8 connections) — `tests/compact/test_task_summary.py`
+- **.test_failed_before_ok_in_summary()** (8 connections) — `tests/compact/test_task_summary.py`
+- **.test_mixed_unreachable_ok_shows_both()** (8 connections) — `tests/compact/test_task_summary.py`
+- **.test_colored_output_has_ansi_codes()** (8 connections) — `tests/compact/test_task_summary.py`
+- **_failed()** (7 connections) — `tests/compact/test_task_summary.py`
+- **.test_all_ok_shows_ok_count()** (7 connections) — `tests/compact/test_task_summary.py`
+- **.test_all_skipped_shows_skipped_count()** (7 connections) — `tests/compact/test_task_summary.py`
+- **.test_failed_always_shows_even_with_hide_state_failed()** (7 connections) — `tests/compact/test_task_summary.py`
+- **.test_hide_ok_with_only_ok_shows_no_suffix()** (7 connections) — `tests/compact/test_task_summary.py`
+- **.test_hide_skipped_suppresses_skipped()** (7 connections) — `tests/compact/test_task_summary.py`
+- **.test_unreachable_always_shows_even_with_hide_state_unreachable()** (7 connections) — `tests/compact/test_task_summary.py`
+- **.test_only_failed_shows_failed()** (7 connections) — `tests/compact/test_task_summary.py`
+- **.test_no_hosts_no_suffix()** (6 connections) — `tests/compact/test_task_summary.py`
+- **_last_print_log()** (5 connections) — `tests/compact/test_task_summary.py`
+- **_changed()** (3 connections) — `tests/compact/test_task_summary.py`
+- *... and 29 more nodes in this community*
 
 ## Relationships
 
-- [[Compact Renderer Implementation]] (22 shared connections)
-- [[Compact Renderer Formatters]] (7 shared connections)
-- [[Panel Refresh Snapshot]] (3 shared connections)
-- [[Event Hide Filter Logic]] (2 shared connections)
-- [[Color ASCII Fallback]] (1 shared connections)
-- [[Host Result Hide Filter]] (1 shared connections)
-- [[Preflight Summary Rendering]] (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (14 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/compact/format.py`
-- `src/ansible_aom/compact/renderer.py`
+- `tests/compact/test_task_summary.py`
 
 ## Audit Trail
 
-- EXTRACTED: 140 (90%)
-- INFERRED: 15 (10%)
+- EXTRACTED: 270 (96%)
+- INFERRED: 10 (4%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

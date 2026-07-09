@@ -1,56 +1,59 @@
 # Data Model Unit Tests
 
-> 54 nodes · cohesion 0.04
+> 58 nodes · cohesion 0.06
 
 ## Key Concepts
 
-- **TestStatusEnum** (22 connections) — `tests/unit/test_models.py`
-- **test_models.py** (17 connections) — `tests/unit/test_models.py`
-- **TestDefinitionVsStateSeparation** (16 connections) — `tests/unit/test_models.py`
-- **TestLinearForceCompletion** (16 connections) — `tests/unit/test_models.py`
-- **TestWarningTypeEnum** (16 connections) — `tests/unit/test_models.py`
-- **.test_free_strategy_not_affected()** (5 connections) — `tests/unit/test_models.py`
-- **.test_meta_task_force_completed_under_linear()** (5 connections) — `tests/unit/test_models.py`
-- **.test_real_terminal_hosts_preserved()** (5 connections) — `tests/unit/test_models.py`
-- **.test_same_play_handler_task_force_completed()** (5 connections) — `tests/unit/test_models.py`
-- **.test_state_classes_are_mutable_intent()** (4 connections) — `tests/unit/test_models.py`
-- **.test_definition_classes_are_immutable_intent()** (3 connections) — `tests/unit/test_models.py`
-- **.test_definition_path_can_be_populated_later()** (3 connections) — `tests/unit/test_models.py`
-- **.test_definition_uuid_can_be_populated_later()** (3 connections) — `tests/unit/test_models.py`
-- **.test_status_enum_all_values_unique()** (2 connections) — `tests/unit/test_models.py`
-- **.test_status_enum_changed()** (2 connections) — `tests/unit/test_models.py`
-- **.test_status_enum_failed()** (2 connections) — `tests/unit/test_models.py`
-- **.test_status_enum_has_eight_values()** (2 connections) — `tests/unit/test_models.py`
-- **.test_status_enum_ok()** (2 connections) — `tests/unit/test_models.py`
-- **.test_status_enum_pending()** (2 connections) — `tests/unit/test_models.py`
-- **.test_status_enum_running()** (2 connections) — `tests/unit/test_models.py`
-- **.test_status_enum_skipped()** (2 connections) — `tests/unit/test_models.py`
-- **.test_status_enum_string_values_lowercased()** (2 connections) — `tests/unit/test_models.py`
-- **.test_status_enum_unreachable()** (2 connections) — `tests/unit/test_models.py`
-- **.test_warning_type_enum_all_values_unique()** (2 connections) — `tests/unit/test_models.py`
-- **.test_warning_type_enum_deprecation()** (2 connections) — `tests/unit/test_models.py`
-- *... and 29 more nodes in this community*
+- **inspect.py** (17 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **DetailBlock** (15 connections) — `src/ansible_aom/core/inspect_model.py`
+- **RunSummary** (14 connections) — `src/ansible_aom/core/inspect_model.py`
+- **_RunRow** (12 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **_ConfirmDelete** (11 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **_FooterStatus** (11 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **_RunsListView** (11 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **_DetailLog** (10 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **_HelpScreen** (8 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **test_status_labels_carry_colour_markup()** (8 connections) — `tests/tui/test_inspect_screen.py`
+- **_render_run_lines()** (7 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **.compose()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._refresh_list()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._render_detail_block()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._visible_summaries()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **_stats_label()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **Static** (6 connections)
+- **test_run_row_renders_local_timezone()** (6 connections) — `tests/tui/test_inspect_screen.py`
+- **.action_toggle_failed()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **.__init__()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._select_session()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **.update()** (4 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **ComposeResult** (4 connections)
+- **_summarise_hosts()** (4 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **_fmt_duration_short()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- *... and 33 more nodes in this community*
 
 ## Relationships
 
-- [[Run State Completion Recap]] (18 shared connections)
-- [[Role Group Task Models]] (14 shared connections)
-- [[Task Definition Live Refresh]] (13 shared connections)
-- [[Play Definition Tree Population]] (9 shared connections)
-- [[Run State Summary Panel]] (9 shared connections)
-- [[Status Bar Warning Panels]] (5 shared connections)
-- [[Run History Mining]] (1 shared connections)
+- [PTY Buffer Stall Handling](PTY_Buffer_Stall_Handling.md) (38 shared connections)
+- [Playbook Parser Integration Tests](Playbook_Parser_Integration_Tests.md) (14 shared connections)
+- [Task Summary Count Tests](Task_Summary_Count_Tests.md) (6 shared connections)
+- [Community 503](Community_503.md) (2 shared connections)
+- [Crash Recovery Auto-Save](Crash_Recovery_Auto-Save.md) (2 shared connections)
+- [ASCII Status Icon Fallback](ASCII_Status_Icon_Fallback.md) (1 shared connections)
+- [Generate Script](Generate_Script.md) (1 shared connections)
+- [Module Init File](Module_Init_File.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_models.py`
+- `src/ansible_aom/core/inspect_model.py`
+- `src/ansible_aom/tui/screens/inspect.py`
+- `tests/tui/test_inspect_screen.py`
 
 ## Audit Trail
 
-- EXTRACTED: 118 (67%)
-- INFERRED: 57 (33%)
+- EXTRACTED: 178 (72%)
+- INFERRED: 69 (28%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

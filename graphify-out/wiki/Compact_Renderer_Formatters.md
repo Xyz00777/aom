@@ -1,54 +1,53 @@
 # Compact Renderer Formatters
 
-> 18 nodes · cohesion 0.14
+> 25 nodes · cohesion 0.16
 
 ## Key Concepts
 
-- **format.py** (23 connections) — `src/ansible_aom/compact/format.py`
-- **_wrap()** (17 connections) — `src/ansible_aom/compact/format.py`
-- **collect_tags()** (8 connections) — `src/ansible_aom/compact/format.py`
-- **format_status_bar()** (5 connections) — `src/ansible_aom/compact/format.py`
-- **_truncate_visible()** (5 connections) — `src/ansible_aom/compact/format.py`
-- **_count_cell()** (4 connections) — `src/ansible_aom/compact/format.py`
-- **_format_count_cells()** (4 connections) — `src/ansible_aom/compact/format.py`
-- **format_host_summary()** (4 connections) — `src/ansible_aom/compact/format.py`
-- **_collect_role_group_tags()** (3 connections) — `src/ansible_aom/compact/format.py`
-- **test_truncate_visible_plain_mode_emits_no_sgr()** (3 connections) — `tests/compact/test_tree_render.py`
-- **Pure formatters for the compact renderer.  Every public function here takes doma** (1 connections) — `src/ansible_aom/compact/format.py`
-- **Format the status bar for compact mode display.      Args:         playbook: Pat** (1 connections) — `src/ansible_aom/compact/format.py`
-- **Render non-zero status count cells.      Order: ok, changed, skipped, failed, un** (1 connections) — `src/ansible_aom/compact/format.py`
-- **Format a host summary line with status icons.      Only includes non-zero counts** (1 connections) — `src/ansible_aom/compact/format.py`
-- **Right-align ``value`` in a fixed-width cell; dim zero values.      A literal zer** (1 connections) — `src/ansible_aom/compact/format.py`
-- **``text`` wrapped in an SGR sequence, or plain ``text`` if not colorising.** (1 connections) — `src/ansible_aom/compact/format.py`
-- **Truncate to `width` visible chars while preserving any open SGR     state by app** (1 connections) — `src/ansible_aom/compact/format.py`
-- **Regression guard: when colorize=False, `_truncate_visible` must     not inject `** (1 connections) — `tests/compact/test_tree_render.py`
+- **Path** (15 connections)
+- **_resolve_session_id()** (12 connections) — `src/ansible_aom/rerun/cli.py`
+- **_make_session()** (8 connections) — `tests/unit/test_rerun_cli.py`
+- **TestMain** (7 connections) — `tests/unit/test_rerun_cli.py`
+- **TestResolveSessionId** (7 connections) — `tests/unit/test_rerun_cli.py`
+- **_write_session_with_failure()** (6 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_runs_with_correct_command()** (4 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_ambiguous_short_id_raises()** (4 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_explicit_full_id_returned_as_is()** (4 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_explicit_short_id_resolved_to_full()** (4 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_omitted_returns_most_recent()** (4 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_unknown_id_raises()** (4 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_missing_ansible_args_returns_2()** (3 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_no_hosts_to_rerun_returns_nonzero()** (3 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_no_session_id_uses_latest()** (3 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_user_declines_returns_zero_without_running()** (3 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_no_sessions_at_all_raises()** (3 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_unknown_session_returns_nonzero()** (2 connections) — `tests/unit/test_rerun_cli.py`
+- **Path** (1 connections)
+- **Resolve an explicit session ID, short prefix, or "most recent" intent.      Mirr** (1 connections) — `src/ansible_aom/rerun/cli.py`
+- **Helper: create a session directory with a minimal meta.json.** (1 connections) — `tests/unit/test_rerun_cli.py`
+- **Helper: write a session with one failed host (web2).** (1 connections) — `tests/unit/test_rerun_cli.py`
+- **Happy path: --yes --failed → run_playbook called with --limit web2.** (1 connections) — `tests/unit/test_rerun_cli.py`
+- **A session with no failures and --failed → nothing to do, exit 1.** (1 connections) — `tests/unit/test_rerun_cli.py`
+- **Old session without ansible_args field → exit 2.** (1 connections) — `tests/unit/test_rerun_cli.py`
 
 ## Relationships
 
-- [[Event Log Emission]] (7 shared connections)
-- [[Host Overview Table]] (5 shared connections)
-- [[Preflight Summary Rendering]] (5 shared connections)
-- [[Total Task Counting]] (4 shared connections)
-- [[Tree Block Animation]] (3 shared connections)
-- [[Check Mode Chip]] (2 shared connections)
-- [[Failure Recap Formatting]] (2 shared connections)
-- [[Color ASCII Fallback]] (1 shared connections)
-- [[Panel Refresh Snapshot]] (1 shared connections)
-- [[Run State Completion Recap]] (1 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
-- [[Play Definition Tree Population]] (1 shared connections)
+- [KeyAction TypedDict](KeyAction_TypedDict.md) (4 shared connections)
+- [Shell Completion Helpers](Shell_Completion_Helpers.md) (3 shared connections)
+- [Loop Item Line Tests](Loop_Item_Line_Tests.md) (1 shared connections)
+- [Event Source Adapters](Event_Source_Adapters.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/compact/format.py`
-- `tests/compact/test_tree_render.py`
+- `src/ansible_aom/rerun/cli.py`
+- `tests/unit/test_rerun_cli.py`
 
 ## Audit Trail
 
-- EXTRACTED: 71 (85%)
-- INFERRED: 13 (15%)
+- EXTRACTED: 89 (86%)
+- INFERRED: 14 (14%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

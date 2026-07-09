@@ -1,43 +1,47 @@
 # Stale Running Cleanup
 
-> 14 nodes · cohesion 0.19
+> 19 nodes · cohesion 0.16
 
 ## Key Concepts
 
-- **TestStaleRunningCleanup** (13 connections) — `tests/unit/test_stale_running_cleanup.py`
-- **_make_state_with_stale_running()** (11 connections) — `tests/unit/test_stale_running_cleanup.py`
-- **test_stale_running_cleanup.py** (5 connections) — `tests/unit/test_stale_running_cleanup.py`
-- **.test_host_rows_no_stale_running_after_stats()** (4 connections) — `tests/unit/test_stale_running_cleanup.py`
-- **.test_completed_hosts_preserved_after_stats_cleanup()** (3 connections) — `tests/unit/test_stale_running_cleanup.py`
-- **.test_task_status_cleared_after_stats_cleanup()** (3 connections) — `tests/unit/test_stale_running_cleanup.py`
-- **.test_v2_playbook_on_stats_clears_stale_running_hosts()** (3 connections) — `tests/unit/test_stale_running_cleanup.py`
-- **Regression tests for stale RUNNING hosts in the state model.  When terminal even** (1 connections) — `tests/unit/test_stale_running_cleanup.py`
-- **host_rows() should not show any host as still running after         the playbook** (1 connections) — `tests/unit/test_stale_running_cleanup.py`
-- **Cleaning up stale RUNNING hosts must not alter hosts that already         have t** (1 connections) — `tests/unit/test_stale_running_cleanup.py`
-- **TaskRunState.status should be cleared from RUNNING after         playbook comple** (1 connections) — `tests/unit/test_stale_running_cleanup.py`
-- **Build a RunState where ipa1 completed task A but is stuck as RUNNING     on task** (1 connections) — `tests/unit/test_stale_running_cleanup.py`
-- **When playbook ends, stale RUNNING hosts must be cleaned up.** (1 connections) — `tests/unit/test_stale_running_cleanup.py`
-- **After v2_playbook_on_stats, hosts stuck as RUNNING must be         transitioned** (1 connections) — `tests/unit/test_stale_running_cleanup.py`
+- **_RecordingChild** (11 connections) — `tests/unit/test_runner_watchdog_endtime.py`
+- **test_runner_watchdog_endtime.py** (9 connections) — `tests/unit/test_runner_watchdog_endtime.py`
+- **_drive_short()** (8 connections) — `tests/unit/test_runner_watchdog_endtime.py`
+- **test_post_stats_watchdog_drops_to_quiet_after_end_time()** (8 connections) — `tests/unit/test_runner_watchdog_endtime.py`
+- **test_pre_end_time_uses_full_watchdog()** (8 connections) — `tests/unit/test_runner_watchdog_endtime.py`
+- **_start_line()** (3 connections) — `tests/unit/test_runner_watchdog_endtime.py`
+- **_stats_line()** (3 connections) — `tests/unit/test_runner_watchdog_endtime.py`
+- **Any** (2 connections)
+- **.expect()** (2 connections) — `tests/unit/test_runner_watchdog_endtime.py`
+- **test_quiet_constant_is_smaller_than_full_watchdog()** (2 connections) — `tests/unit/test_runner_watchdog_endtime.py`
+- **R11 — tighter post-stats EOF watchdog once ``end_time`` is set.  R11 spec: the 3** (1 connections) — `tests/unit/test_runner_watchdog_endtime.py`
+- **R11: after ``state.end_time`` is set, post-stats timeout shrinks.      The runne** (1 connections) — `tests/unit/test_runner_watchdog_endtime.py`
+- **R11: until stats is consumed, full ``_EOF_WATCHDOG_S`` applies.      Once the pa** (1 connections) — `tests/unit/test_runner_watchdog_endtime.py`
+- **R11 invariant: ``_EOF_WATCHDOG_S_QUIET`` < ``_EOF_WATCHDOG_S``.      The whole p** (1 connections) — `tests/unit/test_runner_watchdog_endtime.py`
+- **Fake pexpect child that records every expect() timeout and never hangs.      Aft** (1 connections) — `tests/unit/test_runner_watchdog_endtime.py`
+- **Run ``_drive`` with a renderer+sink that prevent pexpect errors.      The dummy** (1 connections) — `tests/unit/test_runner_watchdog_endtime.py`
+- **.close()** (1 connections) — `tests/unit/test_runner_watchdog_endtime.py`
+- **.__init__()** (1 connections) — `tests/unit/test_runner_watchdog_endtime.py`
+- **.isalive()** (1 connections) — `tests/unit/test_runner_watchdog_endtime.py`
 
 ## Relationships
 
-- [[Run State Completion Recap]] (7 shared connections)
-- [[Play Definition Tree Population]] (3 shared connections)
-- [[Run State Summary Panel]] (2 shared connections)
-- [[Run History Mining]] (1 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
-- [[Tree Projection Logic]] (1 shared connections)
+- [Run State Completion Recap](Run_State_Completion_Recap.md) (4 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (4 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [Architecture Layering Tests](Architecture_Layering_Tests.md) (1 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_stale_running_cleanup.py`
+- `tests/unit/test_runner_watchdog_endtime.py`
 
 ## Audit Trail
 
-- EXTRACTED: 38 (78%)
-- INFERRED: 11 (22%)
+- EXTRACTED: 61 (94%)
+- INFERRED: 4 (6%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

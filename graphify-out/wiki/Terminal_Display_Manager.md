@@ -1,64 +1,56 @@
 # Terminal Display Manager
 
-> 44 nodes · cohesion 0.06
+> 54 nodes · cohesion 0.03
 
 ## Key Concepts
 
-- **Display** (73 connections) — `src/ansible_aom/compact/display.py`
-- **TestDegradedModeEntry** (9 connections) — `tests/compact/test_small_terminal.py`
-- **TestDegradedModeFallthrough** (7 connections) — `tests/compact/test_small_terminal.py`
-- **TestSynchronizedOutput** (5 connections) — `tests/compact/test_display_ansi.py`
-- **.test_terminal_cleanup_on_exit()** (4 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_non_tty_update_emits_no_ansi()** (3 connections) — `tests/compact/test_display_ansi.py`
-- **.test_force_size_at_threshold_does_not_degrade()** (3 connections) — `tests/compact/test_small_terminal.py`
-- **.test_non_tty_is_never_degraded()** (3 connections) — `tests/compact/test_small_terminal.py`
-- **.test_stop_in_degraded_mode_is_a_noop()** (3 connections) — `tests/compact/test_small_terminal.py`
-- **.test_non_tty_display_print_log_uses_stdout()** (3 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_non_tty_display_start_is_noop()** (3 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_non_tty_display_update_is_noop()** (3 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_non_tty_line_per_status()** (3 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_non_tty_no_continuous_elapsed_time()** (3 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_throttled_refresh_rate_max_four_per_second()** (3 connections) — `tests/integration/test_compact_renderer.py`
-- **.__init__()** (2 connections) — `src/ansible_aom/compact/display.py`
-- **.start()** (2 connections) — `src/ansible_aom/compact/display.py`
-- **.test_update_wraps_content_in_dec_2026_sync()** (2 connections) — `tests/compact/test_display_ansi.py`
-- **.test_force_size_below_threshold_enters_degraded_mode()** (2 connections) — `tests/compact/test_small_terminal.py`
-- **.test_force_size_below_threshold_prints_one_line_warning()** (2 connections) — `tests/compact/test_small_terminal.py`
-- **.test_force_size_just_below_cols_threshold_degrades()** (2 connections) — `tests/compact/test_small_terminal.py`
-- **.test_force_size_just_below_rows_threshold_degrades()** (2 connections) — `tests/compact/test_small_terminal.py`
-- **.test_clear_in_degraded_mode_is_a_noop()** (2 connections) — `tests/compact/test_small_terminal.py`
-- **.test_print_log_in_degraded_mode_emits_plain_text()** (2 connections) — `tests/compact/test_small_terminal.py`
-- **.test_update_in_degraded_mode_emits_no_dec_frame()** (2 connections) — `tests/compact/test_small_terminal.py`
-- *... and 19 more nodes in this community*
+- **TestHideStateCompactPlumbing** (18 connections) — `tests/unit/test_cli.py`
+- **TestCoreModuleStructure** (15 connections) — `tests/unit/test_cli.py`
+- **TestVerboseDiagnostics** (15 connections) — `tests/unit/test_cli.py`
+- **TestInspectSubcommand** (14 connections) — `tests/unit/test_cli.py`
+- **TestVerboseDebugLogging** (14 connections) — `tests/unit/test_cli.py`
+- **.test_cli_module_exists()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_core_module_exists()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_main_module_exists()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_renderer_module_exists()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_capture_verbose_propagates_to_renderer()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_hide_state_default_propagates_empty_list()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_hide_state_propagates_multiple_values()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_hide_state_propagates_to_renderer()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_no_failed_hint_propagates_to_renderer()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_inspect_dispatches_to_inspect_main_with_remaining_argv()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_inspect_forwards_prune_subcommand()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_inspect_forwards_text_flag()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_inspect_propagates_exit_code()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_non_verbose_does_not_set_debug_level()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_verbose_creates_log_file_with_debug_entries()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_verbose_sets_debug_log_level()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_verbose_sets_diagnostics_debug_flag()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_verbose_list_tasks_summary()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_verbose_prints_ansible_path()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_verbose_prints_env_overrides()** (2 connections) — `tests/unit/test_cli.py`
+- *... and 29 more nodes in this community*
 
 ## Relationships
 
-- [[Compact Renderer Integration Tests]] (25 shared connections)
-- [[Compact Display Logic]] (7 shared connections)
-- [[Small Terminal Handling]] (6 shared connections)
-- [[ANSI Rewind Correctness]] (5 shared connections)
-- [[Terminal Resize Handling]] (5 shared connections)
-- [[Compact Renderer Implementation]] (2 shared connections)
-- [[Color ASCII Fallback]] (1 shared connections)
-- [[Dirty Flag Throttle]] (1 shared connections)
-- [[Terminal Row Counting]] (1 shared connections)
-- [[Display Helper Class]] (1 shared connections)
-- [[Run State Completion Recap]] (1 shared connections)
-- [[Host Status Indicators]] (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (20 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (5 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (5 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (5 shared connections)
+- [Inspect Data Model Builders](Inspect_Data_Model_Builders.md) (5 shared connections)
+- [Session Recording Tests](Session_Recording_Tests.md) (5 shared connections)
+- [JSONL Environment Variable](JSONL_Environment_Variable.md) (4 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/compact/display.py`
-- `tests/compact/test_display_ansi.py`
-- `tests/compact/test_small_terminal.py`
-- `tests/integration/test_compact_renderer.py`
+- `tests/unit/test_cli.py`
 
 ## Audit Trail
 
-- EXTRACTED: 83 (50%)
-- INFERRED: 84 (50%)
+- EXTRACTED: 107 (73%)
+- INFERRED: 40 (27%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

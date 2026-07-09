@@ -1,43 +1,52 @@
 # Check Mode Chip
 
-> 17 nodes · cohesion 0.17
+> 22 nodes · cohesion 0.09
 
 ## Key Concepts
 
-- **_compute_mode_label()** (12 connections) — `src/ansible_aom/compact/format.py`
-- **TestComputeModeLabel** (9 connections) — `tests/compact/test_check_mode_chip.py`
-- **test_check_mode_chip.py** (3 connections) — `tests/compact/test_check_mode_chip.py`
-- **.test_substring_in_other_arg_does_not_false_positive()** (3 connections) — `tests/compact/test_check_mode_chip.py`
-- **TestStatusBarMode** (3 connections) — `tests/compact/test_check_mode_chip.py`
-- **.test_check_and_diff_combine()** (2 connections) — `tests/compact/test_check_mode_chip.py`
-- **.test_check_long_flag_yields_dry_run_label()** (2 connections) — `tests/compact/test_check_mode_chip.py`
-- **.test_check_short_flag_also_caught()** (2 connections) — `tests/compact/test_check_mode_chip.py`
-- **.test_diff_long_flag_yields_diff_label()** (2 connections) — `tests/compact/test_check_mode_chip.py`
-- **.test_diff_short_flag_also_caught()** (2 connections) — `tests/compact/test_check_mode_chip.py`
-- **.test_no_color_emits_plain_label()** (2 connections) — `tests/compact/test_check_mode_chip.py`
-- **.test_no_flags_yields_empty_label()** (2 connections) — `tests/compact/test_check_mode_chip.py`
-- **Render the status-bar mode chip(s) from ansible-playbook args.      Multiple chi** (1 connections) — `src/ansible_aom/compact/format.py`
-- **Tests for the ``DRY RUN`` / ``DIFF`` chip in the status bar.  Users sometimes fo** (1 connections) — `tests/compact/test_check_mode_chip.py`
-- **``--check-something`` shouldn't trip the literal ``--check`` chip.** (1 connections) — `tests/compact/test_check_mode_chip.py`
-- **.test_mode_label_lands_first_when_set()** (1 connections) — `tests/compact/test_check_mode_chip.py`
-- **.test_no_mode_label_is_unchanged()** (1 connections) — `tests/compact/test_check_mode_chip.py`
+- **TestStatusEnum** (21 connections) — `tests/unit/test_models.py`
+- **.test_status_enum_all_values_unique()** (2 connections) — `tests/unit/test_models.py`
+- **.test_status_enum_changed()** (2 connections) — `tests/unit/test_models.py`
+- **.test_status_enum_failed()** (2 connections) — `tests/unit/test_models.py`
+- **.test_status_enum_has_eight_values()** (2 connections) — `tests/unit/test_models.py`
+- **.test_status_enum_ok()** (2 connections) — `tests/unit/test_models.py`
+- **.test_status_enum_pending()** (2 connections) — `tests/unit/test_models.py`
+- **.test_status_enum_running()** (2 connections) — `tests/unit/test_models.py`
+- **.test_status_enum_skipped()** (2 connections) — `tests/unit/test_models.py`
+- **.test_status_enum_string_values_lowercased()** (2 connections) — `tests/unit/test_models.py`
+- **.test_status_enum_unreachable()** (2 connections) — `tests/unit/test_models.py`
+- **Tests for Status enum - TC-186.** (1 connections) — `tests/unit/test_models.py`
+- **TC-186: Status enum contains exactly 8 values (7 task/host + COMPLETED for run-l** (1 connections) — `tests/unit/test_models.py`
+- **TC-186: Status.PENDING exists with correct value.** (1 connections) — `tests/unit/test_models.py`
+- **TC-186: Status.RUNNING exists with correct value.** (1 connections) — `tests/unit/test_models.py`
+- **TC-186: Status.OK exists with correct value.** (1 connections) — `tests/unit/test_models.py`
+- **TC-186: Status.CHANGED exists with correct value.** (1 connections) — `tests/unit/test_models.py`
+- **TC-186: Status.FAILED exists with correct value.** (1 connections) — `tests/unit/test_models.py`
+- **TC-186: Status.SKIPPED exists with correct value.** (1 connections) — `tests/unit/test_models.py`
+- **TC-186: Status.UNREACHABLE exists with correct value.** (1 connections) — `tests/unit/test_models.py`
+- **TC-186: All Status values are unique strings.** (1 connections) — `tests/unit/test_models.py`
+- **TC-186: All Status string values are lowercase.** (1 connections) — `tests/unit/test_models.py`
 
 ## Relationships
 
-- [[Compact Renderer Formatters]] (2 shared connections)
-- [[Compact Renderer Implementation]] (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (3 shared connections)
+- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (2 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
+- [AOM TUI Application](AOM_TUI_Application.md) (1 shared connections)
+- [Per-Task Overhead Analysis](Per-Task_Overhead_Analysis.md) (1 shared connections)
+- [CLI Argument Parser](CLI_Argument_Parser.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/compact/format.py`
-- `tests/compact/test_check_mode_chip.py`
+- `tests/unit/test_models.py`
 
 ## Audit Trail
 
-- EXTRACTED: 32 (65%)
-- INFERRED: 17 (35%)
+- EXTRACTED: 43 (83%)
+- INFERRED: 9 (17%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

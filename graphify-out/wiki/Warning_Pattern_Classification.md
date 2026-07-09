@@ -1,41 +1,40 @@
 # Warning Pattern Classification
 
-> 12 nodes · cohesion 0.17
+> 16 nodes · cohesion 0.12
 
 ## Key Concepts
 
-- **TestWarningClassification** (13 connections) — `tests/unit/test_warnings.py`
-- **.test_deprecated_feature_classification()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_deprecation_warning_classification()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_regular_warning_classification()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_warning_with_deprecation_in_message_body()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_whitespace_before_bracket()** (3 connections) — `tests/unit/test_warnings.py`
-- **TC-498, TC-499, TC-500: Warning pattern classification.** (1 connections) — `tests/unit/test_warnings.py`
-- **TC-498: [DEPRECATION WARNING]: classified as WarningType.DEPRECATION.** (1 connections) — `tests/unit/test_warnings.py`
-- **TC-499: [DEPRECATED]: classified as WarningType.DEPRECATION.** (1 connections) — `tests/unit/test_warnings.py`
-- **TC-500: [WARNING]: classified as WarningType.WARNING.** (1 connections) — `tests/unit/test_warnings.py`
-- **TC-500: [WARNING]: with 'deprecation' word in body is still WARNING type.** (1 connections) — `tests/unit/test_warnings.py`
-- **TC-498: Whitespace before [DEPRECATION WARNING]: still matches.** (1 connections) — `tests/unit/test_warnings.py`
+- **TestFrameParameterIgnoedForNonRunning** (9 connections) — `tests/unit/test_icons.py`
+- **.test_frame_ignored_for_changed()** (2 connections) — `tests/unit/test_icons.py`
+- **.test_frame_ignored_for_completed()** (2 connections) — `tests/unit/test_icons.py`
+- **.test_frame_ignored_for_failed()** (2 connections) — `tests/unit/test_icons.py`
+- **.test_frame_ignored_for_ok()** (2 connections) — `tests/unit/test_icons.py`
+- **.test_frame_ignored_for_pending()** (2 connections) — `tests/unit/test_icons.py`
+- **.test_frame_ignored_for_skipped()** (2 connections) — `tests/unit/test_icons.py`
+- **.test_frame_ignored_for_unreachable()** (2 connections) — `tests/unit/test_icons.py`
+- **Tests that frame parameter is ignored for non-RUNNING statuses.** (1 connections) — `tests/unit/test_icons.py`
+- **Frame parameter ignored for OK status.** (1 connections) — `tests/unit/test_icons.py`
+- **Frame parameter ignored for PENDING status.** (1 connections) — `tests/unit/test_icons.py`
+- **Frame parameter ignored for FAILED status.** (1 connections) — `tests/unit/test_icons.py`
+- **Frame parameter ignored for CHANGED status.** (1 connections) — `tests/unit/test_icons.py`
+- **Frame parameter ignored for SKIPPED status.** (1 connections) — `tests/unit/test_icons.py`
+- **Frame parameter ignored for UNREACHABLE status.** (1 connections) — `tests/unit/test_icons.py`
+- **Frame parameter ignored for COMPLETED status.** (1 connections) — `tests/unit/test_icons.py`
 
 ## Relationships
 
-- [[PTY Stream Parser]] (6 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
-- [[Warnings Display Config]] (1 shared connections)
-- [[App Configuration Settings]] (1 shared connections)
-- [[Status Bar Warning Panels]] (1 shared connections)
-- [[Warning Classification Tests]] (1 shared connections)
+- [Community 461](Community_461.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_warnings.py`
+- `tests/unit/test_icons.py`
 
 ## Audit Trail
 
-- EXTRACTED: 23 (68%)
-- INFERRED: 11 (32%)
+- EXTRACTED: 31 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

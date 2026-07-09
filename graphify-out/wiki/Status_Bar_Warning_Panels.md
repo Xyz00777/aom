@@ -1,64 +1,68 @@
 # Status Bar Warning Panels
 
-> 242 nodes · cohesion 0.01
+> 258 nodes · cohesion 0.01
 
 ## Key Concepts
 
-- **WarningEntry** (81 connections) — `src/ansible_aom/core/models.py`
-- **StatusBarConfig** (65 connections) — `src/ansible_aom/core/config.py`
-- **test_panels.py** (32 connections) — `tests/tui/test_panels.py`
-- **TestWarningEntry** (20 connections) — `tests/unit/test_models.py`
-- **TestFilterPanelWarningCheckboxes** (16 connections) — `tests/tui/test_panels.py`
-- **TestFilterPanelHostFilter** (15 connections) — `tests/tui/test_panels.py`
-- **TestFilterPanelStatusCheckboxes** (15 connections) — `tests/tui/test_panels.py`
-- **TestFilterPanelTextFilter** (15 connections) — `tests/tui/test_panels.py`
-- **TestLogPanelMaxLines** (15 connections) — `tests/tui/test_panels.py`
-- **TestSummaryPanelElapsedTime** (15 connections) — `tests/tui/test_panels.py`
-- **TestLogPanelAutoScroll** (14 connections) — `tests/tui/test_panels.py`
-- **TestStatusBarElementConfiguration** (14 connections) — `tests/tui/test_panels.py`
-- **TestSummaryPanelHostsProgress** (14 connections) — `tests/tui/test_panels.py`
-- **TestSummaryPanelHostStatusBreakdown** (14 connections) — `tests/tui/test_panels.py`
-- **TestDebugPanelCommandEnvDisplay** (13 connections) — `tests/tui/test_panels.py`
-- **TestDebugPanelDataDisplay** (13 connections) — `tests/tui/test_panels.py`
-- **TestDebugPanelMemoryUsage** (13 connections) — `tests/tui/test_panels.py`
-- **TestDebugPanelSubprocessPid** (13 connections) — `tests/tui/test_panels.py`
-- **TestDebugPanelToggleKey** (13 connections) — `tests/tui/test_panels.py`
-- **TestFilterPanelActivation** (13 connections) — `tests/tui/test_panels.py`
-- **TestLogPanelAnsiColorHandling** (13 connections) — `tests/tui/test_panels.py`
-- **TestLogPanelSearchLogic** (13 connections) — `tests/tui/test_panels.py`
-- **TestPanelInteractions** (13 connections) — `tests/tui/test_panels.py`
-- **TestStatusBarYamlConfiguration** (13 connections) — `tests/tui/test_panels.py`
-- **TestSummaryPanelTasksProgress** (13 connections) — `tests/tui/test_panels.py`
-- *... and 217 more nodes in this community*
+- **RunState** (559 connections) — `src/ansible_aom/core/run_state.py`
+- **test_event_processing.py** (27 connections) — `tests/unit/test_event_processing.py`
+- **TestRunState** (21 connections) — `tests/unit/test_models.py`
+- **TestHandleEventDispatcher** (17 connections) — `tests/unit/test_event_processing.py`
+- **TestElapsedTimeFormat** (15 connections) — `tests/unit/test_event_processing.py`
+- **TestHandleEventMalformedPayloads** (15 connections) — `tests/unit/test_event_processing.py`
+- **TestPlaybookOnStats** (13 connections) — `tests/unit/test_event_processing.py`
+- **count_completed_tasks()** (11 connections) — `src/ansible_aom/compact/format.py`
+- **._graft_or_match_task()** (11 connections) — `src/ansible_aom/core/run_state.py`
+- **TestEventProcessingEdgeCases** (11 connections) — `tests/unit/test_event_processing.py`
+- **TestHandleEventTimestampParsing** (11 connections) — `tests/unit/test_event_processing.py`
+- **TestHandleEventUnknownType** (11 connections) — `tests/unit/test_event_processing.py`
+- **TestHandlerTaskStart** (11 connections) — `tests/unit/test_event_processing.py`
+- **TestPlaybookOnStart** (11 connections) — `tests/unit/test_event_processing.py`
+- **TestPlayStart** (11 connections) — `tests/unit/test_event_processing.py`
+- **TestRunnerOnFailedStateTransition** (11 connections) — `tests/unit/test_event_processing.py`
+- **TestRunnerOnOk** (11 connections) — `tests/unit/test_event_processing.py`
+- **TestRunnerOnOkStatus** (11 connections) — `tests/unit/test_event_processing.py`
+- **TestRunnerOnStartTaskCreation** (11 connections) — `tests/unit/test_event_processing.py`
+- **TestTaskStart** (11 connections) — `tests/unit/test_event_processing.py`
+- **TestV2PlaybookOnStatsCrossCheck** (11 connections) — `tests/unit/test_host_resolution.py`
+- **_seed_run_state()** (10 connections) — `tests/unit/test_event_processing.py`
+- **TestRunnerOnFailed** (10 connections) — `tests/unit/test_event_processing.py`
+- **TestRunnerOnFailedIgnoreErrors** (10 connections) — `tests/unit/test_event_processing.py`
+- **TestRunnerOnSkipped** (10 connections) — `tests/unit/test_event_processing.py`
+- *... and 233 more nodes in this community*
 
 ## Relationships
 
-- [[Run State Completion Recap]] (82 shared connections)
-- [[Role Group Task Models]] (57 shared connections)
-- [[Run State Summary Panel]] (31 shared connections)
-- [[WarningEntry Dataclass]] (9 shared connections)
-- [[App Configuration Settings]] (8 shared connections)
-- [[StatusBarConfig Model]] (7 shared connections)
-- [[App Config Model Tests]] (5 shared connections)
-- [[Data Model Unit Tests]] (5 shared connections)
-- [[Warning Classification Tests]] (5 shared connections)
-- [[PTY Stream Parser]] (4 shared connections)
-- [[JSON Line Detection]] (3 shared connections)
-- [[Log Panel Search]] (3 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (158 shared connections)
+- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (60 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (46 shared connections)
+- [CLI Argument Parser](CLI_Argument_Parser.md) (45 shared connections)
+- [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (34 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (30 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (27 shared connections)
+- [Per-Task Overhead Analysis](Per-Task_Overhead_Analysis.md) (20 shared connections)
+- [Inspect CLI Commands](Inspect_CLI_Commands.md) (16 shared connections)
+- [Session Recording Tests](Session_Recording_Tests.md) (12 shared connections)
+- [Runner Session Recording](Runner_Session_Recording.md) (12 shared connections)
+- [Run History Mining](Run_History_Mining.md) (11 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/config.py`
-- `src/ansible_aom/core/models.py`
-- `tests/tui/test_panels.py`
+- `src/ansible_aom/compact/format.py`
+- `src/ansible_aom/core/run_state.py`
+- `src/ansible_aom/tui/app.py`
+- `tests/compact/test_task_progress.py`
+- `tests/unit/test_dynamic_counters.py`
+- `tests/unit/test_event_processing.py`
+- `tests/unit/test_host_resolution.py`
 - `tests/unit/test_models.py`
 
 ## Audit Trail
 
-- EXTRACTED: 493 (58%)
-- INFERRED: 354 (42%)
+- EXTRACTED: 861 (62%)
+- INFERRED: 528 (38%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

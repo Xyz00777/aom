@@ -1,33 +1,38 @@
 # State Transition Validation
 
-> 8 nodes · cohesion 0.25
+> 13 nodes · cohesion 0.19
 
 ## Key Concepts
 
-- **TestStateMachineCanTransition** (8 connections) — `tests/unit/test_state.py`
-- **.test_can_transition_after_state_change()** (3 connections) — `tests/unit/test_state.py`
-- **.test_can_transition_invalid()** (3 connections) — `tests/unit/test_state.py`
-- **.test_can_transition_valid()** (3 connections) — `tests/unit/test_state.py`
-- **Test can_transition method.** (1 connections) — `tests/unit/test_state.py`
-- **can_transition returns True for valid transitions.** (1 connections) — `tests/unit/test_state.py`
-- **can_transition returns False for invalid transitions.** (1 connections) — `tests/unit/test_state.py`
-- **can_transition reflects current state.** (1 connections) — `tests/unit/test_state.py`
+- **TestFuzzNoFalsePositives** (8 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
+- **test_aom_verbose_line_fuzz.py** (6 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
+- **_build_corpus()** (3 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
+- **_generate_line()** (3 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
+- **_random_text()** (2 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
+- **.test_all_lines_are_unknown()** (2 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
+- **.test_all_lines_have_no_host()** (2 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
+- **.test_corpus_is_deterministic()** (2 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
+- **.test_never_raises()** (2 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
+- **_random_word()** (1 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
+- **Deterministic fuzz test for the v1 stderr classifier.  Exercises ``classify()``** (1 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
+- **10k stderr-like lines must not produce false positives.** (1 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
+- **.test_corpus_size_is_exactly_10k()** (1 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
 
 ## Relationships
 
-- [[Execution State Transitions]] (4 shared connections)
-- [[State Machine Module]] (3 shared connections)
+- [Prompt Detection Heuristics](Prompt_Detection_Heuristics.md) (3 shared connections)
+- [Profile Tracemalloc Wiring](Profile_Tracemalloc_Wiring.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_state.py`
+- `tests/unit/test_aom_verbose_line_fuzz.py`
 
 ## Audit Trail
 
-- EXTRACTED: 15 (71%)
-- INFERRED: 6 (29%)
+- EXTRACTED: 30 (88%)
+- INFERRED: 4 (12%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

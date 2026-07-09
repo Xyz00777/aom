@@ -367,26 +367,18 @@ class TestHostStatusIndicators:
 
 
 class TestExitCodes:
-    """Tests for exit codes based on playbook result."""
+    """Tests for exit codes based on playbook result.
 
-    def determine_exit_code(self, state: RunState) -> int:
-        """Determine exit code from RunState."""
-        for play in state.plays.values():
-            for task in play.tasks.values():
-                for host_state in task.hosts.values():
-                    if host_state.status == Status.FAILED:
-                        return 1
-
-        for play in state.plays.values():
-            for task in play.tasks.values():
-                for host_state in task.hosts.values():
-                    if host_state.status == Status.UNREACHABLE:
-                        return 2
-
-        return 0
+    Uses the canonical ``determine_exit_code`` from
+    :mod:`ansible_aom.core.exit_code` so the test mirrors the
+    production derivation exactly (no risk of drift if the rules
+    evolve).
+    """
 
     def test_exit_code_0_all_ok(self):
         """Exit 0 when all hosts completed OK."""
+        from ansible_aom.core.exit_code import determine_exit_code
+
         state = RunState(playbook="test.yml", status=Status.COMPLETED)
         play = PlayRunState(play_id="p1", name="Test play", status=Status.COMPLETED)
         task = TaskRunState(task_id="t1", name="Test task", status=Status.OK)
@@ -395,11 +387,13 @@ class TestExitCodes:
         play.tasks["t1"] = task
         state.plays["p1"] = play
 
-        exit_code = self.determine_exit_code(state)
+        exit_code = determine_exit_code(state)
         assert exit_code == 0
 
     def test_exit_code_0_with_changes(self):
         """Exit 0 when hosts have changes."""
+        from ansible_aom.core.exit_code import determine_exit_code
+
         state = RunState(playbook="test.yml", status=Status.COMPLETED)
         play = PlayRunState(play_id="p1", name="Test play", status=Status.COMPLETED)
         task = TaskRunState(task_id="t1", name="Test task", status=Status.CHANGED)
@@ -408,11 +402,13 @@ class TestExitCodes:
         play.tasks["t1"] = task
         state.plays["p1"] = play
 
-        exit_code = self.determine_exit_code(state)
+        exit_code = determine_exit_code(state)
         assert exit_code == 0
 
     def test_exit_code_1_failure(self):
         """Exit 1 when any host failed."""
+        from ansible_aom.core.exit_code import determine_exit_code
+
         state = RunState(playbook="test.yml", status=Status.FAILED)
         play = PlayRunState(play_id="p1", name="Test play", status=Status.FAILED)
         task = TaskRunState(task_id="t1", name="Test task", status=Status.FAILED)
@@ -421,11 +417,13 @@ class TestExitCodes:
         play.tasks["t1"] = task
         state.plays["p1"] = play
 
-        exit_code = self.determine_exit_code(state)
+        exit_code = determine_exit_code(state)
         assert exit_code == 1
 
     def test_exit_code_2_unreachable(self):
         """Exit 2 when any host unreachable."""
+        from ansible_aom.core.exit_code import determine_exit_code
+
         state = RunState(playbook="test.yml", status=Status.FAILED)
         play = PlayRunState(play_id="p1", name="Test play", status=Status.FAILED)
         task = TaskRunState(task_id="t1", name="Test task", status=Status.UNREACHABLE)
@@ -436,11 +434,13 @@ class TestExitCodes:
         play.tasks["t1"] = task
         state.plays["p1"] = play
 
-        exit_code = self.determine_exit_code(state)
+        exit_code = determine_exit_code(state)
         assert exit_code == 2
 
     def test_exit_code_1_failure_takes_precedence_over_unreachable(self):
         """When both failed and unreachable exist, exit 1."""
+        from ansible_aom.core.exit_code import determine_exit_code
+
         state = RunState(playbook="test.yml", status=Status.FAILED)
         play = PlayRunState(play_id="p1", name="Test play", status=Status.FAILED)
         task = TaskRunState(task_id="t1", name="Test task", status=Status.FAILED)
@@ -450,7 +450,7 @@ class TestExitCodes:
         state.plays["p1"] = play
 
         # Failed takes precedence (checked first)
-        exit_code = self.determine_exit_code(state)
+        exit_code = determine_exit_code(state)
         assert exit_code == 1
 
 

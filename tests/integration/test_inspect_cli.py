@@ -84,3 +84,43 @@ def test_old_diff_subcommand_is_gone(state_dir: Path):
 
     with pytest.raises(SystemExit):
         main(["--state-dir", str(state_dir), "diff", "id1", "id2"])
+
+
+def test_text_mode_with_play_flag(state_dir: Path, capsys):
+    from ansible_aom.inspect.cli import main
+
+    exit_code = main(["--text", "--state-dir", str(state_dir), "--play", "web"])
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    # Play scoping appears in the Verbose header if there are stderr events.
+    # Even without stderr events, the session still renders.
+    assert "019e4520" in captured.out
+
+
+def test_text_mode_with_task_flag(state_dir: Path, capsys):
+    from ansible_aom.inspect.cli import main
+
+    exit_code = main(["--text", "--state-dir", str(state_dir), "--task", "some task"])
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    # Task scoping appears in the Verbose header if there are stderr events.
+    assert "019e4520" in captured.out
+
+
+def test_text_mode_with_play_and_task_flags(state_dir: Path, capsys):
+    from ansible_aom.inspect.cli import main
+
+    exit_code = main(
+        [
+            "--text",
+            "--state-dir",
+            str(state_dir),
+            "--play",
+            "web",
+            "--task",
+            "some task",
+        ]
+    )
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert "019e4520" in captured.out

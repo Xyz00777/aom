@@ -1,0 +1,1 @@
+{"_event": "aom_stderr_line", "source": "ssh_info", "host": "web1", "level": 2, "line": "<web1> Failed to connect to the host via ssh: ssh: connect to host web1 port 22: Connection refused"}

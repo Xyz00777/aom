@@ -11,7 +11,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from ansible_aom.core.models import RunState, Status
+from ansible_aom.core.models import Status
+from ansible_aom.core.run_state import RunState
 from ansible_aom.core.tree import TreeProjection
 
 

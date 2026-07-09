@@ -68,6 +68,7 @@ packages = ["src/ansible_aom"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+addopts = "-n auto --cov-fail-under=60"
 testpaths = ["tests"]
 markers = [
     "needs_ansible: requires real ansible-playbook + ansible.posix collection (auto-skipped otherwise)",
@@ -81,7 +82,49 @@ target-version = "py314"
 select = ["E", "F", "W", "I"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["F401", "F811", "F841", "E501"]
+# F401: unused imports (test fixtures often import for side effects or future use)
+# F811: redefinition of unused variable (local re-imports in test methods)
+# F841: local variable assigned but never used (test scaffolding)
+# E501: line too long (assertion messages with f-strings, inline JSON strings)
+"tests/compact/test_mitogen_robustness.py" = ["F401"]
+"tests/compact/test_password.py" = ["F401", "F841"]
+"tests/compact/test_tree_render.py" = ["F401", "E501"]
+"tests/compact/test_tree_upcoming_tasks.py" = ["F841"]
+"tests/conftest.py" = ["F401"]
+"tests/integration/test_compact_renderer.py" = ["F401", "F811", "F841"]
+"tests/integration/test_error_handling.py" = ["F401", "F841"]
+"tests/integration/test_playbook_parser.py" = ["F811", "F841"]
+"tests/integration/test_runner_interactive_prompts.py" = ["E501"]
+"tests/integration/test_r6_encoding_roundtrip.py" = ["E501"]
+"tests/integration/test_session.py" = ["E501", "F401", "F841"]
+"tests/tui/test_help_screen.py" = ["E501", "F401"]
+"tests/tui/test_keybindings.py" = ["F401"]
+"tests/tui/test_live_refresh.py" = ["F401"]
+"tests/tui/test_panels.py" = ["F401", "F841"]
+"tests/tui/test_tree_more_footers.py" = ["F401"]
+"tests/unit/test_cli.py" = ["F401", "F841"]
+"tests/unit/test_compact_pause_visibility.py" = ["F401"]
+"tests/unit/test_config.py" = ["F401", "F811", "F841"]
+"tests/unit/test_dynamic_counters.py" = ["E501"]
+"tests/unit/test_dynamic_expansion.py" = ["F401"]
+"tests/unit/test_event_processing.py" = ["F401"]
+"tests/unit/test_include_cache.py" = ["E501", "F401"]
+"tests/unit/test_inspect_model.py" = ["F401"]
+"tests/unit/test_models.py" = ["E501", "F401", "F841"]
+"tests/unit/test_parser.py" = ["F401", "F841"]
+"tests/unit/test_play_boundary_state.py" = ["F401"]
+"tests/unit/test_psutil_safe_probe.py" = ["F401"]
+"tests/unit/test_pty_stream.py" = ["F401"]
+"tests/unit/test_redaction.py" = ["E501", "F401"]
+"tests/unit/test_runner_eof_watchdog.py" = ["E501", "F401"]
+"tests/unit/test_runtime_role_task_count.py" = ["E501"]
+"tests/unit/test_stderr_classifier.py" = ["E501", "F401"]
+"tests/unit/test_template_variable_names.py" = ["F401"]
+"tests/unit/test_tree_classify_and_role_labels.py" = ["E501", "F401", "F841"]
+"tests/unit/test_tree_nested_roles.py" = ["E501"]
+"tests/unit/test_tree_projection.py" = ["F401"]
+"tests/unit/test_tree_ungrouped_roles.py" = ["E501", "F401", "F841"]
+"tests/unit/test_warnings.py" = ["F401"]
 "**/__init__.py" = ["F401"]
 # Ansible callback plugins put DOCUMENTATION before imports by convention.
 "src/ansible_aom/ansible/callback/*.py" = ["E402"]
@@ -93,10 +136,17 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
-# The bundled ansible callback plugin subclasses GPL ansible code that
-# has no type stubs; it runs inside the ansible subprocess, never imported
+# The bundled ansible callback plugins subclass GPL ansible code that
+# has no type stubs; they run inside the ansible subprocess, never imported
 # by AOM, so strict typing buys nothing here.
 module = "ansible_aom.ansible.callback.*"
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+# The connection-tracking callback plugin also subclasses ansible code
+# and runs inside the subprocess.
+module = "ansible_aom.callbacks.*"
 disallow_untyped_defs = false
 disallow_untyped_calls = false
 

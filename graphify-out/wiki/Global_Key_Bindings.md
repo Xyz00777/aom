@@ -1,61 +1,50 @@
 # Global Key Bindings
 
-> 31 nodes · cohesion 0.09
+> 38 nodes · cohesion 0.05
 
 ## Key Concepts
 
-- **get_keybinding()** (57 connections) — `src/ansible_aom/tui/keybindings.py`
-- **TestGlobalKeybindings** (16 connections) — `tests/tui/test_keybindings.py`
-- **.test_lowercase_g_is_top()** (4 connections) — `tests/tui/test_keybindings.py`
-- **.test_compact_view_toggle_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_cycle_theme_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_debug_panel_toggle_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_filter_panel_key_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_help_key_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_log_panel_toggle_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_quit_key_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_refresh_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_settings_key_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_shift_tab_reverse_panel_switch()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_sort_cycle_key_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_tab_switches_panel_globally()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_g_jumps_to_tree_top()** (3 connections) — `tests/tui/test_keybindings.py`
-- **g' jumps to top of tree.** (2 connections) — `tests/tui/test_keybindings.py`
-- **Look up a keybinding by key string.      Args:         key: The key string to lo** (1 connections) — `src/ansible_aom/tui/keybindings.py`
-- **Tests for global keybindings - TC-364.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-340, TC-364: 'q' key is global and requires confirmation.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-349: '?' key shows help overlay globally.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-353: 'f' key opens filter panel globally.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-350: 'S' key opens settings screen globally.** (1 connections) — `tests/tui/test_keybindings.py`
-- **s' key cycles sort order globally.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-345: Tab switches panel focus globally.** (1 connections) — `tests/tui/test_keybindings.py`
-- *... and 6 more nodes in this community*
+- **Implementation Learnings** (21 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **2026-06-29: Verbosity-feature inventory (read-only exploration)** (8 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **Host Status Display (resolved)** (8 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **Redaction Module (src/ansible_aom/core/redaction.py)** (3 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **learnings.md** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **2026-06-26 R6 done — closing gap** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **API to implement:** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **Async-Poll Dict-Leak Guard Extended to Inspect Path (2026-06-27)** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **CLI Exit Code Tests (test_cli.py TC-027/TC-028)** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **Cross-cutting constraints (from AGENTS.md / ARCHITECTURE.md)** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **Cross-Play Task Leakage (resolved 2026-05-24)** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **Data model (core/models.py + core/run_state.py + core/inspect_model.py)** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **Dynamic children not shown as pending in tree (resolved 2026-05-23)** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **Elapsed time stuck at 0s for fallback host leaves (resolved 2026-05)** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **Existing post-run inspect feature — YES, fully built** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **--hide-state Comma-Separated Support (2026-06-22)** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **Host leaves only showed RUNNING hosts (resolved 2026-05)** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **Hostname fallback showed all hosts from all plays (resolved 2026-05)** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **Implication for the planned feature** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **Integration Test Expansion (2026-06-26)** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **JSONL event surface (core/event_types.py + core/run_state.py)** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **Layer Rules:** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **Linear strategy tasks stayed RUNNING until playbook end (resolved 2026-05)** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **Missing Host Resolution Tests (TC-149 to TC-152)** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **Missing POSIX Callback Tests (TC-067 to TC-071)** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- *... and 13 more nodes in this community*
 
 ## Relationships
 
-- [[Tree Navigation Keys]] (9 shared connections)
-- [[Shift Modifier Keybindings]] (6 shared connections)
-- [[Get Keybinding Function]] (5 shared connections)
-- [[Panel Toggle Keybindings]] (5 shared connections)
-- [[TUI Keybindings Tests]] (5 shared connections)
-- [[TUI Keybindings Config]] (4 shared connections)
-- [[Keybinding Context Coverage]] (4 shared connections)
-- [[Quit Keybinding]] (3 shared connections)
-- [[Ctrl-C Keybindings]] (2 shared connections)
-- [[Invalid Key Handling]] (2 shared connections)
-- [[Panel Resize Keybindings]] (2 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `src/ansible_aom/tui/keybindings.py`
-- `tests/tui/test_keybindings.py`
+- `.sisyphus/notepads/impl-gaps/learnings.md`
 
 ## Audit Trail
 
-- EXTRACTED: 62 (47%)
-- INFERRED: 70 (53%)
+- EXTRACTED: 74 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

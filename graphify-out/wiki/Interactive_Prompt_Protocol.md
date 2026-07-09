@@ -1,32 +1,36 @@
 # Interactive Prompt Protocol
 
-> 7 nodes · cohesion 0.29
+> 12 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **TestProtocol** (7 connections) — `tests/unit/test_interactive_prompt.py`
-- **test_interactive_prompt.py** (4 connections) — `tests/unit/test_interactive_prompt.py`
-- **.test_aom_app_still_satisfies_protocol()** (2 connections) — `tests/unit/test_interactive_prompt.py`
-- **.test_compact_renderer_still_satisfies_protocol()** (2 connections) — `tests/unit/test_interactive_prompt.py`
-- **Tests for handle_interactive_prompt (IP1, IP4).  ansible.builtin.pause and vars_** (1 connections) — `tests/unit/test_interactive_prompt.py`
-- **Renderer protocol gains the interactive prompt method.** (1 connections) — `tests/unit/test_interactive_prompt.py`
-- **.test_protocol_declares_handle_interactive_prompt()** (1 connections) — `tests/unit/test_interactive_prompt.py`
+- **T6 (TUI parity — `populate_from_projection`) — 2026-06-24T23:55:00+02:00** (12 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **`add_leaf` vs `add(allow_expand=False)`** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **Conventions reaffirmed** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **Files changed** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **Mypy fix: `TreeProjection` moved to `TYPE_CHECKING`** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **Parent-stack walkthrough (the key insight)** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **Pitfalls avoided** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **TDD order** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **Test count math (post-T6)** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **Test gotchas fixed during TDD** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **Verification** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **What was implemented** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
 
 ## Relationships
 
-- [[AOM TUI Application]] (3 shared connections)
-- [[Compact Renderer Implementation]] (3 shared connections)
+- [Community 522](Community_522.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_interactive_prompt.py`
+- `.sisyphus/notepads/two-level-truncation/learnings.md`
 
 ## Audit Trail
 
-- EXTRACTED: 14 (78%)
-- INFERRED: 4 (22%)
+- EXTRACTED: 23 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

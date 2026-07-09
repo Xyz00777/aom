@@ -10,19 +10,22 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
 from datetime import datetime
-from typing import Any
 
-from ansible_aom.core.models import RunState
+from ansible_aom.core.event_types import JsonlEvent
+from ansible_aom.core.run_state import RunState
+from ansible_aom.core.timestamp import parse_iso_timestamp
 from ansible_aom.core.tree import TreeLine, TreeProjection
 
 
-def _event_timestamp(event: dict[str, Any]) -> datetime:
-    return datetime.fromisoformat(event["_timestamp"].replace("Z", "+00:00"))
+def _event_timestamp(event: JsonlEvent) -> datetime:
+    ts = event.get("_timestamp")
+    assert ts is not None
+    return parse_iso_timestamp(ts)
 
 
 def iter_tree_frames(
     playbook: str,
-    events: Iterable[dict[str, Any]],
+    events: Iterable[JsonlEvent],
     *,
     budget: int = 999,
 ) -> Iterator[list[TreeLine]]:

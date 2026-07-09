@@ -1,50 +1,50 @@
 # Per-Task Timing Tests
 
-> 32 nodes · cohesion 0.16
+> 39 nodes · cohesion 0.05
 
 ## Key Concepts
 
-- **_renderer()** (18 connections) — `tests/compact/test_per_task_timing.py`
-- **_logged()** (15 connections) — `tests/compact/test_per_task_timing.py`
-- **_task_start()** (12 connections) — `tests/compact/test_per_task_timing.py`
-- **test_per_task_timing.py** (10 connections) — `tests/compact/test_per_task_timing.py`
-- **_runner_ok()** (9 connections) — `tests/compact/test_per_task_timing.py`
-- **TestPreviousTaskSummary** (9 connections) — `tests/compact/test_per_task_timing.py`
-- **TestInlineDuration** (8 connections) — `tests/compact/test_per_task_timing.py`
-- **.test_summary_drops_duration_for_single_host_task()** (6 connections) — `tests/compact/test_per_task_timing.py`
-- **.test_summary_emitted_on_stats_for_final_task()** (6 connections) — `tests/compact/test_per_task_timing.py`
-- **.test_summary_keeps_duration_for_multi_host_task()** (6 connections) — `tests/compact/test_per_task_timing.py`
-- **TestFormatDuration** (5 connections) — `tests/compact/test_per_task_timing.py`
-- **.test_changed_line_carries_duration()** (5 connections) — `tests/compact/test_per_task_timing.py`
-- **.test_failed_line_carries_duration_before_msg()** (5 connections) — `tests/compact/test_per_task_timing.py`
-- **.test_long_duration_renders_compact()** (5 connections) — `tests/compact/test_per_task_timing.py`
-- **.test_ok_line_carries_seconds_duration()** (5 connections) — `tests/compact/test_per_task_timing.py`
-- **.test_unknown_task_uuid_drops_duration_suffix()** (5 connections) — `tests/compact/test_per_task_timing.py`
-- **.test_no_summary_when_no_prior_task()** (5 connections) — `tests/compact/test_per_task_timing.py`
-- **.test_summary_contains_task_duration_when_no_per_host_duration()** (5 connections) — `tests/compact/test_per_task_timing.py`
-- **.test_summary_line_lands_before_next_task_header()** (5 connections) — `tests/compact/test_per_task_timing.py`
-- **.test_missing_timestamp_drops_duration_suffix()** (4 connections) — `tests/compact/test_per_task_timing.py`
-- **.test_summary_contains_cumulative()** (3 connections) — `tests/compact/test_per_task_timing.py`
-- **_runner_failed()** (2 connections) — `tests/compact/test_per_task_timing.py`
-- **_stats()** (2 connections) — `tests/compact/test_per_task_timing.py`
-- **.test_hour_range()** (2 connections) — `tests/compact/test_per_task_timing.py`
-- **.test_minute_range()** (2 connections) — `tests/compact/test_per_task_timing.py`
-- *... and 7 more nodes in this community*
+- **Section 1: Exhaustive Line Category Enumeration** (39 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 10: SSH Return Code / Censored Output (`rc=%s` at caplevel=2, vvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 11: ControlPersist Broken Pipe (`RETRYING BECAUSE OF CONTROLPERSIST BROKEN PIPE` at caplevel=2, vvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 12: Connection Lock Messages (`CONNECTION: pid ...` at caplevel=3, vvvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 13: Persistent Connection Reset (`resetting persistent connection` at caplevel=3, vvvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 14: Callback Loading (`Loading callback plugin` at caplevel=3, vvvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 15: Inventory Plugin Setup (`setting up inventory plugins` at caplevel=3, vvvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 16: Inventory Parsing Results (`Parsed ... inventory source` at caplevel=2, vvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 17: Inventory Plugin Declined (`declined parsing` at caplevel=2, vvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 18: Local Connection Establishment (`ESTABLISH LOCAL CONNECTION FOR USER:` at caplevel=2, vvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 19: Local EXEC/PUT/FETCH (caplevel=2, vvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 1: Warnings (`[WARNING]:`)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 20: Local User Detection (`Current user (uid=...)` at caplevel=1, vv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 21: Vault Password Prompts (interactive, to stderr)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 22: Become Password Prompts (interactive, to stderr)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 23: Vault Decryption Attempts (`Trying to use vault secret` at vvvvv, caplevel=4)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 24: Vault Encryption Details (`Encrypting with vault_id` at vvvvv, caplevel=4)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 25: Vault Decrypt Success (`Decrypt successful with secret` at vvvvv, caplevel=4)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 26: Vault ID Matching (`encrypt_vault_id=` at vvvvv, caplevel=4)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 27: Vault Password File Loading (`Reading vault password file` at vvvvv, caplevel=4)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 28: Vault Password Script Execution (`The vault password file ... is a client script` at vvvvv, caplevel=4)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 29: Plugin Loading Debug (`trying ...` at debug level)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 2: Deprecation Warnings (`[DEPRECATION WARNING]:`)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 30: Config File Loading (`Using ... as config file` at caplevel=1, v)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Category 31: Play Count (`N plays in ...` at caplevel=1, vv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- *... and 14 more nodes in this community*
 
 ## Relationships
 
-- [[Compact Renderer Implementation]] (5 shared connections)
+- [Ansible Password Redaction](Ansible_Password_Redaction.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/compact/test_per_task_timing.py`
+- `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
 
 ## Audit Trail
 
-- EXTRACTED: 164 (98%)
-- INFERRED: 3 (2%)
+- EXTRACTED: 77 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

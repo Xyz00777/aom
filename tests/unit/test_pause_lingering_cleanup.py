@@ -17,7 +17,8 @@ finalise prior plays.
 
 from __future__ import annotations
 
-from ansible_aom.core.models import PlayDefinition, RunState, Status
+from ansible_aom.core.models import PlayDefinition, Status
+from ansible_aom.core.run_state import RunState
 from ansible_aom.core.tree import TreeProjection
 
 _PLAY1 = "play-confirm-uuid"

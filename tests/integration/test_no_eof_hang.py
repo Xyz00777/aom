@@ -2,16 +2,11 @@
 
 A misbehaved (or hung) ansible-playbook child can emit a complete event
 stream — including the final ``v2_playbook_on_stats`` — and then never
-close stdout, never exit. The runner's ``_drive`` loop is happy to keep
-waiting on ``child.expect(...)`` for as long as the timeout allows.
-
-**Current behavior**: there is no bounded-wait after ``playbook_on_stats``.
-The runner waits for EOF or for the (long) idle timeout to trigger.
-
-This test pins that behavior as an **xfail** so the gap is visible in
-the suite but doesn't block CI. When/if a 2-second post-stats grace
-window is implemented in ``_drive``, flip the xfail off and the test
-becomes a regression marker.
+close stdout, never exit. Without R8 the runner's ``_drive`` loop would
+keep waiting on ``child.expect(...)`` for as long as the per-read timeout
+allows. R8 bounds the post-stats wait with a 30s watchdog: if EOF doesn't
+fire within ``_EOF_WATCHDOG_S`` of the stats event, the runner logs a
+warning and breaks out of the wait loop as if EOF had arrived.
 
 The shim writes complete events then enters a long sleep without closing
 stdout. We invoke the runner with a tight wall-clock budget and assert
@@ -27,6 +22,8 @@ import time
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+from ansible_aom.ansible.runner import _EOF_WATCHDOG_S
 
 
 def _fake_ansible_hangs_after_stats(
@@ -47,19 +44,20 @@ def _fake_ansible_hangs_after_stats(
     return sys.executable, ["-c", code]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "R8 spec gap: runner has no post-playbook_on_stats grace timeout; "
-        "child that emits all events and then refuses to close stdout will "
-        "block the expect-loop until the (long) per-read timeout. Test "
-        "captures the desired behavior; flip strict=True once the bounded "
-        "wait is implemented in runner._drive."
-    ),
+@pytest.mark.parametrize(
+    "sleep_seconds",
+    [120],
 )
-def test_runner_returns_within_bounded_time_when_child_hangs_after_stats() -> None:
-    """The runner should not wait indefinitely on a hung child once the
-    final stats event has been consumed."""
+def test_runner_returns_within_bounded_time_when_child_hangs_after_stats(
+    sleep_seconds: int,
+) -> None:
+    """R8 regression marker: the runner must not wait indefinitely on a
+    hung child once the final stats event has been consumed.
+
+    With the post-stats EOF watchdog, ``run_playbook`` returns within
+    ``_EOF_WATCHDOG_S`` + a small grace for spawn/cold-start. Without
+    R8 this would block until the child eventually exits (never, here).
+    """
     from ansible_aom.ansible.runner import run_playbook
 
     renderer = MagicMock()
@@ -68,28 +66,40 @@ def test_runner_returns_within_bounded_time_when_child_hangs_after_stats() -> No
             {"_event": "v2_playbook_on_start", "_timestamp": "2026-05-08T10:00:00Z"},
             {"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-08T10:00:01Z"},
         ],
-        sleep_seconds=30,
+        sleep_seconds=sleep_seconds,
     )
 
-    # Run the runner on a worker thread; if it doesn't return within 5s,
-    # we know the EOF wait is unbounded and this test xfails as designed.
     result: dict[str, int | None] = {"exit_code": None}
 
     def _drive_runner() -> None:
         with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
-            # Short per-read timeout so the worker thread can react,
-            # but the run as a whole should still complete bounded.
+            # Tight per-read timeout keeps the pre-stats wait short;
+            # the post-stats watchdog is what bounds the run as a whole.
             result["exit_code"] = run_playbook("playbook.yml", [], renderer, timeout=0.5)
 
     worker = threading.Thread(target=_drive_runner, daemon=True)
     worker.start()
-    worker.join(timeout=5.0)
 
-    assert not worker.is_alive(), (
-        "run_playbook did not return within 5s after the child stopped "
-        "emitting events — bounded post-stats wait not implemented (R8)"
-    )
+    # Budget: _EOF_WATCHDOG_S + 10s slack for spawn, child cleanup
+    # (SIGKILL + waitpid), and post-loop renderer/sink finalisation.
+    # Any regression that disables the watchdog makes this timeout.
+    budget = _EOF_WATCHDOG_S + 10.0
+    worker.join(timeout=budget)
+
+    if worker.is_alive():
+        pytest.fail(
+            f"run_playbook did not return within {budget:.1f}s after the child "
+            "stopped emitting events — R8 EOF watchdog did not fire"
+        )
     assert result["exit_code"] is not None
+
+    # The watchdog warning must be visible to the user via print_log
+    # so an operator staring at a hung run knows AOM bailed out, not
+    # the child.
+    printed = [c.args[0] for c in renderer.print_log.call_args_list]
+    assert any("EOF" in line and "watchdog" in line.lower() for line in printed), (
+        f"expected EOF watchdog warning, got: {printed!r}"
+    )
 
 
 def test_runner_finishes_promptly_on_clean_eof() -> None:

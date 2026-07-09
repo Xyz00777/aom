@@ -1,70 +1,63 @@
 # Total Task Counting
 
-> 29 nodes · cohesion 0.08
+> 40 nodes · cohesion 0.07
 
 ## Key Concepts
 
-- **count_total_tasks()** (16 connections) — `src/ansible_aom/compact/format.py`
-- **count_total_tasks_seen()** (13 connections) — `src/ansible_aom/compact/format.py`
-- **test_dynamic_counters.py** (11 connections) — `tests/unit/test_dynamic_counters.py`
-- **.handle_completion()** (9 connections) — `src/ansible_aom/compact/renderer.py`
-- **_count_tasks()** (7 connections) — `src/ansible_aom/compact/format.py`
-- **test_total_tasks_seen_includes_include_cache()** (7 connections) — `tests/unit/test_dynamic_counters.py`
-- **test_total_tasks_with_role_group_and_dynamic_children()** (6 connections) — `tests/unit/test_dynamic_counters.py`
-- **test_total_tasks_counts_dynamic_children()** (5 connections) — `tests/unit/test_dynamic_counters.py`
-- **test_total_tasks_counts_import_tasks_as_static()** (5 connections) — `tests/unit/test_dynamic_counters.py`
-- **test_total_tasks_multi_play_with_dynamic_children()** (5 connections) — `tests/unit/test_dynamic_counters.py`
-- **test_total_tasks_no_dynamic_children()** (5 connections) — `tests/unit/test_dynamic_counters.py`
-- **with_nested_include.yml (NEW)** (4 connections) — `.sisyphus/test-fixtures/with_nested_include.yml`
-- **test_total_tasks_empty_definitions()** (3 connections) — `tests/unit/test_dynamic_counters.py`
-- **Recursively count leaf tasks inside a ``RoleGroupDefinition``.      ``RoleGroupD** (2 connections) — `src/ansible_aom/compact/format.py`
-- **test_count_total_tasks_empty()** (2 connections) — `tests/compact/test_task_progress.py`
-- **with_dynamic_include.yml (NEW)** (2 connections) — `.sisyphus/test-fixtures/with_dynamic_include.yml`
-- **Handle playbook completion (success/failure/crash).          Shows final status** (1 connections) — `src/ansible_aom/compact/renderer.py`
-- **dynamic_target.yml** (1 connections) — `.sisyphus/test-fixtures/dynamic_target.yml`
-- **nested_level1.yml (NEW)** (1 connections) — `.sisyphus/test-fixtures/nested_level1.yml`
-- **nested_level2.yml (NEW)** (1 connections) — `.sisyphus/test-fixtures/nested_level2.yml`
-- **with_include_role.yml (NEW)** (1 connections) — `.sisyphus/test-fixtures/with_include_role.yml`
-- **Unit tests for dynamic counter accuracy (TC-310–TC-317).  Tests that ``_count_ta** (1 connections) — `tests/unit/test_dynamic_counters.py`
-- **import_tasks are expanded by --list-tasks — they appear as regular     static Ta** (1 connections) — `tests/unit/test_dynamic_counters.py`
-- **A play with RoleGroupDefinition entries and a TaskDefinition that     has dynami** (1 connections) — `tests/unit/test_dynamic_counters.py`
-- **3 static + 5 dynamic children under one parent → total = 8.** (1 connections) — `tests/unit/test_dynamic_counters.py`
-- *... and 4 more nodes in this community*
+- **load_session()** (39 connections) — `src/ansible_aom/session/store.py`
+- **test_meta_schema_version.py** (9 connections) — `tests/unit/test_meta_schema_version.py`
+- **Path** (7 connections)
+- **_start_and_end()** (7 connections) — `tests/unit/test_meta_schema_version.py`
+- **TestCorruptedSessionHandling** (6 connections) — `tests/integration/test_session.py`
+- **TestInspectShow** (6 connections) — `tests/integration/test_session.py`
+- **.test_inspect_shows_malformed_count()** (5 connections) — `tests/integration/test_session.py`
+- **TestOutputFormats** (5 connections) — `tests/integration/test_session.py`
+- **test_load_session_exposes_schema_version_2()** (5 connections) — `tests/unit/test_meta_schema_version.py`
+- **test_load_session_of_v2_session_round_trips_schema_version_2()** (5 connections) — `tests/unit/test_meta_schema_version.py`
+- **.test_malformed_json_skipped_with_warning()** (4 connections) — `tests/integration/test_session.py`
+- **.test_truncated_jsonl_handled_gracefully()** (4 connections) — `tests/integration/test_session.py`
+- **.test_load_nonexistent_session_returns_none()** (4 connections) — `tests/integration/test_session.py`
+- **.test_load_session_includes_events()** (4 connections) — `tests/integration/test_session.py`
+- **.test_load_session_returns_meta()** (4 connections) — `tests/integration/test_session.py`
+- **.test_json_output_format()** (4 connections) — `tests/integration/test_session.py`
+- **.test_jsonl_output_format()** (4 connections) — `tests/integration/test_session.py`
+- **test_end_session_preserves_schema_version_2()** (4 connections) — `tests/unit/test_meta_schema_version.py`
+- **test_load_session_defaults_missing_schema_version_to_1()** (4 connections) — `tests/unit/test_meta_schema_version.py`
+- **test_schema_version_2_coexists_with_existing_meta_fields()** (4 connections) — `tests/unit/test_meta_schema_version.py`
+- **test_start_session_writes_schema_version_2()** (4 connections) — `tests/unit/test_meta_schema_version.py`
+- **Load a session by ID.      Args:         session_id: The session ID to load** (1 connections) — `src/ansible_aom/session/store.py`
+- **TC-231, TC-232, TC-233: Corrupted session handling.** (1 connections) — `tests/integration/test_session.py`
+- **TC-231: Truncated JSONL is handled gracefully.** (1 connections) — `tests/integration/test_session.py`
+- **TC-232: Malformed JSON lines skipped with WARNING.** (1 connections) — `tests/integration/test_session.py`
+- *... and 15 more nodes in this community*
 
 ## Relationships
 
-- [[Play Definition Tree Population]] (9 shared connections)
-- [[Run State Completion Recap]] (9 shared connections)
-- [[Task Definition Live Refresh]] (6 shared connections)
-- [[Compact Renderer Formatters]] (4 shared connections)
-- [[Include Role Discovery]] (3 shared connections)
-- [[Panel Refresh Snapshot]] (2 shared connections)
-- [[Run State Summary Panel]] (2 shared connections)
-- [[Compact Renderer Implementation]] (2 shared connections)
-- [[Preflight Summary Rendering]] (1 shared connections)
-- [[RunState Renderer Invariants]] (1 shared connections)
-- [[Failure Recap Formatting]] (1 shared connections)
-- [[Run History Mining]] (1 shared connections)
+- [Run Config Key Normalization](Run_Config_Key_Normalization.md) (18 shared connections)
+- [Play Boundary State Tests](Play_Boundary_State_Tests.md) (5 shared connections)
+- [Include Import Role Tasks](Include_Import_Role_Tasks.md) (4 shared connections)
+- [Status Bar Widget](Status_Bar_Widget.md) (2 shared connections)
+- [Loop Item Line Tests](Loop_Item_Line_Tests.md) (2 shared connections)
+- [PTY Buffer Stall Handling](PTY_Buffer_Stall_Handling.md) (2 shared connections)
+- [Plaintext Line Handling](Plaintext_Line_Handling.md) (2 shared connections)
+- [Task Summary Count Tests](Task_Summary_Count_Tests.md) (2 shared connections)
+- [Panel Refresh Snapshot](Panel_Refresh_Snapshot.md) (2 shared connections)
+- [Hide State Normalization](Hide_State_Normalization.md) (1 shared connections)
+- [Shell Completion Helpers](Shell_Completion_Helpers.md) (1 shared connections)
+- [Event Source Adapters](Event_Source_Adapters.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/test-fixtures/dynamic_target.yml`
-- `.sisyphus/test-fixtures/nested_level1.yml`
-- `.sisyphus/test-fixtures/nested_level2.yml`
-- `.sisyphus/test-fixtures/with_dynamic_include.yml`
-- `.sisyphus/test-fixtures/with_include_role.yml`
-- `.sisyphus/test-fixtures/with_nested_include.yml`
-- `src/ansible_aom/compact/format.py`
-- `src/ansible_aom/compact/renderer.py`
-- `tests/compact/test_task_progress.py`
-- `tests/unit/test_dynamic_counters.py`
+- `src/ansible_aom/session/store.py`
+- `tests/integration/test_session.py`
+- `tests/unit/test_meta_schema_version.py`
 
 ## Audit Trail
 
-- EXTRACTED: 65 (57%)
-- INFERRED: 50 (43%)
+- EXTRACTED: 105 (67%)
+- INFERRED: 52 (33%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

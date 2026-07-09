@@ -1,32 +1,38 @@
 # Help Overlay TUI
 
-> 6 nodes · cohesion 0.33
+> 12 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **HelpOverlay** (5 connections) — `src/ansible_aom/tui/screens/help.py`
-- **help.py** (2 connections) — `src/ansible_aom/tui/screens/help.py`
-- **.action_dismiss()** (2 connections) — `src/ansible_aom/tui/screens/help.py`
-- **.compose()** (2 connections) — `src/ansible_aom/tui/screens/help.py`
-- **Help overlay for AOM TUI.  Triggered by '?' key. See SPECIFICATION.md Section 10** (1 connections) — `src/ansible_aom/tui/screens/help.py`
-- **Help overlay showing keybindings.      Displays all keybindings grouped by conte** (1 connections) — `src/ansible_aom/tui/screens/help.py`
+- **TestGetKeybindingFunction** (9 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_keybinding_lowercase_letters()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_keybinding_normalizes_modifier_format()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_keybinding_preserves_modifier_case()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_keybinding_returns_dict()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_keybinding_uppercase_letters_distinct()** (3 connections) — `tests/tui/test_keybindings.py`
+- **Tests for get_keybinding function behavior.** (1 connections) — `tests/tui/test_keybindings.py`
+- **Lowercase letters should find their keybinding.** (1 connections) — `tests/tui/test_keybindings.py`
+- **Uppercase letters are distinct from lowercase for defined caps keys.** (1 connections) — `tests/tui/test_keybindings.py`
+- **Modifier keys should preserve case format.** (1 connections) — `tests/tui/test_keybindings.py`
+- **get_keybinding should handle case variations in modifiers.** (1 connections) — `tests/tui/test_keybindings.py`
+- **get_keybinding returns KeyAction dict.** (1 connections) — `tests/tui/test_keybindings.py`
 
 ## Relationships
 
-- [[TUI Keybindings Config]] (1 shared connections)
-- [[Playbook Event Parsing]] (1 shared connections)
-- [[Inspect TUI Widget Data]] (1 shared connections)
+- [Runner Event Batching](Runner_Event_Batching.md) (5 shared connections)
+- [State Machine Invariants](State_Machine_Invariants.md) (2 shared connections)
+- [Warning Color Formatting](Warning_Color_Formatting.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/tui/screens/help.py`
+- `tests/tui/test_keybindings.py`
 
 ## Audit Trail
 
-- EXTRACTED: 12 (92%)
-- INFERRED: 1 (8%)
+- EXTRACTED: 23 (77%)
+- INFERRED: 7 (23%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,38 +1,41 @@
 # Status Icon Mapping
 
-> 10 nodes · cohesion 0.20
+> 14 nodes · cohesion 0.19
 
 ## Key Concepts
 
-- **test_icons.py** (7 connections) — `tests/unit/test_icons.py`
-- **TestStatusIconUniqueness** (5 connections) — `tests/unit/test_icons.py`
-- **.test_all_ascii_icons_are_unique()** (2 connections) — `tests/unit/test_icons.py`
-- **.test_all_colors_are_valid_rich_colors()** (2 connections) — `tests/unit/test_icons.py`
-- **.test_all_status_icons_are_unique()** (2 connections) — `tests/unit/test_icons.py`
-- **Unit tests for status icon mapping in ansible_aom.core.icons.  Test cases cover** (1 connections) — `tests/unit/test_icons.py`
-- **Tests ensuring icon uniqueness (no collisions).** (1 connections) — `tests/unit/test_icons.py`
-- **All status icons should be distinct (except COMPLETED=OK).** (1 connections) — `tests/unit/test_icons.py`
-- **All ASCII fallback icons should be distinct (except COMPLETED=OK).** (1 connections) — `tests/unit/test_icons.py`
-- **All color names should be valid Rich color names.** (1 connections) — `tests/unit/test_icons.py`
+- **TestGetActionKeybindings** (9 connections) — `tests/tui/test_keybindings.py`
+- **get_action_keybindings()** (8 connections) — `src/ansible_aom/tui/keybindings.py`
+- **.test_get_action_keybindings_for_navigation()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_action_keybindings_for_quit()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_action_keybindings_for_unknown_action()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_action_keybindings_returns_list()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_action_keybindings_single_key_action()** (3 connections) — `tests/tui/test_keybindings.py`
+- **Get all keys that map to a given action.      Args:         action: The action i** (1 connections) — `src/ansible_aom/tui/keybindings.py`
+- **Tests for get_action_keybindings function.** (1 connections) — `tests/tui/test_keybindings.py`
+- **get_action_keybindings returns a list.** (1 connections) — `tests/tui/test_keybindings.py`
+- **Quit action should return 'q' key.** (1 connections) — `tests/tui/test_keybindings.py`
+- **Navigate down action should have multiple keys.** (1 connections) — `tests/tui/test_keybindings.py`
+- **Unknown action should return empty list.** (1 connections) — `tests/tui/test_keybindings.py`
+- **Actions with single key should return one item.** (1 connections) — `tests/tui/test_keybindings.py`
 
 ## Relationships
 
-- [[ASCII Status Icon Fallback]] (1 shared connections)
-- [[Frame Parameter Handling]] (1 shared connections)
-- [[Status Color Mapping]] (1 shared connections)
-- [[Status Icon Animation Tests]] (1 shared connections)
-- [[Tree Expansion Icons]] (1 shared connections)
+- [State Machine Invariants](State_Machine_Invariants.md) (3 shared connections)
+- [Module Init File](Module_Init_File.md) (1 shared connections)
+- [Warning Color Formatting](Warning_Color_Formatting.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_icons.py`
+- `src/ansible_aom/tui/keybindings.py`
+- `tests/tui/test_keybindings.py`
 
 ## Audit Trail
 
-- EXTRACTED: 23 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 26 (67%)
+- INFERRED: 13 (33%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

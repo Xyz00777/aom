@@ -1,0 +1,1 @@
+{"_event": "aom_stderr_line", "source": "connection_lifecycle", "host": null, "level": 3, "line": "resetting persistent connection for socket_path /tmp/ansible-ssh-foo"}

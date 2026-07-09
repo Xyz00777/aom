@@ -51,6 +51,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from ansible_aom.core.event_types import JsonlEvent
     from ansible_aom.session.history import PriorRun
 
 
@@ -129,7 +130,7 @@ class Renderer(Protocol):
     # Event stream
     # -----------------------------------------------------------------
 
-    def update_state(self, event: dict) -> None:
+    def update_state(self, event: "JsonlEvent") -> None:
         """Handle a new JSONL event from ansible.
 
         **Mandatory.** Called once per event in document order. The

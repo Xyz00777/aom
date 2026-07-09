@@ -1,35 +1,37 @@
 # Process State Monitoring
 
-> 8 nodes · cohesion 0.25
+> 13 nodes · cohesion 0.15
 
 ## Key Concepts
 
-- **TestProcessStateMonitoring** (8 connections) — `tests/integration/test_error_handling.py`
-- **.test_orphan_detection_during_execution()** (3 connections) — `tests/integration/test_error_handling.py`
-- **.test_orphan_detection_during_loading_tasks()** (3 connections) — `tests/integration/test_error_handling.py`
-- **.test_monitoring_interval_is_half_second()** (2 connections) — `tests/integration/test_error_handling.py`
-- **TC-480 to TC-483: Process state monitoring.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-480: Process state checked every 0.5 seconds.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-482: Early termination during LOADING_TASKS causes CRASHED.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-483: Process termination during EXECUTION parses remaining buffer.** (1 connections) — `tests/integration/test_error_handling.py`
+- **F5 — Shell Completion (bash / zsh / fish) Implementation Plan** (12 connections) — `docs/superpowers/plans/2026-05-12-f5-shell-completion.md`
+- **2026-05-12-f5-shell-completion.md** (1 connections) — `docs/superpowers/plans/2026-05-12-f5-shell-completion.md`
+- **Conventions** (1 connections) — `docs/superpowers/plans/2026-05-12-f5-shell-completion.md`
+- **File Structure** (1 connections) — `docs/superpowers/plans/2026-05-12-f5-shell-completion.md`
+- **Final verification** (1 connections) — `docs/superpowers/plans/2026-05-12-f5-shell-completion.md`
+- **Self-review (run after writing the plan)** (1 connections) — `docs/superpowers/plans/2026-05-12-f5-shell-completion.md`
+- **Task 1: Add `argcomplete` runtime dependency** (1 connections) — `docs/superpowers/plans/2026-05-12-f5-shell-completion.md`
+- **Task 2: Pure-function `session_id_completer` (TDD)** (1 connections) — `docs/superpowers/plans/2026-05-12-f5-shell-completion.md`
+- **Task 3: Wire `argcomplete.autocomplete` into `cli.create_parser` (TDD)** (1 connections) — `docs/superpowers/plans/2026-05-12-f5-shell-completion.md`
+- **Task 4: Add `--install-completion <shell>` flag and handler (TDD)** (1 connections) — `docs/superpowers/plans/2026-05-12-f5-shell-completion.md`
+- **Task 5: Wire session-id completer to `inspect` subcommands (TDD)** (1 connections) — `docs/superpowers/plans/2026-05-12-f5-shell-completion.md`
+- **Task 6: End-to-end smoke test for the completion environment hook** (1 connections) — `docs/superpowers/plans/2026-05-12-f5-shell-completion.md`
+- **Task 7: Document `--install-completion` in CLI epilog (TDD)** (1 connections) — `docs/superpowers/plans/2026-05-12-f5-shell-completion.md`
 
 ## Relationships
 
-- [[Execution State Transitions]] (3 shared connections)
-- [[PTY Stream Parser]] (1 shared connections)
-- [[State Machine Module]] (1 shared connections)
-- [[Error Handling Tests]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/integration/test_error_handling.py`
+- `docs/superpowers/plans/2026-05-12-f5-shell-completion.md`
 
 ## Audit Trail
 
-- EXTRACTED: 15 (75%)
-- INFERRED: 5 (25%)
+- EXTRACTED: 24 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,13 +1,33 @@
-"""4-layer secret redaction system for Ansible output.
+"""Layered secret redaction system (QC-002 rewrite, Phase 2 / Task 2.1).
 
-This module implements the redaction system defined in SPECIFICATION.md Section 5.9.
+This module is the QC-002 hardened redaction. Layers (in order of priority):
 
-Layers:
-1. _ansible_no_log flag: Replace entire result dict with {"censored": "(no_log)"}
-2. Password field redaction: Recursively redact password-like keys in dicts/lists
-3. String sanitization: Strip credentials from cmd, stdout, stderr, msg fields
-4. invocation.module_args: Recursive redaction of module arguments
+- **Layer 0 (upstream contract):** ``res._ansible_no_log`` → entire result
+  replaced with ``{"censored": "(no_log)"}``. Not an AOM layer — it is the
+  ansible-core contract that we honor.
+- **Layer 1 (AOM hard-coded, exact-match keys):** a frozen set of exact
+  lowercased key names. Recurses into dicts/lists by KEY, never by value
+  substring. Default set:
+  ``password``, ``vault_password``, ``api_key``, ``private_key``, ``token``,
+  ``secret``, ``passwd``, ``ssh_pass``.
+- **Layer 2 (user-config, additive to Layer 1):**
+  ``RedactionConfig.custom_fields`` (exact, case-insensitive) and
+  ``RedactionConfig.custom_key_patterns`` (regex over lowercased keys).
+- **Layer 3 (string sanitization, independent of key match):** URL
+  credentials, CLI ``--password=xxx``-style args, and user-config regex
+  patterns applied to string values in ``cmd``/``stdout``/``stderr``/``msg``.
+- **Layer 4 (verbose-mode redaction):** ``res.invocation.module_args`` is
+  passed through ``redact_dict`` (Layers 1+2).
+
+The QC-002 bypass class fix: redaction recurses by **KEY**, not by value
+substring. The previous PASSWORD_MATCH regex (kept here only as a backward-
+compat constant) is no longer used for key matching; it was the bypass class
+because it caught ``passenger_version`` (false positive) while missing cases
+where the secret value sits in a field whose key does not contain
+"password". The new model is exact-match + user-config regex, layered.
 """
+
+from __future__ import annotations
 
 import re
 from copy import deepcopy
@@ -16,15 +36,49 @@ from typing import Any
 from ansible_aom.core.config import RedactionConfig
 
 # =============================================================================
-# Constants (from SPECIFICATION.md Section 5.9)
+# Constants
 # =============================================================================
 
-PASSWORD_MATCH = re.compile(
+# Layer 1: hard-coded exact-match keys. Frozen — this is a public contract
+# (see ``tests/unit/test_redaction_layer4.py::test_qc002_exact_match_keys_frozenset_contents``).
+EXACT_MATCH_SECRET_KEYS: frozenset[str] = frozenset(
+    {
+        "password",
+        "vault_password",
+        "api_key",
+        "private_key",
+        "token",
+        "secret",
+        "passwd",
+        "ssh_pass",
+    }
+)
+
+# Default passphrase-style whitelist. These keys historically matched the
+# old PASSWORD_MATCH regex and were common false positives. They are
+# unconditionally NOT redacted by Layer 1.
+DEFAULT_PASSPHRASE_WHITELIST: frozenset[str] = frozenset(
+    {
+        "passenger_version",
+        "passenger_pool",
+        "bypass",
+        "overpass",
+        "compass",
+        "underpass",
+        "passport_number",
+    }
+)
+
+# Backward-compat aliases (frozen exports; no longer used by the core
+# redaction logic). Kept so existing test modules and downstream callers
+# that imported these by name still resolve. See
+# ``tests/unit/test_redaction.py``.
+PASSWORD_WHITELIST: frozenset[str] = DEFAULT_PASSPHRASE_WHITELIST
+PASSWORD_MATCH: re.Pattern[str] = re.compile(
     r"^(?:.+[-_\s])?pass(?:[-_\s]?(?:word|phrase|wrd|wd))?(?:[-_\s].+)?$",
     re.IGNORECASE,
 )
-
-ANSIBLE_PASSWORD_FIELDS = frozenset(
+ANSIBLE_PASSWORD_FIELDS: frozenset[str] = frozenset(
     {
         "ansible_ssh_pass",
         "ansible_password",
@@ -33,8 +87,7 @@ ANSIBLE_PASSWORD_FIELDS = frozenset(
         "ansible_vault_password",
     }
 )
-
-GENERIC_SECRET_FIELDS = frozenset(
+GENERIC_SECRET_FIELDS: frozenset[str] = frozenset(
     {
         "api_key",
         "api_token",
@@ -49,133 +102,119 @@ GENERIC_SECRET_FIELDS = frozenset(
     }
 )
 
-PASSWORD_WHITELIST = frozenset(
-    {
-        "passenger_version",
-        "passenger_pool",
-        "bypass",
-        "overpass",
-        "compass",
-        "underpass",
-        "passport_number",
-    }
-)
-
-URL_CRED_PATTERN = re.compile(r"([a-zA-Z]+://[^:]+:)([^@]+)(@)")
-
-CLI_CRED_PATTERN = re.compile(
+URL_CRED_PATTERN: re.Pattern[str] = re.compile(r"([a-zA-Z]+://[^:]+:)([^@]+)(@)")
+CLI_CRED_PATTERN: re.Pattern[str] = re.compile(
     r"(--(?:password|pass|pwd|token|secret|key|api-key)\s*[=: ]+)\S+",
     re.IGNORECASE,
 )
 
-REDACTED = "********"
-_MAX_DEPTH = 10
+REDACTED: str = "********"
+_MAX_DEPTH: int = 10
 
 
 # =============================================================================
-# Functions
+# Layer 1 + Layer 2: KEY matching
 # =============================================================================
+
+
+def _lower_set(items: list[str]) -> frozenset[str]:
+    return frozenset(item.lower() for item in items)
 
 
 def should_redact(key: str, config: RedactionConfig) -> bool:
-    """Return True if field should be redacted.
+    """Decide whether a dict KEY should be redacted by Layers 1+2.
 
-    A field should be redacted if:
-    - key.lower() is in ANSIBLE_PASSWORD_FIELDS
-    - key.lower() is in GENERIC_SECRET_FIELDS
-    - key.lower() is in config.custom_fields (lowercased)
-    - PASSWORD_MATCH matches key.lower() AND key is not in whitelist
+    Order of checks (whitelist first — short-circuits the rest):
 
-    Args:
-        key: The field name to check
-        config: RedactionConfig with whitelist and custom_fields
+    1. ``key.lower()`` in :data:`DEFAULT_PASSPHRASE_WHITELIST` → ``False``.
+    2. ``key.lower()`` in ``config.whitelist`` (lowercased) → ``False``.
+    3. ``key.lower()`` in :data:`EXACT_MATCH_SECRET_KEYS` → ``True``
+       (Layer 1).
+    4. ``key.lower()`` in ``config.custom_fields`` (lowercased) → ``True``
+       (Layer 2).
+    5. Any ``config.custom_key_patterns`` regex matches ``key.lower()``
+       → ``True`` (Layer 2). Invalid regexes are silently skipped.
+    6. Otherwise → ``False``.
 
-    Returns:
-        True if the field should be redacted, False otherwise
+    The old PASSWORD_MATCH regex is **not** consulted here. The bypass class
+    QC-002 closed was a PASSWORD_MATCH false-positive on ``passenger_version``
+    coupled with value-substring matching in nested structures.
     """
     key_lower = key.lower()
 
-    # Check if in ansible password fields
-    if key_lower in ANSIBLE_PASSWORD_FIELDS:
+    if key_lower in DEFAULT_PASSPHRASE_WHITELIST:
+        return False
+    if key_lower in _lower_set(config.whitelist):
+        return False
+
+    if key_lower in EXACT_MATCH_SECRET_KEYS:
+        return True
+    if key_lower in _lower_set(config.custom_fields):
         return True
 
-    # Check if in generic secret fields
-    if key_lower in GENERIC_SECRET_FIELDS:
-        return True
-
-    # Check if in custom fields (case-insensitive)
-    custom_fields_lower = {f.lower() for f in config.custom_fields}
-    if key_lower in custom_fields_lower:
-        return True
-
-    # Check PASSWORD_MATCH pattern, but exclude whitelist
-    if PASSWORD_MATCH.match(key_lower):
-        # Build combined whitelist (default + config)
-        whitelist_lower = {w.lower() for w in PASSWORD_WHITELIST}
-        config_whitelist_lower = {w.lower() for w in config.whitelist}
-        combined_whitelist = whitelist_lower | config_whitelist_lower
-
-        if key_lower not in combined_whitelist:
-            return True
+    for pattern_str in config.custom_key_patterns:
+        try:
+            if re.search(pattern_str, key_lower):
+                return True
+        except re.error:
+            continue
 
     return False
 
 
+# =============================================================================
+# Layer 3: string sanitization
+# =============================================================================
+
+
 def sanitize_string(s: str, config: RedactionConfig) -> str:
-    """Sanitize credentials in a single string using Layer 3 patterns.
+    """Sanitize credentials in a single string (Layer 3).
 
-    Applies patterns in order:
-    1. URL_CRED_PATTERN: redacts user:pass@ in URLs
-    2. CLI_CRED_PATTERN: redacts --password=xxx style args
-    3. config.custom_patterns: custom regex patterns
+    Applies in order:
+    1. :data:`URL_CRED_PATTERN` — redacts ``user:pass@`` in URLs.
+    2. :data:`CLI_CRED_PATTERN` — redacts ``--password=xxx`` style args.
+    3. ``config.custom_patterns`` — user regex on values.
 
-    Args:
-        s: String to sanitize
-        config: RedactionConfig with custom_patterns
-
-    Returns:
-        Sanitized string with credentials replaced by REDACTED
+    Layer 3 is independent of Layers 1+2: it inspects *string content* and
+    is not bypassed by key look-alikes. It is the only layer that touches
+    values.
     """
     if not isinstance(s, str):
         return s
 
-    # Apply URL credential pattern
-    result = URL_CRED_PATTERN.sub(r"\1********\3", s)
+    result = URL_CRED_PATTERN.sub(rf"\g<1>{REDACTED}\g<3>", s)
+    result = CLI_CRED_PATTERN.sub(rf"\g<1>{REDACTED}", result)
 
-    # Apply CLI credential pattern
-    result = CLI_CRED_PATTERN.sub(r"\1********", result)
-
-    # Apply custom patterns
     for pattern_dict in config.custom_patterns:
         regex_str = pattern_dict.get("regex", "")
         replacement = pattern_dict.get("replacement", REDACTED)
-        if regex_str:
-            try:
-                custom_pattern = re.compile(regex_str)
-                result = custom_pattern.sub(replacement, result)
-            except re.error:
-                # Invalid regex, skip this pattern
-                pass
+        if not regex_str:
+            continue
+        try:
+            custom_pattern = re.compile(regex_str)
+        except re.error:
+            continue
+        result = custom_pattern.sub(replacement, result)
 
     return result
 
 
+# =============================================================================
+# Recursive dict/list redaction (Layers 1+2 by KEY)
+# =============================================================================
+
+
 def redact_dict(data: dict, config: RedactionConfig, depth: int = 0) -> dict:
-    """Recursively redact a dict (Layer 2). Returns a new dict.
+    """Recursively redact by KEY (Layers 1+2). Returns a new dict.
 
-    Args:
-        data: Dict to redact
-        config: RedactionConfig with whitelist and custom_fields
-        depth: Current recursion depth (stops at _MAX_DEPTH)
-
-    Returns:
-        Deep copy of data with password values redacted
+    The recursion is bounded at :data:`_MAX_DEPTH` to defend against
+    adversarial deeply-nested input. The bypass class fix means values are
+    never inspected for substring matches here; only keys.
     """
     if depth >= _MAX_DEPTH:
         return deepcopy(data)
 
-    result = deepcopy(data)
-
+    result: dict = deepcopy(data)
     for key, value in result.items():
         if should_redact(key, config):
             result[key] = REDACTED
@@ -183,21 +222,19 @@ def redact_dict(data: dict, config: RedactionConfig, depth: int = 0) -> dict:
             result[key] = redact_dict(value, config, depth + 1)
         elif isinstance(value, list):
             result[key] = _redact_list(value, config, depth + 1)
-        # Non-dict/list values are left alone if key doesn't match
 
     return result
 
 
 def _redact_list(lst: list, config: RedactionConfig, depth: int) -> list:
-    """Redact items within a list, recursing on dict items.
+    """Redact items within a list, recursing on dict items and sanitizing strings.
 
-    Args:
-        lst: List to process
-        config: RedactionConfig
-        depth: Current recursion depth
-
-    Returns:
-        New list with redacted dict items and sanitized strings
+    Note: only the dict-items branch triggers Layer 1+2 redaction. Strings in
+    a list are *not* automatically sanitized — that is Layer 3's job and
+    happens in :func:`redact_event` on the well-known ``cmd``/``stdout``/
+    ``stderr``/``msg`` fields. List-of-strings without a key context is not
+    a redaction target (you cannot tell which "key" a bare string belongs
+    to).
     """
     result: list[Any] = []
     for item in lst:
@@ -205,56 +242,52 @@ def _redact_list(lst: list, config: RedactionConfig, depth: int) -> list:
             result.append(redact_dict(item, config, depth))
         elif isinstance(item, list):
             result.append(_redact_list(item, config, depth + 1))
-        elif isinstance(item, str):
-            # Sanitize strings in lists
-            result.append(sanitize_string(item, config))
         else:
             result.append(item)
     return result
 
 
+# =============================================================================
+# Layer 0 + 1+2 + 3 + 4: full event redaction
+# =============================================================================
+
+
 def redact_event(event: dict, config: RedactionConfig) -> dict:
-    """Apply all 4 redaction layers to an event dict. Returns a new event.
+    """Apply all redaction layers to an event dict. Returns a new event.
 
     Layer order:
-    1. _ansible_no_log: Replace entire result dict if flag is True
-    2. Password field redaction: Redact matching keys in event["res"]
-    3. String sanitization: Sanitize cmd, stdout, stderr, msg fields
-    4. invocation.module_args: Recursive redaction of module arguments
 
-    Args:
-        event: Ansible event dict
-        config: RedactionConfig
+    - **Layer 0** — ``res._ansible_no_log`` flag: replace whole result with
+      ``{"censored": "(no_log)"}`` (also applied per-loop-item).
+    - **Layer 1+2** — :func:`redact_dict` over ``res`` and (separately) over
+      ``res.invocation.module_args`` (Layer 4). Recurses by KEY.
+    - **Layer 3** — :func:`sanitize_string` on the well-known string fields
+      ``cmd``, ``stdout``, ``stderr``, ``msg`` in ``res``.
 
-    Returns:
-        Deep copy of event with all layers applied
+    The wired-in call site is the responsibility of Task 2.2 (event pipeline
+    integration). This function is the pure transformation; nothing in
+    ``core/`` calls it yet.
     """
     result = deepcopy(event)
-
-    # Ensure "res" exists
     if "res" not in result:
         result["res"] = {}
-
     res = result["res"]
 
-    # Layer 1: _ansible_no_log flag handling
+    # Layer 0: _ansible_no_log flag.
     if res.get("_ansible_no_log") is True:
         result["res"] = {"censored": "(no_log)"}
         return result
 
-    # Handle loop results (items with individual _ansible_no_log flags)
     if "results" in res and isinstance(res["results"], list):
         for i, item in enumerate(res["results"]):
             if isinstance(item, dict) and item.get("_ansible_no_log") is True:
                 res["results"][i] = {"censored": "(no_log)"}
 
-    # Layer 2: Password field redaction (recursive)
+    # Layer 1+2: recursive key-based redaction.
     result["res"] = redact_dict(res, config)
+    res = result["res"]
 
-    # Layer 3: String sanitization for specific fields
-    res = result["res"]  # Re-fetch after Layer 2
-
-    # cmd field (may be list of strings or single string)
+    # Layer 3: string sanitization on well-known string fields.
     if "cmd" in res:
         if isinstance(res["cmd"], list):
             res["cmd"] = [
@@ -264,19 +297,11 @@ def redact_event(event: dict, config: RedactionConfig) -> dict:
         elif isinstance(res["cmd"], str):
             res["cmd"] = sanitize_string(res["cmd"], config)
 
-    # stdout field
-    if "stdout" in res and isinstance(res["stdout"], str):
-        res["stdout"] = sanitize_string(res["stdout"], config)
+    for field in ("stdout", "stderr", "msg"):
+        if field in res and isinstance(res[field], str):
+            res[field] = sanitize_string(res[field], config)
 
-    # stderr field
-    if "stderr" in res and isinstance(res["stderr"], str):
-        res["stderr"] = sanitize_string(res["stderr"], config)
-
-    # msg field
-    if "msg" in res and isinstance(res["msg"], str):
-        res["msg"] = sanitize_string(res["msg"], config)
-
-    # Layer 4: invocation.module_args redaction
+    # Layer 4: invocation.module_args (verbose mode).
     if "invocation" in res and isinstance(res["invocation"], dict):
         invocation = res["invocation"]
         if "module_args" in invocation and isinstance(invocation["module_args"], dict):

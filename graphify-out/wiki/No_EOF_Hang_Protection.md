@@ -1,32 +1,37 @@
 # No EOF Hang Protection
 
-> 8 nodes · cohesion 0.29
+> 13 nodes · cohesion 0.15
 
 ## Key Concepts
 
-- **test_no_eof_hang.py** (4 connections) — `tests/integration/test_no_eof_hang.py`
-- **_fake_ansible_hangs_after_stats()** (3 connections) — `tests/integration/test_no_eof_hang.py`
-- **test_runner_finishes_promptly_on_clean_eof()** (3 connections) — `tests/integration/test_no_eof_hang.py`
-- **test_runner_returns_within_bounded_time_when_child_hangs_after_stats()** (3 connections) — `tests/integration/test_no_eof_hang.py`
-- **Batch E item #10c — R8 no-EOF hang protection.  A misbehaved (or hung) ansible-p** (1 connections) — `tests/integration/test_no_eof_hang.py`
-- **Build a fake-ansible command that emits events then sleeps without     closing s** (1 connections) — `tests/integration/test_no_eof_hang.py`
-- **The runner should not wait indefinitely on a hung child once the     final stats** (1 connections) — `tests/integration/test_no_eof_hang.py`
-- **Sanity baseline: when the child cleanly exits after emitting all     events, the** (1 connections) — `tests/integration/test_no_eof_hang.py`
+- **Run-duration estimate (ETA) — design** (10 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
+- **Chosen model: per-task profile + live pace (self-correcting)** (3 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
+- **2026-06-16-run-duration-estimate-design.md** (1 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
+- **Architecture & layering** (1 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
+- **Data: mining prior per-task wall durations** (1 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
+- **Display** (1 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
+- **In-flight credit (amended 2026-06-16)** (1 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
+- **Out of scope (YAGNI)** (1 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
+- **Problem** (1 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
+- **Projection (`core/estimate.py`)** (1 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
+- **Result-segmented pace (amended 2026-06-16)** (1 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
+- **Robustness: warmup gate + clamp** (1 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
+- **Testing (TDD, failing-first)** (1 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
 
 ## Relationships
 
-- [[Playbook Run Integration Tests]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/integration/test_no_eof_hang.py`
+- `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
 
 ## Audit Trail
 
-- EXTRACTED: 16 (94%)
-- INFERRED: 1 (6%)
+- EXTRACTED: 24 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

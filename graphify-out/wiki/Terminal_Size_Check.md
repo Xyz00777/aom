@@ -1,34 +1,40 @@
 # Terminal Size Check
 
-> 10 nodes · cohesion 0.20
+> 15 nodes · cohesion 0.47
 
 ## Key Concepts
 
-- **.check_terminal_size()** (6 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_error_message_format()** (3 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_terminal_larger_passes()** (3 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_terminal_minimum_size_passes()** (3 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_terminal_too_small_reports_error()** (3 connections) — `tests/integration/test_compact_renderer.py`
-- **Check if terminal meets minimum size.** (1 connections) — `tests/integration/test_compact_renderer.py`
-- **TC-043: Below minimum shows error.** (1 connections) — `tests/integration/test_compact_renderer.py`
-- **TC-043: Minimum size passes check.** (1 connections) — `tests/integration/test_compact_renderer.py`
-- **TC-043: Larger terminal passes check.** (1 connections) — `tests/integration/test_compact_renderer.py`
-- **TC-044: Error message shows dimensions and minimum.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **test_history_task_wall.py** (14 connections) — `tests/unit/test_history_task_wall.py`
+- **_prior()** (11 connections) — `tests/unit/test_history_task_wall.py`
+- **Path** (9 connections)
+- **_write_session_with_events()** (8 connections) — `tests/unit/test_history_task_wall.py`
+- **_stats()** (7 connections) — `tests/unit/test_history_task_wall.py`
+- **_task_start()** (7 connections) — `tests/unit/test_history_task_wall.py`
+- **test_classifies_changed_tasks_as_variable()** (7 connections) — `tests/unit/test_history_task_wall.py`
+- **test_failed_and_unreachable_count_as_variable()** (7 connections) — `tests/unit/test_history_task_wall.py`
+- **test_malformed_timestamp_skips_that_delta()** (6 connections) — `tests/unit/test_history_task_wall.py`
+- **test_mines_per_task_wall_from_inter_start_deltas()** (6 connections) — `tests/unit/test_history_task_wall.py`
+- **test_no_terminal_events_means_all_fixed()** (6 connections) — `tests/unit/test_history_task_wall.py`
+- **test_recurring_path_stores_per_occurrence_average()** (6 connections) — `tests/unit/test_history_task_wall.py`
+- **_result()** (3 connections) — `tests/unit/test_history_task_wall.py`
+- **test_missing_events_file_yields_empty_profile()** (3 connections) — `tests/unit/test_history_task_wall.py`
+- **Mining per-task wall durations from a prior session's recorded events.  The live** (1 connections) — `tests/unit/test_history_task_wall.py`
 
 ## Relationships
 
-- [[Compact Renderer Integration Tests]] (5 shared connections)
+- [JSON Renderer](JSON_Renderer.md) (2 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_compact_renderer.py`
+- `tests/unit/test_history_task_wall.py`
 
 ## Audit Trail
 
-- EXTRACTED: 23 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 99 (98%)
+- INFERRED: 2 (2%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

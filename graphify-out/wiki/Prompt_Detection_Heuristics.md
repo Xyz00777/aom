@@ -1,51 +1,62 @@
 # Prompt Detection Heuristics
 
-> 37 nodes · cohesion 0.08
+> 44 nodes · cohesion 0.08
 
 ## Key Concepts
 
-- **reconstruct_pause_prompt()** (17 connections) — `src/ansible_aom/core/prompts.py`
-- **TestReconstructPausePrompt** (15 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
-- **looks_like_interactive_prompt()** (8 connections) — `src/ansible_aom/core/prompts.py`
-- **prompts.py** (5 connections) — `src/ansible_aom/core/prompts.py`
-- **_strip_ansi()** (4 connections) — `src/ansible_aom/core/prompts.py`
-- **.test_ansi_colorized_block_is_rebuilt()** (4 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
-- **.test_folded_scalar_single_body_line_is_rebuilt()** (4 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
-- **.test_long_preview_anchors_on_marker_when_header_out_of_window()** (4 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
-- **.test_marker_only_block_without_header_is_rebuilt()** (4 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
-- **.test_header_beyond_lookback_is_none()** (3 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
-- **.test_header_preferred_over_marker_for_full_context()** (3 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
-- **.test_lone_colon_after_header_rebuilds_block()** (3 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
-- **.test_moderate_preview_includes_full_context_via_header()** (3 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
-- **.test_nearest_header_wins_for_second_pause()** (3 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
-- **.test_no_anchor_within_window_is_none()** (3 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
-- **.test_trailing_blank_line_is_none()** (3 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
-- **is_password_prompt()** (2 connections) — `src/ansible_aom/core/prompts.py`
-- **test_pause_prompt_reconstruction.py** (2 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
-- **.test_empty_list_is_none()** (2 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
-- **.test_no_header_in_window_is_none()** (2 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
-- **.test_tail_not_a_terminator_is_none()** (2 connections) — `tests/unit/test_pause_prompt_reconstruction.py`
-- **Pure prompt-detection heuristics.  Two responsibilities, both pure (str in → boo** (1 connections) — `src/ansible_aom/core/prompts.py`
-- **Rebuild a multi-line ``ansible.builtin.pause`` block from recent plaintext.** (1 connections) — `src/ansible_aom/core/prompts.py`
-- **Check if ``text`` matches any known password prompt pattern.** (1 connections) — `src/ansible_aom/core/prompts.py`
-- **Remove SGR escape sequences from ``text``.** (1 connections) — `src/ansible_aom/core/prompts.py`
-- *... and 12 more nodes in this community*
+- **classify()** (75 connections) — `src/ansible_aom/core/stderr_classifier.py`
+- **TestClassifyRunLevel** (14 connections) — `tests/unit/test_stderr_classifier.py`
+- **TestClassifySshInfo** (14 connections) — `tests/unit/test_stderr_classifier.py`
+- **TestClassifyVault** (13 connections) — `tests/unit/test_stderr_classifier.py`
+- **TestClassifyConnection** (12 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_controlpersist_broken_pipe()** (3 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_connection_lock_acquired()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_connection_lock_released()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_connection_lock_waiting()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_exec()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_fetch()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_local_connection_establish()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_put()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_collection_playbook()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_config_file_in_use()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_current_user()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_host_pattern_mismatch()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_no_config_file()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_play_count()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_plugin_loading_debug()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_retry_file()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_syntax_ok()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_failed_to_connect()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_failed_to_connect_permission_denied()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_rc_line()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- *... and 19 more nodes in this community*
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [Skipped Task Collapsing](Skipped_Task_Collapsing.md) (17 shared connections)
+- [Profile Tracemalloc Wiring](Profile_Tracemalloc_Wiring.md) (6 shared connections)
+- [Keybinding Conflict Validation](Keybinding_Conflict_Validation.md) (6 shared connections)
+- [Community 487](Community_487.md) (5 shared connections)
+- [Community 532](Community_532.md) (4 shared connections)
+- [State Transition Validation](State_Transition_Validation.md) (3 shared connections)
+- [Community 514](Community_514.md) (3 shared connections)
+- [Community 575](Community_575.md) (3 shared connections)
+- [Community 612](Community_612.md) (3 shared connections)
+- [Community 576](Community_576.md) (3 shared connections)
+- [Community 578](Community_578.md) (2 shared connections)
+- [16-Color Fallback](16-Color_Fallback.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/prompts.py`
-- `tests/unit/test_pause_prompt_reconstruction.py`
+- `src/ansible_aom/core/stderr_classifier.py`
+- `tests/unit/test_stderr_classifier.py`
 
 ## Audit Trail
 
-- EXTRACTED: 74 (66%)
-- INFERRED: 38 (34%)
+- EXTRACTED: 84 (42%)
+- INFERRED: 117 (58%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

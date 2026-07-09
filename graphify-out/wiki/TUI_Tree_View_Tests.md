@@ -1,56 +1,60 @@
 # TUI Tree View Tests
 
-> 73 nodes · cohesion 0.03
+> 86 nodes · cohesion 0.04
 
 ## Key Concepts
 
-- **TestStatusIconMapping** (19 connections) — `tests/tui/test_tree_view.py`
-- **TestTreeViewNavigation** (19 connections) — `tests/tui/test_tree_view.py`
-- **test_tree_view.py** (16 connections) — `tests/tui/test_tree_view.py`
-- **TestTreeViewTaskNameTruncation** (16 connections) — `tests/tui/test_tree_view.py`
-- **TestTaskTreeWidgetStructure** (15 connections) — `tests/tui/test_tree_view.py`
-- **TestTreeViewCompactModeTruncation** (13 connections) — `tests/tui/test_tree_view.py`
-- **TestTreeViewRoleNamePriority** (13 connections) — `tests/tui/test_tree_view.py`
-- **TestTreeViewTreeIcons** (13 connections) — `tests/tui/test_tree_view.py`
-- **TestTreeViewHandlerTaskDisplay** (12 connections) — `tests/tui/test_tree_view.py`
-- **.test_navigation_down_at_last_node_stays()** (3 connections) — `tests/tui/test_tree_view.py`
-- **.test_navigation_enter_on_leaf_node_noop()** (3 connections) — `tests/tui/test_tree_view.py`
-- **TC-265 edge case: ↑ at first node does nothing.** (2 connections) — `tests/tui/test_tree_view.py`
-- **.test_all_status_icons_are_unicode()** (2 connections) — `tests/tui/test_tree_view.py`
-- **.test_changed_icon_is_diamond()** (2 connections) — `tests/tui/test_tree_view.py`
-- **.test_failed_icon_is_x_mark()** (2 connections) — `tests/tui/test_tree_view.py`
-- **.test_ok_icon_is_filled_circle()** (2 connections) — `tests/tui/test_tree_view.py`
-- **.test_pending_icon_is_empty_square()** (2 connections) — `tests/tui/test_tree_view.py`
-- **.test_running_icon_is_quadrant_cycle()** (2 connections) — `tests/tui/test_tree_view.py`
-- **.test_skipped_icon_is_empty_circle()** (2 connections) — `tests/tui/test_tree_view.py`
-- **.test_unreachable_icon_is_circle_dash()** (2 connections) — `tests/tui/test_tree_view.py`
-- **.task_tree_class()** (2 connections) — `tests/tui/test_tree_view.py`
-- **.test_task_tree_generic_type_is_str()** (2 connections) — `tests/tui/test_tree_view.py`
-- **.test_task_tree_inherits_from_tree()** (2 connections) — `tests/tui/test_tree_view.py`
-- **.test_task_tree_is_importable()** (2 connections) — `tests/tui/test_tree_view.py`
-- **.test_compact_mode_minimal_viable_width()** (2 connections) — `tests/tui/test_tree_view.py`
-- *... and 48 more nodes in this community*
+- **redact_event()** (69 connections) — `src/ansible_aom/core/redaction.py`
+- **RedactionConfig** (28 connections)
+- **_ansible_event_with_res()** (26 connections) — `tests/integration/test_redaction.py`
+- **test_redaction.py** (14 connections) — `tests/integration/test_redaction.py`
+- **TestLayer3StringSanitizationOnEvents** (9 connections) — `tests/integration/test_redaction.py`
+- **TestLayer2PasswordFieldsOnEvents** (8 connections) — `tests/integration/test_redaction.py`
+- **TestCustomConfigOnRealisticEvents** (6 connections) — `tests/integration/test_redaction.py`
+- **TestLayer1NoLogOnFullEvent** (6 connections) — `tests/integration/test_redaction.py`
+- **TestLayer4InvocationModuleArgs** (6 connections) — `tests/integration/test_redaction.py`
+- **.test_custom_fields_redacted_on_event()** (5 connections) — `tests/integration/test_redaction.py`
+- **.test_custom_patterns_sanitize_strings_on_event()** (5 connections) — `tests/integration/test_redaction.py`
+- **.test_custom_whitelist_extends_default()** (5 connections) — `tests/integration/test_redaction.py`
+- **.test_entire_res_replaced_with_censored_marker()** (5 connections) — `tests/integration/test_redaction.py`
+- **.test_envelope_preserved_after_no_log_censorship()** (5 connections) — `tests/integration/test_redaction.py`
+- **.test_no_log_false_passes_through_to_other_layers()** (5 connections) — `tests/integration/test_redaction.py`
+- **.test_per_item_no_log_censors_only_marked_items()** (5 connections) — `tests/integration/test_redaction.py`
+- **.test_generic_secret_fields_redacted()** (5 connections) — `tests/integration/test_redaction.py`
+- **.test_known_ansible_password_fields_redacted()** (5 connections) — `tests/integration/test_redaction.py`
+- **.test_nested_passwords_in_realistic_dict_redacted()** (5 connections) — `tests/integration/test_redaction.py`
+- **.test_password_match_regex_field_redacted()** (5 connections) — `tests/integration/test_redaction.py`
+- **.test_whitelisted_pass_fields_not_redacted()** (5 connections) — `tests/integration/test_redaction.py`
+- **.test_all_sanitized_fields_together()** (5 connections) — `tests/integration/test_redaction.py`
+- **.test_cmd_field_url_credentials_stripped()** (5 connections) — `tests/integration/test_redaction.py`
+- **.test_cmd_list_each_entry_sanitized()** (5 connections) — `tests/integration/test_redaction.py`
+- **.test_msg_field_cli_credentials_stripped()** (5 connections) — `tests/integration/test_redaction.py`
+- *... and 61 more nodes in this community*
 
 ## Relationships
 
-- [[Run State Completion Recap]] (28 shared connections)
-- [[Task Definition Live Refresh]] (18 shared connections)
-- [[Role Group Task Models]] (17 shared connections)
-- [[Play Definition Tree Population]] (8 shared connections)
-- [[Run State Summary Panel]] (8 shared connections)
-- [[Task Tree Truncation]] (4 shared connections)
-- [[Run History Mining]] (1 shared connections)
+- [Warnings Display Config](Warnings_Display_Config.md) (15 shared connections)
+- [Inspect TUI Widget Data](Inspect_TUI_Widget_Data.md) (12 shared connections)
+- [Run State Summary Panel](Run_State_Summary_Panel.md) (10 shared connections)
+- [Summary Panel Widget](Summary_Panel_Widget.md) (5 shared connections)
+- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (5 shared connections)
+- [Rerun Round Trip Tests](Rerun_Round_Trip_Tests.md) (3 shared connections)
+- [View Mode Selection](View_Mode_Selection.md) (2 shared connections)
+- [Status Bar Elements](Status_Bar_Elements.md) (1 shared connections)
+- [Community 463](Community_463.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/tui/test_tree_view.py`
+- `src/ansible_aom/core/redaction.py`
+- `tests/integration/test_redaction.py`
+- `tests/unit/test_redaction_layer4.py`
 
 ## Audit Trail
 
-- EXTRACTED: 158 (68%)
-- INFERRED: 73 (32%)
+- EXTRACTED: 273 (73%)
+- INFERRED: 101 (27%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

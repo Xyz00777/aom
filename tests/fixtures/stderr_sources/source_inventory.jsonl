@@ -1,0 +1,1 @@
+{"_event": "aom_stderr_line", "source": "inventory", "host": null, "level": 2, "line": "Parsed /etc/ansible/hosts inventory source with ini plugin"}

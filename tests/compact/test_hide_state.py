@@ -23,7 +23,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from ansible_aom.compact.renderer import CompactRenderer
-from ansible_aom.core.models import RunState
+from ansible_aom.core.run_state import RunState
 
 
 def _task_start(name: str = "T", uuid: str = "u", ts: str = "2026-05-11T10:00:00Z") -> dict:
@@ -90,8 +90,14 @@ def _stats(ts: str = "2026-05-11T10:00:02Z") -> dict:
     return {"_event": "v2_playbook_on_stats", "_timestamp": ts, "stats": {}}
 
 
-def _renderer(hide_states: list[str] | None = None) -> CompactRenderer:
-    r = CompactRenderer(is_tty=False, hide_states=hide_states or [])
+def _renderer(
+    hide_states: list[str] | None = None, show_failed_hint: bool = True
+) -> CompactRenderer:
+    r = CompactRenderer(
+        is_tty=False,
+        hide_states=hide_states or [],
+        show_failed_hint=show_failed_hint,
+    )
     r.start("test.yml", [])
     r._colorize = False
     r._display = MagicMock()
@@ -241,6 +247,28 @@ class TestHideFailed:
         r._emit_event_log(_task_start("Next", "u2"))
         logged = _logged(r)
         assert any("ok: [web2]" in line for line in logged)
+
+
+class TestHideFailedHint:
+    def test_failed_hint_can_be_disabled(self):
+        r = _renderer(show_failed_hint=False)
+        r._emit_event_log(_task_start("T", "u1"))
+        r._emit_event_log(_failed("web1", "u1", msg="permission denied\nretry later"))
+        r._emit_event_log(_task_start("Next", "u2"))
+        logged = _logged(r)
+        fatal_lines = [line for line in logged if "FAILED!" in line]
+        assert fatal_lines
+        assert all(" => " not in line for line in fatal_lines)
+
+    def test_unreachable_hint_can_be_disabled(self):
+        r = _renderer(show_failed_hint=False)
+        r._emit_event_log(_task_start("T", "u1"))
+        r._emit_event_log(_unreachable("web1", "u1", msg="connection refused\nretry later"))
+        r._emit_event_log(_task_start("Next", "u2"))
+        logged = _logged(r)
+        unreachable_lines = [line for line in logged if "UNREACHABLE!" in line]
+        assert unreachable_lines
+        assert all(" => " not in line for line in unreachable_lines)
 
 
 class TestHideUnreachable:

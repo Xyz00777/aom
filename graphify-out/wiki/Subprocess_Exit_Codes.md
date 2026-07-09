@@ -1,45 +1,50 @@
 # Subprocess Exit Codes
 
-> 18 nodes · cohesion 0.11
+> 23 nodes · cohesion 0.11
 
 ## Key Concepts
 
-- **TestSubprocessExitCodes** (13 connections) — `tests/integration/test_error_handling.py`
-- **.test_exit_code_0_marks_completed()** (3 connections) — `tests/integration/test_error_handling.py`
-- **.test_exit_code_127_marks_crashed_not_found()** (3 connections) — `tests/integration/test_error_handling.py`
-- **.test_exit_code_130_marks_cancelled()** (3 connections) — `tests/integration/test_error_handling.py`
-- **.test_exit_code_137_marks_crashed_killed()** (3 connections) — `tests/integration/test_error_handling.py`
-- **.test_exit_code_1_marks_failed()** (3 connections) — `tests/integration/test_error_handling.py`
-- **.test_exit_code_2_marks_failed_unreachable()** (3 connections) — `tests/integration/test_error_handling.py`
-- **.test_exit_code_4_marks_crashed()** (3 connections) — `tests/integration/test_error_handling.py`
-- **.test_negative_exit_code_marks_crashed_with_signal()** (3 connections) — `tests/integration/test_error_handling.py`
-- **TC-469 to TC-476: Subprocess exit code interpretation.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-469: Exit code 0 marks COMPLETED state.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-470: Exit code 1 marks FAILED state.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-471: Exit code 2 marks FAILED with unreachable hosts.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-472: Exit code 4 marks CRASHED state.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-473: Exit code 127 marks CRASHED with not found message.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-474: Exit code 130 marks IDLE (user-initiated cancel).** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-475: Exit code 137 marks CRASHED with 'killed' message.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-476: Negative exit code marks CRASHED with signal info.** (1 connections) — `tests/integration/test_error_handling.py`
+- **TestEventParsing** (11 connections) — `tests/integration/test_playbook_parser.py`
+- **TestJsonlFixtures** (10 connections) — `tests/integration/test_playbook_parser.py`
+- **Path** (9 connections)
+- **.test_v2_playbook_on_stats_event()** (5 connections) — `tests/integration/test_playbook_parser.py`
+- **.test_v2_runner_on_failed_event()** (5 connections) — `tests/integration/test_playbook_parser.py`
+- **.test_v2_runner_on_ok_event()** (5 connections) — `tests/integration/test_playbook_parser.py`
+- **.test_multi_host_mixed_fixture()** (5 connections) — `tests/integration/test_playbook_parser.py`
+- **.test_playbook_failed_fixture()** (5 connections) — `tests/integration/test_playbook_parser.py`
+- **.test_single_task_ok_fixture()** (5 connections) — `tests/integration/test_playbook_parser.py`
+- **.test_v2_playbook_on_start_event()** (4 connections) — `tests/integration/test_playbook_parser.py`
+- **.fixtures_dir()** (3 connections) — `tests/integration/test_playbook_parser.py`
+- **.fixtures_dir()** (3 connections) — `tests/integration/test_playbook_parser.py`
+- **Tests using pre-recorded JSONL fixtures (no ansible-playbook needed).** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **Return path to tests/fixtures directory.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **Parse single_task_ok.jsonl fixture.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **Parse playbook_failed.jsonl fixture.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **Parse multi_host_mixed.jsonl fixture.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **Test parsing of specific event types from JSONL.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **Return path to tests/fixtures directory.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **v2_playbook_on_start triggers EXECUTION phase.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **v2_playbook_on_stats triggers POST_RUN_RECAP phase and sets end_time.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **v2_runner_on_ok creates HostRunState with OK status.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **v2_runner_on_failed creates HostRunState with FAILED status.** (1 connections) — `tests/integration/test_playbook_parser.py`
 
 ## Relationships
 
-- [[Execution State Transitions]] (9 shared connections)
-- [[PTY Stream Parser]] (1 shared connections)
-- [[State Machine Module]] (1 shared connections)
-- [[Error Handling Tests]] (1 shared connections)
+- [Run State Completion Recap](Run_State_Completion_Recap.md) (9 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (8 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (4 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (2 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_error_handling.py`
+- `tests/integration/test_playbook_parser.py`
 
 ## Audit Trail
 
-- EXTRACTED: 35 (76%)
-- INFERRED: 11 (24%)
+- EXTRACTED: 73 (90%)
+- INFERRED: 8 (10%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

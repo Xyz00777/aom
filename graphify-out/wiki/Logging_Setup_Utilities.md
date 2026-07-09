@@ -1,12 +1,10 @@
 # Logging Setup Utilities
 
-> 3 nodes · cohesion 0.67
+> 1 nodes · cohesion 1.00
 
 ## Key Concepts
 
-- **setup_logging** (2 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **platformdirs library** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **setup_async_logging** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **platformdirs library** (0 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
 
 ## Relationships
 
@@ -18,10 +16,10 @@
 
 ## Audit Trail
 
-- EXTRACTED: 2 (50%)
-- INFERRED: 2 (50%)
+- EXTRACTED: 0 (0%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,32 +1,37 @@
 # Rerun Dialog
 
-> 8 nodes · cohesion 0.25
+> 13 nodes · cohesion 0.15
 
 ## Key Concepts
 
-- **RerunDialog** (6 connections) — `src/ansible_aom/tui/screens/rerun.py`
-- **rerun.py** (2 connections) — `src/ansible_aom/tui/screens/rerun.py`
-- **.compose()** (2 connections) — `src/ansible_aom/tui/screens/rerun.py`
-- **Re-run dialog for AOM TUI.  Triggered by Shift+R. See SPECIFICATION.md Section 1** (1 connections) — `src/ansible_aom/tui/screens/rerun.py`
-- **Modal dialog for re-running playbook with modified args.      Shows confirmation** (1 connections) — `src/ansible_aom/tui/screens/rerun.py`
-- **.action_cancel()** (1 connections) — `src/ansible_aom/tui/screens/rerun.py`
-- **.action_modified_args()** (1 connections) — `src/ansible_aom/tui/screens/rerun.py`
-- **.action_same_args()** (1 connections) — `src/ansible_aom/tui/screens/rerun.py`
+- **2026-06-27 Async-poll dict leak fix in `_format_loop_item_line`** (13 connections) — `.sisyphus/notepads/implementation/learnings.md`
+- **Bug** (1 connections) — `.sisyphus/notepads/implementation/learnings.md`
+- **Detection criterion** (1 connections) — `.sisyphus/notepads/implementation/learnings.md`
+- **Discrepancy with task description** (1 connections) — `.sisyphus/notepads/implementation/learnings.md`
+- **Files changed** (1 connections) — `.sisyphus/notepads/implementation/learnings.md`
+- **Fix (two parts)** (1 connections) — `.sisyphus/notepads/implementation/learnings.md`
+- **Free-strategy per-host task transition (meta: reset_connection fix)** (1 connections) — `.sisyphus/notepads/implementation/learnings.md`
+- **Revert scope creep (renderer.py / tree_projection.py)** (1 connections) — `.sisyphus/notepads/implementation/learnings.md`
+- **Reverted: per-host task transition in runner_on_start (2026-06-27)** (1 connections) — `.sisyphus/notepads/implementation/learnings.md`
+- **Task-status promotion in terminal-event handlers (2026-06-27)** (1 connections) — `.sisyphus/notepads/implementation/learnings.md`
+- **Test contract** (1 connections) — `.sisyphus/notepads/implementation/learnings.md`
+- **Test impact after revert** (1 connections) — `.sisyphus/notepads/implementation/learnings.md`
+- **Verification** (1 connections) — `.sisyphus/notepads/implementation/learnings.md`
 
 ## Relationships
 
-- [[Inspect TUI Widget Data]] (1 shared connections)
+- [Run Diagnostics Accumulator](Run_Diagnostics_Accumulator.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/tui/screens/rerun.py`
+- `.sisyphus/notepads/implementation/learnings.md`
 
 ## Audit Trail
 
-- EXTRACTED: 15 (100%)
+- EXTRACTED: 25 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

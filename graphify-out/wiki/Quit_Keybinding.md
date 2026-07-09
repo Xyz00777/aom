@@ -1,34 +1,38 @@
 # Quit Keybinding
 
-> 8 nodes · cohesion 0.25
+> 13 nodes · cohesion 0.15
 
 ## Key Concepts
 
-- **TestQuitConfirmation** (7 connections) — `tests/tui/test_keybindings.py`
-- **.test_quit_accept_confirms()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_quit_case_insensitive()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_quit_requires_confirmation()** (3 connections) — `tests/tui/test_keybindings.py`
-- **Tests for quit confirmation keybinding - TC-340.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-340: 'q' key shows quit confirmation dialog.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-340: Accepting quit confirmation exits application.** (1 connections) — `tests/tui/test_keybindings.py`
-- **q' and 'Q' both find the quit keybinding.** (1 connections) — `tests/tui/test_keybindings.py`
+- **v1 Verbosity — Learnings (Phase 8 / Task 8.5: verify_anchors.py)** (8 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Critical gotchas** (7 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **1. `re.fullmatch`, not `re.match`** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **2. The scan regex must NOT match `://` URLs** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **3. The single-line form must normalise to `(path, line, line)`** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **4. `argparse.error` raises `SystemExit(2)`, not return** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **5. `mypy` checks `src/ansible_aom`, not `tests/` or `scripts/`** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **6. The script's exit-2 on missing repo root is subtle** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Followups (out of scope for Task 8.5 — wired by later tasks)** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Test count tally for Phase 8 (updated)** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Verification log** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **What the script actually catches (smoke run)** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **What was built** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
 
 ## Relationships
 
-- [[Global Key Bindings]] (3 shared connections)
-- [[TUI Keybindings Config]] (2 shared connections)
-- [[TUI Keybindings Tests]] (1 shared connections)
+- [Runtime Event Handlers](Runtime_Event_Handlers.md) (1 shared connections)
+- [Compact Renderer Package](Compact_Renderer_Package.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/tui/test_keybindings.py`
+- `.sisyphus/notepads/v1-verbosity/learnings.md`
 
 ## Audit Trail
 
-- EXTRACTED: 15 (75%)
-- INFERRED: 5 (25%)
+- EXTRACTED: 26 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

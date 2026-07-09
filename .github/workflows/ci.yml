@@ -1,0 +1,43 @@
+# CI workflow for ansible-aom
+# Runs lint (ruff) → type-check (mypy) → test (pytest with xdist)
+# on push and pull_request to main/master.
+#
+# Uses uv for Python dependency management (matching the project's
+# existing tooling). Python 3.14 only — no matrix builds.
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Lint (ruff format check)
+        run: uv run ruff format --check src/
+
+      - name: Lint (ruff check)
+        run: uv run ruff check src/
+
+      - name: Type-check (mypy)
+        run: uv run mypy src/ansible_aom
+
+      - name: Test (pytest with xdist)
+        run: uv run pytest tests/unit tests/compact tests/tui -q -n auto

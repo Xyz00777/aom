@@ -1,43 +1,50 @@
 # Memory Bounds Constants
 
-> 18 nodes · cohesion 0.11
+> 22 nodes · cohesion 0.09
 
 ## Key Concepts
 
-- **TestMemoryBounds** (13 connections) — `tests/unit/test_state.py`
-- **.test_max_hosts_per_task_value()** (2 connections) — `tests/unit/test_state.py`
-- **.test_max_log_lines_value()** (2 connections) — `tests/unit/test_state.py`
-- **.test_max_plays_value()** (2 connections) — `tests/unit/test_state.py`
-- **.test_max_tasks_per_play_value()** (2 connections) — `tests/unit/test_state.py`
-- **.test_max_total_host_run_states_value()** (2 connections) — `tests/unit/test_state.py`
-- **.test_memory_bound_warning_message_constant()** (2 connections) — `tests/unit/test_state.py`
-- **.test_memory_bounds_are_reasonable()** (2 connections) — `tests/unit/test_state.py`
-- **.test_memory_bounds_hierarchy()** (2 connections) — `tests/unit/test_state.py`
-- **TC-253 to TC-260: Memory bounds constants.** (1 connections) — `tests/unit/test_state.py`
-- **TC-253: Maximum 1000 plays tracked.** (1 connections) — `tests/unit/test_state.py`
-- **TC-254: Maximum 10000 tasks per play tracked.** (1 connections) — `tests/unit/test_state.py`
-- **TC-255: Maximum 10000 hosts per task tracked.** (1 connections) — `tests/unit/test_state.py`
-- **TC-256: Maximum 1,000,000 total HostRunState entries.** (1 connections) — `tests/unit/test_state.py`
-- **TC-257: Memory bounds have associated warning constants.** (1 connections) — `tests/unit/test_state.py`
-- **TC-259: Log panel max_lines=50000.** (1 connections) — `tests/unit/test_state.py`
-- **Verify memory bounds are positive integers.** (1 connections) — `tests/unit/test_state.py`
-- **Verify memory bounds scale appropriately.** (1 connections) — `tests/unit/test_state.py`
+- **TestLogPanelSearchOverlay** (19 connections) — `tests/tui/test_panels.py`
+- **.test_search_case_sensitive_toggle()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_search_empty_result()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_search_f3_navigation_next()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_search_f3_navigation_previous()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_search_f3_wrap_at_last_match()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_search_match_highlighting()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_search_overlay_activation_ctrl_f()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_search_plain_text_mode()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_search_regex_invalid_pattern_handled()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_search_regex_mode()** (2 connections) — `tests/tui/test_panels.py`
+- **Tests for search overlay functionality - TC-278 to TC-283.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-278: Ctrl+F opens search overlay at top of log panel.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-279: Plain text search finds and highlights matching lines.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-280: Regex search matches patterns.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-280 edge case: Invalid regex patterns handled gracefully.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-281: Case-sensitive toggle affects search matching.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-282: F3 jumps to next match.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-282: Shift+F3 jumps to previous match.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-282 edge case: F3 at last match wraps to first.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-283: Search matches are visually highlighted.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-279 edge case: No matches shows empty result.** (1 connections) — `tests/tui/test_panels.py`
 
 ## Relationships
 
-- [[State Machine Module]] (3 shared connections)
-- [[Execution State Transitions]] (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (3 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (2 shared connections)
+- [Run State Summary Panel](Run_State_Summary_Panel.md) (1 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
+- [AOM TUI Application](AOM_TUI_Application.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_state.py`
+- `tests/tui/test_panels.py`
 
 ## Audit Trail
 
-- EXTRACTED: 35 (92%)
-- INFERRED: 3 (8%)
+- EXTRACTED: 43 (86%)
+- INFERRED: 7 (14%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

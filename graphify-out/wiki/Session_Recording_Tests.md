@@ -1,63 +1,67 @@
 # Session Recording Tests
 
-> 103 nodes · cohesion 0.03
+> 146 nodes · cohesion 0.02
 
 ## Key Concepts
 
-- **SessionManager** (75 connections) — `src/ansible_aom/session/store.py`
-- **test_session.py** (17 connections) — `tests/integration/test_session.py`
-- **TestStartSession** (10 connections) — `tests/integration/test_session.py`
-- **test_sink_disable_and_preflight_ms.py** (8 connections) — `tests/unit/test_sink_disable_and_preflight_ms.py`
-- **TestCreateArtifact** (7 connections) — `tests/integration/test_session.py`
-- **TestEndSession** (7 connections) — `tests/integration/test_session.py`
-- **TestSessionFilePermissions** (7 connections) — `tests/integration/test_session.py`
-- **TestRecordEvent** (6 connections) — `tests/integration/test_session.py`
-- **TestRecordStderr** (5 connections) — `tests/integration/test_session.py`
-- **TestSessionManagerInit** (5 connections) — `tests/integration/test_session.py`
-- **TestArtifactPermissions** (4 connections) — `tests/integration/test_session.py`
-- **.test_artifact_file_permissions()** (4 connections) — `tests/integration/test_session.py`
-- **.test_create_artifact_creates_aom_file()** (4 connections) — `tests/integration/test_session.py`
-- **.test_create_artifact_event_lines()** (4 connections) — `tests/integration/test_session.py`
-- **.test_create_artifact_metadata_header()** (4 connections) — `tests/integration/test_session.py`
-- **.test_create_artifact_stats_line()** (4 connections) — `tests/integration/test_session.py`
-- **.test_end_session_records_duration()** (4 connections) — `tests/integration/test_session.py`
-- **.test_end_session_status_crashed()** (4 connections) — `tests/integration/test_session.py`
-- **.test_end_session_status_failed()** (4 connections) — `tests/integration/test_session.py`
-- **.test_end_session_updates_meta_with_status()** (4 connections) — `tests/integration/test_session.py`
-- **TestInspectDiff** (4 connections) — `tests/integration/test_session.py`
-- **.test_diff_shows_task_comparison()** (4 connections) — `tests/integration/test_session.py`
-- **.test_record_event_appends_to_file()** (4 connections) — `tests/integration/test_session.py`
-- **.test_record_event_json_format()** (4 connections) — `tests/integration/test_session.py`
-- **.test_record_event_preserves_event_order()** (4 connections) — `tests/integration/test_session.py`
-- *... and 78 more nodes in this community*
+- **AOMApp** (181 connections) — `src/ansible_aom/tui/app.py`
+- **TaskTree** (47 connections) — `src/ansible_aom/tui/widgets/task_tree.py`
+- **MainScreen** (31 connections) — `src/ansible_aom/tui/screens/main.py`
+- **TestRendererProtocol** (19 connections) — `tests/unit/test_cli.py`
+- **TestDirtyCounter** (16 connections) — `tests/tui/test_live_refresh.py`
+- **TestMainScreenTreeIntegration** (15 connections) — `tests/tui/test_live_refresh.py`
+- **TestCompletionTitleUpdate** (13 connections) — `tests/tui/test_live_refresh.py`
+- **TestPeriodicRefresh** (13 connections) — `tests/tui/test_live_refresh.py`
+- **TestTreePopulationFromDefinitions** (13 connections) — `tests/tui/test_live_refresh.py`
+- **TestCallFromThreadRouting** (12 connections) — `tests/tui/test_live_refresh.py`
+- **TestEndToEndThreeTasks** (12 connections) — `tests/tui/test_live_refresh.py`
+- **Event** (11 connections)
+- **.test_update_from_state_drops_completed_tasks()** (10 connections) — `tests/tui/test_live_refresh.py`
+- **.test_update_from_state_keeps_running_task_visible()** (10 connections) — `tests/tui/test_live_refresh.py`
+- **.test_update_from_state_shows_ok_icon_after_completion()** (10 connections) — `tests/tui/test_live_refresh.py`
+- **TestRunStateOwnership** (9 connections) — `tests/tui/test_app_end_to_end.py`
+- **test_live_refresh.py** (9 connections) — `tests/tui/test_live_refresh.py`
+- **TestAOMAppInteractivePrompt** (9 connections) — `tests/unit/test_interactive_prompt.py`
+- **.update_from_state()** (8 connections) — `src/ansible_aom/tui/screens/main.py`
+- **TestAOMAppConstruction** (7 connections) — `tests/tui/test_app_end_to_end.py`
+- **TestWarningsAndLogsRoutedToState** (7 connections) — `tests/tui/test_app_end_to_end.py`
+- **.test_three_task_starts_appear_in_tree()** (7 connections) — `tests/tui/test_live_refresh.py`
+- **.test_tick_refreshes_widgets_after_event()** (7 connections) — `tests/tui/test_live_refresh.py`
+- **.compose()** (6 connections) — `src/ansible_aom/tui/screens/main.py`
+- **._update_elapsed_from_start()** (6 connections) — `src/ansible_aom/tui/screens/main.py`
+- *... and 121 more nodes in this community*
 
 ## Relationships
 
-- [[Run Config Key Normalization]] (41 shared connections)
-- [[Inspect CLI Commands]] (10 shared connections)
-- [[Playbook Run Integration Tests]] (5 shared connections)
-- [[UUIDv7 Session Generation]] (3 shared connections)
-- [[Runner Session Recording]] (3 shared connections)
-- [[Inspect Session List]] (2 shared connections)
-- [[Session Diagnostics Writing]] (2 shared connections)
-- [[Run History Mining]] (1 shared connections)
-- [[RunState Persistence Shape]] (1 shared connections)
-- [[Session Roundtrip Invariants]] (1 shared connections)
-- [[Playbook Event Parsing]] (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (57 shared connections)
+- [CLI Argument Parser](CLI_Argument_Parser.md) (20 shared connections)
+- [Session Replay Round Trip](Session_Replay_Round_Trip.md) (15 shared connections)
+- [Inventory Auto Detection](Inventory_Auto_Detection.md) (14 shared connections)
+- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (14 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (12 shared connections)
+- [Per-Task Overhead Analysis](Per-Task_Overhead_Analysis.md) (11 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (10 shared connections)
+- [Interactive Prompt Tests](Interactive_Prompt_Tests.md) (10 shared connections)
+- [View Mode Selection](View_Mode_Selection.md) (7 shared connections)
+- [Terminal Display Manager](Terminal_Display_Manager.md) (5 shared connections)
+- [KeyContext Enum](KeyContext_Enum.md) (5 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/session/store.py`
-- `tests/integration/test_session.py`
-- `tests/unit/test_session_meta_persistence.py`
-- `tests/unit/test_sink_disable_and_preflight_ms.py`
+- `src/ansible_aom/tui/app.py`
+- `src/ansible_aom/tui/screens/main.py`
+- `src/ansible_aom/tui/widgets/task_tree.py`
+- `tests/tui/test_app_end_to_end.py`
+- `tests/tui/test_live_refresh.py`
+- `tests/unit/test_cli.py`
+- `tests/unit/test_interactive_prompt.py`
 
 ## Audit Trail
 
-- EXTRACTED: 245 (70%)
-- INFERRED: 105 (30%)
+- EXTRACTED: 345 (47%)
+- INFERRED: 390 (53%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

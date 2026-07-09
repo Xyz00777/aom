@@ -27,7 +27,8 @@ from collections.abc import Callable
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from ansible_aom.core.models import RunState, Status
+from ansible_aom.core.models import Status
+from ansible_aom.core.run_state import RunState
 
 TERMINAL_HOST_STATUSES = {
     Status.OK,

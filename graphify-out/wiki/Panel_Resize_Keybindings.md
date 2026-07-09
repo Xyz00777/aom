@@ -1,32 +1,40 @@
 # Panel Resize Keybindings
 
-> 6 nodes · cohesion 0.33
+> 12 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **TestPanelResizeKeybindings** (6 connections) — `tests/tui/test_keybindings.py`
-- **.test_ctrl_left_resizes_panel()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_ctrl_right_resizes_panel()** (3 connections) — `tests/tui/test_keybindings.py`
-- **Tests for panel resize keybindings - TC-347.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-347: Ctrl+Left resizes panel split (shrink).** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-347: Ctrl+Right resizes panel split (expand).** (1 connections) — `tests/tui/test_keybindings.py`
+- **TestFilterPanelHostFilter** (14 connections) — `tests/tui/test_panels.py`
+- **.tasks_with_hosts()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_host_filter_empty_shows_all()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_host_filter_multiple_hosts()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_host_filter_not_in_inventory()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_host_filter_single_host()** (2 connections) — `tests/tui/test_panels.py`
+- **Tests for host filter - TC-303.** (1 connections) — `tests/tui/test_panels.py`
+- **Sample tasks with hosts.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-303: Host filter shows tasks for specified host.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-303: Multiple hosts in filter matches any.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-303 edge case: Host not in inventory shows empty.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-303 edge case: Empty host input shows all tasks.** (1 connections) — `tests/tui/test_panels.py`
 
 ## Relationships
 
-- [[TUI Keybindings Config]] (2 shared connections)
-- [[Global Key Bindings]] (2 shared connections)
-- [[TUI Keybindings Tests]] (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (3 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (2 shared connections)
+- [Run State Summary Panel](Run_State_Summary_Panel.md) (1 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
+- [AOM TUI Application](AOM_TUI_Application.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/tui/test_keybindings.py`
+- `tests/tui/test_panels.py`
 
 ## Audit Trail
 
-- EXTRACTED: 11 (73%)
-- INFERRED: 4 (27%)
+- EXTRACTED: 23 (77%)
+- INFERRED: 7 (23%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

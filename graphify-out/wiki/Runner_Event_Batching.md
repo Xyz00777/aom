@@ -1,44 +1,61 @@
 # Runner Event Batching
 
-> 20 nodes · cohesion 0.19
+> 28 nodes · cohesion 0.10
 
 ## Key Concepts
 
-- **test_emit_event_log_batching.py** (11 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **_renderer()** (7 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **_task_start()** (6 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **_print_log_calls()** (5 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **.test_failed_event_batched()** (5 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **.test_perf_001_one_print_log_call_per_event()** (5 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **.test_perf_002_all_host_lines_present_in_single_call()** (5 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **.test_changed_and_ok_hosts_in_one_call()** (5 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **.test_unreachable_event_batched()** (5 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **TestRunnerOkBatching** (4 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **_runner_ok_multi()** (3 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **TestRunnerFailedBatching** (3 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **TestRunnerOkMixedChanged** (3 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **TestRunnerUnreachableBatching** (3 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **_runner_failed_multi()** (2 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **_runner_unreachable_multi()** (2 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **TC-PERF-001..002 — batched print_log per runner event.  A single runner event (`** (1 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **ok event with some hosts changed=True still produces one call.** (1 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **14 hosts in one ok event → exactly one print_log call.** (1 connections) — `tests/compact/test_emit_event_log_batching.py`
-- **The single print_log argument carries every host line.** (1 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **get_keybinding()** (57 connections) — `src/ansible_aom/tui/keybindings.py`
+- **TestGlobalKeybindings** (16 connections) — `tests/tui/test_keybindings.py`
+- **.test_compact_view_toggle_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_cycle_theme_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_debug_panel_toggle_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_filter_panel_key_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_help_key_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_log_panel_toggle_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_quit_key_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_refresh_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_settings_key_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_shift_tab_reverse_panel_switch()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_sort_cycle_key_is_global()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_tab_switches_panel_globally()** (3 connections) — `tests/tui/test_keybindings.py`
+- **Look up a keybinding by key string.      Args:         key: The key string to lo** (1 connections) — `src/ansible_aom/tui/keybindings.py`
+- **Tests for global keybindings - TC-364.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-340, TC-364: 'q' key is global and requires confirmation.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-349: '?' key shows help overlay globally.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-353: 'f' key opens filter panel globally.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-350: 'S' key opens settings screen globally.** (1 connections) — `tests/tui/test_keybindings.py`
+- **s' key cycles sort order globally.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-345: Tab switches panel focus globally.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-345: Shift+Tab reverses panel focus.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-348: 'd' key toggles debug panel globally.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-354: Alt+T cycles themes globally.** (1 connections) — `tests/tui/test_keybindings.py`
+- *... and 3 more nodes in this community*
 
 ## Relationships
 
-- [[Compact Renderer Implementation]] (6 shared connections)
+- [TUI Keybindings Tests](TUI_Keybindings_Tests.md) (9 shared connections)
+- [CLI Help Matrix](CLI_Help_Matrix.md) (6 shared connections)
+- [Warning Color Formatting](Warning_Color_Formatting.md) (5 shared connections)
+- [Help Overlay TUI](Help_Overlay_TUI.md) (5 shared connections)
+- [Include Tasks Dynamic Grafting](Include_Tasks_Dynamic_Grafting.md) (5 shared connections)
+- [State Machine Invariants](State_Machine_Invariants.md) (4 shared connections)
+- [Community 459](Community_459.md) (4 shared connections)
+- [Community 509](Community_509.md) (3 shared connections)
+- [Community 569](Community_569.md) (2 shared connections)
+- [Community 568](Community_568.md) (2 shared connections)
+- [Community 567](Community_567.md) (2 shared connections)
 
 ## Source Files
 
-- `tests/compact/test_emit_event_log_batching.py`
+- `src/ansible_aom/tui/keybindings.py`
+- `tests/tui/test_keybindings.py`
 
 ## Audit Trail
 
-- EXTRACTED: 74 (95%)
-- INFERRED: 4 (5%)
+- EXTRACTED: 55 (45%)
+- INFERRED: 68 (55%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

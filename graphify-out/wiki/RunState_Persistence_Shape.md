@@ -1,39 +1,36 @@
 # RunState Persistence Shape
 
-> 7 nodes · cohesion 0.29
+> 12 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **test_session_roundtrip_preserves_state_shape()** (7 connections) — `tests/integration/test_invariants_session_roundtrip.py`
-- **_shape()** (5 connections) — `tests/integration/test_invariants_session_roundtrip.py`
-- **isolated_state_dir()** (5 connections) — `tests/conftest.py`
-- **TempPathFactory** (3 connections)
-- **Reduce a RunState to its persistence-invariant skeleton.      Plays → task_ids →** (1 connections) — `tests/integration/test_invariants_session_roundtrip.py`
-- **Persist → load → replay yields the same structural state.** (1 connections) — `tests/integration/test_invariants_session_roundtrip.py`
-- **Pin AOM's state directory to a per-test tmp dir for every test.      Without thi** (1 connections) — `tests/conftest.py`
+- **issues.md** (11 connections) — `.sisyphus/notepads/implementation/issues.md`
+- **2026-04-24 Potential Issues (all resolved as of 2026-05-11)** (1 connections) — `.sisyphus/notepads/implementation/issues.md`
+- **2026-05-23 Open issues** (1 connections) — `.sisyphus/notepads/implementation/issues.md`
+- **2026-05-24 Async launcher / async-status identity gotcha** (1 connections) — `.sisyphus/notepads/implementation/issues.md`
+- **2026-05-24 Delegated task regression verification** (1 connections) — `.sisyphus/notepads/implementation/issues.md`
+- **2026-05-24 Open issues** (1 connections) — `.sisyphus/notepads/implementation/issues.md`
+- **2026-05-24 Pyright import-resolution caveat** (1 connections) — `.sisyphus/notepads/implementation/issues.md`
+- **2026-05-24 Verification notes** (1 connections) — `.sisyphus/notepads/implementation/issues.md`
+- **2026-05-25 Large-output stall probe** (1 connections) — `.sisyphus/notepads/implementation/issues.md`
+- **2026-05-25 run_once / serial gotcha** (1 connections) — `.sisyphus/notepads/implementation/issues.md`
+- **2026-05-25 run_once / serial probe details** (1 connections) — `.sisyphus/notepads/implementation/issues.md`
+- **2026-05-25 Session rotation tie-breaker** (1 connections) — `.sisyphus/notepads/implementation/issues.md`
 
 ## Relationships
 
-- [[Session Roundtrip Invariants]] (4 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
-- [[Session Recording Tests]] (1 shared connections)
-- [[Inspect CLI Commands]] (1 shared connections)
-- [[Run Config Key Normalization]] (1 shared connections)
-- [[Inventory Auto Detection]] (1 shared connections)
-- [[Test Event Fixtures]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/conftest.py`
-- `tests/integration/test_invariants_session_roundtrip.py`
+- `.sisyphus/notepads/implementation/issues.md`
 
 ## Audit Trail
 
-- EXTRACTED: 21 (91%)
-- INFERRED: 2 (9%)
+- EXTRACTED: 22 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

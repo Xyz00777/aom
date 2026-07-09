@@ -1,34 +1,41 @@
 # Unknown Event Hint
 
-> 8 nodes · cohesion 0.32
+> 14 nodes · cohesion 0.14
 
 ## Key Concepts
 
-- **test_unknown_event_hint.py** (6 connections) — `tests/compact/test_unknown_event_hint.py`
-- **_empty_state()** (4 connections) — `tests/compact/test_unknown_event_hint.py`
-- **test_completion_no_hint_when_all_known()** (4 connections) — `tests/compact/test_unknown_event_hint.py`
-- **test_completion_no_hint_when_state_is_none()** (3 connections) — `tests/compact/test_unknown_event_hint.py`
-- **test_completion_prints_unknown_event_hint()** (3 connections) — `tests/compact/test_unknown_event_hint.py`
-- **R5: completion-time hint when JSONL emits events AOM didn't recognise.  When ans** (1 connections) — `tests/compact/test_unknown_event_hint.py`
-- **No "unknown events" line when nothing weird happened.** (1 connections) — `tests/compact/test_unknown_event_hint.py`
-- **stop()'d renderer with state=None must still complete cleanly.** (1 connections) — `tests/compact/test_unknown_event_hint.py`
+- **TestTimestampLocalTimezone** (14 connections) — `tests/unit/test_event_processing.py`
+- **.test_local_timezone_preserves_instant()** (2 connections) — `tests/unit/test_event_processing.py`
+- **.test_utc_timestamp_converted_to_local_timezone()** (2 connections) — `tests/unit/test_event_processing.py`
+- **.test_utc_timestamp_parsed_with_timezone()** (2 connections) — `tests/unit/test_event_processing.py`
+- **.test_utc_timestamp_without_z()** (2 connections) — `tests/unit/test_event_processing.py`
+- **.test_utc_z_suffix_parsed_correctly()** (2 connections) — `tests/unit/test_event_processing.py`
+- **.test_various_utc_timestamps()** (2 connections) — `tests/unit/test_event_processing.py`
+- **Tests for UTC timestamp conversion to local timezone (TC-085).** (1 connections) — `tests/unit/test_event_processing.py`
+- **TC-085: _parse_timestamp returns timezone-aware datetime from UTC string.** (1 connections) — `tests/unit/test_event_processing.py`
+- **TC-085: UTC timestamp can be converted to local timezone via astimezone().** (1 connections) — `tests/unit/test_event_processing.py`
+- **TC-085: 'Z' suffix in timestamps is handled as UTC.** (1 connections) — `tests/unit/test_event_processing.py`
+- **TC-085: Timestamps without Z still parse as UTC if +00:00.** (1 connections) — `tests/unit/test_event_processing.py`
+- **TC-085: Various UTC timestamp strings parse correctly.** (1 connections) — `tests/unit/test_event_processing.py`
+- **TC-085: fromisoformat().astimezone() preserves UTC instant.** (1 connections) — `tests/unit/test_event_processing.py`
 
 ## Relationships
 
-- [[Compact Renderer Implementation]] (3 shared connections)
-- [[Run History Mining]] (1 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (3 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (2 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
+- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/compact/test_unknown_event_hint.py`
+- `tests/unit/test_event_processing.py`
 
 ## Audit Trail
 
-- EXTRACTED: 20 (87%)
-- INFERRED: 3 (13%)
+- EXTRACTED: 27 (82%)
+- INFERRED: 6 (18%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

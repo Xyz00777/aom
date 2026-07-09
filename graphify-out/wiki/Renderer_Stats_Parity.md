@@ -1,34 +1,38 @@
 # Renderer Stats Parity
 
-> 8 nodes · cohesion 0.29
+> 13 nodes · cohesion 0.27
 
 ## Key Concepts
 
-- **test_renderer_stats_parity.py** (7 connections) — `tests/unit/test_renderer_stats_parity.py`
-- **_drive_json()** (4 connections) — `tests/unit/test_renderer_stats_parity.py`
-- **test_aomapp_handle_completion_publishes_stats()** (2 connections) — `tests/unit/test_renderer_stats_parity.py`
-- **test_aomapp_print_log_increments_log_writes()** (2 connections) — `tests/unit/test_renderer_stats_parity.py`
-- **test_aomapp_update_state_increments_render_calls()** (2 connections) — `tests/unit/test_renderer_stats_parity.py`
-- **test_json_renderer_publishes_stats_on_completion()** (2 connections) — `tests/unit/test_renderer_stats_parity.py`
-- **Phase 12: JsonRenderer and AOMApp publish RendererStats at completion.  Spec: do** (1 connections) — `tests/unit/test_renderer_stats_parity.py`
-- **_reset()** (1 connections) — `tests/unit/test_renderer_stats_parity.py`
+- **.test_perf_030_counters_track_oracle()** (7 connections) — `tests/compact/test_incremental_counters.py`
+- **test_incremental_counters.py** (6 connections) — `tests/compact/test_incremental_counters.py`
+- **_renderer()** (5 connections) — `tests/compact/test_incremental_counters.py`
+- **TestIncrementalCounters** (5 connections) — `tests/compact/test_incremental_counters.py`
+- **.test_completed_counter_not_double_counted()** (5 connections) — `tests/compact/test_incremental_counters.py`
+- **_task_start()** (4 connections) — `tests/compact/test_incremental_counters.py`
+- **.test_perf_031_dynamic_include_task_still_counts()** (4 connections) — `tests/compact/test_incremental_counters.py`
+- **_runner_ok()** (3 connections) — `tests/compact/test_incremental_counters.py`
+- **_runner_failed()** (2 connections) — `tests/compact/test_incremental_counters.py`
+- **TC-PERF-030..031 — incremental task counters on CompactRenderer.  ``count_comple** (1 connections) — `tests/compact/test_incremental_counters.py`
+- **After each event the incremental counter matches count_completed_tasks.** (1 connections) — `tests/compact/test_incremental_counters.py`
+- **A task that arrives without preflight registration still increments.** (1 connections) — `tests/compact/test_incremental_counters.py`
+- **Re-arriving terminal events for the same task don't double-count.** (1 connections) — `tests/compact/test_incremental_counters.py`
 
 ## Relationships
 
-- [[AOM TUI Application]] (3 shared connections)
-- [[Playbook Event Parsing]] (1 shared connections)
-- [[JSON Renderer]] (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (2 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_renderer_stats_parity.py`
+- `tests/compact/test_incremental_counters.py`
 
 ## Audit Trail
 
-- EXTRACTED: 17 (81%)
-- INFERRED: 4 (19%)
+- EXTRACTED: 43 (96%)
+- INFERRED: 2 (4%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

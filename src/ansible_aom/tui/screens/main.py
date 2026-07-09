@@ -7,9 +7,10 @@ from datetime import datetime, timedelta
 
 from textual.app import ComposeResult
 from textual.binding import Binding
+from textual.css.query import NoMatches
 from textual.screen import Screen
 
-from ansible_aom.core.models import RunState
+from ansible_aom.core.run_state import RunState
 from ansible_aom.core.tree import TreeProjection
 from ansible_aom.tui.keybindings import KEYBINDINGS, KeyContext
 from ansible_aom.tui.widgets import DebugPanel, LogPanel, StatusBar, SummaryPanel, TaskTree
@@ -84,7 +85,7 @@ class MainScreen(Screen):
             summary = self.query_one(SummaryPanel)
             status = self.query_one(StatusBar)
             tree = self.query_one(TaskTree)
-        except Exception:
+        except NoMatches:
             # Screen not fully mounted yet; the next tick will retry.
             return
 

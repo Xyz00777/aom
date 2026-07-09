@@ -86,12 +86,63 @@ aom inspect prune --days 30           # delete sessions older than N days
 `--json` / `--jsonl` is available on `list` / `show` for piping into
 `jq` and friends.
 
+### Replay past runs
+
+```bash
+aom replay <session-id>            # replay at original cadence
+aom replay <session-id> --speed 10 # 10x faster
+aom replay <session-id> --speed 0  # as fast as possible (no sleeps)
+aom replay latest                  # replay the most recent session
+```
+
+Re-stream a recorded session's `events.jsonl` through the renderer at
+the original pacing, scaled with `--speed N`. Replay reproduces only
+the JSONL stream, not AOM-emitted warnings, the preflight summary, or
+password-prompt log lines. Session IDs may be a full UUID, a unique
+prefix, or `latest`.
+
+### Rerun failed hosts
+
+```bash
+aom rerun                          # rerun latest session's failed hosts
+aom rerun <session-id> --failed    # explicit session, failed hosts only
+aom rerun <session-id> --unreachable  # failed + unreachable hosts
+aom rerun --changes-only -y        # rerun changed hosts, skip the prompt
+```
+
+Reads a recorded session, derives a host set from
+failed / unreachable / changed events, and re-invokes
+`ansible-playbook` with the original args plus a `--limit` matching
+those hosts. By default `aom rerun` behaves like `--failed`; flags
+compose by union. A pre-existing `--limit` in the recorded args is
+replaced, not intersected, because a rerun to a subset is rarely what
+users want. Always prints the planned command line and a warning that
+re-running may execute non-idempotent tasks, then prompts for
+confirmation unless `-y` is set.
+
+### Shell completion
+
+```bash
+aom --install-completion bash >> ~/.bashrc
+aom --install-completion zsh >> ~/.zshrc
+aom --install-completion fish > ~/.config/fish/completions/aom.fish
+```
+
+Prints the rc-file snippet for the chosen shell to stdout, then exits.
+Powered by `argcomplete`; tab-completes subcommands (`inspect`,
+`replay`, `rerun`), flags, and recorded session IDs from
+`~/.local/state/aom/sessions/`.
+
 ### Flags
 
 | Flag | Effect |
 |------|--------|
 | `--tui` | Launch the full multi-panel TUI (default is compact). |
 | `--verbose` | Print AOM diagnostics (resolved `ansible-playbook` path, env, terminal size), enable DEBUG logging, enable pexpect/event traces, and print post-run `[aom-debug]` summary. Equivalent to `AOM_DEBUG=1`. |
+| `--format {compact,json}` | `compact` (default) streams the nom-style live view. `json` is silent during the run and emits a single JSON object on stdout at completion, designed for CI and `jq` pipelines. Mutually exclusive with `--tui`. |
+| `--hide-state <state>` | Suppress per-host lines of the given state from the live compact log. Accepts comma-separated values (e.g. `--hide-state ok,skipped`) or repeated invocations. Choices: `ok`, `changed`, `failed`, `skipped`, `unreachable`. The status panel, recording, and `aom inspect` are unaffected. Ignored under `--tui`. |
+| `--no-record` | Disable session recording for this run. No directory is written under `~/.local/state/aom/sessions/`. Debug output from `--verbose` is unaffected. |
+| `--install-completion {bash,zsh,fish}` | Print the rc-file snippet for the given shell to stdout, then exit. Pipe to your rc file (e.g. `aom --install-completion bash >> ~/.bashrc`). Powered by `argcomplete`; tab-completes subcommands, flags, and recorded session IDs. |
 | `--version` | Print version and exit. |
 | `--help` | Show built-in help. |
 
@@ -165,13 +216,30 @@ If a conventional inventory file sits in your current directory and
 you didn't pass `-i`, AOM prepends `-i <file>` for you. Pass any
 inventory flag explicitly and AOM keeps its hands off.
 
+### Disk usage
+
+Verbose and setup capture bloat sessions in proportion to the host
+count. A 200-host run with `--capture-verbose --capture-setup` lands
+around `~50MB` of `events.jsonl`. At that rate, 100 sessions stack up
+to roughly `5GB` under `~/.local/state/aom/sessions/`.
+
+Reclaim space by pruning old runs:
+
+```bash
+aom inspect prune --days 30    # delete sessions older than 30 days
+```
+
+The prune command is safe to run on a schedule; it only removes
+session directories whose recorded start time is older than the
+threshold.
+
 ## Project layout
 
 - `src/ansible_aom/` — source. See [`ARCHITECTURE.md`](ARCHITECTURE.md)
   for the module map.
 - `SPECIFICATION.md` — authoritative behaviour spec.
 - `TEST_SPECIFICATION.md` — every test case, indexed by spec section.
-- `CLAUDE.md` — contributor guide: setup, commands, style, TDD rules.
+- `AGENTS.md` — contributor guide: setup, commands, style, TDD rules.
 
 ## Development
 
@@ -185,7 +253,7 @@ uv run mypy src/ansible_aom
 ```
 
 TDD-first; tests for `core/` must pass without `ansible-core`. See
-[`CLAUDE.md`](CLAUDE.md) for the full rules.
+[`AGENTS.md`](AGENTS.md) for the full rules.
 
 ## License
 

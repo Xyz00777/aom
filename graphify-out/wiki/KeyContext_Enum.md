@@ -1,37 +1,45 @@
 # KeyContext Enum
 
-> 12 nodes · cohesion 0.17
+> 18 nodes · cohesion 0.13
 
 ## Key Concepts
 
-- **TestKeyContextEnum** (9 connections) — `tests/tui/test_keybindings.py`
-- **.test_all_contexts_are_strings()** (2 connections) — `tests/tui/test_keybindings.py`
-- **.test_global_context_exists()** (2 connections) — `tests/tui/test_keybindings.py`
-- **.test_log_context_exists()** (2 connections) — `tests/tui/test_keybindings.py`
-- **.test_post_run_context_exists()** (2 connections) — `tests/tui/test_keybindings.py`
-- **.test_tree_context_exists()** (2 connections) — `tests/tui/test_keybindings.py`
-- **Tests for KeyContext enum - TC-361, TC-362, TC-363, TC-364.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-364: Global context is defined.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-361: Tree context is defined.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-362: Log context is defined.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-363: Post-run context is defined.** (1 connections) — `tests/tui/test_keybindings.py`
-- **All KeyContext values are strings for serialization.** (1 connections) — `tests/tui/test_keybindings.py`
+- **test_no_record.py** (7 connections) — `tests/unit/test_no_record.py`
+- **TestNoRecordTUIPlumbing** (6 connections) — `tests/unit/test_no_record.py`
+- **TestNoRecordCompactPlumbing** (5 connections) — `tests/unit/test_no_record.py`
+- **TestRunPlaybookRecordParameter** (5 connections) — `tests/unit/test_no_record.py`
+- **.test_record_false_skips_session_directory()** (4 connections) — `tests/unit/test_no_record.py`
+- **.test_record_true_default_still_writes()** (4 connections) — `tests/unit/test_no_record.py`
+- **_fake_ansible_command()** (3 connections) — `tests/unit/test_no_record.py`
+- **Path** (2 connections)
+- **.test_aomapp_accepts_record_kwarg()** (2 connections) — `tests/unit/test_no_record.py`
+- **.test_aomapp_default_record_true()** (2 connections) — `tests/unit/test_no_record.py`
+- **.test_tui_main_propagates_no_record_to_app()** (2 connections) — `tests/unit/test_no_record.py`
+- **Unit tests for F3 --no-record plumbing.** (1 connections) — `tests/unit/test_no_record.py`
+- **--no-record reaches the TUI worker as record=False.** (1 connections) — `tests/unit/test_no_record.py`
+- **``--no-record --tui`` builds a LiveDriver with recording off.** (1 connections) — `tests/unit/test_no_record.py`
+- **run_playbook accepts a record=bool kwarg; default is True.** (1 connections) — `tests/unit/test_no_record.py`
+- **`aom --no-record playbook.yml` calls run_playbook(..., record=False).** (1 connections) — `tests/unit/test_no_record.py`
+- **.test_default_propagates_record_true()** (1 connections) — `tests/unit/test_no_record.py`
+- **.test_no_record_propagates_to_runner()** (1 connections) — `tests/unit/test_no_record.py`
 
 ## Relationships
 
-- [[TUI Keybindings Config]] (2 shared connections)
-- [[TUI Keybindings Tests]] (1 shared connections)
+- [Session Recording Tests](Session_Recording_Tests.md) (5 shared connections)
+- [Tree Block Animation](Tree_Block_Animation.md) (2 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [Community 644](Community_644.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/tui/test_keybindings.py`
+- `tests/unit/test_no_record.py`
 
 ## Audit Trail
 
-- EXTRACTED: 23 (92%)
-- INFERRED: 2 (8%)
+- EXTRACTED: 42 (86%)
+- INFERRED: 7 (14%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

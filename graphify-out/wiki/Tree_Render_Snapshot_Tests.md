@@ -1,57 +1,51 @@
 # Tree Render Snapshot Tests
 
-> 34 nodes · cohesion 0.08
+> 42 nodes · cohesion 0.05
 
 ## Key Concepts
 
-- **test_tree_render.py** (25 connections) — `tests/compact/test_tree_render.py`
-- **_state()** (13 connections) — `tests/compact/test_tree_render.py`
-- **_full_panel()** (10 connections) — `tests/compact/test_tree_render.py`
-- **test_ancestor_spine_continues_under_tail_after()** (5 connections) — `tests/compact/test_tree_render.py`
-- **test_format_host_rows_two_space_column_separator()** (5 connections) — `tests/compact/test_tree_render.py`
-- **test_format_tree_block_host_leaves_are_plain_indented()** (5 connections) — `tests/compact/test_tree_render.py`
-- **test_has_tail_after_demotes_last_to_mid()** (5 connections) — `tests/compact/test_tree_render.py`
-- **test_hosts_completed_doesnt_oscillate_with_in_flight_task()** (5 connections) — `tests/compact/test_tree_render.py`
-- **test_more_kind_suppresses_branch_glyph()** (5 connections) — `tests/compact/test_tree_render.py`
-- **test_format_host_rows_idle_host_shows_idle_marker()** (4 connections) — `tests/compact/test_tree_render.py`
-- **test_format_host_rows_running_host_includes_current_task_suffix()** (4 connections) — `tests/compact/test_tree_render.py`
-- **test_format_host_rows_unreachable_host_shows_unreachable()** (4 connections) — `tests/compact/test_tree_render.py`
-- **test_format_tree_block_ascii_fallback()** (4 connections) — `tests/compact/test_tree_render.py`
-- **test_format_tree_block_emits_tree_shape()** (4 connections) — `tests/compact/test_tree_render.py`
-- **test_format_tree_block_invisible_returns_empty()** (4 connections) — `tests/compact/test_tree_render.py`
-- **test_free_strategy_panel_shows_two_tasks()** (4 connections) — `tests/compact/test_tree_render.py`
-- **test_linear_strategy_panel_shape()** (4 connections) — `tests/compact/test_tree_render.py`
-- **test_post_recap_panel_drops_tree_and_suffix()** (4 connections) — `tests/compact/test_tree_render.py`
-- **test_render_status_panel_is_status_bar_only_before_any_task()** (3 connections) — `tests/compact/test_tree_render.py`
-- **test_render_status_panel_status_bar_is_last_line()** (3 connections) — `tests/compact/test_tree_render.py`
-- **test_render_status_panel_includes_tree_when_task_running()** (2 connections) — `tests/compact/test_tree_render.py`
-- **Snapshot tests for the compact renderer's tree + host-row block.  These pin the** (1 connections) — `tests/compact/test_tree_render.py`
-- **Regression guard: spacing between count cells and the suffix is     two spaces (** (1 connections) — `tests/compact/test_tree_render.py`
-- **Regression guard: host children render WITHOUT a branch glyph,     matching the** (1 connections) — `tests/compact/test_tree_render.py`
-- **When no task is RUNNING, the panel shows only the status bar —     no tree, no h** (1 connections) — `tests/compact/test_tree_render.py`
-- *... and 9 more nodes in this community*
+- **AOM Diagnostics Layer — Design Plan** (10 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
+- **1. Verified hot spots** (10 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
+- **2. Proposed fixes** (8 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
+- **Performance-Improvement Plan: AOM Compact Renderer** (8 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
+- **4. Tests to write first** (7 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
+- **2026-05-21-diagnostics-layer-design.md** (2 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
+- **2026-05-21-render-state-perf-design.md** (2 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
+- **1. What we want answered, by failure class** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
+- **2. Diagnostic surface** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
+- **3. Module layout** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
+- **4. Lifecycle** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
+- **5. Session-recorded diagnostics** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
+- **6. Sequence and dependencies** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
+- **7. Tests to write first (TDD-first order)** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
+- **8. Out of scope / explicit non-goals** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
+- **9. Open questions** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
+- **3. Sequence and dependencies** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
+- **5. Layer assignment for new logic** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
+- **6. Out of scope / explicit non-goals** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
+- **7. Open questions** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
+- **A0 tests — `tests/unit/test_parser_orjson_swap.py`** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
+- **A1 tests — `tests/compact/test_emit_event_log_batching.py`** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
+- **A2 tests — `tests/unit/test_run_state_index.py`** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
+- **B1 tests — `tests/compact/test_tree_projection_lifecycle.py`** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
+- **C1 tests — `tests/compact/test_incremental_counters.py`** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
+- *... and 17 more nodes in this community*
 
 ## Relationships
 
-- [[Play Definition Tree Population]] (12 shared connections)
-- [[Tree Block Animation]] (8 shared connections)
-- [[Run State Completion Recap]] (7 shared connections)
-- [[Host Overview Table]] (5 shared connections)
-- [[Compact Renderer Implementation]] (4 shared connections)
-- [[Panel Refresh Snapshot]] (2 shared connections)
-- [[Run State Summary Panel]] (2 shared connections)
-- [[Compact Renderer Formatters]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/compact/test_tree_render.py`
+- `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
+- `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
 
 ## Audit Trail
 
-- EXTRACTED: 112 (83%)
-- INFERRED: 23 (17%)
+- EXTRACTED: 82 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

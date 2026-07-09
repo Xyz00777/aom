@@ -1,39 +1,42 @@
 # Parser Warnings List
 
-> 10 nodes · cohesion 0.20
+> 14 nodes · cohesion 0.19
 
 ## Key Concepts
 
-- **TestPtyStreamParserWarningsList** (12 connections) — `tests/unit/test_warnings.py`
-- **.test_multiple_warnings_preserve_order()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_warnings_list_contains_warning_entry_objects()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_warnings_list_empty_initially()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_warnings_property_returns_list()** (3 connections) — `tests/unit/test_warnings.py`
-- **TC-501: PtyStreamParser _warnings list type.** (1 connections) — `tests/unit/test_warnings.py`
-- **TC-501: _warnings contains WarningEntry objects, not strings.** (1 connections) — `tests/unit/test_warnings.py`
-- **TC-501: _warnings is empty list on initialization.** (1 connections) — `tests/unit/test_warnings.py`
-- **TC-501: Multiple warnings are added in order received.** (1 connections) — `tests/unit/test_warnings.py`
-- **TC-501: warnings property returns list.** (1 connections) — `tests/unit/test_warnings.py`
+- **TestTerminalSizeCheck** (16 connections) — `tests/integration/test_compact_renderer.py`
+- **.check_terminal_size()** (6 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_error_message_format()** (3 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_terminal_larger_passes()** (3 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_terminal_minimum_size_passes()** (3 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_terminal_too_small_reports_error()** (3 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_minimum_size_constants()** (2 connections) — `tests/integration/test_compact_renderer.py`
+- **Tests for TC-043, TC-044, TC-045: Terminal size requirements.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **TC-043: Minimum terminal size is 24 lines x 80 columns.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **Check if terminal meets minimum size.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **TC-043: Below minimum shows error.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **TC-043: Minimum size passes check.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **TC-043: Larger terminal passes check.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **TC-044: Error message shows dimensions and minimum.** (1 connections) — `tests/integration/test_compact_renderer.py`
 
 ## Relationships
 
-- [[PTY Stream Parser]] (5 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
-- [[Warnings Display Config]] (1 shared connections)
-- [[App Configuration Settings]] (1 shared connections)
-- [[Status Bar Warning Panels]] (1 shared connections)
-- [[Warning Classification Tests]] (1 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (3 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (3 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
+- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (1 shared connections)
+- [CLI Argument Parser](CLI_Argument_Parser.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_warnings.py`
+- `tests/integration/test_compact_renderer.py`
 
 ## Audit Trail
 
-- EXTRACTED: 19 (66%)
-- INFERRED: 10 (34%)
+- EXTRACTED: 35 (81%)
+- INFERRED: 8 (19%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,39 +1,35 @@
 # CPU Sampling Probing
 
-> 10 nodes · cohesion 0.22
+> 11 nodes · cohesion 0.18
 
 ## Key Concepts
 
-- **_sample_subprocess_active()** (6 connections) — `src/ansible_aom/ansible/runner.py`
-- **TestSampleSubprocessActive** (6 connections) — `tests/unit/test_runner_heartbeat.py`
-- **_get_psutil()** (5 connections) — `src/ansible_aom/ansible/runner.py`
-- **_probe_psutil()** (4 connections) — `src/ansible_aom/ansible/runner.py`
-- **.test_returns_bool_for_own_pid()** (2 connections) — `tests/unit/test_runner_heartbeat.py`
-- **.test_returns_false_for_nonexistent_pid()** (2 connections) — `tests/unit/test_runner_heartbeat.py`
-- **Subprocess-probe ``import psutil``; return ``(module, None)`` on     success or** (1 connections) — `src/ansible_aom/ansible/runner.py`
-- **Return the cached psutil module, or None if probing failed.      Lazy: the first** (1 connections) — `src/ansible_aom/ansible/runner.py`
-- **Return True if pid or any descendant used CPU since the last call.      Uses ``p** (1 connections) — `src/ansible_aom/ansible/runner.py`
-- **The CPU sampler degrades gracefully and never raises.** (1 connections) — `tests/unit/test_runner_heartbeat.py`
+- **Section 5.2.1: --list-hosts Output Parsing** (11 connections) — `TEST_SPECIFICATION.md`
+- **TC-097: --list-hosts Play Pattern Parsing** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-098: --list-hosts Hostname Extraction** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-099: --list-hosts Skip Non-Host Lines** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-100: --list-hosts Localhost Handling** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-101: --list-hosts 'all' Handling** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-102: --list-hosts Pattern Filtering** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-103: --list-hosts Dynamic Pattern Fallback** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-104: --list-hosts with --limit** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-105: --list-hosts Empty Inventory** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-106: --list-hosts Dynamic Inventory** (1 connections) — `TEST_SPECIFICATION.md`
 
 ## Relationships
 
-- [[Runner Session Recording]] (4 shared connections)
-- [[Playbook Event Parsing]] (2 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
-- [[PTY Stream Parser]] (1 shared connections)
-- [[Runner Heartbeat Wiring]] (1 shared connections)
+- [Failure Recap Formatting](Failure_Recap_Formatting.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/ansible/runner.py`
-- `tests/unit/test_runner_heartbeat.py`
+- `TEST_SPECIFICATION.md`
 
 ## Audit Trail
 
-- EXTRACTED: 23 (79%)
-- INFERRED: 6 (21%)
+- EXTRACTED: 21 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

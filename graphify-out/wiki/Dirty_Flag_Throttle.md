@@ -1,39 +1,48 @@
 # Dirty Flag Throttle
 
-> 14 nodes · cohesion 0.24
+> 20 nodes · cohesion 0.14
 
 ## Key Concepts
 
-- **TestDirtyFlagGating** (8 connections) — `tests/compact/test_render_dirty_flag.py`
-- **_renderer()** (7 connections) — `tests/compact/test_render_dirty_flag.py`
-- **_task_start()** (5 connections) — `tests/compact/test_render_dirty_flag.py`
-- **.test_perf_040_two_updates_in_throttle_window_one_compute()** (4 connections) — `tests/compact/test_render_dirty_flag.py`
-- **.test_perf_041_clean_tick_skips_projection_compute()** (4 connections) — `tests/compact/test_render_dirty_flag.py`
-- **.test_perf_043_dirty_panel_renders_after_burst_settles()** (4 connections) — `tests/compact/test_render_dirty_flag.py`
-- **.test_perf_044_dirty_with_fresh_compute_waits_for_tick_refresh()** (4 connections) — `tests/compact/test_render_dirty_flag.py`
-- **test_render_dirty_flag.py** (3 connections) — `tests/compact/test_render_dirty_flag.py`
-- **.test_perf_042_log_storm_triggers_periodic_panel_refresh()** (3 connections) — `tests/compact/test_render_dirty_flag.py`
-- **HS-1/HS-8: a sustained burst of state changes must not starve the         panel.** (1 connections) — `tests/compact/test_render_dirty_flag.py`
-- **HS-1/HS-8: dirty but already-rendered state waits for the 1 s         clock-adva** (1 connections) — `tests/compact/test_render_dirty_flag.py`
-- **Two update_state calls within the throttle window → 1 panel compute.          ``** (1 connections) — `tests/compact/test_render_dirty_flag.py`
-- **tick() with _panel_dirty=False and recent compute skips compute.** (1 connections) — `tests/compact/test_render_dirty_flag.py`
-- **Sustained log output still lets the compact panel repaint.          The log path** (1 connections) — `tests/compact/test_render_dirty_flag.py`
+- **get_status_color()** (12 connections) — `src/ansible_aom/core/icons.py`
+- **TestGetStatusColor** (10 connections) — `tests/unit/test_icons.py`
+- **.test_get_status_color_changed()** (3 connections) — `tests/unit/test_icons.py`
+- **.test_get_status_color_completed()** (3 connections) — `tests/unit/test_icons.py`
+- **.test_get_status_color_failed()** (3 connections) — `tests/unit/test_icons.py`
+- **.test_get_status_color_ok()** (3 connections) — `tests/unit/test_icons.py`
+- **.test_get_status_color_pending()** (3 connections) — `tests/unit/test_icons.py`
+- **.test_get_status_color_running()** (3 connections) — `tests/unit/test_icons.py`
+- **.test_get_status_color_skipped()** (3 connections) — `tests/unit/test_icons.py`
+- **.test_get_status_color_unreachable()** (3 connections) — `tests/unit/test_icons.py`
+- **Get the ANSI color name for a given status.      Args:         status: The execu** (1 connections) — `src/ansible_aom/core/icons.py`
+- **Tests for get_status_color function.** (1 connections) — `tests/unit/test_icons.py`
+- **get_status_color returns green for OK.** (1 connections) — `tests/unit/test_icons.py`
+- **get_status_color returns yellow for CHANGED.** (1 connections) — `tests/unit/test_icons.py`
+- **get_status_color returns red for FAILED.** (1 connections) — `tests/unit/test_icons.py`
+- **get_status_color returns magenta for UNREACHABLE.** (1 connections) — `tests/unit/test_icons.py`
+- **get_status_color returns cyan for RUNNING.** (1 connections) — `tests/unit/test_icons.py`
+- **get_status_color returns dim for PENDING.** (1 connections) — `tests/unit/test_icons.py`
+- **get_status_color returns dim for SKIPPED.** (1 connections) — `tests/unit/test_icons.py`
+- **get_status_color returns green for COMPLETED.** (1 connections) — `tests/unit/test_icons.py`
 
 ## Relationships
 
-- [[Compact Renderer Implementation]] (2 shared connections)
-- [[Terminal Display Manager]] (1 shared connections)
+- [Pause Prompt Heuristic](Pause_Prompt_Heuristic.md) (1 shared connections)
+- [Crash Recovery Notification](Crash_Recovery_Notification.md) (1 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
+- [Community 461](Community_461.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/compact/test_render_dirty_flag.py`
+- `src/ansible_aom/core/icons.py`
+- `tests/unit/test_icons.py`
 
 ## Audit Trail
 
-- EXTRACTED: 45 (96%)
-- INFERRED: 2 (4%)
+- EXTRACTED: 39 (70%)
+- INFERRED: 17 (30%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

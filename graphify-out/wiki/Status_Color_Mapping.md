@@ -1,48 +1,52 @@
 # Status Color Mapping
 
-> 20 nodes · cohesion 0.14
+> 28 nodes · cohesion 0.12
 
 ## Key Concepts
 
-- **get_status_color()** (12 connections) — `src/ansible_aom/core/icons.py`
-- **TestGetStatusColor** (10 connections) — `tests/unit/test_icons.py`
-- **.test_get_status_color_changed()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_get_status_color_completed()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_get_status_color_failed()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_get_status_color_ok()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_get_status_color_pending()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_get_status_color_running()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_get_status_color_skipped()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_get_status_color_unreachable()** (3 connections) — `tests/unit/test_icons.py`
-- **Get the ANSI color name for a given status.      Args:         status: The execu** (1 connections) — `src/ansible_aom/core/icons.py`
-- **Tests for get_status_color function.** (1 connections) — `tests/unit/test_icons.py`
-- **get_status_color returns green for OK.** (1 connections) — `tests/unit/test_icons.py`
-- **get_status_color returns yellow for CHANGED.** (1 connections) — `tests/unit/test_icons.py`
-- **get_status_color returns red for FAILED.** (1 connections) — `tests/unit/test_icons.py`
-- **get_status_color returns magenta for UNREACHABLE.** (1 connections) — `tests/unit/test_icons.py`
-- **get_status_color returns cyan for RUNNING.** (1 connections) — `tests/unit/test_icons.py`
-- **get_status_color returns dim for PENDING.** (1 connections) — `tests/unit/test_icons.py`
-- **get_status_color returns dim for SKIPPED.** (1 connections) — `tests/unit/test_icons.py`
-- **get_status_color returns green for COMPLETED.** (1 connections) — `tests/unit/test_icons.py`
+- **_fake_ansible_command()** (10 connections) — `tests/integration/test_runner_session_recording.py`
+- **test_runner_session_recording.py** (9 connections) — `tests/integration/test_runner_session_recording.py`
+- **Path** (9 connections)
+- **TestSessionRecordingHappyPath** (7 connections) — `tests/integration/test_runner_session_recording.py`
+- **.test_default_state_dir_is_used_when_none_given()** (6 connections) — `tests/integration/test_runner_session_recording.py`
+- **.test_oserror_during_record_event_disables_sink_and_warns_once()** (6 connections) — `tests/integration/test_runner_session_recording.py`
+- **.test_unwritable_session_dir_does_not_crash_run()** (5 connections) — `tests/integration/test_runner_session_recording.py`
+- **.test_records_every_jsonl_event_seen_by_runner()** (5 connections) — `tests/integration/test_runner_session_recording.py`
+- **.test_runner_records_ansible_args_in_meta()** (5 connections) — `tests/integration/test_runner_session_recording.py`
+- **_read_jsonl()** (4 connections) — `tests/integration/test_runner_session_recording.py`
+- **TestSessionRecordingDefaults** (4 connections) — `tests/integration/test_runner_session_recording.py`
+- **TestSessionRecordingDisableOnDiskError** (4 connections) — `tests/integration/test_runner_session_recording.py`
+- **TestSessionRecordingFailureModes** (4 connections) — `tests/integration/test_runner_session_recording.py`
+- **.test_creates_session_directory_with_events_and_meta()** (4 connections) — `tests/integration/test_runner_session_recording.py`
+- **.test_meta_records_status_completed_on_success()** (4 connections) — `tests/integration/test_runner_session_recording.py`
+- **.test_meta_records_status_failed_on_nonzero_exit()** (4 connections) — `tests/integration/test_runner_session_recording.py`
+- **TestSessionRecordingPersistsArgs** (4 connections) — `tests/integration/test_runner_session_recording.py`
+- **MonkeyPatch** (1 connections)
+- **Integration tests for the runner's session recording (roadmap #14).  Every `run_** (1 connections) — `tests/integration/test_runner_session_recording.py`
+- **Recording is best-effort — disk failures don't crash the run.** (1 connections) — `tests/integration/test_runner_session_recording.py`
+- **If session_dir can't be written to, the playbook still runs and exits cleanly.** (1 connections) — `tests/integration/test_runner_session_recording.py`
+- **R3: an OSError mid-run (disk full, FS quota, NFS hiccup) disables     further re** (1 connections) — `tests/integration/test_runner_session_recording.py`
+- **(command, args) pair emitting `events` then exiting with `exit_code`.** (1 connections) — `tests/integration/test_runner_session_recording.py`
+- **When no session_dir is passed, the runner picks the standard state dir.** (1 connections) — `tests/integration/test_runner_session_recording.py`
+- **run_playbook must produce a session under whatever the         ``_default_sessio** (1 connections) — `tests/integration/test_runner_session_recording.py`
+- *... and 3 more nodes in this community*
 
 ## Relationships
 
-- [[Tree Block Animation]] (1 shared connections)
-- [[Compact Display Module Layout]] (1 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
-- [[Status Icon Mapping]] (1 shared connections)
+- [Tree Block Animation](Tree_Block_Animation.md) (8 shared connections)
+- [Run Config Key Normalization](Run_Config_Key_Normalization.md) (6 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/icons.py`
-- `tests/unit/test_icons.py`
+- `tests/integration/test_runner_session_recording.py`
 
 ## Audit Trail
 
-- EXTRACTED: 39 (70%)
-- INFERRED: 17 (30%)
+- EXTRACTED: 91 (87%)
+- INFERRED: 14 (13%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

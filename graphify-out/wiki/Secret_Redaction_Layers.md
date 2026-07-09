@@ -1,31 +1,36 @@
 # Secret Redaction Layers
 
-> 4 nodes · cohesion 0.83
+> 12 nodes · cohesion 0.23
 
 ## Key Concepts
 
-- **core/redaction.py (secret sanitiser)** (5 connections) — `ARCHITECTURE.md`
-- **4-layer secret redaction** (3 connections) — `SPECIFICATION.md`
-- **Redaction test playbooks (L1-L4)** (2 connections) — `TEST_PLAYBOOKS.md`
-- **Redaction test cases (TC-153 to TC-162)** (2 connections) — `TEST_SPECIFICATION.md`
+- **test_diagnostics_summary_print.py** (9 connections) — `tests/unit/test_diagnostics_summary_print.py`
+- **_populate()** (5 connections) — `tests/unit/test_diagnostics_summary_print.py`
+- **test_set_debug_disables_summary()** (3 connections) — `tests/unit/test_diagnostics_summary_print.py`
+- **test_set_debug_enables_summary()** (3 connections) — `tests/unit/test_diagnostics_summary_print.py`
+- **test_print_summary_if_debug_emits_with_debug()** (2 connections) — `tests/unit/test_diagnostics_summary_print.py`
+- **test_print_summary_if_debug_handles_no_run_data()** (2 connections) — `tests/unit/test_diagnostics_summary_print.py`
+- **test_print_summary_if_debug_silent_without_debug()** (2 connections) — `tests/unit/test_diagnostics_summary_print.py`
+- **Phase 13: automatic post-run diagnostics summary on AOM_DEBUG=1.  When the user** (1 connections) — `tests/unit/test_diagnostics_summary_print.py`
+- **No accumulator published yet — still safe to call.** (1 connections) — `tests/unit/test_diagnostics_summary_print.py`
+- **set_debug(True) should have same effect as AOM_DEBUG=1 env var.** (1 connections) — `tests/unit/test_diagnostics_summary_print.py`
+- **set_debug(False) should suppress the summary.** (1 connections) — `tests/unit/test_diagnostics_summary_print.py`
+- **_reset()** (1 connections) — `tests/unit/test_diagnostics_summary_print.py`
 
 ## Relationships
 
-- [[Renderer Architecture]] (2 shared connections)
+- [Frame Parameter Handling](Frame_Parameter_Handling.md) (1 shared connections)
 
 ## Source Files
 
-- `ARCHITECTURE.md`
-- `SPECIFICATION.md`
-- `TEST_PLAYBOOKS.md`
-- `TEST_SPECIFICATION.md`
+- `tests/unit/test_diagnostics_summary_print.py`
 
 ## Audit Trail
 
-- EXTRACTED: 6 (50%)
-- INFERRED: 6 (50%)
+- EXTRACTED: 31 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

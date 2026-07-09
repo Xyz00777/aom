@@ -1,62 +1,64 @@
 # JSON Renderer
 
-> 62 nodes · cohesion 0.04
+> 70 nodes · cohesion 0.07
 
 ## Key Concepts
 
-- **JsonRenderer** (63 connections) — `src/ansible_aom/formats/json.py`
-- **test_json_renderer.py** (26 connections) — `tests/unit/test_json_renderer.py`
-- **_state_two_hosts_one_failure()** (12 connections) — `tests/unit/test_json_renderer.py`
-- **test_handle_completion_unreachable_lands_in_tasks_failed()** (7 connections) — `tests/unit/test_json_renderer.py`
-- **test_handle_completion_aggregates_per_host_counts()** (4 connections) — `tests/unit/test_json_renderer.py`
-- **test_handle_completion_emits_one_json_object()** (4 connections) — `tests/unit/test_json_renderer.py`
-- **test_handle_completion_lists_failed_tasks()** (4 connections) — `tests/unit/test_json_renderer.py`
-- **test_handle_completion_uses_state_timestamps()** (4 connections) — `tests/unit/test_json_renderer.py`
-- **.note_subprocess_active()** (3 connections) — `src/ansible_aom/formats/json.py`
-- **.start()** (3 connections) — `src/ansible_aom/formats/json.py`
-- **test_handle_completion_empty_state_emits_zero_exit()** (3 connections) — `tests/unit/test_json_renderer.py`
-- **test_handle_completion_records_playbook_and_exit_code()** (3 connections) — `tests/unit/test_json_renderer.py`
-- **test_handle_completion_schema_version_is_one()** (3 connections) — `tests/unit/test_json_renderer.py`
-- **test_interactive_prompt_refuses_to_stderr()** (3 connections) — `tests/unit/test_json_renderer.py`
-- **test_json_renderer_noop_methods_emit_nothing()** (3 connections) — `tests/unit/test_json_renderer.py`
-- **test_json_renderer_satisfies_renderer_protocol()** (3 connections) — `tests/unit/test_json_renderer.py`
-- **test_json_renderer_set_definitions_stores_them()** (3 connections) — `tests/unit/test_json_renderer.py`
-- **test_json_renderer_start_records_playbook_and_args()** (3 connections) — `tests/unit/test_json_renderer.py`
-- **test_json_renderer_through_full_lifecycle()** (3 connections) — `tests/unit/test_json_renderer.py`
-- **test_password_prompt_refuses_to_stderr()** (3 connections) — `tests/unit/test_json_renderer.py`
-- **test_prompt_refusal_does_not_corrupt_completion_json()** (3 connections) — `tests/unit/test_json_renderer.py`
-- **.add_warning()** (2 connections) — `src/ansible_aom/formats/json.py`
-- **.handle_interactive_prompt()** (2 connections) — `src/ansible_aom/formats/json.py`
-- **.handle_password_prompt()** (2 connections) — `src/ansible_aom/formats/json.py`
-- **.note_pty_bytes()** (2 connections) — `src/ansible_aom/formats/json.py`
-- *... and 37 more nodes in this community*
+- **build_run_config_key()** (37 connections) — `src/ansible_aom/core/run_config.py`
+- **find_previous_run()** (30 connections) — `src/ansible_aom/session/history.py`
+- **PriorRun** (19 connections) — `src/ansible_aom/session/history.py`
+- **test_history.py** (15 connections) — `tests/unit/test_history.py`
+- **history.py** (13 connections) — `src/ansible_aom/session/history.py`
+- **Path** (13 connections)
+- **test_run_config.py** (13 connections) — `tests/unit/test_run_config.py`
+- **_write_session()** (12 connections) — `tests/unit/test_history.py`
+- **Path** (12 connections)
+- **RunConfigKey** (8 connections) — `src/ansible_aom/core/run_config.py`
+- **_iter_completed_sessions()** (7 connections) — `src/ansible_aom/session/history.py`
+- **_mine_and_replace()** (7 connections) — `src/ansible_aom/session/history.py`
+- **Path** (7 connections)
+- **_build_prior()** (6 connections) — `src/ansible_aom/session/history.py`
+- **_match_loose()** (6 connections) — `src/ansible_aom/session/history.py`
+- **_match_strict()** (6 connections) — `src/ansible_aom/session/history.py`
+- **test_corrupt_meta_is_skipped()** (6 connections) — `tests/unit/test_history.py`
+- **test_fallback_loose_match_when_config_differs()** (6 connections) — `tests/unit/test_history.py`
+- **test_loose_match_filters_mismatched_host_count()** (6 connections) — `tests/unit/test_history.py`
+- **test_loose_match_works_with_any_flag_variation()** (6 connections) — `tests/unit/test_history.py`
+- **test_returns_most_recent_matching_completed_run()** (6 connections) — `tests/unit/test_history.py`
+- **test_skips_non_completed_status()** (6 connections) — `tests/unit/test_history.py`
+- **test_skips_sessions_missing_counts()** (6 connections) — `tests/unit/test_history.py`
+- **test_strict_match_takes_precedence_over_loose()** (6 connections) — `tests/unit/test_history.py`
+- **_mine_task_wall()** (5 connections) — `src/ansible_aom/session/history.py`
+- *... and 45 more nodes in this community*
 
 ## Relationships
 
-- [[CLI Interface Tests]] (17 shared connections)
-- [[Run State Completion Recap]] (10 shared connections)
-- [[Renderer Factory Function]] (5 shared connections)
-- [[Run State Summary Panel]] (4 shared connections)
-- [[JSON Output Renderer]] (3 shared connections)
-- [[Replay Determinism Tests]] (2 shared connections)
-- [[CLI Argument Parser]] (2 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
-- [[Renderer Parity Invariant]] (1 shared connections)
-- [[Install Completion Flag]] (1 shared connections)
-- [[Renderer Protocol Tests]] (1 shared connections)
-- [[Renderer Stats Parity]] (1 shared connections)
+- [Run Config Key Normalization](Run_Config_Key_Normalization.md) (11 shared connections)
+- [TUI Keybindings Config](TUI_Keybindings_Config.md) (3 shared connections)
+- [Community 513](Community_513.md) (3 shared connections)
+- [Tree Block Animation](Tree_Block_Animation.md) (2 shared connections)
+- [Community 481](Community_481.md) (2 shared connections)
+- [Terminal Size Check](Terminal_Size_Check.md) (2 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (2 shared connections)
+- [Shift Modifier Keybindings](Shift_Modifier_Keybindings.md) (2 shared connections)
+- [StatusBarConfig Model](StatusBarConfig_Model.md) (1 shared connections)
+- [Inspect Debug Diagnostics](Inspect_Debug_Diagnostics.md) (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
+- [Interactive Prompt Tests](Interactive_Prompt_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/formats/json.py`
-- `tests/unit/test_json_renderer.py`
+- `src/ansible_aom/core/run_config.py`
+- `src/ansible_aom/session/history.py`
+- `tests/unit/test_history.py`
+- `tests/unit/test_run_config.py`
 
 ## Audit Trail
 
-- EXTRACTED: 144 (67%)
-- INFERRED: 72 (33%)
+- EXTRACTED: 260 (71%)
+- INFERRED: 107 (29%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,11 +1,10 @@
 # SSH Session Detection
 
-> 2 nodes · cohesion 1.00
+> 1 nodes · cohesion 1.00
 
 ## Key Concepts
 
-- **get_refresh_rate** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **is_ssh_session** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **get_refresh_rate** (0 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
 
 ## Relationships
 
@@ -17,10 +16,10 @@
 
 ## Audit Trail
 
-- EXTRACTED: 2 (100%)
+- EXTRACTED: 0 (0%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

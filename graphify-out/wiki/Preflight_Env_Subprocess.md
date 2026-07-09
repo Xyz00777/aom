@@ -1,31 +1,36 @@
 # Preflight Env Subprocess
 
-> 6 nodes · cohesion 0.40
+> 12 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **preflight.py** (6 connections) — `src/ansible_aom/ansible/preflight.py`
-- **_preflight_env()** (3 connections) — `src/ansible_aom/ansible/preflight.py`
-- **_spawn_one()** (3 connections) — `src/ansible_aom/ansible/preflight.py`
-- **Pre-flight: parallel `--list-tasks` + `--list-hosts` orchestration.  This module** (1 connections) — `src/ansible_aom/ansible/preflight.py`
-- **Spawn a single ansible-playbook invocation; return (exit_code, stdout, stderr).** (1 connections) — `src/ansible_aom/ansible/preflight.py`
-- **Environment for preflight subprocesses.      `ANSIBLE_NOCOLOR=1` forces ansible-** (1 connections) — `src/ansible_aom/ansible/preflight.py`
+- **T8 (multi-play head footers + outer footer count) — 2026-06-25** (12 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **Algorithm details** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **Conventions reaffirmed** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **Edge cases handled** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **Files changed** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **Implementation gotchas discovered** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **Open questions / future work** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **Pitfalls avoided** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **TDD order** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **The user's reproduction (2 plays, 2816 pending tasks in play 2)** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **Verification** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
+- **What was implemented** (1 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
 
 ## Relationships
 
-- [[Preflight Definition Assembly]] (2 shared connections)
-- [[Parallel Pre-flight Runner]] (1 shared connections)
+- [Community 522](Community_522.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/ansible/preflight.py`
+- `.sisyphus/notepads/two-level-truncation/learnings.md`
 
 ## Audit Trail
 
-- EXTRACTED: 15 (100%)
+- EXTRACTED: 23 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

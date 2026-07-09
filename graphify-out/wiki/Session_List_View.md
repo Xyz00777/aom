@@ -1,40 +1,42 @@
 # Session List View
 
-> 10 nodes · cohesion 0.29
+> 14 nodes · cohesion 0.18
 
 ## Key Concepts
 
-- **._load_tasks_for()** (8 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **._reload_runs()** (7 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **._visible_summaries()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **.action_toggle_failed()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **.on_mount()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **._refresh_list()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **._select_session()** (4 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **.action_show_first_failure()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **.action_reload_runs()** (2 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **.on_list_view_highlighted()** (2 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **test_ascii_fallback.py** (10 connections) — `tests/compact/test_ascii_fallback.py`
+- **is_unicode_terminal()** (7 connections) — `src/ansible_aom/core/icons.py`
+- **test_is_unicode_terminal_false_for_none_encoding()** (3 connections) — `tests/compact/test_ascii_fallback.py`
+- **test_format_host_summary_ascii_mode_uses_ascii_icons()** (2 connections) — `tests/compact/test_ascii_fallback.py`
+- **test_format_host_summary_unicode_mode_default()** (2 connections) — `tests/compact/test_ascii_fallback.py`
+- **test_format_status_bar_ascii_mode_uses_ascii_warning_glyph()** (2 connections) — `tests/compact/test_ascii_fallback.py`
+- **test_format_status_bar_ascii_mode_uses_pipe_separator()** (2 connections) — `tests/compact/test_ascii_fallback.py`
+- **test_format_status_bar_unicode_mode_keeps_unicode_glyphs()** (2 connections) — `tests/compact/test_ascii_fallback.py`
+- **test_is_unicode_terminal_false_for_ascii()** (2 connections) — `tests/compact/test_ascii_fallback.py`
+- **test_is_unicode_terminal_true_for_uppercase_utf8()** (2 connections) — `tests/compact/test_ascii_fallback.py`
+- **test_is_unicode_terminal_true_for_utf8()** (2 connections) — `tests/compact/test_ascii_fallback.py`
+- **True if stdout claims a UTF-family encoding.      Used by the compact renderer t** (1 connections) — `src/ansible_aom/core/icons.py`
+- **Tests for ASCII fallback in the compact renderer (TC-060 / TC-377).  The status** (1 connections) — `tests/compact/test_ascii_fallback.py`
+- **Some pipe wrappers expose `encoding = None` — be defensive.** (1 connections) — `tests/compact/test_ascii_fallback.py`
 
 ## Relationships
 
-- [[Three-Pane Inspect App]] (10 shared connections)
-- [[Task Tree Navigation]] (2 shared connections)
-- [[Inspect Data Model Builders]] (2 shared connections)
-- [[Inspect CLI Commands]] (2 shared connections)
-- [[Inspect TUI Widget Data]] (2 shared connections)
-- [[Pane Focus Navigation]] (1 shared connections)
-- [[Inspect Session List]] (1 shared connections)
+- [Renderer Event Protocol](Renderer_Event_Protocol.md) (3 shared connections)
+- [Task Wall Duration Mining](Task_Wall_Duration_Mining.md) (2 shared connections)
+- [Inspect Debug Diagnostics](Inspect_Debug_Diagnostics.md) (1 shared connections)
+- [Crash Recovery Notification](Crash_Recovery_Notification.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/tui/screens/inspect.py`
+- `src/ansible_aom/core/icons.py`
+- `tests/compact/test_ascii_fallback.py`
 
 ## Audit Trail
 
-- EXTRACTED: 42 (89%)
-- INFERRED: 5 (11%)
+- EXTRACTED: 25 (64%)
+- INFERRED: 14 (36%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

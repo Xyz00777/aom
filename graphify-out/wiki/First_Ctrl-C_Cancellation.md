@@ -1,33 +1,38 @@
 # First Ctrl-C Cancellation
 
-> 6 nodes · cohesion 0.33
+> 12 nodes · cohesion 0.18
 
 ## Key Concepts
 
-- **TestCancellationFirstCtrlC** (7 connections) — `tests/integration/test_error_handling.py`
-- **.test_first_sigint_valid_transition_from_running()** (3 connections) — `tests/integration/test_error_handling.py`
-- **.test_running_state_allows_cleanup_continuation()** (3 connections) — `tests/integration/test_error_handling.py`
-- **TC-449: Cancellation - First Ctrl+C Forward to Subprocess.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-449: First Ctrl+C from RUNNING stays in RUNNING (cleanup mode).** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-449: RUNNING state allows continued operation during cleanup.** (1 connections) — `tests/integration/test_error_handling.py`
+- **source_hash()** (6 connections) — `src/ansible_aom/__init__.py`
+- **_compute_source_hash()** (4 connections) — `src/ansible_aom/__init__.py`
+- **__init__.py** (3 connections) — `src/ansible_aom/__init__.py`
+- **.test_cli_version_includes_source_hash()** (3 connections) — `tests/unit/test_cli.py`
+- **.test_source_hash_changes_when_source_changes()** (3 connections) — `tests/unit/test_cli.py`
+- **.test_source_hash_is_short_stable_hex()** (3 connections) — `tests/unit/test_cli.py`
+- **AOM (Ansible Output Monitor) - nom-style terminal interface for ansible-playbook** (1 connections) — `src/ansible_aom/__init__.py`
+- **Short stable hash of every .py source file under the package.      Companion to** (1 connections) — `src/ansible_aom/__init__.py`
+- **Public wrapper for ``_compute_source_hash``. Cached on first call.** (1 connections) — `src/ansible_aom/__init__.py`
+- **``aom --version`` prints version AND source hash.** (1 connections) — `tests/unit/test_cli.py`
+- **``source_hash()`` returns a deterministic short hex digest.** (1 connections) — `tests/unit/test_cli.py`
+- **A source-file content change must alter the hash.          Verifies the hash act** (1 connections) — `tests/unit/test_cli.py`
 
 ## Relationships
 
-- [[Execution State Transitions]] (3 shared connections)
-- [[PTY Stream Parser]] (1 shared connections)
-- [[State Machine Module]] (1 shared connections)
-- [[Error Handling Tests]] (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (3 shared connections)
+- [State Transition Validation](State_Transition_Validation.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_error_handling.py`
+- `src/ansible_aom/__init__.py`
+- `tests/unit/test_cli.py`
 
 ## Audit Trail
 
-- EXTRACTED: 11 (69%)
-- INFERRED: 5 (31%)
+- EXTRACTED: 21 (75%)
+- INFERRED: 7 (25%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

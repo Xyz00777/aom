@@ -1,14 +1,10 @@
 # Session Comparison Models
 
-> 5 nodes · cohesion 0.40
+> 1 nodes · cohesion 1.00
 
 ## Key Concepts
 
-- **HostTaskDiff (dataclass)** (2 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **SessionComparison (dataclass)** (2 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **TaskDiff (dataclass)** (2 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **ComparisonSummary (dataclass)** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **DiffStatus (Enum)** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **ComparisonSummary (dataclass)** (0 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
 
 ## Relationships
 
@@ -20,10 +16,10 @@
 
 ## Audit Trail
 
-- EXTRACTED: 8 (100%)
+- EXTRACTED: 0 (0%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

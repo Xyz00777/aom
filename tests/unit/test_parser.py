@@ -332,6 +332,30 @@ class TestPtyStreamParserPlaintextCap:
         first_idx = int(parser.plaintext_lines[0].rsplit(" ", 1)[1])
         assert last_idx > first_idx
 
+    def test_plaintext_lines_60000_input_retains_exactly_50000(self):
+        """R2 spec literal: 60 000 lines in → exactly 50 000 retained.
+
+        A noisy run (verbose pexpect chatter, ansible banners, prompt
+        echoes) easily crosses 60 000 lines on a long playbook. The cap
+        must drop exactly 10 000 entries and keep the most-recent 50 000
+        — never the head (a stuck head defeats the stall-diagnostic
+        purpose of plaintext_lines in runner.py).
+        """
+        from ansible_aom.core.state_machine import MAX_LOG_LINES
+
+        assert MAX_LOG_LINES == 50000  # pin against accidental constant drift
+
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        # Feed the spec-literal input count: 60 000.
+        for i in range(60_000):
+            parser.feed_line(f"line {i}")
+        assert len(parser.plaintext_lines) == 50_000
+        # First retained entry is line 10 000 (the oldest survivor);
+        # last retained entry is line 59 999.
+        assert parser.plaintext_lines[0] == "line 10000"
+        assert parser.plaintext_lines[-1] == "line 59999"
+
 
 class TestPtyStreamParserPhases:
     """TC-128 to TC-142: PTY stream phase transitions."""
@@ -1901,3 +1925,289 @@ class TestWarningDetectionThroughAnsiPrefix:
         parser = PtyStreamParser()
         parser.feed_line("\x1b[31msome random colored text\x1b[0m\n")
         assert parser.warnings == []
+
+
+# =============================================================================
+# Section 5.6: aom_stderr_line synthetic event emission
+# =============================================================================
+
+
+class TestPtyStreamParserStderrLineEmission:
+    """Phase 4: plaintext stderr lines become aom_stderr_line synthetic events.
+
+    Non-warning plaintext lines fed through the parser should produce a
+    synthetic ``aom_stderr_line`` event with the classifier's source, level,
+    host, connection_id, and attribution_confidence.
+
+    Connection tracking:
+    - ``aom_connection_acquired`` events add a connection_id to the host's
+      active list.
+    - ``aom_connection_released`` events remove it.
+    - A host with exactly one active connection gets ``"unique"`` confidence.
+    - A host with multiple overlapping active connections gets ``"ambiguous"``
+      confidence and the most-recent connection_id.
+    - A host with no active connections gets ``connection_id=None``.
+    - Run-level lines (host=None) always get ``connection_id=None``.
+    """
+
+    def test_non_warning_plaintext_emits_stderr_line(self):
+        """A non-warning plaintext line in EXECUTION phase emits aom_stderr_line."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        events = parser.feed_line("some random output\n")
+        assert len(events) == 1
+        assert events[0]["_event"] == "aom_stderr_line"
+        assert "line" in events[0]
+        assert events[0]["line"] == "some random output"
+        assert "source" in events[0]
+        assert "level" in events[0]
+        assert events[0]["connection_id"] is None
+        assert events[0]["attribution_confidence"] == "unique"
+
+    def test_warning_does_not_emit_stderr_line(self):
+        """Warnings still go through the drain_warnings path, not aom_stderr_line."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        events = parser.feed_line("[WARNING]: some warning\n")
+        assert events == []
+        assert len(parser.warnings) == 1
+
+    def test_deprecation_does_not_emit_stderr_line(self):
+        """Deprecation warnings still go through drain_warnings path."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        events = parser.feed_line("[DEPRECATION WARNING]: old API\n")
+        assert events == []
+        assert len(parser.warnings) == 1
+
+    def test_pre_run_prompts_emits_stderr_line(self):
+        """Non-password plaintext in PRE_RUN_PROMPTS phase emits aom_stderr_line."""
+        parser = PtyStreamParser()
+        events = parser.feed_line("preflight output\n")
+        assert len(events) == 1
+        assert events[0]["_event"] == "aom_stderr_line"
+
+    def test_password_prompt_does_not_emit_stderr_line(self):
+        """Password prompts are intercepted before _handle_plaintext."""
+        parser = PtyStreamParser()
+        events = parser.feed_line("Vault password: ")
+        assert events == []
+        assert parser.pending_password_prompt is not None
+
+    def test_stderr_line_has_timestamp(self):
+        """aom_stderr_line events carry an ISO 8601 _timestamp."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        events = parser.feed_line("some output\n")
+        assert "_timestamp" in events[0]
+        assert events[0]["_timestamp"].endswith("Z") or "+" in events[0]["_timestamp"]
+
+    def test_stderr_line_source_is_classified(self):
+        """The source field reflects the classifier output."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        events = parser.feed_line("Using /etc/ansible/ansible.cfg as config file\n")
+        assert len(events) == 1
+        assert events[0]["source"] == "run_level"
+
+    def test_stderr_line_unknown_source(self):
+        """Unrecognised lines get source='unknown'."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        events = parser.feed_line("some completely unrecognised line\n")
+        assert len(events) == 1
+        assert events[0]["source"] == "unknown"
+
+    def test_stderr_line_host_from_classifier(self):
+        """Host is extracted from host-prefixed lines when the classifier supports it."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        events = parser.feed_line("<web1> SSH: SSH_AGENT something\n")
+        assert len(events) == 1
+        assert events[0]["host"] == "web1"
+
+    def test_stderr_line_no_host_for_run_level(self):
+        """Run-level lines have host=None."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        events = parser.feed_line("Using /etc/ansible/ansible.cfg as config file\n")
+        assert events[0]["host"] is None
+
+    def test_plaintext_lines_still_appended(self):
+        """Non-warning plaintext lines are still appended to plaintext_lines."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        parser.feed_line("some output\n")
+        assert len(parser.plaintext_lines) == 1
+        assert parser.plaintext_lines[0] == "some output"
+
+    def test_ansi_stripped_before_classification(self):
+        """ANSI SGR sequences are stripped before the classifier sees the line."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        events = parser.feed_line("\x1b[31mUsing /etc/ansible/ansible.cfg as config file\x1b[0m\n")
+        assert len(events) == 1
+        assert events[0]["source"] == "run_level"
+        # The original line (with ANSI) is preserved in the event
+        assert "\x1b[" in events[0]["line"]
+
+    # ------------------------------------------------------------------ #
+    # Connection tracking tests
+    # ------------------------------------------------------------------ #
+
+    def test_connection_acquire_adds_to_active(self):
+        """aom_connection_acquired adds connection_id to host's active list."""
+        parser = PtyStreamParser()
+        parser._handle_connection_event(
+            {"_event": "aom_connection_acquired", "host": "web1", "connection_id": "conn-001"}
+        )
+        assert parser._active_connections == {"web1": ["conn-001"]}
+
+    def test_connection_release_removes_from_active(self):
+        """aom_connection_released removes connection_id from host's active list."""
+        parser = PtyStreamParser()
+        parser._active_connections = {"web1": ["conn-001"]}
+        parser._handle_connection_event(
+            {"_event": "aom_connection_released", "host": "web1", "connection_id": "conn-001"}
+        )
+        assert parser._active_connections == {}
+
+    def test_connection_release_unknown_conn_id_noop(self):
+        """Releasing a connection_id not in the active list is a no-op."""
+        parser = PtyStreamParser()
+        parser._active_connections = {"web1": ["conn-001"]}
+        parser._handle_connection_event(
+            {"_event": "aom_connection_released", "host": "web1", "connection_id": "conn-999"}
+        )
+        assert parser._active_connections == {"web1": ["conn-001"]}
+
+    def test_connection_acquire_multiple_for_same_host(self):
+        """Multiple acquires for the same host stack connection_ids."""
+        parser = PtyStreamParser()
+        parser._handle_connection_event(
+            {"_event": "aom_connection_acquired", "host": "web1", "connection_id": "conn-001"}
+        )
+        parser._handle_connection_event(
+            {"_event": "aom_connection_acquired", "host": "web1", "connection_id": "conn-002"}
+        )
+        assert parser._active_connections == {"web1": ["conn-001", "conn-002"]}
+
+    def test_connection_acquire_different_hosts(self):
+        """Acquires for different hosts are tracked independently."""
+        parser = PtyStreamParser()
+        parser._handle_connection_event(
+            {"_event": "aom_connection_acquired", "host": "web1", "connection_id": "conn-001"}
+        )
+        parser._handle_connection_event(
+            {"_event": "aom_connection_acquired", "host": "web2", "connection_id": "conn-002"}
+        )
+        assert parser._active_connections == {"web1": ["conn-001"], "web2": ["conn-002"]}
+
+    def test_resolve_connection_no_host(self):
+        """Run-level lines (host=None) get (None, 'unique')."""
+        parser = PtyStreamParser()
+        assert parser._resolve_connection(None) == (None, "unique")
+
+    def test_resolve_connection_no_active_connections(self):
+        """Host with no active connections gets (None, 'unique')."""
+        parser = PtyStreamParser()
+        assert parser._resolve_connection("web1") == (None, "unique")
+
+    def test_resolve_connection_single_active(self):
+        """Host with one active connection gets that connection_id and 'unique'."""
+        parser = PtyStreamParser()
+        parser._active_connections = {"web1": ["conn-001"]}
+        assert parser._resolve_connection("web1") == ("conn-001", "unique")
+
+    def test_resolve_connection_multiple_active_ambiguous(self):
+        """Host with multiple active connections gets most-recent and 'ambiguous'."""
+        parser = PtyStreamParser()
+        parser._active_connections = {"web1": ["conn-001", "conn-002"]}
+        assert parser._resolve_connection("web1") == ("conn-002", "ambiguous")
+
+    def test_resolve_connection_three_active_ambiguous(self):
+        """Three overlapping connections: most-recent wins, confidence is ambiguous."""
+        parser = PtyStreamParser()
+        parser._active_connections = {"web1": ["conn-001", "conn-002", "conn-003"]}
+        assert parser._resolve_connection("web1") == ("conn-003", "ambiguous")
+
+    def test_stderr_line_with_connection_id_from_acquire(self):
+        """Stderr line after a connection acquire gets the connection_id."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        # Feed a connection acquired event
+        parser.feed_line(
+            '{"_event": "aom_connection_acquired", "host": "web1",'
+            ' "connection_id": "conn-001", "_timestamp": "2026-07-01T10:00:00Z"}\n'
+        )
+        # Now feed a stderr line for the same host
+        events = parser.feed_line("<web1> SSH: SSH_AGENT something\n")
+        assert len(events) == 1
+        assert events[0]["connection_id"] == "conn-001"
+        assert events[0]["attribution_confidence"] == "unique"
+
+    def test_stderr_line_ambiguous_with_overlapping_connections(self):
+        """Stderr line with overlapping connections gets 'ambiguous' confidence."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        # Acquire two connections for the same host
+        parser.feed_line(
+            '{"_event": "aom_connection_acquired", "host": "web1",'
+            ' "connection_id": "conn-001", "_timestamp": "2026-07-01T10:00:00Z"}\n'
+        )
+        parser.feed_line(
+            '{"_event": "aom_connection_acquired", "host": "web1",'
+            ' "connection_id": "conn-002", "_timestamp": "2026-07-01T10:00:01Z"}\n'
+        )
+        events = parser.feed_line("<web1> SSH: SSH_AGENT something\n")
+        assert len(events) == 1
+        assert events[0]["connection_id"] == "conn-002"
+        assert events[0]["attribution_confidence"] == "ambiguous"
+
+    def test_stderr_line_connection_released_then_unique(self):
+        """After release, a new stderr line for the host has no connection_id."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        parser.feed_line(
+            '{"_event": "aom_connection_acquired", "host": "web1",'
+            ' "connection_id": "conn-001", "_timestamp": "2026-07-01T10:00:00Z"}\n'
+        )
+        parser.feed_line(
+            '{"_event": "aom_connection_released", "host": "web1",'
+            ' "connection_id": "conn-001", "_timestamp": "2026-07-01T10:00:05Z"}\n'
+        )
+        events = parser.feed_line("<web1> SSH: SSH_AGENT something\n")
+        assert len(events) == 1
+        assert events[0]["connection_id"] is None
+        assert events[0]["attribution_confidence"] == "unique"
+
+    def test_stderr_line_different_hosts_independent_connections(self):
+        """Different hosts have independent connection tracking."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        parser.feed_line(
+            '{"_event": "aom_connection_acquired", "host": "web1",'
+            ' "connection_id": "conn-001", "_timestamp": "2026-07-01T10:00:00Z"}\n'
+        )
+        parser.feed_line(
+            '{"_event": "aom_connection_acquired", "host": "web2",'
+            ' "connection_id": "conn-002", "_timestamp": "2026-07-01T10:00:01Z"}\n'
+        )
+        # web1 stderr gets conn-001
+        events1 = parser.feed_line("<web1> SSH: SSH_AGENT something\n")
+        assert events1[0]["connection_id"] == "conn-001"
+        # web2 stderr gets conn-002
+        events2 = parser.feed_line("<web2> SSH: SSH_AGENT something\n")
+        assert events2[0]["connection_id"] == "conn-002"
+
+    def test_stderr_line_run_level_ignores_connections(self):
+        """Run-level lines (no host) get connection_id=None regardless of active connections."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        parser.feed_line(
+            '{"_event": "aom_connection_acquired", "host": "web1",'
+            ' "connection_id": "conn-001", "_timestamp": "2026-07-01T10:00:00Z"}\n'
+        )
+        events = parser.feed_line("Using /etc/ansible/ansible.cfg as config file\n")
+        assert events[0]["connection_id"] is None
+        assert events[0]["attribution_confidence"] == "unique"

@@ -1,33 +1,37 @@
 # Session Footer Hint
 
-> 7 nodes · cohesion 0.38
+> 13 nodes · cohesion 0.21
 
 ## Key Concepts
 
-- **_print_session_footer()** (6 connections) — `src/ansible_aom/ansible/runner.py`
-- **test_runner_session_footer.py** (4 connections) — `tests/unit/test_runner_session_footer.py`
-- **test_footer_prints_short_id_and_inspect_hint()** (2 connections) — `tests/unit/test_runner_session_footer.py`
-- **test_footer_suppressed_when_no_session_id()** (2 connections) — `tests/unit/test_runner_session_footer.py`
-- **test_footer_suppressed_when_stderr_not_tty()** (2 connections) — `tests/unit/test_runner_session_footer.py`
-- **Print the end-of-run hint that points users at ``aom inspect``.      Suppressed** (1 connections) — `src/ansible_aom/ansible/runner.py`
-- **The runner prints a `Session …  aom inspect` footer on termination.** (1 connections) — `tests/unit/test_runner_session_footer.py`
+- **TestPauseSecondsLogged** (8 connections) — `tests/unit/test_compact_pause_visibility.py`
+- **_pause_task_event()** (5 connections) — `tests/unit/test_compact_pause_visibility.py`
+- **.test_pause_short_action_name_also_caught()** (4 connections) — `tests/unit/test_compact_pause_visibility.py`
+- **.test_pause_with_string_seconds_handled()** (4 connections) — `tests/unit/test_compact_pause_visibility.py`
+- **.test_pause_without_seconds_does_not_emit_sleeping_line()** (4 connections) — `tests/unit/test_compact_pause_visibility.py`
+- **test_compact_pause_visibility.py** (3 connections) — `tests/unit/test_compact_pause_visibility.py`
+- **.test_pause_with_seconds_logs_sleeping_line()** (3 connections) — `tests/unit/test_compact_pause_visibility.py`
+- **.test_non_pause_task_does_not_emit_sleeping_line()** (2 connections) — `tests/unit/test_compact_pause_visibility.py`
+- **Tests for ansible.builtin.pause-with-seconds visibility (IP5).  The pause module** (1 connections) — `tests/unit/test_compact_pause_visibility.py`
+- **ansible sometimes serialises args as strings; tolerate that.** (1 connections) — `tests/unit/test_compact_pause_visibility.py`
+- **A pause-with-seconds task surfaces a sleeping log line.** (1 connections) — `tests/unit/test_compact_pause_visibility.py`
+- **Some playbooks use the short ``pause`` action name.** (1 connections) — `tests/unit/test_compact_pause_visibility.py`
+- **A prompt-style pause is handled by the runner stdin path, not here.** (1 connections) — `tests/unit/test_compact_pause_visibility.py`
 
 ## Relationships
 
-- [[Runner Session Recording]] (1 shared connections)
-- [[Playbook Run Integration Tests]] (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (6 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/ansible/runner.py`
-- `tests/unit/test_runner_session_footer.py`
+- `tests/unit/test_compact_pause_visibility.py`
 
 ## Audit Trail
 
-- EXTRACTED: 12 (67%)
-- INFERRED: 6 (33%)
+- EXTRACTED: 32 (84%)
+- INFERRED: 6 (16%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

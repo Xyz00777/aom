@@ -1,55 +1,55 @@
 # Host Overview Table
 
-> 22 nodes · cohesion 0.26
+> 31 nodes · cohesion 0.09
 
 ## Key Concepts
 
-- **format_host_rows()** (26 connections) — `src/ansible_aom/compact/format.py`
-- **_strip_sgr()** (16 connections) — `src/ansible_aom/compact/format.py`
-- **test_host_table.py** (15 connections) — `tests/compact/test_host_table.py`
-- **_state()** (14 connections) — `tests/compact/test_host_table.py`
-- **_add_results()** (13 connections) — `tests/compact/test_host_table.py`
-- **test_failed_host_shows_failed_task_in_suffix()** (8 connections) — `tests/compact/test_host_table.py`
-- **test_failed_host_shows_X_in_ascii_mode()** (8 connections) — `tests/compact/test_host_table.py`
-- **test_running_host_shows_current_task()** (8 connections) — `tests/compact/test_host_table.py`
-- **test_unreachable_host_shows_unreachable_task_in_suffix()** (8 connections) — `tests/compact/test_host_table.py`
-- **test_columns_align_across_rows()** (6 connections) — `tests/compact/test_host_table.py`
-- **test_header_row_present()** (6 connections) — `tests/compact/test_host_table.py`
-- **test_idle_host_shows_idle_marker()** (6 connections) — `tests/compact/test_host_table.py`
-- **test_skipped_column_hidden_when_no_skipped()** (6 connections) — `tests/compact/test_host_table.py`
-- **test_skipped_column_visible_when_any_host_has_skipped()** (6 connections) — `tests/compact/test_host_table.py`
-- **test_unreachable_column_hidden_when_no_unreachable()** (6 connections) — `tests/compact/test_host_table.py`
-- **test_unreachable_column_visible_when_any_host_has_unreachable()** (6 connections) — `tests/compact/test_host_table.py`
-- **_rows()** (3 connections) — `tests/compact/test_host_table.py`
-- **Render the per-host overview as a column-aligned table.      Header row + one ro** (1 connections) — `src/ansible_aom/compact/format.py`
-- **Strip SGR escapes so visible-length comparisons are accurate.** (1 connections) — `src/ansible_aom/compact/format.py`
-- **Per-host overview renders as a column-aligned table rather than a flat row of co** (1 connections) — `tests/compact/test_host_table.py`
-- **Synthesise OK/CHANGED/SKIPPED/FAILED/UNREACHABLE results for a host.** (1 connections) — `tests/compact/test_host_table.py`
-- **Split rows on whitespace runs after stripping SGR — coarse but     enough to ass** (1 connections) — `tests/compact/test_host_table.py`
+- **test_r6_encoding_roundtrip.py** (9 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **TestR6RendererDisplay** (7 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **.test_renderer_print_log_does_not_show_surrogate_codepoint()** (7 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **_truncate_msg()** (6 connections) — `src/ansible_aom/compact/format.py`
+- **.test_invalid_utf8_bytes_round_trip_byte_exact_into_events_jsonl()** (6 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **.test_valid_utf8_bytes_also_round_trip_unchanged()** (6 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **_replace_surrogates()** (5 connections) — `src/ansible_aom/compact/format.py`
+- **_fake_ansible_emits_jsonl_with_raw_msg()** (5 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **Path** (5 connections)
+- **_read_jsonl()** (5 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **TestR6SurrogateescapeRoundTrip** (5 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **_isolate_session_dir()** (4 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **TestR6RunnerPexpectConfig** (4 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **.test_replace_surrogates_helper_idempotent_on_clean_text()** (3 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **.test_truncate_msg_replaces_surrogate_codepoint_with_replacement()** (3 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **.test_replace_surrogates_converts_lone_surrogates()** (2 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **Cap a JSONL ``msg`` field for live display.      R6: any lone-surrogate codepoin** (1 connections) — `src/ansible_aom/compact/format.py`
+- **Replace any lone-surrogate codepoints in ``s`` with U+FFFD.      Pexpect's ``cod** (1 connections) — `src/ansible_aom/compact/format.py`
+- **MonkeyPatch** (1 connections)
+- **R6: encoding surrogateescape for byte-exact round-trip into ``events.jsonl``.  P** (1 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **Sanity check: switching pexpect to ``surrogateescape`` must         not change b** (1 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **The renderer's display path must normalise surrogate codepoints     to U+FFFD (`** (1 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **``_truncate_msg`` runs every msg field through the         encode-with-replace/d** (1 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **Strings without surrogate codepoints pass through unchanged.** (1 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **End-to-end: drive the runner with a fake ansible that emits         a JSONL even** (1 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- *... and 6 more nodes in this community*
 
 ## Relationships
 
-- [[Run State Completion Recap]] (15 shared connections)
-- [[Play Definition Tree Population]] (12 shared connections)
-- [[Compact Renderer Formatters]] (5 shared connections)
-- [[Tree Render Snapshot Tests]] (5 shared connections)
-- [[Panel Refresh Snapshot]] (2 shared connections)
-- [[Run State Summary Panel]] (2 shared connections)
-- [[Running Animation Frames]] (1 shared connections)
-- [[Tree Projection Logic]] (1 shared connections)
-- [[Tree Block Animation]] (1 shared connections)
+- [Three-Pane Inspect App](Three-Pane_Inspect_App.md) (4 shared connections)
+- [Tree Block Animation](Tree_Block_Animation.md) (3 shared connections)
+- [Renderer Set Definitions](Renderer_Set_Definitions.md) (2 shared connections)
+- [Heartbeat Liveness Tracker](Heartbeat_Liveness_Tracker.md) (1 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
 
 ## Source Files
 
 - `src/ansible_aom/compact/format.py`
-- `tests/compact/test_host_table.py`
+- `tests/integration/test_r6_encoding_roundtrip.py`
 
 ## Audit Trail
 
-- EXTRACTED: 96 (58%)
-- INFERRED: 70 (42%)
+- EXTRACTED: 82 (85%)
+- INFERRED: 15 (15%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

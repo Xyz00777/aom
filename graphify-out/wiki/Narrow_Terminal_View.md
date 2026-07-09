@@ -1,36 +1,43 @@
 # Narrow Terminal View
 
-> 12 nodes · cohesion 0.23
+> 16 nodes · cohesion 0.13
 
 ## Key Concepts
 
-- **TestWidthBelowSixtyMinimalView** (7 connections) — `tests/unit/test_view_modes.py`
-- **.format_minimal_view()** (6 connections) — `tests/unit/test_view_modes.py`
-- **.test_host_shown_when_space_allows()** (3 connections) — `tests/unit/test_view_modes.py`
-- **.test_minimal_fits_in_40_columns()** (3 connections) — `tests/unit/test_view_modes.py`
-- **.test_no_task_names_below_60()** (3 connections) — `tests/unit/test_view_modes.py`
-- **.test_only_icons_and_status_below_60()** (3 connections) — `tests/unit/test_view_modes.py`
-- **Tests for TC-066: Width below 60 columns minimal view.** (1 connections) — `tests/unit/test_view_modes.py`
-- **Format minimal view for very narrow terminals.          Only shows icons and sta** (1 connections) — `tests/unit/test_view_modes.py`
-- **TC-066: Task names not displayed below 60 columns.** (1 connections) — `tests/unit/test_view_modes.py`
-- **TC-066: Only icons and status shown below 60 columns.** (1 connections) — `tests/unit/test_view_modes.py`
-- **TC-066: Host shown if space allows in minimal view.** (1 connections) — `tests/unit/test_view_modes.py`
-- **TC-066: Minimal view fits in very narrow terminals.** (1 connections) — `tests/unit/test_view_modes.py`
+- **FakeRenderer** (22 connections) — `tests/unit/test_event_source.py`
+- **Any** (3 connections)
+- **.set_definitions()** (2 connections) — `tests/unit/test_event_source.py`
+- **.update_state()** (2 connections) — `tests/unit/test_event_source.py`
+- **.add_warning()** (1 connections) — `tests/unit/test_event_source.py`
+- **.handle_completion()** (1 connections) — `tests/unit/test_event_source.py`
+- **.handle_interactive_prompt()** (1 connections) — `tests/unit/test_event_source.py`
+- **.__init__()** (1 connections) — `tests/unit/test_event_source.py`
+- **.note_pty_bytes()** (1 connections) — `tests/unit/test_event_source.py`
+- **.note_subprocess_active()** (1 connections) — `tests/unit/test_event_source.py`
+- **.print_log()** (1 connections) — `tests/unit/test_event_source.py`
+- **.set_prior_run()** (1 connections) — `tests/unit/test_event_source.py`
+- **.start()** (1 connections) — `tests/unit/test_event_source.py`
+- **.stop()** (1 connections) — `tests/unit/test_event_source.py`
+- **.tick()** (1 connections) — `tests/unit/test_event_source.py`
+- **Minimal Renderer-shaped sink used by the driver smoke tests.** (1 connections) — `tests/unit/test_event_source.py`
 
 ## Relationships
 
-- [[View Mode Selection]] (1 shared connections)
+- [Diagnostics Layer Tests](Diagnostics_Layer_Tests.md) (6 shared connections)
+- [Debug Diagnostics Summary](Debug_Diagnostics_Summary.md) (1 shared connections)
+- [Rerun Main Function](Rerun_Main_Function.md) (1 shared connections)
+- [Status Bar Liveness Tests](Status_Bar_Liveness_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_view_modes.py`
+- `tests/unit/test_event_source.py`
 
 ## Audit Trail
 
-- EXTRACTED: 31 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 38 (93%)
+- INFERRED: 3 (7%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

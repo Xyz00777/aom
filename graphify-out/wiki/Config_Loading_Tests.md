@@ -1,38 +1,48 @@
 # Config Loading Tests
 
-> 10 nodes · cohesion 0.20
+> 24 nodes · cohesion 0.08
 
 ## Key Concepts
 
-- **TestConfigFromEnvironment** (10 connections) — `tests/unit/test_config.py`
-- **.test_app_config_can_be_created_without_file()** (3 connections) — `tests/unit/test_config.py`
-- **.test_app_config_uses_defaults_when_no_env()** (3 connections) — `tests/unit/test_config.py`
-- **.test_app_config_with_nested_models()** (3 connections) — `tests/unit/test_config.py`
-- **.test_status_bar_config_equality()** (3 connections) — `tests/unit/test_config.py`
-- **Tests for environment variable and YAML config loading.** (1 connections) — `tests/unit/test_config.py`
-- **AppConfig can be instantiated without a config file.** (1 connections) — `tests/unit/test_config.py`
-- **AppConfig uses defaults when no environment variables set.** (1 connections) — `tests/unit/test_config.py`
-- **StatusBarConfig instances with same values are equal.** (1 connections) — `tests/unit/test_config.py`
-- **AppConfig properly creates nested config models.** (1 connections) — `tests/unit/test_config.py`
+- **Section 3: Command Interface** (24 connections) — `TEST_SPECIFICATION.md`
+- **TC-006: Basic CLI Invocation** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-007: TUI Mode Flag** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-008: Verbose Flag Diagnostics** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-009: Verbose Enables DEBUG Logging** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-010: Ansible Options Pass-Through** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-011: Help Flag** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-012: Version Flag** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-013: Inspect List Subcommand** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-014: Inspect Session Summary** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-015: Inspect Filter Failed Tasks** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-016: Inspect Filter by Host** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-017: Inspect Tree View** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-018: Inspect Export Artifact** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-019: Inspect Diff Sessions** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-020: Inspect Prune Sessions** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-021: Inspect TUI Mode** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-022: Inspect JSON Output** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-023: Inspect JSONL Output** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-024: Exit Code 0 - Success** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-025: Exit Code 1 - Playbook Failure** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-026: Exit Code 2 - Unreachable Hosts** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-027: Exit Code 127 - Command Not Found** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-028: Exit Code 130 - User Cancelled** (1 connections) — `TEST_SPECIFICATION.md`
 
 ## Relationships
 
-- [[App Configuration Settings]] (4 shared connections)
-- [[Status Bar Warning Panels]] (2 shared connections)
-- [[Secret Redaction Configuration]] (1 shared connections)
-- [[Warnings Display Config]] (1 shared connections)
-- [[App Config Model Tests]] (1 shared connections)
+- [Failure Recap Formatting](Failure_Recap_Formatting.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_config.py`
+- `TEST_SPECIFICATION.md`
 
 ## Audit Trail
 
-- EXTRACTED: 19 (70%)
-- INFERRED: 8 (30%)
+- EXTRACTED: 47 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

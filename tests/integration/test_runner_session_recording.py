@@ -60,7 +60,9 @@ class TestSessionRecordingHappyPath:
         session_path = sessions[0]
         assert (session_path / "events.jsonl").exists()
         assert (session_path / "meta.json").exists()
-        assert (session_path / "stderr.log").exists()
+        # Phase 4: stderr.log is gone; stderr lines now live inside
+        # events.jsonl as ``aom_stderr_line`` synthetic events.
+        assert not (session_path / "stderr.log").exists()
 
     def test_records_every_jsonl_event_seen_by_runner(self, tmp_path: Path) -> None:
         from ansible_aom.ansible.runner import run_playbook
@@ -82,7 +84,12 @@ class TestSessionRecordingHappyPath:
 
         session_path = next(tmp_path.iterdir())
         recorded = _read_jsonl(session_path / "events.jsonl")
-        assert [e["_event"] for e in recorded] == [
+        # Phase 4.4: preflight errors are now recorded as ``aom_stderr_line``
+        # events too, so a session may contain a mix. Filter to the JSONL
+        # events we explicitly fed through the fake ansible to assert on
+        # the recording contract.
+        jsonl_events = [e for e in recorded if e["_event"] != "aom_stderr_line"]
+        assert [e["_event"] for e in jsonl_events] == [
             "v2_playbook_on_start",
             "v2_playbook_on_play_start",
             "v2_playbook_on_stats",
@@ -209,10 +216,14 @@ class TestSessionRecordingDisableOnDiskError:
         assert exit_code == 0
         renderer.handle_completion.assert_called_once()
 
-        # Only the first two events made it to disk.
+        # Only the first two record_event calls made it to disk. Phase 4.4
+        # also writes aom_stderr_line events via record_stderr (a separate
+        # code path this test doesn't patch), so filter to the JSONL events
+        # that flowed through record_event.
         session_path = next(tmp_path.iterdir())
         recorded = _read_jsonl(session_path / "events.jsonl")
-        assert len(recorded) == 2
+        jsonl_events = [e for e in recorded if e["_event"] != "aom_stderr_line"]
+        assert len(jsonl_events) == 2
 
         # Renderer warned exactly once about disabled recording.
         warning_calls = [

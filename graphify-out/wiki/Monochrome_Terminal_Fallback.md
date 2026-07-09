@@ -1,34 +1,39 @@
 # Monochrome Terminal Fallback
 
-> 10 nodes · cohesion 0.27
+> 14 nodes · cohesion 0.24
 
 ## Key Concepts
 
-- **TestMonochromeFallback** (6 connections) — `tests/unit/test_view_modes.py`
-- **.map_status_to_text_label()** (5 connections) — `tests/unit/test_view_modes.py`
-- **.test_text_labels_no_ansi_codes()** (3 connections) — `tests/unit/test_view_modes.py`
-- **.test_text_labels_uppercase()** (3 connections) — `tests/unit/test_view_modes.py`
-- **.test_uses_text_labels_not_colors()** (3 connections) — `tests/unit/test_view_modes.py`
-- **Tests for TC-063: Monochrome/piped fallback.** (1 connections) — `tests/unit/test_view_modes.py`
-- **Map status to text label for monochrome terminals.** (1 connections) — `tests/unit/test_view_modes.py`
-- **TC-063: Monochrome terminals use text labels instead of colors.** (1 connections) — `tests/unit/test_view_modes.py`
-- **TC-063: Text labels are uppercase for visibility.** (1 connections) — `tests/unit/test_view_modes.py`
-- **TC-063: Text labels contain no ANSI escape codes.** (1 connections) — `tests/unit/test_view_modes.py`
+- **TestDirtyFlagGating** (8 connections) — `tests/compact/test_render_dirty_flag.py`
+- **_renderer()** (7 connections) — `tests/compact/test_render_dirty_flag.py`
+- **_task_start()** (5 connections) — `tests/compact/test_render_dirty_flag.py`
+- **.test_perf_040_two_updates_in_throttle_window_one_compute()** (4 connections) — `tests/compact/test_render_dirty_flag.py`
+- **.test_perf_041_clean_tick_skips_projection_compute()** (4 connections) — `tests/compact/test_render_dirty_flag.py`
+- **.test_perf_043_dirty_panel_renders_after_burst_settles()** (4 connections) — `tests/compact/test_render_dirty_flag.py`
+- **.test_perf_044_dirty_with_fresh_compute_waits_for_tick_refresh()** (4 connections) — `tests/compact/test_render_dirty_flag.py`
+- **test_render_dirty_flag.py** (3 connections) — `tests/compact/test_render_dirty_flag.py`
+- **.test_perf_042_log_storm_triggers_periodic_panel_refresh()** (3 connections) — `tests/compact/test_render_dirty_flag.py`
+- **HS-1/HS-8: a sustained burst of state changes must not starve the         panel.** (1 connections) — `tests/compact/test_render_dirty_flag.py`
+- **HS-1/HS-8: dirty but already-rendered state waits for the 1 s         clock-adva** (1 connections) — `tests/compact/test_render_dirty_flag.py`
+- **Two update_state calls within the throttle window → 1 panel compute.          ``** (1 connections) — `tests/compact/test_render_dirty_flag.py`
+- **tick() with _panel_dirty=False and recent compute skips compute.** (1 connections) — `tests/compact/test_render_dirty_flag.py`
+- **Sustained log output still lets the compact panel repaint.          The log path** (1 connections) — `tests/compact/test_render_dirty_flag.py`
 
 ## Relationships
 
-- [[View Mode Selection]] (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (2 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_view_modes.py`
+- `tests/compact/test_render_dirty_flag.py`
 
 ## Audit Trail
 
-- EXTRACTED: 25 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 45 (96%)
+- INFERRED: 2 (4%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

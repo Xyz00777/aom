@@ -1,67 +1,64 @@
 # Run State Summary Panel
 
-> 224 nodes · cohesion 0.01
+> 222 nodes · cohesion 0.01
 
 ## Key Concepts
 
-- **RunState** (633 connections) — `src/ansible_aom/core/models.py`
-- **test_event_processing.py** (28 connections) — `tests/unit/test_event_processing.py`
-- **TestRunState** (22 connections) — `tests/unit/test_models.py`
-- **TestRunStateUnknownEvent** (20 connections) — `tests/unit/test_parser.py`
-- **TestHandleEventDispatcher** (17 connections) — `tests/unit/test_event_processing.py`
-- **TestHandleEventMalformedPayloads** (15 connections) — `tests/unit/test_event_processing.py`
-- **TestSummaryPanelPlayDisplay** (13 connections) — `tests/tui/test_panels.py`
-- **TestPlaybookOnStats** (13 connections) — `tests/unit/test_event_processing.py`
-- **TestEventProcessingEdgeCases** (11 connections) — `tests/unit/test_event_processing.py`
-- **TestHandleEventTimestampParsing** (11 connections) — `tests/unit/test_event_processing.py`
-- **TestHandleEventUnknownType** (11 connections) — `tests/unit/test_event_processing.py`
-- **TestHandlerTaskStart** (11 connections) — `tests/unit/test_event_processing.py`
-- **TestPlaybookOnStart** (11 connections) — `tests/unit/test_event_processing.py`
-- **TestPlayStart** (11 connections) — `tests/unit/test_event_processing.py`
-- **TestRunnerOnFailedStateTransition** (11 connections) — `tests/unit/test_event_processing.py`
-- **TestRunnerOnOk** (11 connections) — `tests/unit/test_event_processing.py`
-- **TestRunnerOnOkStatus** (11 connections) — `tests/unit/test_event_processing.py`
-- **TestRunnerOnStartTaskCreation** (11 connections) — `tests/unit/test_event_processing.py`
-- **TestTaskStart** (11 connections) — `tests/unit/test_event_processing.py`
-- **TestRunnerOnFailed** (10 connections) — `tests/unit/test_event_processing.py`
-- **TestRunnerOnFailedIgnoreErrors** (10 connections) — `tests/unit/test_event_processing.py`
-- **TestRunnerOnSkipped** (10 connections) — `tests/unit/test_event_processing.py`
-- **TestRunnerOnStartStrategy** (10 connections) — `tests/unit/test_event_processing.py`
-- **TestRunnerOnUnreachable** (10 connections) — `tests/unit/test_event_processing.py`
-- **TestStatsCrossValidation** (10 connections) — `tests/unit/test_event_processing.py`
-- *... and 199 more nodes in this community*
+- **AppConfig** (68 connections) — `src/ansible_aom/core/config.py`
+- **StatusBarConfig** (68 connections) — `src/ansible_aom/core/config.py`
+- **RedactionConfig** (56 connections) — `src/ansible_aom/core/config.py`
+- **WarningsConfig** (49 connections) — `src/ansible_aom/core/config.py`
+- **TestAppConfig** (19 connections) — `tests/unit/test_config.py`
+- **TestWarningsConfig** (17 connections) — `tests/unit/test_warnings.py`
+- **TestAppConfigValidation** (15 connections) — `tests/unit/test_config.py`
+- **TestConfigModelBasics** (15 connections) — `tests/unit/test_config.py`
+- **test_config.py** (14 connections) — `tests/unit/test_config.py`
+- **TestStatusBarElementConfiguration** (13 connections) — `tests/tui/test_panels.py`
+- **TestWarningsConfig** (13 connections) — `tests/unit/test_config.py`
+- **TestAppConfigFieldTypes** (12 connections) — `tests/unit/test_config.py`
+- **TestStatusBarConfig** (12 connections) — `tests/unit/test_config.py`
+- **TestConfigFieldValidation** (11 connections) — `tests/unit/test_config.py`
+- **TestWarningsConfigWithAppConfig** (11 connections) — `tests/unit/test_warnings.py`
+- **TestAppConfigYamlFile** (10 connections) — `tests/unit/test_config.py`
+- **TestConfigFromEnvironment** (10 connections) — `tests/unit/test_config.py`
+- **TestRedactionCustomPatterns** (10 connections) — `tests/unit/test_config.py`
+- **load_config()** (9 connections) — `src/ansible_aom/core/config.py`
+- **TestLoadConfig** (9 connections) — `tests/unit/test_config.py`
+- **TestConfigImmutabilityIntent** (8 connections) — `tests/unit/test_config.py`
+- **config.py** (6 connections) — `src/ansible_aom/core/config.py`
+- **.test_app_config_custom_status_bar()** (4 connections) — `tests/unit/test_config.py`
+- **.test_app_config_custom_warnings()** (4 connections) — `tests/unit/test_config.py`
+- **.test_app_config_default_status_bar()** (4 connections) — `tests/unit/test_config.py`
+- *... and 197 more nodes in this community*
 
 ## Relationships
 
-- [[Run State Completion Recap]] (146 shared connections)
-- [[Play Definition Tree Population]] (111 shared connections)
-- [[Role Group Task Models]] (73 shared connections)
-- [[Task Definition Live Refresh]] (65 shared connections)
-- [[Status Bar Warning Panels]] (31 shared connections)
-- [[Include Role Discovery]] (23 shared connections)
-- [[Compact Renderer Integration Tests]] (18 shared connections)
-- [[CLI Interface Tests]] (17 shared connections)
-- [[Hide State Gating Tests]] (15 shared connections)
-- [[Runtime Event Handlers]] (14 shared connections)
-- [[Dynamic Include Expansion]] (12 shared connections)
-- [[Ungrouped Role Tree Tests]] (12 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (25 shared connections)
+- [AOM TUI Application](AOM_TUI_Application.md) (16 shared connections)
+- [TUI Tree View Tests](TUI_Tree_View_Tests.md) (10 shared connections)
+- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (8 shared connections)
+- [Compact Password Passthrough](Compact_Password_Passthrough.md) (5 shared connections)
+- [Inspect TUI Widget Data](Inspect_TUI_Widget_Data.md) (5 shared connections)
+- [Rerun Round Trip Tests](Rerun_Round_Trip_Tests.md) (5 shared connections)
+- [Warnings Display Config](Warnings_Display_Config.md) (5 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (5 shared connections)
+- [Status Bar Elements](Status_Bar_Elements.md) (4 shared connections)
+- [Password Timeout](Password_Timeout.md) (2 shared connections)
+- [Diagnostics CLI Wiring](Diagnostics_CLI_Wiring.md) (2 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/plans/robustness.md`
-- `src/ansible_aom/core/models.py`
+- `src/ansible_aom/core/config.py`
 - `tests/tui/test_panels.py`
-- `tests/unit/test_event_processing.py`
-- `tests/unit/test_models.py`
-- `tests/unit/test_parser.py`
-- `tests/unit/test_run_state_index.py`
+- `tests/unit/test_config.py`
+- `tests/unit/test_warnings.py`
 
 ## Audit Trail
 
-- EXTRACTED: 798 (57%)
-- INFERRED: 596 (43%)
+- EXTRACTED: 451 (54%)
+- INFERRED: 382 (46%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

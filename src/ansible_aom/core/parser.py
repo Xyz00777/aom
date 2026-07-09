@@ -9,15 +9,17 @@ Phases:
 3. POST_RUN_RECAP: Final PLAY RECAP output
 """
 
+import json as stdlib_json
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum, auto
-from typing import Callable
+from typing import Any, Callable, cast
 
 import orjson
 
+from ansible_aom.core.event_types import JsonlEvent
 from ansible_aom.core.models import (
     IncludeCacheEntry,
     PlayDefinition,
@@ -26,6 +28,7 @@ from ansible_aom.core.models import (
     WarningType,
 )
 from ansible_aom.core.state_machine import MAX_LOG_LINES
+from ansible_aom.core.stderr_classifier import classify
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +37,35 @@ logger = logging.getLogger(__name__)
 # lines so warnings whose [WARNING]: prefix is wrapped in colour escapes
 # still anchor against the WARNING_PATTERNS regexes.
 _ANSI_SGR_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _has_surrogate_codepoint(s: str) -> bool:
+    """True if ``s`` contains any surrogate codepoint (U+D800..U+DFFF).
+
+    R6: pexpect's ``codec_errors="surrogateescape"`` decodes invalid UTF-8
+    bytes into lone-surrogate codepoints so the original bytes round-trip
+    through ``str`` losslessly. ``orjson`` rejects those strings as
+    "surrogates not allowed", so the parser falls back to stdlib
+    ``json.loads`` (which preserves them) only when needed.
+    """
+    for ch in s:
+        if 0xD800 <= ord(ch) <= 0xDFFF:
+            return True
+    return False
+
+
+def _safe_loads(line: str) -> Any:
+    """Parse one JSONL line, picking orjson or stdlib json by content.
+
+    R6: orjson is faster but rejects any string containing surrogate
+    codepoints — which now happens whenever pexpect surfaces invalid
+    UTF-8 from the PTY stream. stdlib ``json.loads`` accepts surrogates
+    natively and round-trips them via ``\\uXXXX`` escapes, so the
+    original byte sequence is preserved through ``record_event``.
+    """
+    if _has_surrogate_codepoint(line):
+        return stdlib_json.loads(line)
+    return orjson.loads(line)
 
 
 class StreamPhase(Enum):
@@ -63,7 +95,7 @@ class JsonLineStream:
         self._non_json_handler: Callable[[str], None] | None = None
         self._carry: str = ""
 
-    def feed_line(self, line: str) -> list[dict]:
+    def feed_line(self, line: str) -> list[JsonlEvent]:
         """Parse a line and return zero or more JSON events.
 
         Returns empty list for:
@@ -91,8 +123,8 @@ class JsonLineStream:
             return []
 
         try:
-            data = orjson.loads(line)
-        except orjson.JSONDecodeError:
+            data = _safe_loads(line)
+        except ValueError:
             # The carry-prepended view failed. If the bare new chunk
             # parses cleanly on its own as a JSON object, the carry
             # was garbage masquerading as a split-event head — drop
@@ -100,14 +132,14 @@ class JsonLineStream:
             raw_stripped = raw.strip()
             if raw_stripped != line and raw_stripped.startswith("{"):
                 try:
-                    data = orjson.loads(raw_stripped)
-                except orjson.JSONDecodeError:
+                    data = _safe_loads(raw_stripped)
+                except ValueError:
                     data = None
                 if isinstance(data, dict):
                     if "_event" not in data:
                         logger.warning("JSON missing _event field: %s", raw_stripped[:100])
                         return []
-                    return [data]
+                    return [cast(JsonlEvent, data)]
             # Stash as carry if there's room, otherwise drop. Without
             # the cap a runaway/garbage stream would grow ``_carry``
             # without bound.
@@ -119,11 +151,11 @@ class JsonLineStream:
                 self._non_json_handler(line)
             return []
 
-        if "_event" not in data:
+        if not isinstance(data, dict) or "_event" not in data:
             logger.warning("JSON missing _event field: %s", line[:100])
             return []
 
-        return [data]
+        return [cast(JsonlEvent, data)]
 
     def set_non_json_handler(self, handler: Callable[[str], None]) -> None:
         """Set handler for non-JSON lines."""
@@ -162,13 +194,18 @@ class PtyStreamParser:
         self._warnings: list[WarningEntry] = []
         self._plaintext_lines: list[str] = []
         self._current_timestamp: datetime | None = None
+        # Connection tracking: host -> ordered list of active connection_ids.
+        # Populated by aom_connection_acquired / aom_connection_released events
+        # flowing through feed_line. Used by _handle_plaintext to attach the
+        # most-recent connection_id and determine attribution_confidence.
+        self._active_connections: dict[str, list[str]] = {}
 
-    def feed_line(self, line: str) -> list[dict]:
+    def feed_line(self, line: str) -> list[JsonlEvent]:
         """Parse a line and return zero or more events."""
         line_stripped = line.rstrip("\n\r")
 
         if self.phase == StreamPhase.PRE_RUN_PROMPTS:
-            self._handle_plaintext(line_stripped)
+            events = self._handle_plaintext(line_stripped)
 
             if self._is_jsonl_start_event(line_stripped):
                 self.phase = StreamPhase.EXECUTION
@@ -179,7 +216,12 @@ class PtyStreamParser:
                     self._pending_password_prompt = line_stripped
                     return []
 
-            return []
+            # Lines starting with { that aren't a start event are malformed
+            # JSON (e.g. truncated carry). Return empty — not stderr.
+            if line_stripped.startswith("{"):
+                return []
+
+            return events
 
         if self.phase == StreamPhase.EXECUTION:
             if self._is_jsonl_stats_event(line_stripped):
@@ -188,33 +230,48 @@ class PtyStreamParser:
                 return self._parse_and_return(line_stripped)
 
             if self._is_json(line_stripped):
-                return self._parse_and_return(line_stripped)
+                parsed = self._parse_and_return(line_stripped)
+                if parsed:
+                    self._handle_connection_event(parsed[0])
+                return parsed
 
             if self.RECAP_PATTERN.match(line_stripped):
                 self.phase = StreamPhase.POST_RUN_RECAP
                 self._in_recap = True
                 return []
 
-            self._handle_plaintext(line_stripped)
-            return []
+            # Lines starting with { that failed _is_json are malformed JSON
+            # (e.g. truncated carry). Return empty — they are not stderr.
+            if line_stripped.startswith("{"):
+                return []
+
+            return self._handle_plaintext(line_stripped)
 
         if self.phase == StreamPhase.POST_RUN_RECAP:
             self._recap_lines.append(line_stripped)
+            # R13: cap _recap_lines at MAX_LOG_LINES so a verbose
+            # ``PLAY RECAP`` (e.g. -v with hundreds of host stats per
+            # line × thousands of hosts) can't grow the list without
+            # bound. Mirror the R2 plaintext_lines pattern — drop
+            # oldest first so the most-recent recap tail stays
+            # available for completion-time display.
+            if len(self._recap_lines) > MAX_LOG_LINES:
+                del self._recap_lines[: len(self._recap_lines) - MAX_LOG_LINES]
             return []
 
         return []
 
-    def _parse_and_return(self, line: str) -> list[dict]:
+    def _parse_and_return(self, line: str) -> list[JsonlEvent]:
         """Parse JSON line and return events."""
         try:
-            data = orjson.loads(line)
-            if "_event" in data:
-                return [data]
-        except orjson.JSONDecodeError:
+            data = _safe_loads(line)
+            if isinstance(data, dict) and "_event" in data:
+                return [cast(JsonlEvent, data)]
+        except ValueError:
             pass
         return []
 
-    def _handle_plaintext(self, line: str) -> None:
+    def _handle_plaintext(self, line: str) -> list[JsonlEvent]:
         """Classify and handle non-JSON lines from PTY stream.
 
         Real ansible-playbook output is colorised — warnings come through
@@ -222,8 +279,17 @@ class PtyStreamParser:
         Strip them before pattern-matching so the WARNING_PATTERNS regexes
         (anchored at line start) still match, and store the stripped form
         so downstream UI doesn't have to re-strip.
+
+        Returns:
+            A list containing a synthetic ``aom_stderr_line`` event for
+            non-warning plaintext lines, or an empty list for warnings
+            (which are handled via the existing ``drain_warnings`` path).
         """
         clean = _ANSI_SGR_RE.sub("", line)
+        # Empty or whitespace-only lines are not stderr — return empty.
+        if not clean or not clean.strip():
+            return []
+
         for pattern in self.WARNING_PATTERNS:
             if re.match(pattern, clean):
                 warning_type = WarningType.WARNING
@@ -239,7 +305,23 @@ class PtyStreamParser:
                         timestamp=datetime.now(),
                     )
                 )
-                return
+                return []
+
+        # Classify the line via stderr_classifier and emit a synthetic
+        # aom_stderr_line event so the session recording captures it.
+        classified = classify(clean)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        conn_id, confidence = self._resolve_connection(classified.host)
+        stderr_event: JsonlEvent = {
+            "_event": "aom_stderr_line",
+            "_timestamp": now_iso,
+            "line": line,
+            "source": classified.source.value,
+            "level": classified.level.value,
+            "host": classified.host,
+            "connection_id": conn_id,
+            "attribution_confidence": confidence,
+        }
 
         self._plaintext_lines.append(line)
         # R2: cap plaintext_lines at MAX_LOG_LINES so a long noisy run
@@ -248,6 +330,58 @@ class PtyStreamParser:
         # diagnostics in runner.py.
         if len(self._plaintext_lines) > MAX_LOG_LINES:
             del self._plaintext_lines[: len(self._plaintext_lines) - MAX_LOG_LINES]
+
+        return [stderr_event]
+
+    def _handle_connection_event(self, event: JsonlEvent) -> None:
+        """Update connection tracking state from a connection event.
+
+        Intercepts ``aom_connection_acquired`` and ``aom_connection_released``
+        events that flow through ``feed_line`` in EXECUTION phase. Maintains
+        ``_active_connections`` as a host -> ordered list of active
+        connection_ids so ``_handle_plaintext`` can look up the most-recent
+        connection for a host and determine attribution confidence.
+        """
+        event_type = event.get("_event")
+        host = event.get("host")
+        conn_id = event.get("connection_id")
+        if host is None or conn_id is None:
+            return
+
+        if event_type == "aom_connection_acquired":
+            self._active_connections.setdefault(host, []).append(conn_id)
+        elif event_type == "aom_connection_released":
+            conns = self._active_connections.get(host)
+            if conns and conn_id in conns:
+                conns.remove(conn_id)
+                if not conns:
+                    del self._active_connections[host]
+
+    def _resolve_connection(self, host: str | None) -> tuple[str | None, str]:
+        """Resolve connection_id and attribution_confidence for a stderr line.
+
+        Args:
+            host: The host extracted by the classifier, or None for run-level lines.
+
+        Returns:
+            A ``(connection_id, attribution_confidence)`` pair. Run-level lines
+            (host is None) always get ``(None, "unique")``. Lines with a host
+            that has exactly one active connection get that connection_id and
+            ``"unique"``. Lines with a host that has multiple overlapping active
+            connections get the most-recent connection_id and ``"ambiguous"``.
+            Lines with a host that has no active connections get ``(None, "unique")``.
+        """
+        if host is None:
+            return None, "unique"
+
+        conns = self._active_connections.get(host)
+        if not conns:
+            return None, "unique"
+
+        if len(conns) == 1:
+            return conns[0], "unique"
+
+        return conns[-1], "ambiguous"
 
     def _is_jsonl_start_event(self, line: str) -> bool:
         """Check if line is a JSONL start event.
@@ -259,7 +393,7 @@ class PtyStreamParser:
         if not line.startswith("{"):
             return False
         try:
-            data = orjson.loads(line)
+            data = _safe_loads(line)
             return bool(
                 data.get("_event")
                 in (
@@ -267,7 +401,7 @@ class PtyStreamParser:
                     "v2_playbook_on_play_start",
                 )
             )
-        except orjson.JSONDecodeError:
+        except ValueError:
             return False
 
     def _is_jsonl_stats_event(self, line: str) -> bool:
@@ -275,9 +409,9 @@ class PtyStreamParser:
         if not line.startswith("{"):
             return False
         try:
-            data = orjson.loads(line)
+            data = _safe_loads(line)
             return bool(data.get("_event") == "v2_playbook_on_stats")
-        except orjson.JSONDecodeError:
+        except ValueError:
             return False
 
     def _is_json(self, line: str) -> bool:
@@ -285,14 +419,14 @@ class PtyStreamParser:
         if not line.startswith("{"):
             return False
         try:
-            orjson.loads(line)
+            _safe_loads(line)
             return True
-        except orjson.JSONDecodeError:
+        except ValueError:
             return False
 
     def _parse_json(self, line: str) -> dict:
         """Parse a JSON line into a dict."""
-        result = orjson.loads(line)
+        result = _safe_loads(line)
         assert isinstance(result, dict), "Expected JSON object"
         return result
 

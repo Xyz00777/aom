@@ -1,36 +1,40 @@
 # Ansible Args Validation
 
-> 10 nodes · cohesion 0.29
+> 14 nodes · cohesion 0.15
 
 ## Key Concepts
 
-- **_require_ansible_args()** (8 connections) — `src/ansible_aom/rerun/cli.py`
-- **TestRequireAnsibleArgs** (6 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_none_value_treated_as_missing()** (3 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_session_with_empty_args_returns_empty_list()** (3 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_missing_field_error_message_explains_schema()** (2 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_missing_field_raises_with_clear_error()** (2 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_session_with_args_returns_them()** (2 connections) — `tests/unit/test_rerun_cli.py`
-- **Return the recorded ``ansible_args`` or refuse with a clear error.      Sessions** (1 connections) — `src/ansible_aom/rerun/cli.py`
-- **An explicit [] is valid — the user originally ran `aom site.yml`.** (1 connections) — `tests/unit/test_rerun_cli.py`
-- **A null value (rare, but possible if hand-edited) is also missing.** (1 connections) — `tests/unit/test_rerun_cli.py`
+- **TestTreeIcons** (7 connections) — `tests/unit/test_icons.py`
+- **get_tree_icon()** (4 connections) — `src/ansible_aom/core/icons.py`
+- **.test_get_tree_icon_collapsed()** (3 connections) — `tests/unit/test_icons.py`
+- **.test_get_tree_icon_expanded()** (3 connections) — `tests/unit/test_icons.py`
+- **.test_tree_collapsed_icon()** (2 connections) — `tests/unit/test_icons.py`
+- **.test_tree_expanded_icon()** (2 connections) — `tests/unit/test_icons.py`
+- **.test_tree_icons_are_unicode()** (2 connections) — `tests/unit/test_icons.py`
+- **Get tree expansion icon.      Args:         expanded: True for expanded node (▼)** (1 connections) — `src/ansible_aom/core/icons.py`
+- **Tests for TC-373 and TC-374.** (1 connections) — `tests/unit/test_icons.py`
+- **TC-373: Collapsed tree node displays right arrow (▶).** (1 connections) — `tests/unit/test_icons.py`
+- **TC-374: Expanded tree node displays down arrow (▼).** (1 connections) — `tests/unit/test_icons.py`
+- **TC-373: get_tree_icon returns correct icon for collapsed node.** (1 connections) — `tests/unit/test_icons.py`
+- **TC-374: get_tree_icon returns correct icon for expanded node.** (1 connections) — `tests/unit/test_icons.py`
+- **Tree icons are valid Unicode characters.** (1 connections) — `tests/unit/test_icons.py`
 
 ## Relationships
 
-- [[Rerun CLI Entry]] (2 shared connections)
-- [[Rerun Host Set Composition]] (1 shared connections)
+- [Crash Recovery Notification](Crash_Recovery_Notification.md) (1 shared connections)
+- [Community 461](Community_461.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/rerun/cli.py`
-- `tests/unit/test_rerun_cli.py`
+- `src/ansible_aom/core/icons.py`
+- `tests/unit/test_icons.py`
 
 ## Audit Trail
 
-- EXTRACTED: 19 (66%)
-- INFERRED: 10 (34%)
+- EXTRACTED: 26 (87%)
+- INFERRED: 4 (13%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

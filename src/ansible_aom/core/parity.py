@@ -17,7 +17,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from ansible_aom.core.models import RunState, Status
+from ansible_aom.core.exit_code import determine_exit_code
+from ansible_aom.core.models import Status
+from ansible_aom.core.run_state import RunState
 
 _PER_HOST_KEYS: tuple[str, ...] = (
     "ok",
@@ -71,9 +73,9 @@ def reduce_state_for_parity(state: RunState) -> dict[str, Any]:
     ``exit_code`` is computed from the state directly (rather than
     taken from the renderer) so a renderer that mishandles the
     completion callback can't hide a state-vs-exit disagreement.
-    Mirrors ``determine_exit_code`` in ``compact/renderer.py``: a
-    duplicate is acceptable here because ``core/`` is forbidden from
-    importing from ``compact/``, and the logic is two short scans.
+    Uses the canonical ``determine_exit_code`` in
+    :mod:`ansible_aom.core.exit_code` so all consumers agree on the
+    same derivation.
     """
     hosts: dict[str, dict[str, int]] = {}
     totals: dict[str, int] = _empty_host_counts()
@@ -99,20 +101,7 @@ def reduce_state_for_parity(state: RunState) -> dict[str, Any]:
                     bucket[key] += 1
                     totals[key] += 1
 
-    exit_code = 0
-    any_failed = False
-    any_unreachable = False
-    for play in state.plays.values():
-        for task in play.tasks.values():
-            for host_state in task.hosts.values():
-                if host_state.status == Status.FAILED:
-                    any_failed = True
-                elif host_state.status == Status.UNREACHABLE:
-                    any_unreachable = True
-    if any_failed:
-        exit_code = 1
-    elif any_unreachable:
-        exit_code = 2
+    exit_code = determine_exit_code(state)
 
     return {
         "hosts": hosts,

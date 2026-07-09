@@ -1,44 +1,46 @@
 # Tree Navigation Keys
 
-> 18 nodes · cohesion 0.11
+> 22 nodes · cohesion 0.09
 
 ## Key Concepts
 
-- **TestTreeNavigationKeybindings** (13 connections) — `tests/tui/test_keybindings.py`
-- **.test_arrow_down_navigates_tree()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_arrow_up_navigates_tree()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_capital_g_jumps_to_tree_bottom()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_enter_toggles_node()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_j_navigates_tree_down()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_k_navigates_tree_up()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_left_arrow_collapses_node()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_right_arrow_expands_node()** (3 connections) — `tests/tui/test_keybindings.py`
-- **Tests for tree navigation keybindings - TC-343, TC-344.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-343: Up arrow navigates tree up when tree focused.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-343: Down arrow navigates tree down when tree focused.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-343: 'j' navigates tree down (vim-style).** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-343: 'k' navigates tree up (vim-style).** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-343: 'G' (shift+g) jumps to bottom of tree.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-344: Right arrow expands tree node when tree focused.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-344: Left arrow collapses tree node when tree focused.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-344: Enter toggles expand/collapse state.** (1 connections) — `tests/tui/test_keybindings.py`
+- **Section 2: Prefix List for `aom_verbose_line` Heuristic** (6 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **Ansible Source Research: Verbosity Handling in ansible-core 2.20.4** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **Prefixes at caplevel 4 (vvvvv) and caplevel 5 (vvvvvv)** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **Section 3: Cross-Check -- SSH Connection Plugin Debug Output** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **Section 1: Claims Verification** (4 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **ansible-source-research.md** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **Claim 1: `ansible.posix.jsonl` is verbosity-agnostic** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **Claim 2: `_dump_results` strips `invocation` + `diff` when `verbosity < 3`** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **Claim 3: `Display.v*()` methods go to stderr, bypassing stdout callbacks** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **Conservative framing** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **Enumerated Prefix List for Heuristic (caplevel >= 4 only)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **From `lib/ansible/inventory/manager.py` (vvvv, caplevel=3)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **From `lib/ansible/plugins/callback/__init__.py` (vvvv, caplevel=3)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **From `lib/ansible/plugins/connection/__init__.py` (vvvv, caplevel=3)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **From `lib/ansible/plugins/connection/ssh.py` (vvvvv, caplevel=4)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **Prefixes at caplevel 1 (vv) -- for reference** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **Prefixes at caplevel 2 (vvv) -- for reference (below conservative boundary)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **Section 4: Open Questions** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **What does `Display.vvv()` look like for local?** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **What does `Display.vvv()` look like for SSH?** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **What does `Display.vvvv()` look like for SSH?** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **What does `Display.vvvvv()` look like for SSH?** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
 
 ## Relationships
 
-- [[Global Key Bindings]] (9 shared connections)
-- [[TUI Keybindings Config]] (2 shared connections)
-- [[TUI Keybindings Tests]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/tui/test_keybindings.py`
+- `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
 
 ## Audit Trail
 
-- EXTRACTED: 36 (78%)
-- INFERRED: 10 (22%)
+- EXTRACTED: 42 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

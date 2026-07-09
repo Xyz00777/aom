@@ -1,31 +1,38 @@
 # Become Password Prompt
 
-> 4 nodes · cohesion 0.50
+> 14 nodes · cohesion 0.23
 
 ## Key Concepts
 
-- **TestBecomePassword** (7 connections) — `tests/integration/test_playbook_parser.py`
-- **.test_become_password_prompt()** (2 connections) — `tests/integration/test_playbook_parser.py`
-- **Integration tests for 14-become-password playbook.** (1 connections) — `tests/integration/test_playbook_parser.py`
-- **Parser detects BECOME password prompt.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **verify_anchors.py** (6 connections) — `scripts/verify_anchors.py`
+- **verify_doc()** (6 connections) — `scripts/verify_anchors.py`
+- **extract_anchors()** (5 connections) — `scripts/verify_anchors.py`
+- **main()** (5 connections) — `scripts/verify_anchors.py`
+- **Path** (4 connections)
+- **validate_anchor()** (4 connections) — `scripts/verify_anchors.py`
+- **_build_parser()** (3 connections) — `scripts/verify_anchors.py`
+- **parse_anchor()** (3 connections) — `scripts/verify_anchors.py`
+- **ArgumentParser** (1 connections)
+- **Return ``None`` if the anchor is valid, or a one-line error     message describi** (1 connections) — `scripts/verify_anchors.py`
+- **Return a list of broken-anchor error messages for ``doc``.      The list is in c** (1 connections) — `scripts/verify_anchors.py`
+- **CLI entry point. See module docstring for exit codes.      ``argv`` defaults to** (1 connections) — `scripts/verify_anchors.py`
+- **Parse a single anchor token into ``(path, start, end)``.      Returns ``None`` i** (1 connections) — `scripts/verify_anchors.py`
+- **Extract every distinct anchor token from a design doc.      The order in the ret** (1 connections) — `scripts/verify_anchors.py`
 
 ## Relationships
 
-- [[Role Group Task Models]] (2 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
-- [[PTY Stream Parser]] (1 shared connections)
-- [[Playbook Parser Integration Tests]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/integration/test_playbook_parser.py`
+- `scripts/verify_anchors.py`
 
 ## Audit Trail
 
-- EXTRACTED: 7 (64%)
-- INFERRED: 4 (36%)
+- EXTRACTED: 42 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

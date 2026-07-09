@@ -1,46 +1,42 @@
 # Tree Projection Utilities
 
-> 13 nodes · cohesion 0.17
+> 18 nodes · cohesion 0.11
 
 ## Key Concepts
 
-- **tree.py** (20 connections) — `src/ansible_aom/core/tree.py`
-- **_is_template_match()** (6 connections) — `src/ansible_aom/core/tree.py`
-- **_host_leaf_label()** (4 connections) — `src/ansible_aom/core/tree.py`
-- **_collapse_role_path()** (3 connections) — `src/ansible_aom/core/tree.py`
-- **_play_target_hostnames()** (3 connections) — `src/ansible_aom/core/tree.py`
-- **_template_skeleton()** (3 connections) — `src/ansible_aom/core/tree.py`
-- **core.models.iter_preflight_task_defs()** (2 connections) — `.sisyphus/notepads/implementation/decisions.md`
-- **Pure projection of RunState into renderable tree + host-row data.  This module c** (1 connections) — `src/ansible_aom/core/tree.py`
-- **Return True if ``runtime_name`` could be a resolved version of     ``preflight_n** (1 connections) — `src/ansible_aom/core/tree.py`
-- **Collect hostnames targeted by this play (read-only).      Uses ``play_def.resolv** (1 connections) — `src/ansible_aom/core/tree.py`
-- **Host-leaf label, with a loop-progress hint when live.      A looped task tallies** (1 connections) — `src/ansible_aom/core/tree.py`
-- **Strip ``{{ ... }}`` from a task name, yielding the static parts.      ``--list-t** (1 connections) — `src/ansible_aom/core/tree.py`
-- **Collapse consecutive duplicate role names in a path.      ``iter_preflight_task_** (1 connections) — `src/ansible_aom/core/tree.py`
+- **Plan: Static pre-expansion of `include_tasks` (Plan A)** (11 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **Approach (TDD-first, surgical)** (7 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **include-tasks-pre-expansion.md** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **Acceptance Criteria** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **Files Touched** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **Goals** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **Non-Goals (explicitly out of scope)** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **Out-of-scope follow-ups (parking lot)** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **Phase 0 — Pin down the data flow (no code change, tests only)** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **Phase 1 — Add `_graft_include_children()` (pure core function)** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **Phase 2 — Wire `resolve_includes_from_playbook()` into preflight** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **Phase 3 — Wire `discover_include_with_runtime_path()` into runtime handlers** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **Phase 4 — Hide the include stub in the tree** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **Phase 5 — Pre-flight denormalization for `count_total_tasks_seen`** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **Problem** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **Risks & Mitigations** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **Sequencing & Dependencies** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **Test Specification Updates** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
 
 ## Relationships
 
-- [[Play Tree Projection]] (4 shared connections)
-- [[Tree Projection Logic]] (4 shared connections)
-- [[Tree Truncation Utilities]] (3 shared connections)
-- [[Role Chain Extraction]] (3 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
-- [[Play Definition Tree Population]] (2 shared connections)
-- [[Run History Mining]] (1 shared connections)
-- [[Compact Display Module Layout]] (1 shared connections)
-- [[Run State Completion Recap]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `.sisyphus/notepads/implementation/decisions.md`
-- `src/ansible_aom/core/tree.py`
+- `.sisyphus/plans/include-tasks-pre-expansion.md`
 
 ## Audit Trail
 
-- EXTRACTED: 47 (100%)
+- EXTRACTED: 34 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,37 +1,42 @@
 # Status Bar Formatting
 
-> 12 nodes · cohesion 0.17
+> 16 nodes · cohesion 0.16
 
 ## Key Concepts
 
-- **.render()** (8 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **._format_elapsed_time()** (3 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **._format_host_count()** (3 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **._format_memory_usage()** (3 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **._format_pid()** (3 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **._format_task_progress()** (3 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **Format elapsed time as H:MM:SS or M:SS.          Returns:             Formatted** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **Format host count.          Returns:             Formatted host count string** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **Format task progress.          Returns:             Formatted task progress stri** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **Format memory usage.          Returns:             Formatted memory string or N/** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **Format PID.          Returns:             Formatted PID string or N/A** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **Render the status bar.          Returns:             Rich Text object with confi** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **test_properties_parser.py** (9 connections) — `tests/unit/test_properties_parser.py`
+- **valid_event_dicts()** (5 connections) — `tests/unit/test_properties_parser.py`
+- **test_valid_events_survive_garbage_interleaving()** (4 connections) — `tests/unit/test_properties_parser.py`
+- **_encode_event_line()** (3 connections) — `tests/unit/test_properties_parser.py`
+- **_hostname_strategy()** (3 connections) — `tests/unit/test_properties_parser.py`
+- **_identifier_strategy()** (3 connections) — `tests/unit/test_properties_parser.py`
+- **test_jsonline_stream_never_crashes_on_arbitrary_bytes()** (3 connections) — `tests/unit/test_properties_parser.py`
+- **test_pty_stream_parser_never_crashes_on_arbitrary_bytes()** (3 connections) — `tests/unit/test_properties_parser.py`
+- **SearchStrategy** (2 connections)
+- **DrawFn** (1 connections)
+- **Property-based tests for the JSONL parser (Batch C, family #5a).  These tests as** (1 connections) — `tests/unit/test_properties_parser.py`
+- **Arbitrary bytes (decoded loosely) never raise from JsonLineStream.feed_line.** (1 connections) — `tests/unit/test_properties_parser.py`
+- **Arbitrary bytes (decoded loosely) never raise from PtyStreamParser.feed_line.** (1 connections) — `tests/unit/test_properties_parser.py`
+- **Well-formed events interleaved with arbitrary noise still drain in order.      T** (1 connections) — `tests/unit/test_properties_parser.py`
+- **Build a realistic, JSON-encodable ansible event dict.** (1 connections) — `tests/unit/test_properties_parser.py`
+- **Encode an event dict as a single JSONL line (no trailing newline).** (1 connections) — `tests/unit/test_properties_parser.py`
 
 ## Relationships
 
-- [[Status Bar Widget]] (6 shared connections)
-- [[Renderer Render Methods]] (1 shared connections)
+- [Three-Pane Inspect App](Three-Pane_Inspect_App.md) (2 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [Run State Completion Recap](Run_State_Completion_Recap.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/tui/widgets/status_bar.py`
+- `tests/unit/test_properties_parser.py`
 
 ## Audit Trail
 
-- EXTRACTED: 29 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 39 (93%)
+- INFERRED: 3 (7%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

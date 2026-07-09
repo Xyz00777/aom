@@ -1,38 +1,41 @@
 # Get Keybinding Function
 
-> 12 nodes · cohesion 0.17
+> 17 nodes · cohesion 0.12
 
 ## Key Concepts
 
-- **TestGetKeybindingFunction** (9 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_keybinding_lowercase_letters()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_keybinding_normalizes_modifier_format()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_keybinding_preserves_modifier_case()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_keybinding_returns_dict()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_keybinding_uppercase_letters_distinct()** (3 connections) — `tests/tui/test_keybindings.py`
-- **Tests for get_keybinding function behavior.** (1 connections) — `tests/tui/test_keybindings.py`
-- **Lowercase letters should find their keybinding.** (1 connections) — `tests/tui/test_keybindings.py`
-- **Uppercase letters are distinct from lowercase for defined caps keys.** (1 connections) — `tests/tui/test_keybindings.py`
-- **Modifier keys should preserve case format.** (1 connections) — `tests/tui/test_keybindings.py`
-- **get_keybinding should handle case variations in modifiers.** (1 connections) — `tests/tui/test_keybindings.py`
-- **get_keybinding returns KeyAction dict.** (1 connections) — `tests/tui/test_keybindings.py`
+- **Live per-item loop streaming** (12 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
+- **Architecture** (2 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
+- **Component 1 — the callback plugin** (2 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
+- **Goal** (2 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
+- **Problem** (2 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
+- **2026-06-02-live-loop-item-streaming-design.md** (1 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
+- **Component 2 — runner wiring + packaging** (1 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
+- **Component 3 — compact renderer (the core ask)** (1 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
+- **Component 4 — TUI task tree (count only)** (1 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
+- **Component 5 — loop totals from history (the `N/total` polish)** (1 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
+- **Event schema (the contract)** (1 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
+- **Inspect / replay** (1 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
+- **Open risks** (1 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
+- **Out of scope** (1 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
+- **Phased implementation plan** (1 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
+- **Root cause (confirmed)** (1 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
+- **Testing** (1 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
 
 ## Relationships
 
-- [[Global Key Bindings]] (5 shared connections)
-- [[TUI Keybindings Config]] (2 shared connections)
-- [[TUI Keybindings Tests]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/tui/test_keybindings.py`
+- `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
 
 ## Audit Trail
 
-- EXTRACTED: 23 (77%)
-- INFERRED: 7 (23%)
+- EXTRACTED: 32 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

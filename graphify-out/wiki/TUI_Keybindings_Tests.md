@@ -1,38 +1,35 @@
 # TUI Keybindings Tests
 
-> 14 nodes · cohesion 0.14
+> 20 nodes · cohesion 0.10
 
 ## Key Concepts
 
-- **test_keybindings.py** (19 connections) — `tests/tui/test_keybindings.py`
-- **TestPostRunKeybindings** (6 connections) — `tests/tui/test_keybindings.py`
-- **TestSearchKeybinding** (6 connections) — `tests/tui/test_keybindings.py`
-- **.test_capital_r_rerun_with_same_args()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_shift_r_rerun_with_modified_args()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_ctrl_f_opens_search()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_slash_opens_search()** (3 connections) — `tests/tui/test_keybindings.py`
-- **Unit tests for TUI keybindings (Section 10 of TEST_SPECIFICATION.md).  Test case** (1 connections) — `tests/tui/test_keybindings.py`
-- **Tests for search keybinding - TC-346.** (1 connections) — `tests/tui/test_keybindings.py`
-- **/' opens search in log panel.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-346: Ctrl+F opens search when log panel focused.** (1 connections) — `tests/tui/test_keybindings.py`
-- **Tests for post-run keybindings - TC-351, TC-352, TC-363.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-351: 'R' re-runs playbook with same args (post-run).** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-352: Shift+R opens dialog to modify args before re-run.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TestTreeNavigationKeybindings** (13 connections) — `tests/tui/test_keybindings.py`
+- **.test_arrow_down_navigates_tree()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_arrow_up_navigates_tree()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_capital_g_jumps_to_tree_bottom()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_enter_toggles_node()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_g_jumps_to_tree_top()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_j_navigates_tree_down()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_k_navigates_tree_up()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_left_arrow_collapses_node()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_right_arrow_expands_node()** (3 connections) — `tests/tui/test_keybindings.py`
+- **Tests for tree navigation keybindings - TC-343, TC-344.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-343: Up arrow navigates tree up when tree focused.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-343: Down arrow navigates tree down when tree focused.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-343: 'j' navigates tree down (vim-style).** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-343: 'k' navigates tree up (vim-style).** (1 connections) — `tests/tui/test_keybindings.py`
+- **g' jumps to top of tree.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-343: 'G' (shift+g) jumps to bottom of tree.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-344: Right arrow expands tree node when tree focused.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-344: Left arrow collapses tree node when tree focused.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-344: Enter toggles expand/collapse state.** (1 connections) — `tests/tui/test_keybindings.py`
 
 ## Relationships
 
-- [[TUI Keybindings Config]] (5 shared connections)
-- [[Global Key Bindings]] (5 shared connections)
-- [[Ctrl-C Keybindings]] (1 shared connections)
-- [[Action Keybindings Lookup]] (1 shared connections)
-- [[Get All Actions]] (1 shared connections)
-- [[Get Keybinding Function]] (1 shared connections)
-- [[Invalid Key Handling]] (1 shared connections)
-- [[KeyAction TypedDict]] (1 shared connections)
-- [[Keybinding Conflict Validation]] (1 shared connections)
-- [[Keybinding Context Coverage]] (1 shared connections)
-- [[KeyContext Enum]] (1 shared connections)
-- [[Panel Resize Keybindings]] (1 shared connections)
+- [Runner Event Batching](Runner_Event_Batching.md) (9 shared connections)
+- [State Machine Invariants](State_Machine_Invariants.md) (2 shared connections)
+- [Warning Color Formatting](Warning_Color_Formatting.md) (1 shared connections)
 
 ## Source Files
 
@@ -40,10 +37,10 @@
 
 ## Audit Trail
 
-- EXTRACTED: 42 (84%)
-- INFERRED: 8 (16%)
+- EXTRACTED: 39 (78%)
+- INFERRED: 11 (22%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

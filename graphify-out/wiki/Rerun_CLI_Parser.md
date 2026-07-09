@@ -1,41 +1,46 @@
 # Rerun CLI Parser
 
-> 12 nodes · cohesion 0.29
+> 18 nodes · cohesion 0.20
 
 ## Key Concepts
 
-- **_create_parser()** (14 connections) — `src/ansible_aom/rerun/cli.py`
-- **TestCreateParser** (10 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_state_dir_override()** (3 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_changes_only_flag()** (2 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_combined()** (2 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_failed_flag()** (2 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_no_args()** (2 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_session_id_positional()** (2 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_unreachable_flag()** (2 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_yes_long_form()** (2 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_yes_short_form()** (2 connections) — `tests/unit/test_rerun_cli.py`
-- **Build the argparse parser for ``aom rerun``.      Split out from ``main`` so tes** (1 connections) — `src/ansible_aom/rerun/cli.py`
+- **test_inspect_debug.py** (14 connections) — `tests/unit/test_inspect_debug.py`
+- **format_diagnostics_section()** (7 connections) — `src/ansible_aom/inspect/formatters.py`
+- **Path** (7 connections)
+- **_write_session()** (7 connections) — `tests/unit/test_inspect_debug.py`
+- **test_inspect_debug_json_emits_raw_record()** (4 connections) — `tests/unit/test_inspect_debug.py`
+- **test_inspect_debug_json_legacy_session_outputs_null()** (3 connections) — `tests/unit/test_inspect_debug.py`
+- **test_inspect_debug_on_legacy_session_prints_fallback()** (3 connections) — `tests/unit/test_inspect_debug.py`
+- **test_inspect_debug_prints_histogram()** (3 connections) — `tests/unit/test_inspect_debug.py`
+- **test_inspect_debug_with_specific_session_id()** (3 connections) — `tests/unit/test_inspect_debug.py`
+- **test_format_diagnostics_recording_disabled_surfaces_reason()** (2 connections) — `tests/unit/test_inspect_debug.py`
+- **test_format_diagnostics_section_with_full_record()** (2 connections) — `tests/unit/test_inspect_debug.py`
+- **test_format_diagnostics_section_with_none_returns_fallback()** (2 connections) — `tests/unit/test_inspect_debug.py`
+- **test_inspect_debug_no_sessions()** (2 connections) — `tests/unit/test_inspect_debug.py`
+- **Any** (1 connections)
+- **Render the ``diagnostics.json`` payload as a plain-text section.      Returns a** (1 connections) — `src/ansible_aom/inspect/formatters.py`
+- **Phase 6: ``aom inspect --debug`` prints diagnostics.json contents.  Spec: docs/s** (1 connections) — `tests/unit/test_inspect_debug.py`
+- **``--debug --json`` writes the diagnostics record as a single JSON     object for** (1 connections) — `tests/unit/test_inspect_debug.py`
+- **_reset()** (1 connections) — `tests/unit/test_inspect_debug.py`
 
 ## Relationships
 
-- [[Rerun CLI Entry]] (2 shared connections)
-- [[Replay CLI Subcommand]] (1 shared connections)
-- [[Shell Completion Helpers]] (1 shared connections)
-- [[Rerun Host Set Composition]] (1 shared connections)
-- [[Run Config Key Normalization]] (1 shared connections)
+- [Status Bar Widget](Status_Bar_Widget.md) (1 shared connections)
+- [Color ASCII Fallback](Color_ASCII_Fallback.md) (1 shared connections)
+- [Frame Parameter Handling](Frame_Parameter_Handling.md) (1 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/rerun/cli.py`
-- `tests/unit/test_rerun_cli.py`
+- `src/ansible_aom/inspect/formatters.py`
+- `tests/unit/test_inspect_debug.py`
 
 ## Audit Trail
 
-- EXTRACTED: 25 (57%)
-- INFERRED: 19 (43%)
+- EXTRACTED: 57 (89%)
+- INFERRED: 7 (11%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

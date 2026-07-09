@@ -4,8 +4,8 @@
 
 ## Key Concepts
 
-- **install-hooks.sh script** (1 connections) — `scripts/install-hooks.sh`
 - **install-hooks.sh** (1 connections) — `scripts/install-hooks.sh`
+- **install-hooks.sh script** (1 connections) — `scripts/install-hooks.sh`
 
 ## Relationships
 
@@ -23,4 +23,4 @@
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

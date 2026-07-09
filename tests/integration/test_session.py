@@ -101,15 +101,18 @@ class TestStartSession:
         events_file = session_dir / session_id / "events.jsonl"
         assert events_file.exists()
 
-    def test_start_session_creates_stderr_file(self, tmp_path: Path):
-        """start_session creates stderr.log file."""
+    def test_start_session_does_not_create_stderr_file(self, tmp_path: Path):
+        """Phase 4: start_session no longer creates stderr.log (stderr goes to events.jsonl)."""
         session_dir = tmp_path / "sessions"
         manager = SessionManager(session_dir=session_dir, playbook="test.yml")
 
         session_id = manager.start_session("test.yml")
 
         stderr_file = session_dir / session_id / "stderr.log"
-        assert stderr_file.exists()
+        assert not stderr_file.exists()
+        # stderr is now embedded in events.jsonl as aom_stderr_line events
+        events_file = session_dir / session_id / "events.jsonl"
+        assert events_file.exists()
 
     def test_start_session_creates_meta_file(self, tmp_path: Path):
         """start_session creates meta.json with initial metadata."""
@@ -241,39 +244,48 @@ class TestRecordEvent:
 
 
 class TestRecordStderr:
-    """TC-220: Session stderr.log content."""
+    """TC-220: Session stderr content (now in events.jsonl as aom_stderr_line)."""
 
-    def test_record_stderr_appends_line(self, tmp_path: Path):
-        """record_stderr appends line to stderr.log."""
+    def test_record_stderr_emits_aom_stderr_line_event(self, tmp_path: Path):
+        """record_stderr emits aom_stderr_line events to events.jsonl."""
+        import json
+
         session_dir = tmp_path / "sessions"
         manager = SessionManager(session_dir=session_dir, playbook="test.yml")
         session_id = manager.start_session("test.yml")
 
         manager.record_stderr(session_id, "[WARNING]: ansible.posix not found")
-        manager.record_stderr(session_id, "[DEPRECATION]: This feature is deprecated")
+        manager.record_stderr(session_id, "[DEPRECATION WARNING]: This feature is deprecated")
 
-        stderr_file = session_dir / session_id / "stderr.log"
-        with open(stderr_file) as f:
-            lines = f.readlines()
+        events_file = session_dir / session_id / "events.jsonl"
+        with open(events_file) as f:
+            lines = [json.loads(line) for line in f if line.strip()]
 
-        assert len(lines) == 2
-        assert "[WARNING]" in lines[0]
-        assert "[DEPRECATION]" in lines[1]
+        stderr_events = [line for line in lines if line.get("_event") == "aom_stderr_line"]
+        assert len(stderr_events) == 2
+        assert stderr_events[0]["source"] == "warning"
+        assert stderr_events[1]["source"] == "deprecation"
+        assert "[WARNING]" in stderr_events[0]["line"]
+        assert "[DEPRECATION WARNING]" in stderr_events[1]["line"]
 
     def test_record_stderr_utf8_encoding(self, tmp_path: Path):
-        """record_stderr handles UTF-8 characters."""
+        """record_stderr handles UTF-8 characters in aom_stderr_line events."""
+        import json
+
         session_dir = tmp_path / "sessions"
         manager = SessionManager(session_dir=session_dir, playbook="test.yml")
         session_id = manager.start_session("test.yml")
 
-        manager.record_stderr(session_id, "Error: 中文字符 émojis 🎉")
+        line = "Error: 中文字符 émojis 🎉"
+        manager.record_stderr(session_id, line)
 
-        stderr_file = session_dir / session_id / "stderr.log"
-        with open(stderr_file, encoding="utf-8") as f:
+        events_file = session_dir / session_id / "events.jsonl"
+        with open(events_file, encoding="utf-8") as f:
             content = f.read()
 
-        assert "中文字符" in content
-        assert "🎉" in content
+        assert "aom_stderr_line" in content
+        # The line is stored as JSON-escaped Unicode in the event
+        assert "\\u4e2d\\u6587\\u5b57\\u7b26" in content
 
 
 class TestEndSession:
@@ -480,16 +492,14 @@ class TestSessionFilePermissions:
 
         assert mode & 0o644 == 0o644
 
-    def test_stderr_file_permissions(self, tmp_path: Path):
-        """stderr.log created with 0o644 permissions."""
+    def test_stderr_file_not_created(self, tmp_path: Path):
+        """Phase 4: stderr.log is no longer created (stderr goes to events.jsonl)."""
         session_dir = tmp_path / "sessions"
         manager = SessionManager(session_dir=session_dir, playbook="test.yml")
         session_id = manager.start_session("test.yml")
 
         stderr_file = session_dir / session_id / "stderr.log"
-        mode = stat.S_IMODE(stderr_file.stat().st_mode)
-
-        assert mode & 0o644 == 0o644
+        assert not stderr_file.exists()
 
     def test_meta_file_permissions(self, tmp_path: Path):
         """meta.json created with 0o644 permissions."""

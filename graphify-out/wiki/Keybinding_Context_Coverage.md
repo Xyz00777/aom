@@ -1,36 +1,40 @@
 # Keybinding Context Coverage
 
-> 10 nodes · cohesion 0.20
+> 14 nodes · cohesion 0.18
 
 ## Key Concepts
 
-- **TestKeybindingContextsComplete** (8 connections) — `tests/tui/test_keybindings.py`
-- **.test_global_context_keys_work_everywhere()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_log_context_keys_only_for_log()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_post_run_keys_only_after_completion()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_tree_context_keys_dont_work_globally()** (3 connections) — `tests/tui/test_keybindings.py`
-- **Complete coverage of keybinding contexts - TC-361 through TC-364.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-361: Keys like j/k/arrow only work when tree focused.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-362: Search keys only work when log focused.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-363: Rerun keys only work after playbook completion.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-364: Global keys work from any panel.** (1 connections) — `tests/tui/test_keybindings.py`
+- **generate_uuidv7()** (7 connections) — `src/ansible_aom/session/store.py`
+- **TestGenerateUUIDv7** (7 connections) — `tests/integration/test_session.py`
+- **.start_session()** (3 connections) — `src/ansible_aom/session/store.py`
+- **.test_uuidv7_contains_timestamp()** (3 connections) — `tests/integration/test_session.py`
+- **.test_uuidv7_first_8_chars_usable_for_display()** (3 connections) — `tests/integration/test_session.py`
+- **.test_uuidv7_format_matches_pattern()** (3 connections) — `tests/integration/test_session.py`
+- **.test_uuidv7_is_time_sortable()** (3 connections) — `tests/integration/test_session.py`
+- **Create a new session and return the session ID (UUIDv7).          Creates the se** (1 connections) — `src/ansible_aom/session/store.py`
+- **Generate a UUIDv7 session ID.      UUIDv7 is time-sortable, which allows session** (1 connections) — `src/ansible_aom/session/store.py`
+- **TC-218: Session UUIDv7 Format Validation.** (1 connections) — `tests/integration/test_session.py`
+- **UUIDv7 matches expected format pattern.** (1 connections) — `tests/integration/test_session.py`
+- **UUIDv7 values are time-sortable (earlier timestamps produce smaller UUIDs).** (1 connections) — `tests/integration/test_session.py`
+- **First 8 characters of UUIDv7 can be used for display.** (1 connections) — `tests/integration/test_session.py`
+- **UUIDv7 embeds timestamp in first segment.** (1 connections) — `tests/integration/test_session.py`
 
 ## Relationships
 
-- [[Global Key Bindings]] (4 shared connections)
-- [[TUI Keybindings Config]] (2 shared connections)
-- [[TUI Keybindings Tests]] (1 shared connections)
+- [Run Config Key Normalization](Run_Config_Key_Normalization.md) (3 shared connections)
+- [Loop Item Line Tests](Loop_Item_Line_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/tui/test_keybindings.py`
+- `src/ansible_aom/session/store.py`
+- `tests/integration/test_session.py`
 
 ## Audit Trail
 
-- EXTRACTED: 19 (76%)
-- INFERRED: 6 (24%)
+- EXTRACTED: 27 (75%)
+- INFERRED: 9 (25%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

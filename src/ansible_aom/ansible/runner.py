@@ -21,14 +21,18 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from os import _Environ
 
 import pexpect
 
 from ansible_aom.ansible.preflight import run_preflight
 from ansible_aom.core import diagnostics
-from ansible_aom.core.models import WarningType, count_leaf_tasks
-from ansible_aom.core.parser import PtyStreamParser
+from ansible_aom.core.event_types import JsonlEvent
+from ansible_aom.core.models import WarningType
+from ansible_aom.core.parser import PtyStreamParser, StreamPhase
 
 # Re-exported under their historical underscore-prefixed names so existing
 # tests that patch / import them from this module keep working unchanged.
@@ -39,6 +43,7 @@ from ansible_aom.core.prompts import (
     reconstruct_pause_prompt as _reconstruct_pause_prompt,
 )
 from ansible_aom.core.run_config import build_run_config_key
+from ansible_aom.core.run_state import RunState, count_leaf_tasks
 from ansible_aom.renderer.protocol import Renderer
 from ansible_aom.session.history import find_previous_run
 from ansible_aom.session.store import SessionManager
@@ -59,6 +64,28 @@ def _bundled_callback_dir() -> Path | None:
     return None
 
 
+def _bundled_connection_callback_dir() -> Path | None:
+    """Resolve the directory holding AOM's bundled ``aom_connection`` callback.
+
+    This is the notification-type callback that emits
+    ``aom_connection_acquired``/``aom_connection_released`` JSONL events
+    for the parser's connection-id map. It lives in a separate package
+    (``ansible_aom/callbacks/``) so the connection-tracking surface can
+    evolve independently of the stdout-callback (``ansible_aom/ansible/
+    callback/``) surface.
+
+    Returns the dir when it exists and contains the plugin file, else
+    None. A missing connection callback is non-fatal — the run just
+    loses per-host connection-id attribution, which is observability,
+    not control flow. ANSIBLE's default plugin search path is used as
+    the fallback in that case.
+    """
+    callbacks_pkg = Path(__file__).resolve().parent.parent / "callbacks"
+    if (callbacks_pkg / "aom_connection.py").is_file():
+        return callbacks_pkg
+    return None
+
+
 def _callback_env() -> dict[str, str]:
     """Return the env overrides that select AOM's stdout callback.
 
@@ -66,14 +93,35 @@ def _callback_env() -> dict[str, str]:
     events live); falls back to ``ansible.posix.jsonl`` when the bundled
     dir can't be resolved, so a packaging glitch costs only live item
     streaming — never the whole run.
+
+    Also includes the bundled ``aom_connection`` notification callback
+    in ``ANSIBLE_CALLBACK_PLUGINS`` so the connection-tracking plugin
+    loads automatically — no user-visible flag. The connection-callback
+    dir is listed first in the search path so its plugin resolves
+    before the upstream ones (avoids any future name collision).
     """
-    callback_dir = _bundled_callback_dir()
-    if callback_dir is not None:
-        return {
-            "ANSIBLE_CALLBACK_PLUGINS": str(callback_dir),
-            "ANSIBLE_STDOUT_CALLBACK": "aom_jsonl",
-        }
-    return {"ANSIBLE_STDOUT_CALLBACK": "ansible.posix.jsonl"}
+    stdout_dir = _bundled_callback_dir()
+    conn_dir = _bundled_connection_callback_dir()
+
+    # Build the plugin search path. Connection-callback dir is listed
+    # first so it resolves before any upstream plugin with the same
+    # short name (defensive; today there is no such collision).
+    plugin_dirs: list[Path] = []
+    if conn_dir is not None:
+        plugin_dirs.append(conn_dir)
+    if stdout_dir is not None:
+        plugin_dirs.append(stdout_dir)
+
+    env: dict[str, str] = {}
+    if plugin_dirs:
+        env["ANSIBLE_CALLBACK_PLUGINS"] = os.pathsep.join(str(d) for d in plugin_dirs)
+
+    if stdout_dir is not None:
+        env["ANSIBLE_STDOUT_CALLBACK"] = "aom_jsonl"
+    else:
+        env["ANSIBLE_STDOUT_CALLBACK"] = "ansible.posix.jsonl"
+
+    return env
 
 
 def _default_session_dir() -> Path:
@@ -112,7 +160,7 @@ class _NullSink:
     def session_id(self) -> str | None:
         return None
 
-    def record_event(self, event: dict) -> None:  # noqa: ARG002
+    def record_event(self, event: JsonlEvent) -> None:  # noqa: ARG002
         return None
 
     def record_stderr(self, line: str) -> None:  # noqa: ARG002
@@ -180,11 +228,11 @@ class _SessionSink:
             if callable(add_warning):
                 add_warning(f"session recording disabled (disk write failed: {reason})", False)
 
-    def record_event(self, event: dict) -> None:
+    def record_event(self, event: JsonlEvent) -> None:
         if self._disabled or self._manager is None or self._session_id is None:
             return
         try:
-            self._manager.record_event(self._session_id, event)
+            self._manager.record_event(self._session_id, cast(dict[str, Any], event))
         except OSError as exc:
             logger.debug("session event write failed: %s", exc)
             self._disable(str(exc))
@@ -257,6 +305,30 @@ _STALL_HINT_TIMEOUTS: int = 4  # ~2s at the default 0.5s timeout
 
 _DEFAULT_TIMEOUT_S = 0.5
 
+# R8: after ``v2_playbook_on_stats`` has been consumed, the wait for
+# EOF is bounded by this many seconds. If EOF doesn't fire within the
+# window we log a warning and treat it as a synthetic EOF so a child
+# that forgot to close its PTY (rare, but seen with become_user nested
+# forks) can't hang the run forever.
+_EOF_WATCHDOG_S: float = 30.0
+
+# R11: tighter EOF watchdog once the runner has both consumed the final
+# stats event AND observed the parser's ``end_time`` to be set. 5 s is
+# long enough to absorb the typical post-stats cleanup tail (stragglers
+# draining buffers, become forks unwinding) without paying the full 30 s
+# when the child actually went idle and forgot to close its PTY.
+_EOF_WATCHDOG_S_QUIET: float = 5.0
+
+# R9: bound pexpect's internal search window so a single multi-MB JSONL
+# event can't blow up pexpect's StringIO.  pexpect retains the entire
+# incoming buffer when ``searchwindowsize=None`` (``expect.py``: ``copy
+# the whole buffer (really slow for large datasets)``); with the default
+# a ``debug: var=huge_object`` line keeps growing the StringIO until
+# the terminating ``\n`` arrives.  512 bytes covers every pattern in
+# ``_drive``'s pattern list (longest is ``[sudo] password for ...``,
+# well under 100 chars) while bounding pexpect's per-call buffer.
+_SEARCH_WINDOW_BYTES: int = 512
+
 # Per-loop pexpect trace toggle. Now folded into ``AOM_DEBUG`` — one
 # diagnostic knob instead of three. Used to debug "AOM didn't see the
 # prompt" reports — every TIMEOUT branch logs
@@ -319,6 +391,7 @@ def run_playbook(
     env.update(_callback_env())
 
     parser = PtyStreamParser()
+    state = RunState(playbook=playbook)
     renderer.start(playbook, ansible_args)
 
     # Resolve once so the sink and the history lookup can never see
@@ -372,13 +445,23 @@ def run_playbook(
     child: pexpect.spawn | None = None
     try:
         try:
+            # R6: ``codec_errors="surrogateescape"`` so any invalid UTF-8 byte
+            # in the PTY stream becomes a lone surrogate codepoint in ``str``,
+            # and ``str.encode("utf-8", "surrogateescape")`` later round-trips
+            # the byte back losslessly. The on-disk ``events.jsonl`` therefore
+            # contains the original payload bytes (``aom inspect show`` can
+            # dump them verbatim). The renderer, in turn, decodes those
+            # surrogate codepoints back to bytes and re-encodes with
+            # ``errors="replace"`` before display so the user never sees a
+            # bare surrogate — only ``?`` for non-displayable bytes.
             child = pexpect.spawn(
                 executable,
                 args=args,
-                env=env,
+                env=cast("_Environ[str]", env),
                 encoding="utf-8",
-                codec_errors="replace",
+                codec_errors="surrogateescape",
                 timeout=timeout,
+                searchwindowsize=_SEARCH_WINDOW_BYTES,
             )
         except pexpect.exceptions.ExceptionPexpect, FileNotFoundError, OSError:
             # Command not found / not executable — surface as 127.
@@ -394,20 +477,24 @@ def run_playbook(
         profiler = diagnostics.get_profiler()
         if profiler is not None:
             profiler.enable()
+        # Pre-declare so the KeyboardInterrupt handler below can read the
+        # child's real exit code if the race window between ``_drive``
+        # returning and ``run_playbook`` returning lands SIGINT here.
+        exit_code: int | None = None
         try:
-            exit_code = _drive(child, parser, renderer, timeout, sink, diag=diag)
+            exit_code = _drive(child, parser, state, renderer, timeout, sink, diag=diag)
         finally:
             if profiler is not None:
                 profiler.disable()
         diagnostics.lifecycle_mark("last_event")
         diagnostics.record_tracemalloc_peak()
-        state = "completed" if exit_code == 0 else "failed"
+        final_status = "completed" if exit_code == 0 else "failed"
         sink.end(
-            state,
+            final_status,
             preflight_task_count=preflight_task_count,
             resolved_host_count=resolved_host_count,
         )
-        renderer.handle_completion(exit_code, state)
+        renderer.handle_completion(exit_code, final_status)
         diagnostics.lifecycle_mark("completion")
         return exit_code
 
@@ -418,13 +505,25 @@ def run_playbook(
             try:
                 child.sendintr()
                 child.close(force=True)
-            except Exception:
-                pass
+            except pexpect.exceptions.ExceptionPexpect, OSError:
+                logger.debug("child cleanup during Ctrl+C failed", exc_info=True)
         sink.end(
             "crashed",
             preflight_task_count=preflight_task_count,
             resolved_host_count=resolved_host_count,
         )
+        # R7 race guard: if the child already exited cleanly (exitstatus
+        # is set and the child is no longer alive) before SIGINT fired,
+        # prefer the real exit code over the unconditional 130. The
+        # narrow window where this matters is between ``_drive``
+        # returning and ``run_playbook`` itself returning — small in
+        # practice, but observable when the renderer does real work in
+        # ``handle_completion``. A still-running child (no exitstatus
+        # yet, or ``isalive`` True) is a genuine cancel: keep 130.
+        if child is not None and not child.isalive() and child.exitstatus is not None:
+            real_exit = int(child.exitstatus)
+            renderer.handle_completion(real_exit, "completed" if real_exit == 0 else "failed")
+            return real_exit
         renderer.handle_completion(130, "crashed")
         return 130
     finally:
@@ -442,6 +541,7 @@ def run_playbook(
 def _drive(
     child: pexpect.spawn,
     parser: PtyStreamParser,
+    state: RunState,
     renderer: Renderer,
     timeout: float,
     sink: _SessionSink | _NullSink,
@@ -482,33 +582,99 @@ def _drive(
     cpu_sample_every = max(1, int(2.0 / max(timeout, 0.05)))
     timeout_count = 0
 
+    # R8: post-stats EOF watchdog. The parser flips its phase to
+    # POST_RUN_RECAP exactly when it consumes a ``v2_playbook_on_stats``
+    # event (see PtyStreamParser._is_jsonl_stats_event), so tracking
+    # phase is the canonical way to know stats has been seen. Once
+    # that fires, the per-read timeout below grows to ``_EOF_WATCHDOG_S``
+    # so a child that never closes its PTY can't hang us forever, and
+    # the next post-stats TIMEOUT turns into a synthetic EOF + warning.
+
     while True:
+        # Post-stats: a single ``expect`` call covers the whole watchdog
+        # window. Pre-stats: keep the regular per-read timeout so the
+        # liveness / prompt heuristics still tick on the normal cadence.
+        # R11: once ``v2_playbook_on_stats`` has set the run's
+        # ``end_time``, shrink the watchdog to the "quiet" window.
+        if parser.phase == StreamPhase.POST_RUN_RECAP and state.end_time is not None:
+            read_timeout = _EOF_WATCHDOG_S_QUIET
+        else:
+            read_timeout = (
+                _EOF_WATCHDOG_S if parser.phase == StreamPhase.POST_RUN_RECAP else timeout
+            )
         try:
-            idx = child.expect(patterns, timeout=timeout)
+            idx = child.expect(patterns, timeout=read_timeout)
         except pexpect.exceptions.EOF:
-            _flush_pending(child, parser, renderer, sink)
+            _flush_pending(child, parser, state, renderer, sink)
             break
 
         if idx == newline_idx:
-            line = (child.before or "") + (child.after or "")
+            before: str = cast("str", child.before or "")
+            after: str = cast("str", child.after or "")
+            line = before + after
             _trace("newline", line=line[:200])
-            _feed(line, parser, renderer, sink, diag=diag)
+            # pexpect's `before` carries the entire unread chunk since
+            # the last match; when that chunk spans multiple JSONL
+            # events (the common case once the child has flushed its
+            # final stats event), it contains every event concatenated
+            # by `\n`. ``PtyStreamParser.feed_line`` treats the payload
+            # as a single JSON document, so a multi-event blob fails
+            # to parse and falls through to plaintext — every event in
+            # the blob is silently dropped from ``events.jsonl``. Split
+            # on the actual newline boundaries so each event lands in
+            # its own ``feed_line`` call.
+            for sub_line in line.splitlines():
+                if not sub_line:
+                    continue
+                _feed(sub_line, parser, state, renderer, sink, diag=diag)
+            # pexpect's ``_before`` StringIO holds the per-match buffer
+            # that's exposed as ``child.before`` on the next match.
+            # When the post-match ``isalive`` break runs, it calls
+            # ``_flush_pending`` which reads ``child.before`` again —
+            # the same lines we just fed. Reset the documented per-match
+            # accumulator to an empty string so the re-read sees nothing.
+            # The setter is a plain attribute write (not a property);
+            # some pexpect builds don't expose it as settable, hence
+            # the AttributeError fallback.
+            try:
+                child.before = ""
+            except AttributeError:
+                pass
             # Reset to 0 (not max(stall_count, 0)) — a newline always
             # ends a silent window, including the "already-handled"
             # window marked by negative stall_count.
             stall_count = 0
+            # R10: the child may have exited between ``expect`` returning
+            # and now (the Python subprocess finished writing its
+            # events and ``sys.exit(0)`` raced with pexpect's match).
+            # Check liveness AFTER feeding the newline payload so the
+            # trailing events from the same PTY read aren't silently
+            # dropped — the previous ordering broke the loop on the
+            # last batch and lost events 7/8 in the fixture.
+            if not child.isalive():
+                _flush_pending(child, parser, state, renderer, sink)
+                break
         elif idx == eof_idx:
             _trace("eof", leftover=(child.before or "")[:200])
-            _flush_pending(child, parser, renderer, sink)
+            _flush_pending(child, parser, state, renderer, sink)
             break
         elif idx == timeout_idx:
-            # The parser's plaintext_lines accumulates every non-JSONL,
-            # non-warning line that's gone through `_feed`. The last
-            # entry is our window into "what did the child say right
-            # before going quiet?" — which lets us catch the case
-            # where ansible emits ``[Task name]\n<prompt>:`` and the
-            # header line was already consumed before the prompt's
-            # TIMEOUT fired.
+            # R8: post-stats timeout = EOF watchdog fired. The child
+            # refused to close its PTY within ``_EOF_WATCHDOG_S`` of
+            # the final stats event — bail out as if EOF had arrived
+            # so the run can complete.
+            if parser.phase == StreamPhase.POST_RUN_RECAP:
+                warning = (
+                    f"EOF watchdog fired after {_EOF_WATCHDOG_S:.0f}s — "
+                    "ansible-playbook child did not close its PTY after "
+                    "v2_playbook_on_stats; treating as synthetic EOF"
+                )
+                logger.warning(warning)
+                renderer.print_log(f"[aom] {warning}")
+                _flush_pending(child, parser, state, renderer, sink)
+                break
+            # Pre-stats timeout: same liveness / prompt heuristics as
+            # before — the watchdog doesn't apply yet.
             prior = parser.plaintext_lines[-1] if parser.plaintext_lines else None
             # Rebuild a multi-line ``|`` pause block whose terminating
             # ``:`` landed on its own line (the bare-colon ``prior`` alone
@@ -530,14 +696,18 @@ def _drive(
                 diag.note_stall(stall_count if stall_count > 0 else 0)
             timeout_count += 1
             if timeout_count >= cpu_sample_every:
-                renderer.note_subprocess_active(_sample_subprocess_active(child.pid))
+                pid = child.pid
+                if pid is not None:
+                    renderer.note_subprocess_active(_sample_subprocess_active(pid))
                 timeout_count = 0
             continue
         else:
             # Password prompt fired. Build the prompt text from the
             # pre-match content (which may contain prior plaintext we
             # haven't routed yet) and the matched prompt itself.
-            prompt = (child.before or "") + (child.after or "")
+            prompt_before: str = cast("str", child.before or "")
+            prompt_after: str = cast("str", child.after or "")
+            prompt = prompt_before + prompt_after
             _trace("password-pattern", prompt=prompt[:200])
             renderer.note_pty_bytes()
             password = renderer.handle_password_prompt(prompt)
@@ -567,14 +737,14 @@ def _consume_unread(child: pexpect.spawn) -> str:
         # StringIO internally; the setter replaces it with a fresh one).
         try:
             child.buffer = ""
-        except Exception:
+        except AttributeError:
             # Defensive: some pexpect versions/spawn variants don't
             # support direct buffer assignment. Fall back to a
             # read_nonblocking drain.
             try:
                 child.read_nonblocking(size=len(pending), timeout=0)
-            except Exception:
-                pass
+            except pexpect.exceptions.ExceptionPexpect:
+                logger.debug("buffer drain via read_nonblocking failed", exc_info=True)
     return pending
 
 
@@ -606,6 +776,7 @@ def _fire_prompt(
     try:
         answer = renderer.handle_interactive_prompt(prompt_text)
     except Exception:
+        logger.warning("interactive prompt handler crashed; sending empty line", exc_info=True)
         answer = ""
     child.sendline(answer)
     sink.record_stderr(prompt_text.rstrip())
@@ -709,6 +880,7 @@ def _handle_timeout_branch(
 def _flush_pending(
     child: pexpect.spawn,
     parser: PtyStreamParser,
+    state: RunState,
     renderer: Renderer,
     sink: _SessionSink | _NullSink,
 ) -> None:
@@ -717,15 +889,31 @@ def _flush_pending(
     EOF often arrives without a trailing newline — pexpect leaves the last
     fragment in `child.before`. We treat it as a terminal line so its event,
     if any, still reaches the renderer.
+
+    When the child died mid-write, ``child.before`` may also hold multiple
+    ``\\n``-separated events that arrived in the same PTY read. Feed each
+    non-empty line individually; ``PtyStreamParser.feed_line`` can only
+    parse one JSON object per call.
+
+    R17: also drain ``child.buffer`` (pexpect's internal unread accumulator).
+    After the newline branch resets ``child.before = ""`` and the
+    ``isalive()`` check fires, ``child.buffer`` may still hold events that
+    arrived in the same PTY read but after the matched ``\\n``. Without this,
+    trailing events are silently dropped when the child exits between
+    ``expect()`` returning and the ``isalive()`` check.
     """
-    leftover = child.before or ""
-    if leftover.strip():
-        _feed(leftover, parser, renderer, sink)
+    leftover = (child.before or "") + (_peek_unread(child) or "")
+    if not leftover.strip():
+        return
+    for sub_line in leftover.splitlines():
+        if sub_line:
+            _feed(sub_line, parser, state, renderer, sink)
 
 
 def _feed(
     line: str,
     parser: PtyStreamParser,
+    state: RunState,
     renderer: Renderer,
     sink: _SessionSink | _NullSink,
     *,
@@ -748,6 +936,13 @@ def _feed(
     formulae) keeps the heartbeat tracker in a defined state from
     its very first ``task_start`` event onwards.
 
+    ``state`` (the runner's own RunState) is fed events in parallel
+    with the renderer's state so the post-stats watchdog logic in
+    ``_drive`` can read ``state.end_time`` without depending on
+    renderer-private attributes. The renderer's RunState is the
+    source of truth for display; this one is read-only outside the
+    watchdog timeout selection.
+
     When ``diag`` is supplied, it receives ``note_pty_bytes(len(line))``
     plus a ``note_event`` per parsed JSONL event — that's how the
     diagnostics histogram is built (also fires the ``first_event``
@@ -759,6 +954,11 @@ def _feed(
 
     trace_events = diagnostics.is_debug()
     for event in parser.feed_line(line):
+        # R11: feed the runner's RunState so ``state.end_time`` is set
+        # when ``v2_playbook_on_stats`` is consumed. The renderer's own
+        # ``update_state`` does this too for display purposes; this call
+        # is what makes ``_drive``'s quiet-watchdog selection work.
+        state.handle_event(event)
         sink.record_event(event)
         renderer.update_state(event)
         if diag is not None:
@@ -889,5 +1089,10 @@ def _sample_subprocess_active(pid: int) -> bool:
     except psutil.Error:
         cache.pop(pid, None)
         return False
-    except Exception:
+    except OSError, AttributeError:
+        # OSError: e.g. race where the PID disappears between
+        # Process(pid) and is_running() returning True.
+        # AttributeError: psutil sometimes raises this on exotic platforms.
+        logger.debug("psutil CPU sampling failed", exc_info=True)
+        cache.pop(pid, None)
         return False

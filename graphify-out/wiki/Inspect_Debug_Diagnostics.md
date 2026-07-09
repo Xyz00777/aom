@@ -1,44 +1,58 @@
 # Inspect Debug Diagnostics
 
-> 16 nodes · cohesion 0.18
+> 21 nodes · cohesion 0.11
 
 ## Key Concepts
 
-- **test_inspect_debug.py** (12 connections) — `tests/unit/test_inspect_debug.py`
-- **format_diagnostics_section()** (7 connections) — `src/ansible_aom/inspect/formatters.py`
-- **_write_session()** (7 connections) — `tests/unit/test_inspect_debug.py`
-- **test_inspect_debug_json_emits_raw_record()** (4 connections) — `tests/unit/test_inspect_debug.py`
-- **test_inspect_debug_json_legacy_session_outputs_null()** (3 connections) — `tests/unit/test_inspect_debug.py`
-- **test_inspect_debug_on_legacy_session_prints_fallback()** (3 connections) — `tests/unit/test_inspect_debug.py`
-- **test_inspect_debug_prints_histogram()** (3 connections) — `tests/unit/test_inspect_debug.py`
-- **test_inspect_debug_with_specific_session_id()** (3 connections) — `tests/unit/test_inspect_debug.py`
-- **test_format_diagnostics_recording_disabled_surfaces_reason()** (2 connections) — `tests/unit/test_inspect_debug.py`
-- **test_format_diagnostics_section_with_full_record()** (2 connections) — `tests/unit/test_inspect_debug.py`
-- **test_format_diagnostics_section_with_none_returns_fallback()** (2 connections) — `tests/unit/test_inspect_debug.py`
-- **test_inspect_debug_no_sessions()** (2 connections) — `tests/unit/test_inspect_debug.py`
-- **Render the ``diagnostics.json`` payload as a plain-text section.      Returns a** (1 connections) — `src/ansible_aom/inspect/formatters.py`
-- **Phase 6: ``aom inspect --debug`` prints diagnostics.json contents.  Spec: docs/s** (1 connections) — `tests/unit/test_inspect_debug.py`
-- **``--debug --json`` writes the diagnostics record as a single JSON     object for** (1 connections) — `tests/unit/test_inspect_debug.py`
-- **_reset()** (1 connections) — `tests/unit/test_inspect_debug.py`
+- **_BoundedSet** (16 connections) — `src/ansible_aom/compact/renderer.py`
+- **.__init__()** (10 connections) — `src/ansible_aom/compact/renderer.py`
+- **TestColorEnabled** (10 connections) — `tests/compact/test_status_bar_colors.py`
+- **.start()** (9 connections) — `src/ansible_aom/compact/renderer.py`
+- **_color_enabled()** (6 connections) — `src/ansible_aom/compact/format.py`
+- **.stop()** (6 connections) — `src/ansible_aom/compact/renderer.py`
+- **.handle_interactive_prompt()** (4 connections) — `src/ansible_aom/compact/renderer.py`
+- **.handle_password_prompt()** (4 connections) — `src/ansible_aom/compact/renderer.py`
+- **.__init__()** (2 connections) — `src/ansible_aom/compact/renderer.py`
+- **.test_off_when_no_color_set_even_for_tty()** (2 connections) — `tests/compact/test_status_bar_colors.py`
+- **.test_off_when_not_a_tty()** (2 connections) — `tests/compact/test_status_bar_colors.py`
+- **.test_on_when_tty_and_no_color_unset()** (2 connections) — `tests/compact/test_status_bar_colors.py`
+- **True if we should emit SGR codes — TTY only, NO_COLOR honored.** (1 connections) — `src/ansible_aom/compact/format.py`
+- **set** (1 connections)
+- **Stop rendering and clean up resources.          Restores terminal state, flushes** (1 connections) — `src/ansible_aom/compact/renderer.py`
+- **Initialize the compact renderer.          Args:             is_tty: Whether stdo** (1 connections) — `src/ansible_aom/compact/renderer.py`
+- **Start rendering a playbook run.          Initializes the RunState, starts the Ri** (1 connections) — `src/ansible_aom/compact/renderer.py`
+- **Surface a pause / vars_prompt-style prompt and capture one line.          Mirror** (1 connections) — `src/ansible_aom/compact/renderer.py`
+- **Handle a password prompt.          Stops the Rich Live display, delegates to the** (1 connections) — `src/ansible_aom/compact/renderer.py`
+- **A ``set`` that drops itself when it exceeds a cap on insert.      R14: the compa** (1 connections) — `src/ansible_aom/compact/renderer.py`
+- **The gating predicate honours both the TTY flag and ``NO_COLOR``.** (1 connections) — `tests/compact/test_status_bar_colors.py`
 
 ## Relationships
 
-- [[Run Config Key Normalization]] (7 shared connections)
-- [[Playbook Event Parsing]] (1 shared connections)
-- [[Inspect CLI Commands]] (1 shared connections)
-- [[Per-Task Overhead Analysis]] (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (6 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (4 shared connections)
+- [Warning Classification Tests](Warning_Classification_Tests.md) (4 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (3 shared connections)
+- [Renderer Set Definitions](Renderer_Set_Definitions.md) (2 shared connections)
+- [Heartbeat Liveness Tracker](Heartbeat_Liveness_Tracker.md) (2 shared connections)
+- [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (2 shared connections)
+- [Status Icon Unicode Mapping](Status_Icon_Unicode_Mapping.md) (2 shared connections)
+- [Renderer Event Protocol](Renderer_Event_Protocol.md) (1 shared connections)
+- [JSON Renderer](JSON_Renderer.md) (1 shared connections)
+- [Session List View](Session_List_View.md) (1 shared connections)
+- [Main TUI Screen](Main_TUI_Screen.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/inspect/formatters.py`
-- `tests/unit/test_inspect_debug.py`
+- `src/ansible_aom/compact/format.py`
+- `src/ansible_aom/compact/renderer.py`
+- `tests/compact/test_status_bar_colors.py`
 
 ## Audit Trail
 
-- EXTRACTED: 47 (87%)
-- INFERRED: 7 (13%)
+- EXTRACTED: 51 (62%)
+- INFERRED: 31 (38%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

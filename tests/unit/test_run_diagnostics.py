@@ -113,9 +113,11 @@ class _FakeSink:
 
 def test_feed_with_diag_increments_histogram() -> None:
     from ansible_aom.ansible.runner import _feed
+    from ansible_aom.core.run_state import RunState
 
     renderer = MagicMock()
     parser = _execution_parser()
+    state = RunState(playbook="x")
     sink = _FakeSink()
     diag = diagnostics.RunDiagnostics()
 
@@ -124,7 +126,7 @@ def test_feed_with_diag_increments_histogram() -> None:
         ' "task": {"id": "t1"}, "hosts": {"web1": {"ok": true}}}\n'
     )
 
-    _feed(line, parser, renderer, sink, diag=diag)
+    _feed(line, parser, state, renderer, sink, diag=diag)
 
     assert diag.events_received == 1
     assert diag.event_histogram == {"v2_runner_on_ok": 1}
@@ -134,11 +136,13 @@ def test_feed_with_diag_increments_histogram() -> None:
 def test_feed_without_diag_does_not_crash() -> None:
     """Backwards-compat: existing call sites that don't pass diag still work."""
     from ansible_aom.ansible.runner import _feed
+    from ansible_aom.core.run_state import RunState
 
     renderer = MagicMock()
     parser = PtyStreamParser()
+    state = RunState(playbook="x")
     sink = _FakeSink()
-    _feed("PLAY [test] *** \n", parser, renderer, sink)  # no diag kwarg
+    _feed("PLAY [test] *** \n", parser, state, renderer, sink)  # no diag kwarg
     assert renderer.note_pty_bytes.called
 
 

@@ -1,45 +1,42 @@
 # Panel Refresh Snapshot
 
-> 11 nodes · cohesion 0.18
+> 16 nodes · cohesion 0.21
 
 ## Key Concepts
 
-- **._render_status_panel()** (14 connections) — `src/ansible_aom/compact/renderer.py`
-- **._capture_panel_snapshot()** (7 connections) — `src/ansible_aom/compact/renderer.py`
-- **_compute_tree_budget()** (6 connections) — `src/ansible_aom/compact/format.py`
-- **._render_status_bar()** (3 connections) — `src/ansible_aom/compact/renderer.py`
-- **.tick()** (3 connections) — `src/ansible_aom/compact/renderer.py`
-- **test_compute_tree_budget_math()** (2 connections) — `tests/compact/test_tree_render.py`
-- **Tree height budget in lines.      Baseline ~½ of terminal rows; +1 line per 3 ac** (1 connections) — `src/ansible_aom/compact/format.py`
-- **Refresh the status panel without processing an event.          The runner calls** (1 connections) — `src/ansible_aom/compact/renderer.py`
-- **Compute and push the current panel (status bar + tree + hosts).          Compose** (1 connections) — `src/ansible_aom/compact/renderer.py`
-- **Deprecated alias — kept for any test references that still call         the old** (1 connections) — `src/ansible_aom/compact/renderer.py`
-- **Render the current tree and host overview as static lines.          Returns a ``** (1 connections) — `src/ansible_aom/compact/renderer.py`
+- **test_session_diagnostics.py** (10 connections) — `tests/unit/test_session_diagnostics.py`
+- **Path** (7 connections)
+- **_start_and_end()** (7 connections) — `tests/unit/test_session_diagnostics.py`
+- **test_disk_failure_during_diagnostics_write_does_not_break_end()** (5 connections) — `tests/unit/test_session_diagnostics.py`
+- **test_diagnostics_json_handles_no_run_diagnostics()** (4 connections) — `tests/unit/test_session_diagnostics.py`
+- **test_diagnostics_json_written_alongside_meta()** (4 connections) — `tests/unit/test_session_diagnostics.py`
+- **test_load_session_returns_diagnostics_when_present()** (4 connections) — `tests/unit/test_session_diagnostics.py`
+- **test_load_session_returns_none_diagnostics_for_legacy_session()** (4 connections) — `tests/unit/test_session_diagnostics.py`
+- **test_diagnostics_json_includes_aom_version()** (3 connections) — `tests/unit/test_session_diagnostics.py`
+- **MonkeyPatch** (1 connections)
+- **Phase 5: SessionManager writes diagnostics.json next to meta.json.  Spec: docs/s** (1 connections) — `tests/unit/test_session_diagnostics.py`
+- **diagnostics.json write is best-effort: an OSError must not propagate     out of** (1 connections) — `tests/unit/test_session_diagnostics.py`
+- **end_session writes diagnostics.json containing the schema version + histogram.** (1 connections) — `tests/unit/test_session_diagnostics.py`
+- **If the run path never published a RunDiagnostics, schema still writes     with z** (1 connections) — `tests/unit/test_session_diagnostics.py`
+- **A session directory without diagnostics.json (older session) is still loadable;** (1 connections) — `tests/unit/test_session_diagnostics.py`
+- **_reset()** (1 connections) — `tests/unit/test_session_diagnostics.py`
 
 ## Relationships
 
-- [[Compact Renderer Implementation]] (4 shared connections)
-- [[Event Log Emission]] (3 shared connections)
-- [[Tree Render Snapshot Tests]] (2 shared connections)
-- [[Host Overview Table]] (2 shared connections)
-- [[Tree Block Animation]] (2 shared connections)
-- [[Total Task Counting]] (2 shared connections)
-- [[Play Definition Tree Population]] (2 shared connections)
-- [[Color ASCII Fallback]] (2 shared connections)
-- [[Compact Renderer Formatters]] (1 shared connections)
+- [Run Config Key Normalization](Run_Config_Key_Normalization.md) (2 shared connections)
+- [Total Task Counting](Total_Task_Counting.md) (2 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/compact/format.py`
-- `src/ansible_aom/compact/renderer.py`
-- `tests/compact/test_tree_render.py`
+- `tests/unit/test_session_diagnostics.py`
 
 ## Audit Trail
 
-- EXTRACTED: 26 (65%)
-- INFERRED: 14 (35%)
+- EXTRACTED: 51 (93%)
+- INFERRED: 4 (7%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

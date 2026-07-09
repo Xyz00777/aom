@@ -1,0 +1,37 @@
+# AOM built-in default configuration. Layered (lowest → highest):
+#   this file < /etc/aom/aom_config.yaml < ~/.config/aom/aom_config.yaml
+#   < ./.aom_config.yaml < $AOM_CONFIG < --config < CLI value flags.
+# All fields here are AOM's compile-time defaults; users override per layer.
+
+capture:
+  verbose: false          # off by default; opt-in via --capture-verbose
+  include_setup: false    # drop ansible.builtin.setup / gather_facts output
+  exclude_modules:        # additional module FQCNs to skip
+    - ansible.builtin.debug
+
+redaction:
+  enabled: true           # always-on safety net (Layer 0–3 are non-optional)
+  whitelist: []           # extra exact-match keys to NOT redact
+  custom_fields: []       # extra exact-match secret keys
+  custom_key_patterns: [] # regex on lowercased keys
+  custom_patterns: []     # [{regex, replacement}] applied to string values
+
+live:
+  show_failed_hint: true
+  show_warnings: true
+  show_deprecations: true
+
+inspect:
+  # Reserved for v1.1+: per-tab config, default tab, etc.
+  default_tab: summary
+
+tui:
+  # Reserved: keybindings, theme overrides.
+  theme: default
+
+log:
+  max_lines: 50000
+
+session:
+  keep_sessions: 100
+  keep_days: 30

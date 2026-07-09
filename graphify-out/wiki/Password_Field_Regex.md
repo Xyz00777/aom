@@ -1,30 +1,40 @@
 # Password Field Regex
 
-> 6 nodes · cohesion 0.33
+> 16 nodes · cohesion 0.12
 
 ## Key Concepts
 
-- **TestPASSWORDMatch** (5 connections) — `tests/unit/test_redaction.py`
-- **.test_false_positives_handled()** (2 connections) — `tests/unit/test_redaction.py`
-- **.test_matches_password_variants()** (2 connections) — `tests/unit/test_redaction.py`
-- **Tests for TC-155: PASSWORD_MATCH regex pattern matching.** (1 connections) — `tests/unit/test_redaction.py`
-- **TC-155: Regex matches known password field name variants.** (1 connections) — `tests/unit/test_redaction.py`
-- **TC-155 edge case: Fields containing 'pass' that match regex but aren't passwords** (1 connections) — `tests/unit/test_redaction.py`
+- **Section 11: Icons and Theming** (16 connections) — `TEST_SPECIFICATION.md`
+- **TC-365: Status Icon OK - Green Circle** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-366: Status Icon Changed - Yellow Diamond** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-367: Status Icon Failed - Bold Red X** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-368: Status Icon Unreachable - Dim Red Circle** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-369: Status Icon Running - Animated Cycle** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-370: Status Icon Pending - Dim Square** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-371: Status Icon Skipped - Dim Circle Outline** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-372: Running Animation Frame Rate** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-373: Tree Icon Collapsed Node** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-374: Tree Icon Expanded Node** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-375: Theme Cycling with Alt+T** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-376: Theme CSS Variable Update** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-377: Unicode Fallback to ASCII** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-378: Color Fallback to 16 Colors** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-379: Monochrome Color Stripping** (1 connections) — `TEST_SPECIFICATION.md`
 
 ## Relationships
 
-- [[Secret Redaction Configuration]] (2 shared connections)
+- [Failure Recap Formatting](Failure_Recap_Formatting.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_redaction.py`
+- `TEST_SPECIFICATION.md`
 
 ## Audit Trail
 
-- EXTRACTED: 11 (92%)
-- INFERRED: 1 (8%)
+- EXTRACTED: 31 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

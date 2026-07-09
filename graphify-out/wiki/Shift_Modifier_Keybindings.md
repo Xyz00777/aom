@@ -1,38 +1,45 @@
 # Shift Modifier Keybindings
 
-> 12 nodes · cohesion 0.17
+> 18 nodes · cohesion 0.27
 
 ## Key Concepts
 
-- **TestShiftModifiers** (10 connections) — `tests/tui/test_keybindings.py`
-- **.test_lowercase_r_is_refresh()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_lowercase_s_is_sort()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_uppercase_g_is_bottom()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_uppercase_r_is_rerun()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_uppercase_s_is_settings()** (3 connections) — `tests/tui/test_keybindings.py`
-- **Tests for shift modifier keybindings - R vs r, S vs s.** (1 connections) — `tests/tui/test_keybindings.py`
-- **r' is refresh, not rerun.** (1 connections) — `tests/tui/test_keybindings.py`
-- **R' is rerun, different from 'r'.** (1 connections) — `tests/tui/test_keybindings.py`
-- **s' is sort cycle, not settings.** (1 connections) — `tests/tui/test_keybindings.py`
-- **S' is settings, different from 's'.** (1 connections) — `tests/tui/test_keybindings.py`
-- **G' jumps to bottom of tree.** (1 connections) — `tests/tui/test_keybindings.py`
+- **_FakeDisplay** (14 connections) — `tests/integration/test_renderer_eta.py`
+- **test_renderer_eta.py** (12 connections) — `tests/integration/test_renderer_eta.py`
+- **_setup()** (10 connections) — `tests/integration/test_renderer_eta.py`
+- **_complete_task()** (8 connections) — `tests/integration/test_renderer_eta.py`
+- **test_fixed_floor_not_scaled_by_fast_variable_task()** (8 connections) — `tests/integration/test_renderer_eta.py`
+- **test_long_running_task_burns_estimate_down()** (8 connections) — `tests/integration/test_renderer_eta.py`
+- **test_no_estimate_without_prior()** (7 connections) — `tests/integration/test_renderer_eta.py`
+- **_task()** (6 connections) — `tests/integration/test_renderer_eta.py`
+- **.start()** (5 connections) — `tests/integration/test_renderer_eta.py`
+- **_prior()** (5 connections) — `tests/integration/test_renderer_eta.py`
+- **test_eta_appears_once_gate_opens()** (3 connections) — `tests/integration/test_renderer_eta.py`
+- **test_no_eta_below_warmup_gate()** (3 connections) — `tests/integration/test_renderer_eta.py`
+- **test_unmatched_path_does_not_count()** (3 connections) — `tests/integration/test_renderer_eta.py`
+- **.__init__()** (1 connections) — `tests/integration/test_renderer_eta.py`
+- **.print_log()** (1 connections) — `tests/integration/test_renderer_eta.py`
+- **.stop()** (1 connections) — `tests/integration/test_renderer_eta.py`
+- **.update()** (1 connections) — `tests/integration/test_renderer_eta.py`
+- **Renderer wiring for the live run-duration estimate.  The renderer builds a :clas** (1 connections) — `tests/integration/test_renderer_eta.py`
 
 ## Relationships
 
-- [[Global Key Bindings]] (6 shared connections)
-- [[TUI Keybindings Config]] (2 shared connections)
-- [[TUI Keybindings Tests]] (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (6 shared connections)
+- [CLI Argument Parser](CLI_Argument_Parser.md) (5 shared connections)
+- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (2 shared connections)
+- [JSON Renderer](JSON_Renderer.md) (2 shared connections)
 
 ## Source Files
 
-- `tests/tui/test_keybindings.py`
+- `tests/integration/test_renderer_eta.py`
 
 ## Audit Trail
 
-- EXTRACTED: 24 (77%)
-- INFERRED: 7 (23%)
+- EXTRACTED: 89 (92%)
+- INFERRED: 8 (8%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,40 +1,41 @@
 # Ansible Posix Install Prompt
 
-> 12 nodes · cohesion 0.21
+> 17 nodes · cohesion 0.12
 
 ## Key Concepts
 
-- **test_posix_callback.py** (12 connections) — `tests/unit/test_posix_callback.py`
-- **_generate_install_prompt()** (5 connections) — `tests/unit/test_posix_callback.py`
-- **TestAnsiblePosixInstallPrompt** (5 connections) — `tests/unit/test_posix_callback.py`
-- **.test_install_prompt_format()** (3 connections) — `tests/unit/test_posix_callback.py`
-- **.test_install_prompt_function_exists()** (3 connections) — `tests/unit/test_posix_callback.py`
-- **.test_install_prompt_message_contains_expected_text()** (3 connections) — `tests/unit/test_posix_callback.py`
-- **Tests for JSONL callback plugin configuration (TC-067 to TC-071).  Test cases co** (1 connections) — `tests/unit/test_posix_callback.py`
-- **Tests for TC-068: ansible.posix Install Prompt.** (1 connections) — `tests/unit/test_posix_callback.py`
-- **TC-068: Prompt shows installation message.** (1 connections) — `tests/unit/test_posix_callback.py`
-- **TC-068: Prompt format includes confirmation options.** (1 connections) — `tests/unit/test_posix_callback.py`
-- **TC-068: Install prompt helper function is callable.** (1 connections) — `tests/unit/test_posix_callback.py`
-- **Generate the install prompt message for missing ansible.posix.      Returns:** (1 connections) — `tests/unit/test_posix_callback.py`
+- **2026-06-25 — Bug A & B fixes applied to src/ansible_aom/core/tree.py** (6 connections) — `.sisyphus/notepads/fix-task-counting/learnings.md`
+- **2026-06-25 — Regression fix: post-completion icons reset to PENDING** (5 connections) — `.sisyphus/notepads/fix-task-counting/learnings.md`
+- **2026-06-25 — TUI tree-view projection-based refresh (Bug D)** (5 connections) — `.sisyphus/notepads/fix-task-counting/learnings.md`
+- **learnings.md** (3 connections) — `.sisyphus/notepads/fix-task-counting/learnings.md`
+- **Bug A: Sibling role accumulation in role_stack** (1 connections) — `.sisyphus/notepads/fix-task-counting/learnings.md`
+- **Bug: `apply_state_icons` never removes completed task nodes** (1 connections) — `.sisyphus/notepads/fix-task-counting/learnings.md`
+- **Bug B: Footer count included non-task structural lines** (1 connections) — `.sisyphus/notepads/fix-task-counting/learnings.md`
+- **Bug C: Parent-stub double counting in tree.py preflight passes (2026-06-25)** (1 connections) — `.sisyphus/notepads/fix-task-counting/learnings.md`
+- **Bug: `populate_from_definitions` in the else branch reset icons to PENDING** (1 connections) — `.sisyphus/notepads/fix-task-counting/learnings.md`
+- **Fix: hybrid two-mode refresh** (1 connections) — `.sisyphus/notepads/fix-task-counting/learnings.md`
+- **Fix: Projection-based rebuild in `MainScreen.update_from_state`** (1 connections) — `.sisyphus/notepads/fix-task-counting/learnings.md`
+- **Pattern to remember** (1 connections) — `.sisyphus/notepads/fix-task-counting/learnings.md`
+- **Test added** (1 connections) — `.sisyphus/notepads/fix-task-counting/learnings.md`
+- **Tests updated** (1 connections) — `.sisyphus/notepads/fix-task-counting/learnings.md`
+- **Verification** (1 connections) — `.sisyphus/notepads/fix-task-counting/learnings.md`
+- **Verification** (1 connections) — `.sisyphus/notepads/fix-task-counting/learnings.md`
+- **Verification** (1 connections) — `.sisyphus/notepads/fix-task-counting/learnings.md`
 
 ## Relationships
 
-- [[JSONL Environment Variable]] (2 shared connections)
-- [[Ansible Core Version Check]] (2 shared connections)
-- [[Ansible Posix Availability]] (2 shared connections)
-- [[Ansible Posix Version Check]] (2 shared connections)
-- [[Version String Parsing]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/unit/test_posix_callback.py`
+- `.sisyphus/notepads/fix-task-counting/learnings.md`
 
 ## Audit Trail
 
-- EXTRACTED: 37 (100%)
+- EXTRACTED: 32 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

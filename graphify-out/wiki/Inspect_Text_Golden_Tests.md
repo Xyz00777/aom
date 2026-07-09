@@ -1,49 +1,51 @@
 # Inspect Text Golden Tests
 
-> 20 nodes · cohesion 0.17
+> 30 nodes · cohesion 0.07
 
 ## Key Concepts
 
-- **render_session()** (16 connections) — `src/ansible_aom/inspect/text.py`
-- **text.py** (10 connections) — `src/ansible_aom/inspect/text.py`
-- **test_inspect_text_golden.py** (7 connections) — `tests/compact/test_inspect_text_golden.py`
-- **_load()** (6 connections) — `tests/compact/test_inspect_text_golden.py`
-- **_render_failures()** (6 connections) — `src/ansible_aom/inspect/text.py`
-- **_render_header()** (5 connections) — `src/ansible_aom/inspect/text.py`
-- **_fmt_duration()** (4 connections) — `src/ansible_aom/inspect/text.py`
-- **_iter_failed_tasks()** (4 connections) — `src/ansible_aom/inspect/text.py`
-- **_render_detail()** (4 connections) — `src/ansible_aom/inspect/text.py`
-- **render_session_list()** (4 connections) — `src/ansible_aom/inspect/text.py`
-- **test_render_clean_run_has_header_and_no_failure_block()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
-- **test_render_failed_loop_shows_msg_and_failed_items()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
-- **test_render_includes_stderr_tail_on_failure()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
-- **test_render_running_shows_running_status()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
-- **test_render_unreachable_shows_connection_msg()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
-- **_host_counts_line()** (3 connections) — `src/ansible_aom/inspect/text.py`
-- **_render_stderr_tail()** (2 connections) — `src/ansible_aom/inspect/text.py`
-- **Golden-frame tests for the text-mode inspect renderer.** (1 connections) — `tests/compact/test_inspect_text_golden.py`
-- **Plain-text rendering of an inspect session.  Used by ``aom inspect --text`` (and** (1 connections) — `src/ansible_aom/inspect/text.py`
-- **Walk the tree yielding (task_node, host_node) for every failed/unreachable host.** (1 connections) — `src/ansible_aom/inspect/text.py`
+- **Research: `aom inspect diff <session1> <session2>` Implementation (2026-04-20)** (11 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **7. OPEN QUESTIONS for User Decision** (6 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **1. Existing Tools Research** (4 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **2. Task Matching Strategies** (4 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **3. Comparison Dimensions** (4 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **4. Output Format: Table View** (4 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **6. Recommended Implementation** (4 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **1.1 ARA (Ansible Run Analysis)** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **1.2 Ansible-Specific Diff Tools** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **1.3 General Diff Tools (Applicable Patterns)** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **2.1 Available Identifiers** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **2.2 Matching Strategy Comparison** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **2.3 Recommended Matching Strategy: Hybrid UUID + Path** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **3.1 Task-Level Comparison (Per Task)** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **3.2 Host-Level Comparison (Per Host)** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **3.3 Playbook-Level Comparison** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **4.1 Task-Centric View (`--task` flag)** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **4.2 Host-Centric View (`--host` flag)** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **4.3 Rich Table Implementation Pattern** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **6.1 Data Models for Diff** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **6.2 Core Diff Function** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **6.3 CLI Command** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **8. Implementation Checklist** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **9. References** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **Executive Summary** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- *... and 5 more nodes in this community*
 
 ## Relationships
 
-- [[Inspect Data Model Builders]] (5 shared connections)
-- [[Task Tree Navigation]] (2 shared connections)
-- [[Design Specs Plans]] (2 shared connections)
-- [[Inspect TUI Widget Data]] (1 shared connections)
-- [[Inspect CLI Commands]] (1 shared connections)
+- [Real Ansible Integration](Real_Ansible_Integration.md) (1 shared connections)
+- [Community 555](Community_555.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/inspect/text.py`
-- `tests/compact/test_inspect_text_golden.py`
+- `.sisyphus/notepads/new-spec/open-questions.md`
 
 ## Audit Trail
 
-- EXTRACTED: 77 (87%)
-- INFERRED: 12 (13%)
+- EXTRACTED: 60 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

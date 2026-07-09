@@ -1,45 +1,52 @@
 # Ansible Runner Subprocess
 
-> 20 nodes · cohesion 0.13
+> 27 nodes · cohesion 0.11
 
 ## Key Concepts
 
-- **_fake_ansible_command()** (8 connections) — `tests/integration/test_runner.py`
-- **test_runner.py** (6 connections) — `tests/integration/test_runner.py`
-- **TestRunnerPreflight** (6 connections) — `tests/integration/test_runner.py`
-- **TestRunnerHappyPath** (5 connections) — `tests/integration/test_runner.py`
-- **TestRunnerCommandNotFound** (4 connections) — `tests/integration/test_runner.py`
-- **TestRunnerFailureExit** (4 connections) — `tests/integration/test_runner.py`
-- **.test_run_playbook_calls_preflight_and_forwards_definitions()** (4 connections) — `tests/integration/test_runner.py`
-- **.test_run_playbook_forwards_every_preflight_error_to_add_warning()** (4 connections) — `tests/integration/test_runner.py`
-- **.test_run_playbook_marks_failed_on_nonzero_exit()** (3 connections) — `tests/integration/test_runner.py`
-- **.test_run_playbook_calls_renderer_start_and_completion()** (3 connections) — `tests/integration/test_runner.py`
-- **.test_run_playbook_forwards_jsonl_events_to_update_state()** (3 connections) — `tests/integration/test_runner.py`
-- **.test_run_playbook_forwards_preflight_errors_as_warnings()** (3 connections) — `tests/integration/test_runner.py`
-- **.test_run_playbook_returns_127_when_command_missing()** (2 connections) — `tests/integration/test_runner.py`
-- **Integration tests for the ansible-playbook runner.  The runner spawns `ansible-p** (1 connections) — `tests/integration/test_runner.py`
-- **Missing ansible-playbook surfaces as exit 127 without crashing.** (1 connections) — `tests/integration/test_runner.py`
-- **Runner calls run_preflight before spawning and forwards its result.** (1 connections) — `tests/integration/test_runner.py`
-- **Build a (command, args) pair that emits `events` as JSONL then exits.      Retur** (1 connections) — `tests/integration/test_runner.py`
-- **Each error → an add_warning call, even when they share a body.          The coun** (1 connections) — `tests/integration/test_runner.py`
-- **Runner spawns the subprocess and pumps events to the renderer.** (1 connections) — `tests/integration/test_runner.py`
-- **Non-zero subprocess exit becomes 'failed' state.** (1 connections) — `tests/integration/test_runner.py`
+- **_row_count()** (18 connections) — `src/ansible_aom/compact/display.py`
+- **test_row_count.py** (16 connections) — `tests/compact/test_row_count.py`
+- **test_row_count_ignores_ansi_escape_sequences()** (5 connections) — `tests/compact/test_row_count.py`
+- **test_row_count_ansi_long_line_still_wraps_correctly()** (3 connections) — `tests/compact/test_row_count.py`
+- **test_row_count_blank_lines_count_as_one_row_each()** (3 connections) — `tests/compact/test_row_count.py`
+- **test_row_count_exact_width_one_row()** (3 connections) — `tests/compact/test_row_count.py`
+- **test_row_count_multiline_with_one_wrapping_line()** (3 connections) — `tests/compact/test_row_count.py`
+- **test_row_count_narrow_terminal_short_text_wraps()** (3 connections) — `tests/compact/test_row_count.py`
+- **test_row_count_trailing_newline_does_not_add_row()** (3 connections) — `tests/compact/test_row_count.py`
+- **test_display_update_records_wrapped_row_count()** (2 connections) — `tests/compact/test_row_count.py`
+- **test_row_count_double_width_wraps_to_two_rows()** (2 connections) — `tests/compact/test_row_count.py`
+- **test_row_count_empty_string_zero_rows()** (2 connections) — `tests/compact/test_row_count.py`
+- **test_row_count_just_over_double_width_three_rows()** (2 connections) — `tests/compact/test_row_count.py`
+- **test_row_count_one_over_width_wraps_to_two_rows()** (2 connections) — `tests/compact/test_row_count.py`
+- **test_row_count_short_line_one_row()** (2 connections) — `tests/compact/test_row_count.py`
+- **test_row_count_two_lines_two_rows()** (2 connections) — `tests/compact/test_row_count.py`
+- **test_row_count_two_lines_with_trailing_newline()** (2 connections) — `tests/compact/test_row_count.py`
+- **How many terminal rows `text` occupies at the given terminal `width`.      Each** (1 connections) — `src/ansible_aom/compact/display.py`
+- **Tests for width-aware row counting (roadmap #12).  `_row_count` decides how many** (1 connections) — `tests/compact/test_row_count.py`
+- **ANSI codes are excluded from the wrap calculation; visible chars     are what co** (1 connections) — `tests/compact/test_row_count.py`
+- **After update() in a narrow terminal, _status_rows reflects wrapped rows.      SI** (1 connections) — `tests/compact/test_row_count.py`
+- **After 'abc\\n' the cursor sits on the next row but nothing is rendered there.** (1 connections) — `tests/compact/test_row_count.py`
+- **A line exactly `width` chars long fits on one row (no wrap).** (1 connections) — `tests/compact/test_row_count.py`
+- **First line wraps to 2 rows, second line takes 1 row → 3 total.** (1 connections) — `tests/compact/test_row_count.py`
+- **A 50-char line in a 24-col terminal wraps to ceil(50/24) = 3 rows.** (1 connections) — `tests/compact/test_row_count.py`
+- *... and 2 more nodes in this community*
 
 ## Relationships
 
-- [[Playbook Run Integration Tests]] (7 shared connections)
-- [[Play Definition Tree Population]] (5 shared connections)
+- [Ctrl-C Race Handling](Ctrl-C_Race_Handling.md) (3 shared connections)
+- [Renderer Event Protocol](Renderer_Event_Protocol.md) (2 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_runner.py`
+- `src/ansible_aom/compact/display.py`
+- `tests/compact/test_row_count.py`
 
 ## Audit Trail
 
-- EXTRACTED: 50 (81%)
-- INFERRED: 12 (19%)
+- EXTRACTED: 53 (64%)
+- INFERRED: 30 (36%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

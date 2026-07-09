@@ -294,8 +294,16 @@ class TestArbitraryDepthRendersCorrectly:
         lines = TreeProjection.from_run_state(state).tree_lines(budget=60)
         seq = _line_summary(lines)
 
+        # The pending task ``B : level-two work`` appears at depth 4
+        # alongside the role header for the running task's deeper chain.
+        # A dict comprehension overwrites by depth so the last entry at
+        # each depth wins. Depths 2, 3, 5 must be role headers; depth 4
+        # has both a role and a task (the now-visible pending task) so
+        # we check each depth individually instead.
+        first_role_depth_4 = next(ln for ln in lines if ln.depth == 4 and ln.kind == "role")
+        assert first_role_depth_4 is not None, f"expected a role line at depth=4; tree={seq}"
         kinds_at_depth = {d: k for d, k, _ in seq}
-        for required_depth in (2, 3, 4, 5):
+        for required_depth in (2, 3, 5):
             assert required_depth in kinds_at_depth, (
                 f"expected a role line at depth={required_depth}; "
                 f"only saw kinds at depths {sorted(kinds_at_depth)}; "

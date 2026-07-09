@@ -1,43 +1,49 @@
 # Crash Recovery Auto-Save
 
-> 15 nodes · cohesion 0.12
+> 20 nodes · cohesion 0.13
 
 ## Key Concepts
 
-- **TestStateMachineReset** (8 connections) — `tests/unit/test_state.py`
-- **TestCrashRecoveryAutoSavePartialSession** (7 connections) — `tests/integration/test_error_handling.py`
-- **.test_loads_tasks_state_preserved_on_crash()** (3 connections) — `tests/integration/test_error_handling.py`
-- **.test_running_state_preserved_on_crash()** (3 connections) — `tests/integration/test_error_handling.py`
-- **.test_reset_from_crashed()** (3 connections) — `tests/unit/test_state.py`
-- **.test_reset_from_failed()** (3 connections) — `tests/unit/test_state.py`
-- **.test_reset_from_idle_is_idempotent()** (3 connections) — `tests/unit/test_state.py`
-- **.test_reset_returns_to_idle()** (3 connections) — `tests/unit/test_state.py`
-- **TC-444: Crash Recovery - Auto Save Partial Session.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-444: LOADING_TASKS crash preserves partial state.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-444: RUNNING crash preserves execution state.** (1 connections) — `tests/integration/test_error_handling.py`
-- **reset returns state to IDLE regardless of current state.** (1 connections) — `tests/unit/test_state.py`
-- **reset from FAILED state returns to IDLE.** (1 connections) — `tests/unit/test_state.py`
-- **reset from CRASHED state returns to IDLE.** (1 connections) — `tests/unit/test_state.py`
-- **reset from IDLE state stays IDLE.** (1 connections) — `tests/unit/test_state.py`
+- **._body()** (10 connections) — `src/ansible_aom/tui/screens/rerun.py`
+- **.compose()** (7 connections) — `src/ansible_aom/tui/screens/help.py`
+- **._host_breakdown()** (7 connections) — `src/ansible_aom/tui/screens/rerun.py`
+- **._command_panel()** (5 connections) — `src/ansible_aom/tui/screens/rerun.py`
+- **_build_shortcuts_section()** (4 connections) — `src/ansible_aom/tui/screens/help.py`
+- **Text** (4 connections)
+- **.compose()** (4 connections) — `src/ansible_aom/tui/screens/rerun.py`
+- **._session_header()** (4 connections) — `src/ansible_aom/tui/screens/rerun.py`
+- **Panel** (3 connections)
+- **help.py** (3 connections) — `src/ansible_aom/tui/screens/help.py`
+- **Group** (2 connections)
+- **Text** (2 connections)
+- **ComposeResult** (1 connections)
+- **Help overlay for AOM TUI.  Triggered by '?' key. See SPECIFICATION.md Section 10** (1 connections) — `src/ansible_aom/tui/screens/help.py`
+- **Render the keybindings section as a Rich Text.      Each context gets a bold hea** (1 connections) — `src/ansible_aom/tui/screens/help.py`
+- **ComposeResult** (1 connections)
+- **First section: identify which session this rerun targets.** (1 connections) — `src/ansible_aom/tui/screens/rerun.py`
+- **Second section: failed / unreachable / changed host groups.** (1 connections) — `src/ansible_aom/tui/screens/rerun.py`
+- **Third section: the exact ansible-playbook invocation.** (1 connections) — `src/ansible_aom/tui/screens/rerun.py`
+- **Compose all sections into a single Rich renderable.** (1 connections) — `src/ansible_aom/tui/screens/rerun.py`
 
 ## Relationships
 
-- [[Execution State Transitions]] (8 shared connections)
-- [[State Machine Module]] (4 shared connections)
-- [[PTY Stream Parser]] (1 shared connections)
-- [[Error Handling Tests]] (1 shared connections)
+- [Session Replay Round Trip](Session_Replay_Round_Trip.md) (5 shared connections)
+- [Dynamic Include Expansion](Dynamic_Include_Expansion.md) (3 shared connections)
+- [Inventory Auto Detection](Inventory_Auto_Detection.md) (2 shared connections)
+- [Data Model Unit Tests](Data_Model_Unit_Tests.md) (2 shared connections)
+- [Shell Completion Helpers](Shell_Completion_Helpers.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_error_handling.py`
-- `tests/unit/test_state.py`
+- `src/ansible_aom/tui/screens/help.py`
+- `src/ansible_aom/tui/screens/rerun.py`
 
 ## Audit Trail
 
-- EXTRACTED: 28 (70%)
-- INFERRED: 12 (30%)
+- EXTRACTED: 53 (84%)
+- INFERRED: 10 (16%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

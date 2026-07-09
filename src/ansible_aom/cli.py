@@ -126,6 +126,58 @@ def ensure_inventory_arg(ansible_args: list[str]) -> list[str]:
     return ["-i", default, *ansible_args]
 
 
+def _confirm_no_redact(is_tty: bool, auto_yes: bool) -> tuple[bool, str | None]:
+    """Validate ``--no-redact`` per QC-003 (Q4=B: confirm prompt).
+
+    Returns ``(proceed, error_message)``. ``proceed=True`` means the caller
+    may continue. The error message, when set, is suitable for stderr.
+
+    Rules:
+      * ``--no-redact`` not set → always proceed (the no-op default).
+      * TTY + no ``--yes``        → interactive y/N prompt. Default is No
+        so a stray Enter can't accidentally disable redaction.
+      * TTY + ``--yes``           → proceed without prompting.
+      * Non-TTY + ``--yes``       → proceed (CI escape hatch; same semantics
+        as ``apt-get -y`` / ``pip --yes``).
+      * Non-TTY + no ``--yes``    → refuse with exit-code-2 message. This
+        is exactly the case QC-003 flagged as dangerous and is the spec'd
+        behavior: forcing the user to think twice before writing
+        unredacted secrets to disk.
+
+    The function never reads from stdin itself when ``is_tty`` is False
+    (it would block or EOF-error in CI), so the CI path is a clean
+    return without side effects.
+    """
+    if is_tty and auto_yes:
+        return True, None
+    if is_tty:
+        # /dev/tty is the controlling terminal even under `aom ... | tee`,
+        # where stdin is the pipe and a plain input() would EOF.
+        prompt = (
+            "WARNING: --no-redact writes unredacted secrets to "
+            "<session_dir>/events.jsonl. Continue? [y/N] "
+        )
+        try:
+            with open("/dev/tty") as tty_in:
+                sys.stderr.write(prompt)
+                sys.stderr.flush()
+                answer = tty_in.readline().strip().lower()
+        except OSError:
+            return False, (
+                "aom: --no-redact requires --yes in non-interactive mode "
+                "(refusing to write unredacted secrets to events.jsonl)."
+            )
+        if answer in ("y", "yes"):
+            return True, None
+        return False, "aom: --no-redact cancelled by user."
+    if auto_yes:
+        return True, None
+    return False, (
+        "aom: --no-redact requires --yes in non-interactive mode "
+        "(refusing to write unredacted secrets to events.jsonl)."
+    )
+
+
 class _HideStateAction(argparse.Action):
     def __call__(
         self,
@@ -304,6 +356,99 @@ See README.md and SPECIFICATION.md in the source tree for full details.
     )
 
     parser.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Automatically answer yes to all prompts.",
+    )
+
+    parser.add_argument(
+        "--capture-verbose",
+        action="store_true",
+        dest="capture_verbose",
+        help=(
+            "Capture verbose-capable (>= -vvv) output from ansible-playbook. "
+            "Default is off; the runner only records the JSONL stream and "
+            "high-signal stderr (warnings, deprecations, errors). "
+            "Verbose blocks are persisted as aom_stderr_line events in "
+            "events.jsonl and surfaced via aom inspect. "
+            "Combined with --capture-setup to also include ansible.builtin.setup output."
+        ),
+    )
+
+    parser.add_argument(
+        "--capture-setup",
+        action="store_true",
+        dest="capture_setup",
+        help=(
+            "When verbose capture is on, also include ansible.builtin.setup / "
+            "gather_facts output. Default is to drop setup output to keep "
+            "events.jsonl small. Implies --capture-verbose."
+        ),
+    )
+
+    parser.add_argument(
+        "--no-redact",
+        action="store_true",
+        dest="no_redact",
+        help=(
+            "Disable redaction of secrets in the recorded events.jsonl. "
+            "DANGEROUS: unredacted credentials will land in "
+            "~/.local/state/aom/sessions/<sid>/events.jsonl. "
+            "AOM prompts for confirmation in TTY mode and refuses to run in "
+            "non-interactive (CI) mode unless --yes is also supplied. "
+            "Use only for local debugging."
+        ),
+    )
+
+    parser.add_argument(
+        "--no-failed-hint",
+        action="store_true",
+        dest="no_failed_hint",
+        help=(
+            "Suppress the first line of the failure 'msg' shown beneath "
+            "failed/unreachable tasks in the compact log. "
+            "Equivalent to [live] show_failed_hint: false in aom_config.yaml."
+        ),
+    )
+
+    parser.add_argument(
+        "--hide-warnings",
+        action="store_true",
+        dest="hide_warnings",
+        help=(
+            "Hide [WARNING] lines from the live compact log. "
+            "Warnings are still recorded in events.jsonl. "
+            "Equivalent to [live] show_warnings: false in aom_config.yaml."
+        ),
+    )
+
+    parser.add_argument(
+        "--hide-deprecations",
+        action="store_true",
+        dest="hide_deprecations",
+        help=(
+            "Hide [DEPRECATION WARNING] lines from the live compact log. "
+            "Deprecations are still recorded in events.jsonl. "
+            "Equivalent to [live] show_deprecations: false in aom_config.yaml."
+        ),
+    )
+
+    parser.add_argument(
+        "--config",
+        metavar="PATH",
+        default=None,
+        dest="config_path",
+        help=(
+            "Path to an aom_config.yaml file. Highest-precedence layer "
+            "(above AOM_CONFIG env, XDG locations, and the built-in "
+            "default). Use to point AOM at a project-local config without "
+            "setting $AOM_CONFIG. The file must exist; a missing path is "
+            "an error, unlike the XDG lookups which are silently skipped."
+        ),
+    )
+
+    parser.add_argument(
         "--hide-state",
         action=_HideStateAction,
         nargs=1,
@@ -356,6 +501,10 @@ def _run_compact(
     record: bool = True,
     format: str = "compact",
     hide_states: list[str] | None = None,
+    capture_verbose: bool = False,
+    show_failed_hint: bool = True,
+    show_warnings: bool = True,
+    show_deprecations: bool = True,
 ) -> int:
     """Spawn the streaming renderer (compact ANSI or end-of-run JSON) via a LiveDriver.
 
@@ -372,6 +521,11 @@ def _run_compact(
             mode=cast(RenderMode, format),
             is_tty=sys.stdout.isatty(),
             hide_states=hide_states if hide_states is not None else [],
+            record=record,
+            capture_verbose=capture_verbose,
+            show_failed_hint=show_failed_hint,
+            show_warnings=show_warnings,
+            show_deprecations=show_deprecations,
         )
         driver = LiveDriver(playbook, ansible_args, record=record)
         return driver.drive(renderer)
@@ -479,6 +633,16 @@ def main() -> int:
     parser = create_parser()
     args = parser.parse_args()
 
+    if args.no_redact:
+        proceed, err = _confirm_no_redact(
+            is_tty=sys.stdin.isatty(),
+            auto_yes=args.yes,
+        )
+        if not proceed:
+            assert err is not None  # invariant: refusal always carries a message
+            print(err, file=sys.stderr)
+            return 2
+
     if args.verbose:
         diagnostics.set_debug()
         aom_logger = logging.getLogger("ansible_aom")
@@ -522,12 +686,21 @@ def main() -> int:
         try:
             if args.tui:
                 return _run_tui(args.playbook, ansible_args, record=record)
+            from ansible_aom.core.config_layer import load_config_with_layers
+
+            config = load_config_with_layers()
+            show_warnings = config.live.show_warnings and not args.hide_warnings
+            show_deprecations = config.live.show_deprecations and not args.hide_deprecations
             return _run_compact(
                 args.playbook,
                 ansible_args,
                 record=record,
                 format=args.format,
                 hide_states=hide_states,
+                capture_verbose=args.capture_verbose,
+                show_failed_hint=config.live.show_failed_hint and not args.no_failed_hint,
+                show_warnings=show_warnings,
+                show_deprecations=show_deprecations,
             )
         finally:
             # AOM_DEBUG=1 → single-line post-run digest on stderr. Silent

@@ -1,56 +1,58 @@
 # TUI Keybindings Config
 
-> 20 nodes · cohesion 0.14
+> 27 nodes · cohesion 0.14
 
 ## Key Concepts
 
-- **KeyContext** (26 connections) — `src/ansible_aom/tui/keybindings.py`
-- **KeyAction** (23 connections) — `src/ansible_aom/tui/keybindings.py`
-- **keybindings.py** (9 connections) — `src/ansible_aom/tui/keybindings.py`
-- **get_keybindings_by_context()** (8 connections) — `src/ansible_aom/tui/keybindings.py`
-- **TestGetKeybindingsByContext** (8 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_global_keybindings()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_log_keybindings()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_post_run_keybindings()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_tree_keybindings()** (3 connections) — `tests/tui/test_keybindings.py`
-- **str** (1 connections)
-- **Keybindings configuration for AOM TUI.  This module defines all keyboard shortcu** (1 connections) — `src/ansible_aom/tui/keybindings.py`
-- **Context where a keybinding is active.** (1 connections) — `src/ansible_aom/tui/keybindings.py`
-- **Definition of a keybinding action.** (1 connections) — `src/ansible_aom/tui/keybindings.py`
-- **Get all keybindings for a specific context.      Args:         context: The cont** (1 connections) — `src/ansible_aom/tui/keybindings.py`
-- **Tests for get_keybindings_by_context function.** (1 connections) — `tests/tui/test_keybindings.py`
-- **get_keybindings_by_context filters by GLOBAL context.** (1 connections) — `tests/tui/test_keybindings.py`
-- **get_keybindings_by_context filters by TREE context.** (1 connections) — `tests/tui/test_keybindings.py`
-- **get_keybindings_by_context filters by LOG context.** (1 connections) — `tests/tui/test_keybindings.py`
-- **get_keybindings_by_context filters by POST_RUN context.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TypedDict** (1 connections)
+- **format_preflight_summary()** (20 connections) — `src/ansible_aom/compact/format.py`
+- **test_preflight_summary.py** (14 connections) — `tests/compact/test_preflight_summary.py`
+- **_td()** (7 connections) — `tests/compact/test_preflight_summary.py`
+- **_td_tagged()** (7 connections) — `tests/compact/test_preflight_summary.py`
+- **_play()** (7 connections) — `tests/compact/test_prior_run_line.py`
+- **test_format_preflight_summary_counts_role_grouped_tasks()** (6 connections) — `tests/compact/test_preflight_summary.py`
+- **test_prior_run_line.py** (6 connections) — `tests/compact/test_prior_run_line.py`
+- **test_collect_tags_handles_role_group_definition()** (5 connections) — `tests/compact/test_preflight_summary.py`
+- **test_format_preflight_summary_handles_no_resolved_hosts()** (5 connections) — `tests/compact/test_preflight_summary.py`
+- **test_format_preflight_summary_pluralization()** (5 connections) — `tests/compact/test_preflight_summary.py`
+- **test_collect_tags_empty_when_no_tags()** (4 connections) — `tests/compact/test_preflight_summary.py`
+- **test_collect_tags_unique_sorted_across_plays()** (4 connections) — `tests/compact/test_preflight_summary.py`
+- **test_format_preflight_summary_appends_tag_line_when_tags_present()** (4 connections) — `tests/compact/test_preflight_summary.py`
+- **test_format_preflight_summary_multi_play()** (4 connections) — `tests/compact/test_preflight_summary.py`
+- **test_format_preflight_summary_omits_tag_line_when_no_tags()** (4 connections) — `tests/compact/test_preflight_summary.py`
+- **test_format_preflight_summary_single_play()** (4 connections) — `tests/compact/test_preflight_summary.py`
+- **test_prior_run_line_hours_format()** (4 connections) — `tests/compact/test_prior_run_line.py`
+- **test_prior_run_line_seconds_only_under_a_minute()** (4 connections) — `tests/compact/test_prior_run_line.py`
+- **test_prior_run_line_shown_when_prior_exists()** (4 connections) — `tests/compact/test_prior_run_line.py`
+- **test_prior_run_line_is_omitted_when_none()** (3 connections) — `tests/compact/test_prior_run_line.py`
+- **test_format_preflight_summary_empty_returns_none()** (2 connections) — `tests/compact/test_preflight_summary.py`
+- **Render a one-shot startup summary of plays/tasks/hosts from preflight.      Prin** (1 connections) — `src/ansible_aom/compact/format.py`
+- **Tests for format_preflight_summary — startup tree preview.** (1 connections) — `tests/compact/test_preflight_summary.py`
+- **When --list-hosts failed for a play, resolved_hosts is empty.** (1 connections) — `tests/compact/test_preflight_summary.py`
+- **1 host vs N hosts; 1 task vs N tasks.** (1 connections) — `tests/compact/test_preflight_summary.py`
+- *... and 2 more nodes in this community*
 
 ## Relationships
 
-- [[TUI Keybindings Tests]] (5 shared connections)
-- [[Global Key Bindings]] (4 shared connections)
-- [[Action Keybindings Lookup]] (3 shared connections)
-- [[Get All Actions]] (3 shared connections)
-- [[Keybinding Conflict Validation]] (3 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
-- [[Ctrl-C Keybindings]] (2 shared connections)
-- [[Get Keybinding Function]] (2 shared connections)
-- [[Invalid Key Handling]] (2 shared connections)
-- [[KeyAction TypedDict]] (2 shared connections)
-- [[Keybinding Context Coverage]] (2 shared connections)
-- [[KeyContext Enum]] (2 shared connections)
+- [CLI Argument Parser](CLI_Argument_Parser.md) (12 shared connections)
+- [Renderer Set Definitions](Renderer_Set_Definitions.md) (6 shared connections)
+- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (3 shared connections)
+- [JSON Renderer](JSON_Renderer.md) (3 shared connections)
+- [Source Hash Version](Source_Hash_Version.md) (2 shared connections)
+- [Per-Task Overhead Analysis](Per-Task_Overhead_Analysis.md) (2 shared connections)
+- [Heartbeat Liveness Tracker](Heartbeat_Liveness_Tracker.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/tui/keybindings.py`
-- `tests/tui/test_keybindings.py`
+- `src/ansible_aom/compact/format.py`
+- `tests/compact/test_preflight_summary.py`
+- `tests/compact/test_prior_run_line.py`
 
 ## Audit Trail
 
-- EXTRACTED: 48 (49%)
-- INFERRED: 49 (51%)
+- EXTRACTED: 83 (64%)
+- INFERRED: 46 (36%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

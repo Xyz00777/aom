@@ -1,28 +1,39 @@
 # Generic Secret Redaction
 
-> 4 nodes · cohesion 0.50
+> 15 nodes · cohesion 0.13
 
 ## Key Concepts
 
-- **TestGenericSecretFields** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_generic_secret_fields_redacted()** (2 connections) — `tests/unit/test_redaction.py`
-- **Tests for TC-157: GENERIC_SECRET_FIELDS set.** (1 connections) — `tests/unit/test_redaction.py`
-- **TC-157: Generic secret field names are redacted.** (1 connections) — `tests/unit/test_redaction.py`
+- **Section 8.1 Supplement: Warning Configuration (v1.8)** (15 connections) — `TEST_SPECIFICATION.md`
+- **TC-509: WarningsConfig Default Values** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-510: WarningsConfig Show Warnings False** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-511: WarningsConfig Show Deprecations False** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-512: WarningsConfig in YAML Config File** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-650: CLI --hide-state Flag Parsing** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-651: --hide-state ok Suppresses ok: and changed: Lines** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-652: --hide-state skipped Suppresses skipping: Lines** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-653: --hide-state failed Suppresses fatal: FAILED! Lines** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-654: --hide-state unreachable Suppresses fatal: UNREACHABLE! Lines** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-655: Multiple --hide-state Values Stack** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-656: Event Recording Unaffected by --hide-state** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-657: aom inspect Unaffected by --hide-state** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-658: TUI Mode Ignores --hide-state** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-659: Default Behaviour Unchanged** (1 connections) — `TEST_SPECIFICATION.md`
 
 ## Relationships
 
-- [[Secret Redaction Configuration]] (2 shared connections)
+- [Failure Recap Formatting](Failure_Recap_Formatting.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_redaction.py`
+- `TEST_SPECIFICATION.md`
 
 ## Audit Trail
 
-- EXTRACTED: 7 (88%)
-- INFERRED: 1 (12%)
+- EXTRACTED: 29 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

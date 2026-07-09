@@ -1,52 +1,50 @@
 # Password Pattern Detection
 
-> 26 nodes · cohesion 0.08
+> 33 nodes · cohesion 0.06
 
 ## Key Concepts
 
-- **TestPasswordPromptPatterns** (17 connections) — `tests/unit/test_pty_stream.py`
-- **.test_all_password_patterns_in_parser()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_clear_password_prompt()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_password_pattern_become()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_password_pattern_become_default_variant()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_password_pattern_confirm_vault()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_password_pattern_new_vault()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_password_pattern_ssh()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_password_pattern_vault()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_password_pattern_vault_id_variant()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_password_prompt_cleared_after_jsonl()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_password_prompt_in_execution_phase()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_password_prompt_in_pre_run_phase()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **TC-133 to TC-139: Password pattern detection.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-134: Vault password: pattern detected.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-135: Vault password (id): pattern detected.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-136: SSH password: pattern detected.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-137: BECOME password: pattern detected.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-138: BECOME password[defaults to SSH password]: pattern detected.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-139: New Vault password: pattern detected.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-139: Confirm New Vault password: pattern detected.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-133: All PASSWORD_PATTERNS exist in parser.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Password prompts in PRE_RUN_PROMPTS phase are captured.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Password prompts in EXECUTION phase are captured.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Password prompt can be cleared after handling.** (1 connections) — `tests/unit/test_pty_stream.py`
-- *... and 1 more nodes in this community*
+- **Connection ID Feasibility Report** (9 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **3. Are SSH debug lines (`<hostname> SSH: ...`) emitted from the same process as `CONNECTION:` lock messages?** (6 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **1. Are `CONNECTION: pid X acquired lock on Y` messages always paired with `pid X released lock on Y`?** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **2. Is the lock counter Y unique within a run?** (4 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **4. Is the `pid` consistent within a connection's lifetime?** (4 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **6. For persistent connections (ControlPersist), does the SSH debug line come from the ansible process or the SSH client process?** (4 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **7. Overall Feasibility Assessment** (4 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **5. For the local connection plugin, what does the connection lifecycle look like?** (3 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **connection-id-feasibility.md** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **Alternative approaches for `connection_id`** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **Can `pid` + lock counter serve as a `connection_id`?** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **ControlPersist implications** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **Display proxy mechanism** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **Evidence** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **Evidence** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **Evidence** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **Evidence** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **Evidence** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **Evidence** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **Key implications** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **Process boundary** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **Recommendation** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **Scenarios where lock would be lost** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **Source Code References** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- **The `pid` in CONNECTION messages** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- *... and 8 more nodes in this community*
 
 ## Relationships
 
-- [[PTY Stream Parser]] (13 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
-- [[PTY Stream Parser Tests]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/unit/test_pty_stream.py`
+- `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
 
 ## Audit Trail
 
-- EXTRACTED: 51 (77%)
-- INFERRED: 15 (23%)
+- EXTRACTED: 64 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

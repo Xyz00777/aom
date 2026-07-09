@@ -1,5 +1,6 @@
 """Pilot tests for the Inspect TUI screen — three-pane browser."""
 
+import json
 import shutil
 from pathlib import Path
 
@@ -13,6 +14,121 @@ _ALIASES = {
     "multi_host": "019e4100-0000-7000-8000-000000000003",
     "unreachable": "019e4200-0000-7000-8000-000000000004",
 }
+
+
+def _write_verbose_session(state_dir: Path) -> str:
+    sid = "019e5000-0000-7000-8000-000000000005"
+    session_dir = state_dir / sid
+    session_dir.mkdir(parents=True)
+    (session_dir / "meta.json").write_text(
+        json.dumps(
+            {
+                "playbook": "verbose.yml",
+                "status": "completed",
+                "start_time": "2026-07-01T10:00:00Z",
+                "end_time": "2026-07-01T10:00:10Z",
+                "duration_seconds": 10,
+            }
+        )
+        + "\n"
+    )
+    events = [
+        {"_event": "v2_playbook_on_play_start", "play": {"id": "play-1", "name": "Play One"}},
+        {"_event": "v2_playbook_on_task_start", "task": {"id": "task-1", "name": "Task One"}},
+        {
+            "_event": "aom_connection_acquired",
+            "connection_id": "conn-1",
+            "task_id": "task-1",
+            "host": "web1",
+            "timestamp": "2026-07-01T10:00:00Z",
+        },
+        {
+            "_event": "aom_stderr_line",
+            "source": "run_level",
+            "host": None,
+            "level": 1,
+            "line": "run line",
+            "connection_id": None,
+            "attribution_confidence": "unique",
+        },
+        {
+            "_event": "aom_stderr_line",
+            "source": "connection",
+            "host": "web1",
+            "level": 3,
+            "line": "play one line",
+            "connection_id": "conn-1",
+            "attribution_confidence": "unique",
+        },
+        {
+            "_event": "aom_stderr_line",
+            "source": "connection",
+            "host": "web1",
+            "level": 3,
+            "line": "ambiguous line",
+            "connection_id": "conn-1",
+            "attribution_confidence": "ambiguous",
+        },
+        {
+            "_event": "v2_runner_on_failed",
+            "task": {"id": "task-1", "name": "Task One"},
+            "hosts": {"web1": {"changed": False, "failed": True}},
+        },
+        {
+            "_event": "aom_connection_released",
+            "connection_id": "conn-1",
+            "task_id": "task-1",
+            "host": "web1",
+            "timestamp": "2026-07-01T10:00:05Z",
+        },
+        {"_event": "v2_playbook_on_play_start", "play": {"id": "play-2", "name": "Play Two"}},
+        {"_event": "v2_playbook_on_task_start", "task": {"id": "task-2", "name": "Task Two"}},
+        {
+            "_event": "aom_connection_acquired",
+            "connection_id": "conn-2",
+            "task_id": "task-2",
+            "host": "web2",
+            "timestamp": "2026-07-01T10:00:06Z",
+        },
+        {
+            "_event": "aom_stderr_line",
+            "source": "connection",
+            "host": "web2",
+            "level": 3,
+            "line": "play two line",
+            "connection_id": "conn-2",
+            "attribution_confidence": "unique",
+        },
+        {
+            "_event": "v2_runner_on_ok",
+            "task": {"id": "task-2", "name": "Task Two"},
+            "hosts": {"web2": {"changed": False}},
+        },
+        {
+            "_event": "aom_connection_released",
+            "connection_id": "conn-2",
+            "task_id": "task-2",
+            "host": "web2",
+            "timestamp": "2026-07-01T10:00:10Z",
+        },
+    ]
+    events_text = "\n".join(json.dumps(event) for event in events) + "\n"
+    (session_dir / "events.jsonl").write_text(events_text)
+    return sid
+
+
+def _walk_tree_nodes(node):
+    yield node
+    for child in node.children:
+        yield from _walk_tree_nodes(child)
+
+
+def _find_tree_node_by_kind(tree, kind: str):
+    for node in _walk_tree_nodes(tree.root):
+        data = getattr(node, "data", None)
+        if getattr(data, "kind", None) == kind:
+            return node
+    return None
 
 
 @pytest.fixture
@@ -527,6 +643,176 @@ async def test_question_mark_opens_help(state_dir: Path):
         assert isinstance(app.screen, _HelpScreen)
 
 
+def test_v_is_documented_and_bound(state_dir: Path):
+    from ansible_aom.tui.screens.inspect import _HELP_TEXT, InspectApp
+
+    app = InspectApp(state_dir=state_dir)
+    keys = [b.key for b in app.BINDINGS]
+    assert "V" in keys
+    assert "Verbose" in _HELP_TEXT
+    assert "V           open Verbose" in _HELP_TEXT
+
+
+@pytest.mark.asyncio
+async def test_v_opens_verbose_from_run_and_returns_to_runs(state_dir: Path):
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.focus_runs()
+        await pilot.pause()
+        await pilot.press("V")
+        await pilot.pause()
+        assert app._verbose_scope is not None
+        assert app._verbose_scope.level == "run"
+        assert "VERBOSE" in app._detail_text
+        assert "SCOPE  run" in app._detail_text
+        await pilot.press("escape")
+        await pilot.pause()
+        ids: list[str | None] = []
+        node = app.focused
+        while node is not None:
+            ids.append(getattr(node, "id", None))
+            node = getattr(node, "parent", None)
+        assert "runs-list" in ids, f"Expected focus to return to runs pane, got {ids!r}"
+        assert app._verbose_scope is None
+
+
+@pytest.mark.asyncio
+async def test_v_opens_verbose_from_play_and_host_scopes(state_dir: Path):
+    from ansible_aom.tui.screens.inspect import InspectApp, _NavTree
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["multi_host"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        tree = app.query_one("#tasks-tree")
+        assert isinstance(tree, _NavTree)
+        app.focus_tasks()
+        await pilot.pause()
+
+        play_node = _find_tree_node_by_kind(tree, "play")
+        assert play_node is not None
+        tree.move_cursor(play_node)
+        await pilot.pause()
+        await pilot.press("V")
+        await pilot.pause()
+        assert app._verbose_scope is not None
+        assert app._verbose_scope.level == "play"
+        assert app._verbose_scope.play_name is not None
+        assert "SCOPE  play" in app._detail_text
+        await pilot.press("escape")
+        await pilot.pause()
+        ids: list[str | None] = []
+        node = app.focused
+        while node is not None:
+            ids.append(getattr(node, "id", None))
+            node = getattr(node, "parent", None)
+        assert "tasks-tree" in ids, f"Expected focus to return to tasks pane, got {ids!r}"
+        assert app._verbose_scope is None
+
+        host_node = _find_tree_node_by_kind(tree, "host")
+        assert host_node is not None
+        tree.move_cursor(host_node)
+        await pilot.pause()
+        await pilot.press("V")
+        await pilot.pause()
+        assert app._verbose_scope is not None
+        assert app._verbose_scope.level == "task"
+        assert app._verbose_scope.host is not None
+        assert "SCOPE  task" in app._detail_text
+        assert app._verbose_scope.host in app._detail_text
+        await pilot.press("escape")
+        await pilot.pause()
+        ids = []
+        node = app.focused
+        while node is not None:
+            ids.append(getattr(node, "id", None))
+            node = getattr(node, "parent", None)
+        assert "tasks-tree" in ids, f"Expected focus to return to tasks pane, got {ids!r}"
+        assert app._verbose_scope is None
+
+
+@pytest.mark.asyncio
+async def test_v_is_ignored_when_detail_has_focus(state_dir: Path):
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.focus_tasks()
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert app._current_pane() == "detail-pane"
+        before = app._detail_text
+        await pilot.press("V")
+        await pilot.pause()
+        assert app._verbose_scope is None
+        assert app._detail_text == before
+
+
+@pytest.mark.asyncio
+async def test_v_populates_verbose_panel_from_session_events(tmp_path: Path):
+    from ansible_aom.tui.screens.inspect import InspectApp, _NavTree
+
+    state_dir = tmp_path / "sessions"
+    state_dir.mkdir()
+    session_id = _write_verbose_session(state_dir)
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=session_id)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.focus_runs()
+        await pilot.pause()
+        await pilot.press("V")
+        await pilot.pause()
+        assert app._verbose_scope is not None
+        assert app._verbose_scope.level == "run"
+        assert "run line" in app._detail_text
+        assert "play one line" not in app._detail_text
+        await pilot.press("escape")
+        await pilot.pause()
+
+        app.focus_tasks()
+        await pilot.pause()
+        tree = app.query_one("#tasks-tree")
+        assert isinstance(tree, _NavTree)
+        play_node = _find_tree_node_by_kind(tree, "play")
+        assert play_node is not None
+        tree.move_cursor(play_node)
+        await pilot.pause()
+        await pilot.press("V")
+        await pilot.pause()
+        assert app._verbose_scope is not None
+        assert app._verbose_scope.level == "play"
+        assert "play one line" in app._detail_text
+        assert "? ambiguous line" in app._detail_text
+        assert "play two line" not in app._detail_text
+        await pilot.press("escape")
+        await pilot.pause()
+
+        host_node = _find_tree_node_by_kind(tree, "host")
+        assert host_node is not None
+        tree.move_cursor(host_node)
+        await pilot.pause()
+        await pilot.press("V")
+        await pilot.pause()
+        assert app._verbose_scope is not None
+        assert app._verbose_scope.level == "task"
+        assert "play one line" in app._detail_text
+        assert "? ambiguous line" in app._detail_text
+        assert "play two line" not in app._detail_text
+        await pilot.press("escape")
+        await pilot.pause()
+        ids: list[str | None] = []
+        node = app.focused
+        while node is not None:
+            ids.append(getattr(node, "id", None))
+            node = getattr(node, "parent", None)
+        assert "tasks-tree" in ids, f"Expected focus to return to tasks pane, got {ids!r}"
+
+
 @pytest.mark.asyncio
 async def test_r_reloads_runs_from_disk(state_dir: Path):
     """`r` re-reads the state dir; deleting a session out-of-band is reflected."""
@@ -563,6 +849,63 @@ async def test_focused_pane_gets_visual_class(state_dir: Path):
         runs_pane = app.query_one("#runs-pane")
         assert "--focused-pane" in tasks_pane.classes
         assert "--focused-pane" not in runs_pane.classes
+
+
+@pytest.mark.asyncio
+async def test_footer_focus_text_tracks_run_play_task_and_v_flash(state_dir: Path):
+    from ansible_aom.tui.screens.inspect import InspectApp, _NavTree
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["multi_host"])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        app.focus_runs()
+        await pilot.pause()
+        footer = app.query_one("#focus-footer")
+        assert app._footer_text() == "focus: run (current session)"
+        assert footer.current_text == app._footer_text()
+
+        app.focus_tasks()
+        await pilot.pause()
+        tree = app.query_one("#tasks-tree")
+        assert isinstance(tree, _NavTree)
+
+        play_node = _find_tree_node_by_kind(tree, "play")
+        assert play_node is not None
+        tree.move_cursor(play_node)
+        await pilot.pause()
+        expected_play = f"focus: play ({play_node.data.label})"
+        assert app._footer_text() == expected_play
+        assert footer.current_text == expected_play
+
+        task_node = _find_tree_node_by_kind(tree, "task")
+        assert task_node is not None
+        tree.move_cursor(task_node)
+        await pilot.pause()
+        host_node = next(
+            (child for child in task_node.children if getattr(child.data, "kind", None) == "host"),
+            None,
+        )
+        if host_node is not None:
+            expected_task_context = f"{host_node.data.label} / {task_node.data.label}"
+        else:
+            expected_task_context = str(task_node.data.label)
+        expected_task = f"focus: task ({expected_task_context})"
+        assert app._footer_text() == expected_task
+        assert footer.current_text == expected_task
+
+        expected_flash = f"V: verbose for {expected_task_context}"
+        await pilot.press("V")
+        await pilot.pause()
+        assert app._verbose_scope is not None
+        assert app._verbose_scope.level == "task"
+        assert app._verbose_flash == expected_flash
+        assert expected_flash in app._footer_text()
+        assert expected_flash in footer.current_text
+
+        await pilot.pause(1.6)
+        assert app._verbose_flash is None
+        assert expected_flash not in app._footer_text()
 
 
 @pytest.mark.asyncio
@@ -713,25 +1056,64 @@ async def test_detail_pane_handles_huge_stdout_quickly(state_dir: Path):
                     return hit
             return None
 
+        def find_ok(node: TaskTreeNode) -> TaskTreeNode | None:
+            if node.kind == "task" and node.stats.ok > 0 and node.stats.failed == 0:
+                return node
+            for c in node.children:
+                hit = find_ok(c)
+                if hit is not None:
+                    return hit
+            return None
+
+        def find_host(node: TaskTreeNode) -> TaskTreeNode | None:
+            if node.kind == "host":
+                return node
+            for c in node.children:
+                hit = find_host(c)
+                if hit is not None:
+                    return hit
+            return None
+
         failed = find_failed(tree)
         assert failed is not None and failed.raw_event is not None
-        host_label = next(iter(failed.raw_event["hosts"]))
         big_stdout = "\n".join(f"line {i} of synthetic stdout" for i in range(20_000))
-        failed.raw_event["hosts"][host_label]["stdout"] = big_stdout
+        ok_task = find_ok(tree)
+        assert ok_task is not None
+        ok_host = find_host(ok_task)
+        assert ok_host is not None and ok_host.raw_event is not None
+        ok_host.raw_event["hosts"][ok_host.label]["stdout"] = big_stdout
         app._current_session = session
-        app._focused_task = failed
-        app._focused_host = failed.children[0] if failed.children else None
+        app._focused_task = ok_task
+        app._focused_host = ok_host
 
         start = time.perf_counter()
         app._update_detail()
         await pilot.pause()
         elapsed = time.perf_counter() - start
-        # The Static-based implementation took ~2s for 20k lines. RichLog
-        # writes per-line strips so it stays well under that even on
-        # slow CI. Generous bound (1.5s) leaves room for CI variance but
-        # still catches a regression to the old wrap-everything path.
+        # The lazy preview must keep the detail pane responsive on huge
+        # stdout blocks while still showing the first 100 lines.
         assert elapsed < 1.5, (
             f"Detail update for {big_stdout.count(chr(10)) + 1} lines took "
             f"{elapsed:.2f}s — the detail pane is back to wrapping the whole "
             f"body on every refresh."
         )
+        preview = app._detail_text
+        assert "press L to load full" in preview
+        assert "line 0 of synthetic stdout" in preview
+        assert "line 99 of synthetic stdout" in preview
+        assert "line 100 of synthetic stdout" not in preview
+
+        await pilot.press("L")
+        await pilot.pause()
+        full = app._detail_text
+        assert "press L to load full" not in full
+        assert "line 100 of synthetic stdout" in full
+        assert "line 19999 of synthetic stdout" in full
+
+        app._focused_task = failed
+        failed_host = find_host(failed)
+        assert failed_host is not None
+        app._focused_host = failed_host
+        app._update_detail()
+        assert app._detail_force_full is False
+        assert "press L to load full" not in app._detail_text

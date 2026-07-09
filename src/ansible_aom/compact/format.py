@@ -28,10 +28,10 @@ from ansible_aom.core.icons import (
 from ansible_aom.core.models import (
     PlayDefinition,
     RoleGroupDefinition,
-    RunState,
     Status,
     TaskDefinition,
 )
+from ansible_aom.core.run_state import RunState
 from ansible_aom.core.tree import TreeProjection
 
 if TYPE_CHECKING:
@@ -53,6 +53,7 @@ _DIM = "\x1b[2m"
 _BOLD = "\x1b[1m"
 _GREEN = "\x1b[32m"
 _YELLOW = "\x1b[33m"
+_ORANGE = "\x1b[38;5;208m"
 _RED = "\x1b[31m"
 _MAGENTA = "\x1b[35m"
 _CYAN = "\x1b[36m"
@@ -118,12 +119,39 @@ _MSG_DISPLAY_CAP = 4096
 def _truncate_msg(msg: str) -> str:
     """Cap a JSONL ``msg`` field for live display.
 
+    R6: any lone-surrogate codepoints in the input (placed there by
+    pexpect's ``codec_errors="surrogateescape"`` when the PTY stream
+    carried invalid UTF-8 bytes) are normalised via
+    ``.encode("utf-8", "replace").decode("utf-8", "replace")`` so the
+    terminal never tries to render an unpaired surrogate — it sees
+    ``?`` instead. The original bytes are still preserved losslessly in
+    ``events.jsonl``; this normalisation only affects display.
+
     The suffix includes the original byte length so the user knows how
     much was hidden — important for grep'ing the right session later.
     """
+    msg = _replace_surrogates(msg)
     if len(msg) <= _MSG_DISPLAY_CAP:
         return msg
     return f"{msg[:_MSG_DISPLAY_CAP]}…(truncated, {len(msg)} bytes)"
+
+
+def _replace_surrogates(s: str) -> str:
+    """Replace any lone-surrogate codepoints in ``s`` with U+FFFD.
+
+    Pexpect's ``codec_errors="surrogateescape"`` decodes invalid UTF-8
+    bytes into unpaired surrogate codepoints so the bytes round-trip
+    through ``str`` losslessly. The terminal cannot render those
+    surrogates — printing them corrupts the display — so this helper
+    converts them to ``?`` for any string that is about to be written
+    to stdout. The on-disk ``events.jsonl`` is unaffected; only
+    display strings pass through here.
+    """
+    try:
+        s.encode("utf-8")
+    except UnicodeEncodeError:
+        return s.encode("utf-8", "replace").decode("utf-8", "replace")
+    return s
 
 
 # ansible-playbook flags worth surfacing as a status-bar chip. Each
@@ -134,12 +162,21 @@ _MODE_FLAGS: tuple[tuple[frozenset[str], str, str], ...] = (
 )
 
 
-def _compute_mode_label(args: list[str], colorize: bool) -> str:
+def _compute_mode_label(
+    args: list[str],
+    colorize: bool,
+    *,
+    recording: bool = False,
+    capture_verbose: bool = False,
+) -> str:
     """Render the status-bar mode chip(s) from ansible-playbook args.
 
-    Multiple chips render space-joined (`DRY RUN DIFF`). Each chip is
-    colour-wrapped only if ``colorize`` is True so non-TTY consumers
-    still see the label without escape codes around it.
+    Recording is the leftmost chip when enabled. Verbose capture upgrades
+    that chip from ``● REC`` to ``● REC+VC``. Check/diff chips follow in
+    their existing order, space-joined (``DRY RUN DIFF``).
+
+    Each chip is colour-wrapped only if ``colorize`` is True so non-TTY
+    consumers still see the label without escape codes around it.
 
     The detection is conservative: only literal flag aliases (no
     ``--check=foo`` style suffixes — those don't exist for these
@@ -147,6 +184,9 @@ def _compute_mode_label(args: list[str], colorize: bool) -> str:
     arg can't trigger a false chip.
     """
     chips: list[str] = []
+    if recording:
+        label = "● REC+VC" if capture_verbose else "● REC"
+        chips.append(_wrap(label, _GREEN, colorize))
     args_set = set(args)
     for aliases, label, color in _MODE_FLAGS:
         if args_set & aliases:

@@ -1,25 +1,37 @@
 # Module Init File
 
-> 1 nodes · cohesion 1.00
+> 10 nodes · cohesion 0.20
 
 ## Key Concepts
 
-- **__init__.py** (0 connections) — `tests/compact/__init__.py`
+- **TestKeybindingConflicts** (7 connections) — `tests/tui/test_keybindings.py`
+- **validate_keybindings()** (3 connections) — `src/ansible_aom/tui/keybindings.py`
+- **.test_multiple_keys_can_map_to_same_action()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_validate_keybindings_returns_no_errors()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_no_duplicate_keys_in_keybindings_dict()** (2 connections) — `tests/tui/test_keybindings.py`
+- **Validate that there are no duplicate keybindings.      Returns:         List of** (1 connections) — `src/ansible_aom/tui/keybindings.py`
+- **Tests for keybinding conflicts - no duplicate bindings.** (1 connections) — `tests/tui/test_keybindings.py`
+- **The KEYBINDINGS dict should have no duplicate keys.** (1 connections) — `tests/tui/test_keybindings.py`
+- **validate_keybindings should return empty list if valid.** (1 connections) — `tests/tui/test_keybindings.py`
+- **Multiple keys can map to the same action (e.g., '/' and 'ctrl+f' for search).** (1 connections) — `tests/tui/test_keybindings.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [State Machine Invariants](State_Machine_Invariants.md) (3 shared connections)
+- [Warning Color Formatting](Warning_Color_Formatting.md) (1 shared connections)
+- [Status Icon Mapping](Status_Icon_Mapping.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/compact/__init__.py`
+- `src/ansible_aom/tui/keybindings.py`
+- `tests/tui/test_keybindings.py`
 
 ## Audit Trail
 
-- EXTRACTED: 0 (0%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 18 (78%)
+- INFERRED: 5 (22%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,42 +1,40 @@
 # View Mode Selection
 
-> 10 nodes · cohesion 0.24
+> 14 nodes · cohesion 0.14
 
 ## Key Concepts
 
-- **test_view_modes.py** (11 connections) — `tests/unit/test_view_modes.py`
-- **TestMinimumWidthEightyColumns** (5 connections) — `tests/unit/test_view_modes.py`
-- **.format_compact_panel_at_80()** (4 connections) — `tests/unit/test_view_modes.py`
-- **.test_format_preserves_all_elements_at_80()** (3 connections) — `tests/unit/test_view_modes.py`
-- **.test_panel_renders_at_80_columns()** (3 connections) — `tests/unit/test_view_modes.py`
-- **Unit tests for view mode selection and terminal compatibility.  Test cases cover** (1 connections) — `tests/unit/test_view_modes.py`
-- **Tests for TC-064: Minimum width 80 columns.** (1 connections) — `tests/unit/test_view_modes.py`
-- **Format compact panel for 80-column terminal.** (1 connections) — `tests/unit/test_view_modes.py`
-- **TC-064: Panel renders fully at 80 columns.** (1 connections) — `tests/unit/test_view_modes.py`
-- **TC-064: All elements visible at 80 columns.** (1 connections) — `tests/unit/test_view_modes.py`
+- **TestTUIModePasswordModal** (10 connections) — `tests/compact/test_password.py`
+- **.test_tui_handle_password_prompt_blocks_until_complete()** (3 connections) — `tests/compact/test_password.py`
+- **.test_tui_handle_password_prompt_passes_prompt_with_suffix()** (3 connections) — `tests/compact/test_password.py`
+- **.test_tui_handle_password_prompt_returns_empty_on_eof()** (3 connections) — `tests/compact/test_password.py`
+- **.test_tui_handle_password_prompt_returns_empty_on_keyboard_interrupt()** (3 connections) — `tests/compact/test_password.py`
+- **.test_tui_handle_password_prompt_returns_password()** (3 connections) — `tests/compact/test_password.py`
+- **.test_tui_handle_password_prompt_uses_suspend()** (3 connections) — `tests/compact/test_password.py`
+- **TC-146: Verify call_from_thread triggers Textual modal, worker blocked.      In** (1 connections) — `tests/compact/test_password.py`
+- **TC-146: TUI mode uses app.suspend() context manager for password input.** (1 connections) — `tests/compact/test_password.py`
+- **TC-146: TUI mode appends ': ' to prompt when showing to user.** (1 connections) — `tests/compact/test_password.py`
+- **TC-146: TUI mode returns the password entered by user.** (1 connections) — `tests/compact/test_password.py`
+- **TC-146: TUI mode returns empty string on EOFError (user cancelled).** (1 connections) — `tests/compact/test_password.py`
+- **TC-146: TUI mode returns empty string on KeyboardInterrupt.** (1 connections) — `tests/compact/test_password.py`
+- **TC-146: handle_password_prompt is synchronous — blocks caller until complete.** (1 connections) — `tests/compact/test_password.py`
 
 ## Relationships
 
-- [[Color Support Detection]] (1 shared connections)
-- [[Terminal Capability Detection]] (1 shared connections)
-- [[Monochrome Terminal Fallback]] (1 shared connections)
-- [[16-Color Fallback]] (1 shared connections)
-- [[Status Icon Unicode Mapping]] (1 shared connections)
-- [[Unicode Support Detection]] (1 shared connections)
-- [[View Mode Selection]] (1 shared connections)
-- [[Narrow Terminal View]] (1 shared connections)
-- [[Width 60-79 Truncation]] (1 shared connections)
+- [Session Recording Tests](Session_Recording_Tests.md) (7 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
+- [Pause Lingering Cleanup](Pause_Lingering_Cleanup.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_view_modes.py`
+- `tests/compact/test_password.py`
 
 ## Audit Trail
 
-- EXTRACTED: 31 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 27 (77%)
+- INFERRED: 8 (23%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,35 +1,40 @@
 # CLI Help Matrix
 
-> 9 nodes · cohesion 0.28
+> 14 nodes · cohesion 0.14
 
 ## Key Concepts
 
-- **_run_cli()** (5 connections) — `tests/unit/test_cli_matrix.py`
-- **CompletedProcess** (4 connections)
-- **test_cli_matrix.py** (4 connections) — `tests/unit/test_cli_matrix.py`
-- **test_help_exits_zero()** (3 connections) — `tests/unit/test_cli_matrix.py`
-- **test_mutex_rejected()** (3 connections) — `tests/unit/test_cli_matrix.py`
-- **Batch E item #9 — CLI matrix smoke.  Every subcommand's ``--help`` exits 0, and** (1 connections) — `tests/unit/test_cli_matrix.py`
-- **Spawn ``python -m ansible_aom <argv>`` and return the completed proc.** (1 connections) — `tests/unit/test_cli_matrix.py`
-- **Every documented subcommand's ``--help`` exits 0 with a usage banner.** (1 connections) — `tests/unit/test_cli_matrix.py`
-- **Documented mutually-exclusive combos must reject with a useful message.** (1 connections) — `tests/unit/test_cli_matrix.py`
+- **TestShiftModifiers** (10 connections) — `tests/tui/test_keybindings.py`
+- **.test_lowercase_g_is_top()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_lowercase_r_is_refresh()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_lowercase_s_is_sort()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_uppercase_g_is_bottom()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_uppercase_r_is_rerun()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_uppercase_s_is_settings()** (3 connections) — `tests/tui/test_keybindings.py`
+- **Tests for shift modifier keybindings - R vs r, S vs s.** (1 connections) — `tests/tui/test_keybindings.py`
+- **r' is refresh, not rerun.** (1 connections) — `tests/tui/test_keybindings.py`
+- **R' is rerun, different from 'r'.** (1 connections) — `tests/tui/test_keybindings.py`
+- **s' is sort cycle, not settings.** (1 connections) — `tests/tui/test_keybindings.py`
+- **S' is settings, different from 's'.** (1 connections) — `tests/tui/test_keybindings.py`
+- **g' jumps to top of tree.** (1 connections) — `tests/tui/test_keybindings.py`
+- **G' jumps to bottom of tree.** (1 connections) — `tests/tui/test_keybindings.py`
 
 ## Relationships
 
-- [[Include Import Role Tasks]] (1 shared connections)
-- [[Loop Item Events Integration]] (1 shared connections)
-- [[Real Ansible Integration]] (1 shared connections)
+- [Runner Event Batching](Runner_Event_Batching.md) (6 shared connections)
+- [State Machine Invariants](State_Machine_Invariants.md) (2 shared connections)
+- [Warning Color Formatting](Warning_Color_Formatting.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_cli_matrix.py`
+- `tests/tui/test_keybindings.py`
 
 ## Audit Trail
 
-- EXTRACTED: 23 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 27 (77%)
+- INFERRED: 8 (23%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

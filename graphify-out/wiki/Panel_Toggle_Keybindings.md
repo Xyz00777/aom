@@ -1,38 +1,42 @@
 # Panel Toggle Keybindings
 
-> 12 nodes · cohesion 0.17
+> 18 nodes · cohesion 0.15
 
 ## Key Concepts
 
-- **TestPanelToggleKeybindings** (9 connections) — `tests/tui/test_keybindings.py`
-- **.test_key_1_toggles_status_bar()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_key_2_toggles_tree_view()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_key_3_toggles_summary_panel()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_key_4_toggles_log_panel()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_key_5_toggles_footer()** (3 connections) — `tests/tui/test_keybindings.py`
-- **Tests for panel toggle keybindings - TC-355 through TC-360.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-356: '1' toggles Status Bar visibility.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-357: '2' toggles Tree View visibility.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-358: '3' toggles Summary Panel visibility.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-359: '4' toggles Log Panel visibility.** (1 connections) — `tests/tui/test_keybindings.py`
-- **TC-360: '5' toggles Footer visibility.** (1 connections) — `tests/tui/test_keybindings.py`
+- **test_loop_item_events.py** (8 connections) — `tests/integration/test_loop_item_events.py`
+- **_run_aom()** (6 connections) — `tests/integration/test_loop_item_events.py`
+- **_run_playbook()** (6 connections) — `tests/integration/test_loop_item_events.py`
+- **TestLoopItemEvents** (4 connections) — `tests/integration/test_loop_item_events.py`
+- **_ansible_collection_paths()** (3 connections) — `tests/integration/test_loop_item_events.py`
+- **TestLoopItemStreamingEndToEnd** (3 connections) — `tests/integration/test_loop_item_events.py`
+- **Path** (2 connections)
+- **.test_aggregate_event_still_emitted()** (2 connections) — `tests/integration/test_loop_item_events.py`
+- **.test_item_event_carries_label_under_host()** (2 connections) — `tests/integration/test_loop_item_events.py`
+- **.test_one_item_event_per_loop_iteration()** (2 connections) — `tests/integration/test_loop_item_events.py`
+- **.test_each_item_line_appears_exactly_once()** (2 connections) — `tests/integration/test_loop_item_events.py`
+- **_has_ansible_posix()** (1 connections) — `tests/integration/test_loop_item_events.py`
+- **CompletedProcess** (1 connections)
+- **Integration: the bundled ``aom_jsonl`` callback emits per-item loop events.  ``a** (1 connections) — `tests/integration/test_loop_item_events.py`
+- **Spawn ``python -m ansible_aom <playbook>`` against a sandboxed HOME.      Exerci** (1 connections) — `tests/integration/test_loop_item_events.py`
+- **The full ``aom`` pipeline renders one line per loop item, once each.** (1 connections) — `tests/integration/test_loop_item_events.py`
+- **Search-path entries reported by ``ansible-galaxy collection list``.      A sandb** (1 connections) — `tests/integration/test_loop_item_events.py`
+- **Run ansible-playbook with the bundled callback; return parsed JSONL events.** (1 connections) — `tests/integration/test_loop_item_events.py`
 
 ## Relationships
 
-- [[Global Key Bindings]] (5 shared connections)
-- [[TUI Keybindings Config]] (2 shared connections)
-- [[TUI Keybindings Tests]] (1 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/tui/test_keybindings.py`
+- `tests/integration/test_loop_item_events.py`
 
 ## Audit Trail
 
-- EXTRACTED: 23 (77%)
-- INFERRED: 7 (23%)
+- EXTRACTED: 47 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,35 +1,37 @@
 # Warning Pattern Detection
 
-> 8 nodes · cohesion 0.25
+> 13 nodes · cohesion 0.15
 
 ## Key Concepts
 
-- **TestWarningDetection** (9 connections) — `tests/integration/test_playbook_parser.py`
-- **.test_deprecated_pattern()** (3 connections) — `tests/integration/test_playbook_parser.py`
-- **.test_deprecation_warning_pattern()** (3 connections) — `tests/integration/test_playbook_parser.py`
-- **.test_warning_pattern()** (3 connections) — `tests/integration/test_playbook_parser.py`
-- **Test warning pattern detection.** (1 connections) — `tests/integration/test_playbook_parser.py`
-- **[WARNING]: pattern is detected.** (1 connections) — `tests/integration/test_playbook_parser.py`
-- **[DEPRECATION WARNING]: pattern is detected.** (1 connections) — `tests/integration/test_playbook_parser.py`
-- **[DEPRECATED]: pattern is detected.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **2. Where is `stderr.log` written? Cost to add timestamps?** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-timestamp-verification.md`
+- **stderr.log Timestamp Verification** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-timestamp-verification.md`
+- **3. JSONL event timestamps — format and correlation** (3 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-timestamp-verification.md`
+- **1. Are timestamps on each line of `stderr.log`?** (2 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-timestamp-verification.md`
+- **stderr-timestamp-verification.md** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-timestamp-verification.md`
+- **All call sites of `record_stderr`** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-timestamp-verification.md`
+- **Correlation feasibility** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-timestamp-verification.md`
+- **Cost to add timestamps** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-timestamp-verification.md`
+- **Evidence: Test fixture** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-timestamp-verification.md`
+- **Format** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-timestamp-verification.md`
+- **Read side** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-timestamp-verification.md`
+- **Summary** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-timestamp-verification.md`
+- **Write location** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-timestamp-verification.md`
 
 ## Relationships
 
-- [[PTY Stream Parser]] (4 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
-- [[Playbook Parser Integration Tests]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/integration/test_playbook_parser.py`
+- `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-timestamp-verification.md`
 
 ## Audit Trail
 
-- EXTRACTED: 18 (82%)
-- INFERRED: 4 (18%)
+- EXTRACTED: 24 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

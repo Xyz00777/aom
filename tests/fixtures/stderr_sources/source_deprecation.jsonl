@@ -1,0 +1,1 @@
+{"_event": "aom_stderr_line", "source": "deprecation", "host": null, "level": 0, "line": "[DEPRECATION WARNING]: Distribution Ubuntu 20.04 on host db1 should use the python3 interpreter"}

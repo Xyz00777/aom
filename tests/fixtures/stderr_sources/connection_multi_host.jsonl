@@ -1,0 +1,4 @@
+{"_event": "aom_connection_acquired", "connection_id": "conn-web1", "host": "web1", "task_id": "t1", "timestamp": "2026-07-01T10:00:00Z"}
+{"_event": "aom_connection_acquired", "connection_id": "conn-web2", "host": "web2", "task_id": "t1", "timestamp": "2026-07-01T10:00:01Z"}
+{"_event": "aom_connection_released", "connection_id": "conn-web1", "host": "web1", "task_id": "t1", "timestamp": "2026-07-01T10:00:05Z"}
+{"_event": "aom_connection_released", "connection_id": "conn-web2", "host": "web2", "task_id": "t1", "timestamp": "2026-07-01T10:00:06Z"}

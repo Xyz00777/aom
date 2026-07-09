@@ -446,11 +446,12 @@ class TestMixedStreamHandling:
         assert len(events) == 1
         assert events[0]["_event"] == "v2_playbook_on_start"
 
-    def test_plaintext_returns_empty(self):
-        """feed_line returns empty list for plaintext."""
+    def test_plaintext_returns_stderr_line(self):
+        """feed_line returns aom_stderr_line for plaintext."""
         parser = PtyStreamParser()
         events = parser.feed_line("This is plaintext")
-        assert events == []
+        assert len(events) == 1
+        assert events[0]["_event"] == "aom_stderr_line"
 
     def test_invalid_json_returns_empty(self):
         """feed_line returns empty for invalid JSON."""

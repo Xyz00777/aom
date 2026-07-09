@@ -1,24 +1,29 @@
 # Psutil Safe Probe
 
-> 15 nodes · cohesion 0.13
+> 20 nodes · cohesion 0.10
 
 ## Key Concepts
 
-- **test_psutil_safe_probe.py** (8 connections) — `tests/unit/test_psutil_safe_probe.py`
-- **test_probe_failure_disables_psutil_in_diagnostics()** (2 connections) — `tests/unit/test_psutil_safe_probe.py`
-- **test_probe_failure_returns_false_without_importing_psutil()** (2 connections) — `tests/unit/test_psutil_safe_probe.py`
-- **test_probe_runs_once_per_process()** (2 connections) — `tests/unit/test_psutil_safe_probe.py`
-- **test_probe_success_path_uses_returned_module()** (2 connections) — `tests/unit/test_psutil_safe_probe.py`
-- **test_real_probe_in_current_process_does_not_crash()** (2 connections) — `tests/unit/test_psutil_safe_probe.py`
-- **test_sample_short_circuits_when_subprocess_check_unavailable()** (2 connections) — `tests/unit/test_psutil_safe_probe.py`
-- **Tests for the psutil-safe probe in the runner.  Background: ``_sample_subprocess** (1 connections) — `tests/unit/test_psutil_safe_probe.py`
-- **If subprocess itself blows up (highly unlikely but defensive), the     helper st** (1 connections) — `tests/unit/test_psutil_safe_probe.py`
-- **If the subprocess probe exits non-zero (e.g. SIGSEGV at import),     ``_sample_s** (1 connections) — `tests/unit/test_psutil_safe_probe.py`
-- **The disable reason is surfaced via the diagnostics module so it     lands in dia** (1 connections) — `tests/unit/test_psutil_safe_probe.py`
-- **The probe is expensive (subprocess spawn). It must be cached so     repeated hea** (1 connections) — `tests/unit/test_psutil_safe_probe.py`
-- **A successful probe yields a usable psutil module; subsequent     sample calls go** (1 connections) — `tests/unit/test_psutil_safe_probe.py`
-- **Sanity: the real subprocess probe runs to completion in the test     environment** (1 connections) — `tests/unit/test_psutil_safe_probe.py`
-- **_reset()** (1 connections) — `tests/unit/test_psutil_safe_probe.py`
+- **Interactive prompts — diagnosis and plan** (9 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **Plan as TDD slices** (6 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **Architectural options** (5 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **Status: IP1–IP5 shipped** (2 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **interactive-prompts.md** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **A. Pattern-matched suspend (extend the password model)** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **Affected interactive surfaces** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **B. Stall-detection + passthrough** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **C. Full stdin bridging** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **D. Hybrid (recommended)** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **Diagnosis (precise)** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **IP1. Fix `ansible.builtin.pause` (compact mode) — the immediate user pain** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **IP2. Stall-detection safety net** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **IP3. `vars_prompt` plain-text support** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **IP4. TUI integration** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **IP5. Pause-with-seconds visibility (cosmetic)** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **Known limitations (post-implementation)** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **Open questions / risks** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **Quick win** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **Recommended landing order** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
 
 ## Relationships
 
@@ -26,14 +31,14 @@
 
 ## Source Files
 
-- `tests/unit/test_psutil_safe_probe.py`
+- `.sisyphus/notepads/plans/interactive-prompts.md`
 
 ## Audit Trail
 
-- EXTRACTED: 28 (100%)
+- EXTRACTED: 38 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

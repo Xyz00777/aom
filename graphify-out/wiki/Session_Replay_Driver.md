@@ -1,57 +1,50 @@
 # Session Replay Driver
 
-> 35 nodes · cohesion 0.07
+> 43 nodes · cohesion 0.05
 
 ## Key Concepts
 
-- **FakeRenderer** (22 connections) — `tests/unit/test_event_source.py`
-- **ReplayDriver** (10 connections) — `src/ansible_aom/drivers/replay.py`
-- **test_event_source.py** (10 connections) — `tests/unit/test_event_source.py`
-- **test_live_driver_drives_renderer_with_fake_subprocess()** (6 connections) — `tests/unit/test_event_source.py`
-- **test_replay_driver_drives_renderer_end_to_end()** (6 connections) — `tests/unit/test_event_source.py`
-- **_write_session()** (6 connections) — `tests/unit/test_event_source.py`
-- **test_replay_driver_missing_session_returns_1()** (5 connections) — `tests/unit/test_event_source.py`
-- **.drive()** (4 connections) — `src/ansible_aom/drivers/replay.py`
-- **test_replay_driver_satisfies_event_source()** (4 connections) — `tests/unit/test_event_source.py`
-- **.__init__()** (2 connections) — `src/ansible_aom/drivers/replay.py`
-- **.set_definitions()** (2 connections) — `tests/unit/test_event_source.py`
-- **.update_state()** (2 connections) — `tests/unit/test_event_source.py`
-- **test_event_source_is_runtime_checkable()** (2 connections) — `tests/unit/test_event_source.py`
-- **Re-stream a previously recorded session through a :class:`Renderer`.      Mirror** (1 connections) — `src/ansible_aom/drivers/replay.py`
-- **.session_id()** (1 connections) — `src/ansible_aom/drivers/replay.py`
-- **.add_warning()** (1 connections) — `tests/unit/test_event_source.py`
-- **.handle_completion()** (1 connections) — `tests/unit/test_event_source.py`
-- **.handle_interactive_prompt()** (1 connections) — `tests/unit/test_event_source.py`
-- **.handle_password_prompt()** (1 connections) — `tests/unit/test_event_source.py`
-- **.__init__()** (1 connections) — `tests/unit/test_event_source.py`
-- **.note_pty_bytes()** (1 connections) — `tests/unit/test_event_source.py`
-- **.note_subprocess_active()** (1 connections) — `tests/unit/test_event_source.py`
-- **.print_log()** (1 connections) — `tests/unit/test_event_source.py`
-- **.set_prior_run()** (1 connections) — `tests/unit/test_event_source.py`
-- **.start()** (1 connections) — `tests/unit/test_event_source.py`
-- *... and 10 more nodes in this community*
+- **Learnings: PTY Stream Parsing for AOM** (12 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **What DOESN'T Go Through JSONL Callback?** (7 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **Key Design Recommendations** (6 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **Implementation Checklist for AOM** (5 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **Password Prompt Handling with PTY** (4 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **Temporal Sequence in PTY Stream** (4 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **Existing Implementation Analysis** (3 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **PTY Stream Characteristics** (3 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **Robust Stream Parser Design** (3 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **Test Fixture Analysis** (3 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **Integration with pexpect** (2 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **learnings.md** (1 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **1. Password Prompts (getpass)** (1 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **1. Separate Concerns** (1 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **2. PLAY RECAP Text** (1 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **2. Use Phase-Aware Parsing** (1 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **3. Buffer Line-by-Line** (1 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **3. Deprecation Warnings** (1 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **4. Ansible Banner Text** (1 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **4. Classify Non-JSON Content** (1 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **5. Handle Interactive Prompts in PTY Context** (1 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **5. SSH Key Fingerprints** (1 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **6. Galaxy Output** (1 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **ansible-aomp `json_stream.py` (Zero Dependencies)** (1 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **ansible-aomp `runner.py` (Asyncio Subprocess)** (1 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- *... and 18 more nodes in this community*
 
 ## Relationships
 
-- [[Run Config Key Normalization]] (6 shared connections)
-- [[Replay CLI Subcommand]] (3 shared connections)
-- [[CLI Main Entry Point]] (3 shared connections)
-- [[Playbook Event Parsing]] (3 shared connections)
-- [[Renderer Event Protocol]] (2 shared connections)
-- [[Session Replay Round Trip]] (1 shared connections)
-- [[Inventory Auto Detection]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `src/ansible_aom/drivers/replay.py`
-- `tests/unit/test_event_source.py`
+- `.sisyphus/notepads/new-spec/learnings.md`
 
 ## Audit Trail
 
-- EXTRACTED: 92 (89%)
-- INFERRED: 11 (11%)
+- EXTRACTED: 84 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

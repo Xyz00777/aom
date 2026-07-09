@@ -1,35 +1,37 @@
 # Crash Recovery Stay Open
 
-> 8 nodes · cohesion 0.25
+> 13 nodes · cohesion 0.15
 
 ## Key Concepts
 
-- **TestCrashRecoveryStayOpen** (8 connections) — `tests/integration/test_error_handling.py`
-- **.test_stays_open_after_crash()** (3 connections) — `tests/integration/test_error_handling.py`
-- **.test_stays_open_after_failure()** (3 connections) — `tests/integration/test_error_handling.py`
-- **.test_stays_open_after_successful_completion()** (3 connections) — `tests/integration/test_error_handling.py`
-- **TC-441: Crash Recovery - Stay Open After Exit.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-441: AOM stays open after playbook completes successfully.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-441: AOM stays open after task failure.** (1 connections) — `tests/integration/test_error_handling.py`
-- **TC-441: AOM stays open after subprocess crash.** (1 connections) — `tests/integration/test_error_handling.py`
+- **Open flags (pending input)** (13 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Empirical re-verification (2026-06-30)** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Q11 — Naming: `--verbose` collision** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Q12 — Vault password prompts** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Q13.1 — Verbose-line caplevel threshold** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Q13.2 — Verbose-line classifier rules** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Q13 — Capture `Display.vvvv()` plugin-loader / connection lines** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Q14.1 final — Alt 1 (`V` key, context-sensitive)** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Q14.1 — Simplification options (re-thinking)** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Q14 — Inspect view default + contextual debug buttons** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Q15 — Live compact log: verbose capture indicator** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Q16 — Redacted field display** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Q17 — Config file structure** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
 
 ## Relationships
 
-- [[Execution State Transitions]] (4 shared connections)
-- [[PTY Stream Parser]] (1 shared connections)
-- [[State Machine Module]] (1 shared connections)
-- [[Error Handling Tests]] (1 shared connections)
+- [Stderr Capture Handling](Stderr_Capture_Handling.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_error_handling.py`
+- `docs/brainstorms/2026-06-29-verbosity-handling.md`
 
 ## Audit Trail
 
-- EXTRACTED: 15 (71%)
-- INFERRED: 6 (29%)
+- EXTRACTED: 25 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

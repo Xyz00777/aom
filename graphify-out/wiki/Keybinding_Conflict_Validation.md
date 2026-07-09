@@ -1,37 +1,50 @@
 # Keybinding Conflict Validation
 
-> 10 nodes · cohesion 0.20
+> 14 nodes · cohesion 0.18
 
 ## Key Concepts
 
-- **TestKeybindingConflicts** (7 connections) — `tests/tui/test_keybindings.py`
-- **validate_keybindings()** (3 connections) — `src/ansible_aom/tui/keybindings.py`
-- **.test_multiple_keys_can_map_to_same_action()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_validate_keybindings_returns_no_errors()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_no_duplicate_keys_in_keybindings_dict()** (2 connections) — `tests/tui/test_keybindings.py`
-- **Validate that there are no duplicate keybindings.      Returns:         List of** (1 connections) — `src/ansible_aom/tui/keybindings.py`
-- **Tests for keybinding conflicts - no duplicate bindings.** (1 connections) — `tests/tui/test_keybindings.py`
-- **The KEYBINDINGS dict should have no duplicate keys.** (1 connections) — `tests/tui/test_keybindings.py`
-- **validate_keybindings should return empty list if valid.** (1 connections) — `tests/tui/test_keybindings.py`
-- **Multiple keys can map to the same action (e.g., '/' and 'ctrl+f' for search).** (1 connections) — `tests/tui/test_keybindings.py`
+- **StderrEvent** (30 connections) — `src/ansible_aom/core/stderr_classifier.py`
+- **TestStderrEvent** (8 connections) — `tests/unit/test_stderr_classifier.py`
+- **TestAnsiStrippedInputs** (6 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_clean_text_input()** (3 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_equality()** (3 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_frozen_dataclass()** (3 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_required_fields()** (3 connections) — `tests/unit/test_stderr_classifier.py`
+- **A classified stderr line.      Carries the full info needed to emit a synthetic** (1 connections) — `src/ansible_aom/core/stderr_classifier.py`
+- **StderrEvent shape — used by emit code in store.py.** (1 connections) — `tests/unit/test_stderr_classifier.py`
+- **StderrEvent is frozen so emit code can rely on it being immutable.** (1 connections) — `tests/unit/test_stderr_classifier.py`
+- **Frozen dataclass equality on all four fields.** (1 connections) — `tests/unit/test_stderr_classifier.py`
+- **All four fields are required (no defaults).** (1 connections) — `tests/unit/test_stderr_classifier.py`
+- **Real ansible-playbook wraps stderr in SGR escape sequences. The     classifier s** (1 connections) — `tests/unit/test_stderr_classifier.py`
+- **Sanity: clean text is classifiable.** (1 connections) — `tests/unit/test_stderr_classifier.py`
 
 ## Relationships
 
-- [[TUI Keybindings Config]] (3 shared connections)
-- [[TUI Keybindings Tests]] (1 shared connections)
-- [[Action Keybindings Lookup]] (1 shared connections)
+- [Skipped Task Collapsing](Skipped_Task_Collapsing.md) (11 shared connections)
+- [Prompt Detection Heuristics](Prompt_Detection_Heuristics.md) (6 shared connections)
+- [Profile Tracemalloc Wiring](Profile_Tracemalloc_Wiring.md) (5 shared connections)
+- [Community 465](Community_465.md) (1 shared connections)
+- [Community 514](Community_514.md) (1 shared connections)
+- [Community 575](Community_575.md) (1 shared connections)
+- [Community 612](Community_612.md) (1 shared connections)
+- [Community 576](Community_576.md) (1 shared connections)
+- [Community 532](Community_532.md) (1 shared connections)
+- [Community 578](Community_578.md) (1 shared connections)
+- [Community 487](Community_487.md) (1 shared connections)
+- [Community 577](Community_577.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/tui/keybindings.py`
-- `tests/tui/test_keybindings.py`
+- `src/ansible_aom/core/stderr_classifier.py`
+- `tests/unit/test_stderr_classifier.py`
 
 ## Audit Trail
 
-- EXTRACTED: 18 (78%)
-- INFERRED: 5 (22%)
+- EXTRACTED: 26 (41%)
+- INFERRED: 37 (59%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

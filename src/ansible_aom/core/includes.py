@@ -24,10 +24,10 @@ from ansible_aom.core.models import (
     PlayDefinition,
     RoleCacheEntry,
     RoleGroupDefinition,
-    RunState,
     TaskDefinition,
     strip_role_prefix,
 )
+from ansible_aom.core.run_state import RunState
 
 logger = logging.getLogger(__name__)
 

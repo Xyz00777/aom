@@ -1,40 +1,46 @@
 # View Mode Selection
 
-> 16 nodes · cohesion 0.17
+> 21 nodes · cohesion 0.15
 
 ## Key Concepts
 
-- **TestViewModeSelection** (9 connections) — `tests/unit/test_view_modes.py`
-- **.select_view_mode()** (8 connections) — `tests/unit/test_view_modes.py`
-- **.test_default_is_compact()** (3 connections) — `tests/unit/test_view_modes.py`
-- **.test_non_tty_uses_streaming()** (3 connections) — `tests/unit/test_view_modes.py`
-- **.test_tui_flag_enables_full_tui()** (3 connections) — `tests/unit/test_view_modes.py`
-- **.test_tui_flag_ignored_without_tty()** (3 connections) — `tests/unit/test_view_modes.py`
-- **.test_verbose_enables_logging_in_compact()** (3 connections) — `tests/unit/test_view_modes.py`
-- **.test_verbose_non_tty_uses_streaming()** (3 connections) — `tests/unit/test_view_modes.py`
-- **Tests for view mode selection logic.** (1 connections) — `tests/unit/test_view_modes.py`
-- **Select renderer mode based on flags and terminal.          Args:             tui** (1 connections) — `tests/unit/test_view_modes.py`
-- **Default mode is compact.** (1 connections) — `tests/unit/test_view_modes.py`
-- **--tui flag enables full TUI when TTY available.** (1 connections) — `tests/unit/test_view_modes.py`
-- **--tui flag ignored without TTY, uses streaming instead.** (1 connections) — `tests/unit/test_view_modes.py`
-- **--verbose enables logging with Rich Live in compact mode.** (1 connections) — `tests/unit/test_view_modes.py`
-- **Non-TTY uses streaming output.** (1 connections) — `tests/unit/test_view_modes.py`
-- **--verbose with non-TTY still uses streaming.** (1 connections) — `tests/unit/test_view_modes.py`
+- **test_redaction_redteam_fixture.py** (11 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **Any** (8 connections)
+- **_build_config()** (6 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **_load_fixture()** (5 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **test_fixture_does_not_leak_plaintext_secrets()** (5 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **test_redaction_redteam_row()** (5 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **redteam_cases()** (4 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **test_fixture_covers_required_categories()** (3 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **test_fixture_has_at_least_30_rows()** (3 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **test_fixture_iter()** (3 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **_id_from_row()** (2 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **RedactionConfig** (1 connections)
+- **Table-driven red-team fixture test for the QC-002 redaction rewrite.  This file** (1 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **Defense-in-depth: every SHOULD_REDACT row must end with the literal     ``REDACT** (1 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **Sanity: the fixture loads as a list (ad-hoc debugging entry point).** (1 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **Load and parse the red-team JSONL fixture.** (1 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **Build a RedactionConfig from the row's ``config`` field.** (1 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **Module-scoped fixture: parse the JSONL once for the whole module.** (1 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **Each fixture row is a full redaction contract test.** (1 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **Sanity: the red-team corpus must be a real corpus, not a stub.** (1 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **Sanity: the corpus must include at least the four QC-002 categories.      - exac** (1 connections) — `tests/unit/test_redaction_redteam_fixture.py`
 
 ## Relationships
 
-- [[View Mode Selection]] (1 shared connections)
+- [TUI Tree View Tests](TUI_Tree_View_Tests.md) (2 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_view_modes.py`
+- `tests/unit/test_redaction_redteam_fixture.py`
 
 ## Audit Trail
 
-- EXTRACTED: 43 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 63 (97%)
+- INFERRED: 2 (3%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -4,6 +4,7 @@ The CLI exposes three invocations:
 
 * ``aom inspect``         — launch the TUI on the most recent session.
 * ``aom inspect --text``  — dump the most recent session as plain text.
+  ``--play`` and ``--task`` scope the verbose output to that play or task.
 * ``aom inspect prune``   — clean up old sessions on disk.
 
 The legacy ``list`` / ``show`` / ``diff`` subcommands are removed;
@@ -42,8 +43,17 @@ def _stdout_is_tty() -> bool:
         return False
 
 
-def inspect_text(state_dir: Path) -> int:
-    """Print the most-recent session as plain text. Return exit code."""
+def inspect_text(
+    state_dir: Path,
+    *,
+    play_name: str | None = None,
+    task_name: str | None = None,
+) -> int:
+    """Print the most-recent session as plain text. Return exit code.
+
+    When ``play_name`` or ``task_name`` are given, the verbose section
+    is scoped to that play or task.
+    """
     latest = find_latest_session(state_dir)
     if latest is None:
         print(f"No sessions found in {state_dir}")
@@ -52,7 +62,7 @@ def inspect_text(state_dir: Path) -> int:
     if session is None:
         print(f"Session not found: {latest}", file=sys.stderr)
         return 1
-    print(render_session(session), end="")
+    print(render_session(session, play_name=play_name, task_name=task_name), end="")
     return 0
 
 
@@ -126,6 +136,18 @@ def _build_parser() -> argparse.ArgumentParser:
         "(also implied when stdout is not a TTY).",
     )
     parser.add_argument(
+        "--play",
+        dest="play_name",
+        default=None,
+        help="With --text, scope verbose output to the named play.",
+    )
+    parser.add_argument(
+        "--task",
+        dest="task_name",
+        default=None,
+        help="With --text, scope verbose output to the named task.",
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         help="Print the session's diagnostics.json summary (lifecycle "
@@ -168,7 +190,11 @@ def main(argv: list[str] | None = None) -> int:
 
     use_text = args.text or not _stdout_is_tty()
     if use_text:
-        return inspect_text(args.state_dir)
+        return inspect_text(
+            args.state_dir,
+            play_name=args.play_name,
+            task_name=args.task_name,
+        )
     return inspect_tui(args.state_dir)
 
 

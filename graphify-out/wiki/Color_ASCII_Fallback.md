@@ -1,67 +1,55 @@
 # Color ASCII Fallback
 
-> 60 nodes · cohesion 0.07
+> 69 nodes · cohesion 0.06
 
 ## Key Concepts
 
-- **RunProgress** (25 connections) — `src/ansible_aom/core/estimate.py`
-- **test_estimate.py** (19 connections) — `tests/unit/test_estimate.py`
-- **_est()** (19 connections) — `tests/unit/test_estimate.py`
-- **project_remaining()** (15 connections) — `src/ansible_aom/core/estimate.py`
-- **TestColorEnabled** (11 connections) — `tests/compact/test_status_bar_colors.py`
-- **test_ascii_fallback.py** (10 connections) — `tests/compact/test_ascii_fallback.py`
-- **RunEstimate** (10 connections) — `src/ansible_aom/core/estimate.py`
-- **add_completed()** (9 connections) — `src/ansible_aom/core/estimate.py`
-- **add_in_flight()** (9 connections) — `src/ansible_aom/core/estimate.py`
-- **.__init__()** (8 connections) — `src/ansible_aom/compact/renderer.py`
-- **is_unicode_terminal()** (7 connections) — `src/ansible_aom/core/icons.py`
-- **_color_enabled()** (6 connections) — `src/ansible_aom/compact/format.py`
-- **estimate.py** (6 connections) — `src/ansible_aom/core/estimate.py`
-- **test_add_completed_buckets_by_prior_result()** (4 connections) — `tests/unit/test_estimate.py`
-- **test_add_completed_fixed_task_does_not_touch_var_actual()** (4 connections) — `tests/unit/test_estimate.py`
-- **test_add_completed_ignores_unmatched_path()** (4 connections) — `tests/unit/test_estimate.py`
-- **test_add_in_flight_caps_credit_at_prior_but_not_actual()** (4 connections) — `tests/unit/test_estimate.py`
-- **test_add_in_flight_credits_variable_bucket_and_actual()** (4 connections) — `tests/unit/test_estimate.py`
-- **test_add_in_flight_fixed_task_credits_floor_only()** (4 connections) — `tests/unit/test_estimate.py`
-- **test_fast_rerun_keeps_floor_but_collapses_variable()** (4 connections) — `tests/unit/test_estimate.py`
-- **test_fixed_floor_projected_unscaled()** (4 connections) — `tests/unit/test_estimate.py`
-- **test_no_prior_returns_none()** (4 connections) — `tests/unit/test_estimate.py`
-- **test_remaining_never_negative()** (4 connections) — `tests/unit/test_estimate.py`
-- **test_variable_remainder_scaled_by_work_pace()** (4 connections) — `tests/unit/test_estimate.py`
-- **test_warmup_fraction_gate()** (4 connections) — `tests/unit/test_estimate.py`
-- *... and 35 more nodes in this community*
+- **analyze_overhead()** (19 connections) — `src/ansible_aom/core/overhead.py`
+- **OverheadStats** (19 connections) — `src/ansible_aom/core/overhead.py`
+- **format_overhead_section()** (14 connections) — `src/ansible_aom/inspect/formatters.py`
+- **test_overhead.py** (14 connections) — `tests/unit/test_overhead.py`
+- **_runner_ok()** (12 connections) — `tests/unit/test_overhead.py`
+- **_task_start()** (11 connections) — `tests/unit/test_overhead.py`
+- **_stats()** (10 connections) — `tests/unit/test_overhead_display.py`
+- **.test_all_runner_result_types_count()** (8 connections) — `tests/unit/test_overhead.py`
+- **TestFullStats** (7 connections) — `tests/unit/test_overhead_display.py`
+- **.test_overhead_share_clamped_to_one()** (7 connections) — `tests/unit/test_overhead.py`
+- **overhead.py** (6 connections) — `src/ansible_aom/core/overhead.py`
+- **test_overhead_display.py** (6 connections) — `tests/unit/test_overhead_display.py`
+- **TestEmptyAndDegenerate** (6 connections) — `tests/unit/test_overhead.py`
+- **TestWallClockAndShare** (6 connections) — `tests/unit/test_overhead.py`
+- **.test_overhead_share_is_ratio()** (6 connections) — `tests/unit/test_overhead.py`
+- **.test_wall_clock_from_start_and_stats()** (6 connections) — `tests/unit/test_overhead.py`
+- **_parse_iso8601()** (5 connections) — `src/ansible_aom/core/overhead.py`
+- **TestFormatting** (5 connections) — `tests/unit/test_overhead_display.py`
+- **_playbook_start()** (5 connections) — `tests/unit/test_overhead.py`
+- **.test_floor_is_p25_of_durations()** (5 connections) — `tests/unit/test_overhead.py`
+- **.test_insufficient_samples()** (5 connections) — `tests/unit/test_overhead.py`
+- **.test_skips_negative_durations()** (5 connections) — `tests/unit/test_overhead.py`
+- **.test_estimated_overhead_uses_distinct_task_count()** (5 connections) — `tests/unit/test_overhead.py`
+- **formatters.py** (4 connections) — `src/ansible_aom/inspect/formatters.py`
+- **_stats()** (4 connections) — `tests/unit/test_overhead.py`
+- *... and 44 more nodes in this community*
 
 ## Relationships
 
-- [[Compact Renderer Implementation]] (6 shared connections)
-- [[Run State Completion Recap]] (3 shared connections)
-- [[Panel Refresh Snapshot]] (2 shared connections)
-- [[Compact Renderer Formatters]] (1 shared connections)
-- [[Terminal Display Manager]] (1 shared connections)
-- [[Heartbeat Liveness Tracker]] (1 shared connections)
-- [[Hide State Normalization]] (1 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
-- [[Status Bar Color Tests]] (1 shared connections)
-- [[Event Log Emission]] (1 shared connections)
-- [[Compact Display Module Layout]] (1 shared connections)
+- [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (2 shared connections)
+- [StatusBarConfig Model](StatusBarConfig_Model.md) (1 shared connections)
+- [Rerun CLI Parser](Rerun_CLI_Parser.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/compact/format.py`
-- `src/ansible_aom/compact/renderer.py`
-- `src/ansible_aom/core/estimate.py`
-- `src/ansible_aom/core/icons.py`
-- `tests/compact/test_ascii_fallback.py`
-- `tests/compact/test_status_bar_colors.py`
-- `tests/unit/test_estimate.py`
+- `src/ansible_aom/core/overhead.py`
+- `src/ansible_aom/inspect/formatters.py`
+- `tests/unit/test_overhead.py`
+- `tests/unit/test_overhead_display.py`
 
 ## Audit Trail
 
-- EXTRACTED: 161 (61%)
-- INFERRED: 101 (39%)
+- EXTRACTED: 228 (77%)
+- INFERRED: 70 (23%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

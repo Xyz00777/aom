@@ -20,7 +20,8 @@ from typing import TYPE_CHECKING, Literal
 from pydantic import BaseModel
 
 if TYPE_CHECKING:
-    from ansible_aom.core.models import RunState
+    from ansible_aom.core.event_types import JsonlEvent
+    from ansible_aom.core.run_state import RunState
 
 
 class HostCounts(BaseModel):
@@ -94,7 +95,7 @@ class JsonRenderer:
         """Capture playbook + args; initialise empty RunState. No output."""
         import time
 
-        from ansible_aom.core.models import RunState
+        from ansible_aom.core.run_state import RunState
 
         self._playbook = playbook
         self._args = list(args)
@@ -109,7 +110,7 @@ class JsonRenderer:
         """No-op — JSON mode doesn't show the prior-run hint."""
         return
 
-    def update_state(self, event: dict) -> None:
+    def update_state(self, event: JsonlEvent) -> None:
         """Drive RunState from a JSONL event. No output."""
         if self._state is None:
             return
@@ -145,11 +146,7 @@ class JsonRenderer:
 
     def handle_interactive_prompt(self, prompt_text: str) -> str:
         """Refuse on stderr; return empty so the playbook proceeds without input."""
-        import sys
-
-        sys.stderr.write("aom: --format json cannot answer interactive prompt; refusing.\n")
-        sys.stderr.flush()
-        return ""
+        return self.handle_password_prompt(prompt_text)
 
     def handle_completion(self, exit_code: int, state: str) -> None:
         """Build the RunSummary from accumulated RunState and print as JSON.
@@ -165,8 +162,9 @@ class JsonRenderer:
         import time
         from datetime import datetime, timezone
 
-        from ansible_aom.compact.renderer import determine_exit_code
-        from ansible_aom.core.models import RunState, Status
+        from ansible_aom.core.exit_code import determine_exit_code
+        from ansible_aom.core.models import Status
+        from ansible_aom.core.run_state import RunState
 
         self._wall_end = time.time()
 

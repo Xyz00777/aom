@@ -1,37 +1,38 @@
 # Parser Phase Transitions
 
-> 10 nodes · cohesion 0.20
+> 14 nodes · cohesion 0.14
 
 ## Key Concepts
 
-- **TestPhaseTransitions** (10 connections) — `tests/integration/test_playbook_parser.py`
-- **.test_execution_to_post_run_on_stats_event()** (3 connections) — `tests/integration/test_playbook_parser.py`
-- **.test_initial_phase_is_pre_run_prompts()** (3 connections) — `tests/integration/test_playbook_parser.py`
-- **.test_non_json_lines_handled_during_execution()** (3 connections) — `tests/integration/test_playbook_parser.py`
-- **.test_pre_run_to_execution_on_start_event()** (3 connections) — `tests/integration/test_playbook_parser.py`
-- **Test PtyStreamParser phase transitions.** (1 connections) — `tests/integration/test_playbook_parser.py`
-- **Parser starts in PRE_RUN_PROMPTS phase.** (1 connections) — `tests/integration/test_playbook_parser.py`
-- **PRE_RUN_PROMPTS -> EXECUTION on v2_playbook_on_start.** (1 connections) — `tests/integration/test_playbook_parser.py`
-- **EXECUTION -> POST_RUN_RECAP on v2_playbook_on_stats.** (1 connections) — `tests/integration/test_playbook_parser.py`
-- **Non-JSON lines during EXECUTION are added to plaintext_lines.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **F6 — `aom --format json` end-of-run JSON summary Implementation Plan** (13 connections) — `docs/superpowers/plans/2026-05-12-f6-json-output.md`
+- **2026-05-12-f6-json-output.md** (1 connections) — `docs/superpowers/plans/2026-05-12-f6-json-output.md`
+- **File Structure** (1 connections) — `docs/superpowers/plans/2026-05-12-f6-json-output.md`
+- **Interactive-prompt behaviour under `--format json`** (1 connections) — `docs/superpowers/plans/2026-05-12-f6-json-output.md`
+- **Schema (locked here, don't drift)** (1 connections) — `docs/superpowers/plans/2026-05-12-f6-json-output.md`
+- **Self-Review** (1 connections) — `docs/superpowers/plans/2026-05-12-f6-json-output.md`
+- **Task 1: `RunSummary` Pydantic schema model** (1 connections) — `docs/superpowers/plans/2026-05-12-f6-json-output.md`
+- **Task 2: `JsonRenderer` skeleton — Protocol no-ops** (1 connections) — `docs/superpowers/plans/2026-05-12-f6-json-output.md`
+- **Task 3: `handle_completion` builds and emits the JSON object** (1 connections) — `docs/superpowers/plans/2026-05-12-f6-json-output.md`
+- **Task 4: Factory dispatch — `create_renderer(format=...)`** (1 connections) — `docs/superpowers/plans/2026-05-12-f6-json-output.md`
+- **Task 5: CLI — `--format` argparse flag + mutual exclusion with `--tui`** (1 connections) — `docs/superpowers/plans/2026-05-12-f6-json-output.md`
+- **Task 6: End-to-end smoke test through `run_playbook`** (1 connections) — `docs/superpowers/plans/2026-05-12-f6-json-output.md`
+- **Task 7: Interactive-prompt refusal behaviour** (1 connections) — `docs/superpowers/plans/2026-05-12-f6-json-output.md`
+- **Task 8: Run full suite + ruff + mypy** (1 connections) — `docs/superpowers/plans/2026-05-12-f6-json-output.md`
 
 ## Relationships
 
-- [[PTY Stream Parser]] (5 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
-- [[Run State Summary Panel]] (1 shared connections)
-- [[Playbook Parser Integration Tests]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/integration/test_playbook_parser.py`
+- `docs/superpowers/plans/2026-05-12-f6-json-output.md`
 
 ## Audit Trail
 
-- EXTRACTED: 23 (85%)
-- INFERRED: 4 (15%)
+- EXTRACTED: 26 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,34 +1,36 @@
 # Renderer Render Methods
 
-> 7 nodes · cohesion 0.29
+> 12 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **.render()** (4 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
-- **Text** (3 connections)
-- **.render()** (3 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **._format_elapsed_time()** (3 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
-- **Render the debug panel.          Returns:             Rich Text object with all** (1 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **Render the summary panel.          Returns:             Rich Text object with pl** (1 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
-- **Format elapsed time.          Returns:             Formatted time string (H:MM:S** (1 connections) — `src/ansible_aom/tui/widgets/summary_panel.py`
+- **Python TUI Application Logging Strategy Research (2026-04-20)** (12 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **Executive Summary** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **LQ10: Should AOM Log Ansible's Output?** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **LQ1: Where should AOM's own logs go?** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **LQ2: Log File Path - XDG Compliance** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **LQ3: Log Levels - What Should AOM Log?** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **LQ4: Log Rotation Policy** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **LQ5: Non-Blocking Logging for TUI** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **LQ6: `--verbose` Flag Behavior** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **LQ7: Error Handling - ansible-playbook Not Found** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **LQ8: Error Handling - ansible.posix or Other Dependencies Not Found** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **LQ9: Python Logging Module Integration with Textual** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
 
 ## Relationships
 
-- [[Summary Panel Widget]] (2 shared connections)
-- [[Status Bar Formatting]] (1 shared connections)
-- [[Debug Panel Widget]] (1 shared connections)
+- [Real Ansible Integration](Real_Ansible_Integration.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/tui/widgets/debug_panel.py`
-- `src/ansible_aom/tui/widgets/summary_panel.py`
+- `.sisyphus/notepads/new-spec/open-questions.md`
 
 ## Audit Trail
 
-- EXTRACTED: 16 (100%)
+- EXTRACTED: 23 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

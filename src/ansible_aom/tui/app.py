@@ -14,10 +14,12 @@ that thread schedule UI updates onto Textual's event loop via
 from pathlib import Path
 from typing import Any
 
-from textual.app import App
+from textual.app import App, ScreenStackError
 from textual.binding import Binding
+from textual.css.query import NoMatches
 
-from ansible_aom.core.models import RunState
+from ansible_aom.core.event_types import JsonlEvent
+from ansible_aom.core.run_state import RunState
 from ansible_aom.drivers.protocol import EventSource
 from ansible_aom.tui.keybindings import KEYBINDINGS, KeyContext
 from ansible_aom.tui.widgets import DebugPanel
@@ -237,7 +239,7 @@ class AOMApp(App[None]):
         """Renderer Protocol: no-op. TUI does not surface a heartbeat yet."""
         return None
 
-    def update_state(self, event: dict) -> None:
+    def update_state(self, event: JsonlEvent) -> None:
         """Renderer Protocol: route the JSONL event through RunState.
 
         Called from the runner worker thread. The mutation itself is
@@ -330,6 +332,20 @@ class AOMApp(App[None]):
                     base = base[:-2]
             self.title = f"{base} {marker}"
 
+            # R12: append a truncation hint to the title when memory
+            # caps fired. Mirrors the compact renderer's one-line
+            # footer so the user sees "did the run finish normally?".
+            truncated = getattr(self._state, "truncated_events", None)
+            if truncated:
+                parts = ",".join(
+                    f"{name}={count}"
+                    for name, count in sorted(
+                        truncated.items(),
+                        key=lambda kv: (-kv[1], kv[0]),
+                    )
+                )
+                self.title = f"{self.title} (truncated: {parts})"
+
             # Force one final refresh independent of the tick cadence
             # so the user sees the terminal state immediately.
             self._dirty += 1
@@ -375,9 +391,15 @@ class AOMApp(App[None]):
         except Exception as exc:
             # Surface unexpected failures into final_state instead of
             # leaving the user with a frozen UI and no explanation.
+            # Keeping the broad ``except Exception`` here is intentional:
+            # the runner worker is the last line of defence against any
+            # crash in the pexpect / parser / renderer pipeline, and
+            # swallowing them silently would freeze the TUI without a
+            # trace. Logged below so the failure isn't completely lost.
             self._exit_code = 1
             self._final_state = "crashed"
             self._log_lines.append(f"[ERROR] runner crashed: {exc}")
+            self.log.error(f"runner worker crashed: {exc}", exc_info=True)
 
     def _refresh_widgets(self) -> None:
         """Periodic tick: drain pending updates onto widgets.
@@ -393,7 +415,11 @@ class AOMApp(App[None]):
         """
         try:
             screen = self.screen
-        except Exception:
+        except AttributeError, RuntimeError, ScreenStackError:
+            # AttributeError: self.screen is None before the first mount.
+            # RuntimeError: Textual raises during teardown.
+            # ScreenStackError: no screen on stack (e.g. legacy
+            # renderer-protocol smoke tests construct bare AOMApp()).
             return
         if not screen.is_mounted:
             return
@@ -415,7 +441,9 @@ class AOMApp(App[None]):
 
                     try:
                         log = screen.query_one(LogPanel)
-                    except Exception:
+                    except NoMatches:
+                        # NoMatches: LogPanel isn't on the current
+                        # screen (e.g. inspect screen swapped in mid-tick).
                         log = None
                     if log is not None:
                         # Snapshot-and-clear so a concurrent print_log
@@ -474,5 +502,48 @@ class AOMApp(App[None]):
         try:
             debug_panel = self.screen.query_one(DebugPanel)
             debug_panel.toggle_visibility()
-        except Exception:
-            pass
+        except NoMatches, AttributeError:
+            # NoMatches: DebugPanel not present on current screen.
+            # AttributeError: self.screen raises before the first mount.
+            self.log.debug("debug panel toggle skipped", exc_info=True)
+
+    async def action_show_help(self) -> None:
+        """Push the help overlay on top of whatever screen is active."""
+        from ansible_aom.tui.screens.help import HelpOverlay
+
+        self.push_screen(HelpOverlay())
+
+    async def action_show_settings(self) -> None:
+        """Push the settings screen (mirrors the ``S`` keybinding)."""
+        from ansible_aom.tui.screens.settings import SettingsScreen
+
+        self.push_screen(SettingsScreen())
+
+    async def action_rerun_with_same_args(self) -> None:
+        """Open the rerun dialog pre-set to failed hosts.
+
+        Active only after the playbook finishes — the ``POST_RUN`` key
+        context covers the binding. If no session exists (e.g. the
+        smoke-test path that builds ``AOMApp()`` with no playbook), the
+        dialog itself surfaces the "no sessions" error.
+        """
+        from pathlib import Path
+
+        from ansible_aom.tui.screens.rerun import RerunDialog
+
+        state_dir = self._session_dir or (Path.home() / ".local" / "state" / "aom" / "sessions")
+        self.push_screen(RerunDialog(state_dir=state_dir, host_filter="failed"))
+
+    async def action_rerun_with_modified_args(self) -> None:
+        """Open the rerun dialog pre-set to failed hosts.
+
+        The "modified args" variant currently uses the same dialog as
+        ``action_rerun_with_same_args``; an arg-editor screen can be
+        layered on top in a follow-up without changing the binding.
+        """
+        from pathlib import Path
+
+        from ansible_aom.tui.screens.rerun import RerunDialog
+
+        state_dir = self._session_dir or (Path.home() / ".local" / "state" / "aom" / "sessions")
+        self.push_screen(RerunDialog(state_dir=state_dir, host_filter="failed"))

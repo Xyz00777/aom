@@ -1,53 +1,50 @@
 # Tree Projection Logic
 
-> 17 nodes · cohesion 0.12
+> 33 nodes · cohesion 0.06
 
 ## Key Concepts
 
-- **TreeProjection** (102 connections) — `src/ansible_aom/core/tree.py`
-- **iter_preflight_task_defs()** (10 connections) — `src/ansible_aom/core/models.py`
-- **._build_role_total_tasks()** (10 connections) — `src/ansible_aom/core/tree.py`
-- **.tree_lines()** (10 connections) — `src/ansible_aom/core/tree.py`
-- **.host_rows()** (8 connections) — `src/ansible_aom/core/tree.py`
-- **._recompute_inner_footer_count()** (8 connections) — `src/ansible_aom/core/tree.py`
-- **._task_role()** (7 connections) — `src/ansible_aom/core/tree.py`
-- **._relabel_role_lines()** (6 connections) — `src/ansible_aom/core/tree.py`
-- **._count_visible_tasks_per_role()** (5 connections) — `src/ansible_aom/core/tree.py`
-- **._refresh_tree_cache()** (5 connections) — `src/ansible_aom/core/tree.py`
-- **._remember_running_play()** (5 connections) — `src/ansible_aom/core/tree.py`
-- **._prune_row_leases()** (4 connections) — `src/ansible_aom/core/tree.py`
-- **._play_sticky_identity()** (3 connections) — `src/ansible_aom/core/tree.py`
-- **._worst_status_of()** (3 connections) — `src/ansible_aom/core/tree.py`
-- **.is_host_summary_visible()** (2 connections) — `src/ansible_aom/core/tree.py`
-- **._task_definition_identity()** (2 connections) — `src/ansible_aom/core/tree.py`
-- **Yield preflight task definitions in display order with effective role path.** (1 connections) — `src/ansible_aom/core/models.py`
+- **Locked design decisions (post-research revisions)** (22 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Phase 0 (research) — Findings 2026-06-30** (6 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Verbosity-Plan Pre-Implementation Interview** (6 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **2026-06-30-verbosity-pre-impl-interview.md** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Classifier: 12 source values, 30 regex rules** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Connection tracking: custom JSONL callback plugin** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Design revisions needed** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Finding 1 — `aom_verbose_line` prefix list is one prefix, not many** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Finding 2 — Inspect TUI is a static browser** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Finding 3 — Config refactor is ~50 LOC, not 150-200** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Finding 4 — All 5 verification tasks PASS** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Implementation outline** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Implication for the 8-phase plan** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Open architectural questions** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Open flags (pending input)** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Q1 — What does "v1" mean in this context?** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Q2 — Implementation order** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Q3.1 — Q21 (`--check`/`--diff` UI)** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Q3.2 — Q22 (per-host truncation policy)** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Q3.3 — Q23 (live streaming inspect spec note)** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Q3.4 — Q32 (TUI render budget for full stdout/stderr)** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Q3 — How are the 4 open questions (Q21, Q22, Q23, Q32) being resolved?** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Q4 — Is the multi-layer config refactor part of v1?** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Q5 — `aom_verbose_line` heuristic prefix list** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- **Q6 — `~/.cache/aom/` config cache** (1 connections) — `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
+- *... and 8 more nodes in this community*
 
 ## Relationships
 
-- [[Play Definition Tree Population]] (39 shared connections)
-- [[Play Tree Projection]] (24 shared connections)
-- [[Task Definition Live Refresh]] (12 shared connections)
-- [[Run State Completion Recap]] (8 shared connections)
-- [[Role Chain Extraction]] (7 shared connections)
-- [[Role Group Task Models]] (5 shared connections)
-- [[Tree Truncation Utilities]] (4 shared connections)
-- [[Tree Projection Utilities]] (4 shared connections)
-- [[Ungrouped Role Tree Tests]] (3 shared connections)
-- [[Loop Item Counter]] (2 shared connections)
-- [[Host Overview Table]] (1 shared connections)
-- [[Tree Block Animation]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `src/ansible_aom/core/models.py`
-- `src/ansible_aom/core/tree.py`
+- `docs/brainstorms/2026-06-30-verbosity-pre-impl-interview.md`
 
 ## Audit Trail
 
-- EXTRACTED: 116 (61%)
-- INFERRED: 75 (39%)
+- EXTRACTED: 64 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

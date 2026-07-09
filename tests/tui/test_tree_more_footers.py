@@ -13,9 +13,9 @@ Tests:
   "more" footers render as Textual TreeNodes with the right data key.
 - ``test_tui_more_node_is_not_expandable`` — footers carry
   ``allow_expand=False`` so the user can't expand a footer.
-- ``test_tui_role_label_remaining_in_textual_tree`` — the role
-  label says ``(M remaining)`` when the cut lands inside the role
-  (T3 contract).
+- ``test_tui_role_label_carries_total_in_textual_tree`` — the role
+  label says ``(N tasks)`` (the role's total) and never a
+  ``(M remaining)`` suffix (T3 contract after the suffix drop).
 - ``test_tui_more_node_styled_dim_italic`` — the footer's label
   carries ``"dim italic"`` style so it reads as metadata, not a
   real task.
@@ -200,9 +200,13 @@ class TestPopulateFromProjectionFooters:
                 f"for data={n.data!r}"
             )
 
-    def test_tui_role_label_remaining_in_textual_tree(self) -> None:
+    def test_tui_role_label_carries_total_in_textual_tree(self) -> None:
         """When the budget cut lands inside a role, the role's
-        TreeNode label must contain ``"remaining"`` (T3 contract)."""
+        TreeNode label must carry ``(N tasks)`` (the role's total) and
+        NEVER a ``(M remaining)`` suffix. The suffix counted completed
+        tasks and grew as the run progressed; the ``… and N more
+        tasks`` inner/outer footers carry the hidden-work signal in the
+        truncated case."""
         from ansible_aom.tui.widgets.task_tree import TaskTree
 
         state = _two_level_state()
@@ -211,8 +215,8 @@ class TestPopulateFromProjectionFooters:
         # (playbook + smfc play + smfc role + 3 smfc tasks + smfc host
         # leaves + Podman play + podman role) consumes most of the
         # budget, and the visible tasks under podman (1-2 of 33) leave
-        # the rest to the inner footer. The role label must switch to
-        # ``(M remaining)`` because visible < total.
+        # the rest to the inner footer. The role label must read
+        # ``(N tasks)`` (the role's total) — no "remaining" suffix.
         tree = TaskTree("Playbook")
         tree.populate_from_projection(projection, budget=12)
 
@@ -227,8 +231,14 @@ class TestPopulateFromProjectionFooters:
             f"fixture must produce a podman role TreeLine at budget=12; "
             f"got kinds={[ln.kind for ln in lines]}"
         )
-        assert "remaining" in podman_role_lines[0].label, (
-            f"data-layer role label must already say '(M remaining)'; "
+        # The role label must contain "(N tasks)" — the role's total
+        # task count — and must NOT contain the "remaining" suffix.
+        assert "(" in podman_role_lines[0].label and ")" in podman_role_lines[0].label, (
+            f"data-layer role label must carry the count parens '(N tasks)'; "
+            f"got {podman_role_lines[0].label!r}"
+        )
+        assert "remaining" not in podman_role_lines[0].label, (
+            f"data-layer role label must NOT carry 'remaining' suffix; "
             f"got {podman_role_lines[0].label!r}"
         )
 
@@ -238,14 +248,15 @@ class TestPopulateFromProjectionFooters:
         # Find the podman role specifically.
         podman_nodes = [n for n in role_nodes if "podman" in str(n.label)]
         assert podman_nodes, f"expected a podman role node; got {[n.data for n in role_nodes]}"
-        # The label must contain "remaining" — Rich's Text ``__contains__``
-        # checks the plain text, so the assertion reads naturally.
+        # The label must NOT contain "remaining" — Rich's Text
+        # ``__contains__`` checks the plain text, so the assertion reads
+        # naturally.
         label_str = str(podman_nodes[0].label)
-        assert "remaining" in label_str, (
-            f"role label must say '(M remaining)' inside the cut; got {label_str!r}"
+        assert "remaining" not in label_str, (
+            f"role label must NOT carry '(M remaining)' suffix; got {label_str!r}"
         )
         assert "(" in label_str and ")" in label_str, (
-            f"role label must carry the count parens; got {label_str!r}"
+            f"role label must carry the count parens '(N tasks)'; got {label_str!r}"
         )
 
     def test_tui_more_node_styled_dim_italic(self) -> None:

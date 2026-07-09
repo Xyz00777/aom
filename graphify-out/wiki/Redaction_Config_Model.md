@@ -1,45 +1,50 @@
 # Redaction Config Model
 
-> 17 nodes · cohesion 0.12
+> 41 nodes · cohesion 0.05
 
 ## Key Concepts
 
-- **TestRedactionConfig** (14 connections) — `tests/unit/test_config.py`
-- **.test_redaction_config_all_fields_independent()** (3 connections) — `tests/unit/test_config.py`
-- **.test_redaction_config_custom_fields()** (3 connections) — `tests/unit/test_config.py`
-- **.test_redaction_config_custom_fields_is_list()** (3 connections) — `tests/unit/test_config.py`
-- **.test_redaction_config_custom_patterns()** (3 connections) — `tests/unit/test_config.py`
-- **.test_redaction_config_custom_patterns_is_list()** (3 connections) — `tests/unit/test_config.py`
-- **.test_redaction_config_custom_whitelist()** (3 connections) — `tests/unit/test_config.py`
-- **.test_redaction_config_default_whitelist_empty()** (3 connections) — `tests/unit/test_config.py`
-- **.test_redaction_config_whitelist_is_list()** (2 connections) — `tests/unit/test_config.py`
-- **Each RedactionConfig instance has independent lists.** (1 connections) — `tests/unit/test_config.py`
-- **custom_fields is a list.** (1 connections) — `tests/unit/test_config.py`
-- **custom_patterns is a list of dicts.** (1 connections) — `tests/unit/test_config.py`
-- **Tests for RedactionConfig model - TC-170, TC-312, TC-313, TC-314.** (1 connections) — `tests/unit/test_config.py`
-- **TC-170: RedactionConfig whitelist defaults to empty list.** (1 connections) — `tests/unit/test_config.py`
-- **TC-312: RedactionConfig can have custom whitelist.** (1 connections) — `tests/unit/test_config.py`
-- **TC-313: RedactionConfig can have custom_fields.** (1 connections) — `tests/unit/test_config.py`
-- **TC-314: RedactionConfig can have custom_patterns.** (1 connections) — `tests/unit/test_config.py`
+- **Section 12: Testing Strategy** (41 connections) — `TEST_SPECIFICATION.md`
+- **TC-380: TDD Failing Test Before Implementation** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-381: Test Pyramid Proportions** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-382: Pytest Framework Version** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-383: Pytest-Asyncio Version** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-384: Pytest-Textual-Snapshot Version** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-385: Textual Test App Running** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-386: Textual Test Key Press** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-387: Subprocess Mock pexpect.spawn** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-388: Subprocess Mock is_alive** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-389: Snapshot Test Main Screen** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-390: Snapshot Test with run_before** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-391: Compact Renderer Rich Console Capture** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-392: Compact Renderer inline-snapshot** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-393: Diff Snapshot All Tasks** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-394: Diff Snapshot Changes Only** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-395: Non-TTY Output Testing** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-396: Mock pexpect Integration Test** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-397: parse_play_header Test** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-398: parse_task_with_role Test** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-399: parse_task_without_role Test** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-400: parse_tags Test** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-401: parse_include_tasks_not_expanded Test** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-402: parse_import_tasks_expanded Test** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-403: state_transitions_on_start Test** (1 connections) — `TEST_SPECIFICATION.md`
+- *... and 16 more nodes in this community*
 
 ## Relationships
 
-- [[Secret Redaction Configuration]] (9 shared connections)
-- [[Status Bar Warning Panels]] (1 shared connections)
-- [[Warnings Display Config]] (1 shared connections)
-- [[App Configuration Settings]] (1 shared connections)
-- [[App Config Model Tests]] (1 shared connections)
+- [Failure Recap Formatting](Failure_Recap_Formatting.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_config.py`
+- `TEST_SPECIFICATION.md`
 
 ## Audit Trail
 
-- EXTRACTED: 33 (73%)
-- INFERRED: 12 (27%)
+- EXTRACTED: 81 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

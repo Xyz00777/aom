@@ -1,44 +1,50 @@
 # Runner Heartbeat Wiring
 
-> 17 nodes · cohesion 0.15
+> 22 nodes · cohesion 0.11
 
 ## Key Concepts
 
-- **_FakeSink** (10 connections) — `tests/unit/test_runner_heartbeat.py`
-- **test_runner_heartbeat.py** (6 connections) — `tests/unit/test_runner_heartbeat.py`
-- **TestFeedNotesBytes** (6 connections) — `tests/unit/test_runner_heartbeat.py`
-- **_parser_in_execution_phase()** (5 connections) — `tests/unit/test_runner_heartbeat.py`
-- **TestTaskStartCountsAsHeartbeat** (5 connections) — `tests/unit/test_runner_heartbeat.py`
-- **.test_task_start_does_not_clear_heartbeat()** (5 connections) — `tests/unit/test_runner_heartbeat.py`
-- **.test_jsonl_event_line_notes_pty_bytes()** (4 connections) — `tests/unit/test_runner_heartbeat.py`
-- **.test_plaintext_line_notes_pty_bytes()** (4 connections) — `tests/unit/test_runner_heartbeat.py`
-- **.end()** (1 connections) — `tests/unit/test_runner_heartbeat.py`
-- **.__init__()** (1 connections) — `tests/unit/test_runner_heartbeat.py`
-- **.record_event()** (1 connections) — `tests/unit/test_runner_heartbeat.py`
-- **.record_stderr()** (1 connections) — `tests/unit/test_runner_heartbeat.py`
-- **Tests for the runner's heartbeat wiring.  The runner is responsible for feeding** (1 connections) — `tests/unit/test_runner_heartbeat.py`
-- **Return a parser advanced past the PRE_RUN_PROMPTS gate.      ``feed_line`` only** (1 connections) — `tests/unit/test_runner_heartbeat.py`
-- **Every successful line fed to ``_feed`` bumps the heartbeat.** (1 connections) — `tests/unit/test_runner_heartbeat.py`
-- **The task_start line is itself bytes from the subprocess; it must     leave the t** (1 connections) — `tests/unit/test_runner_heartbeat.py`
-- **``reset_heartbeat`` is no longer called on task_start — the         line's own `** (1 connections) — `tests/unit/test_runner_heartbeat.py`
+- **_BufferedChild** (10 connections) — `tests/unit/test_runner_events_recorded.py`
+- **_NullSink** (9 connections) — `tests/unit/test_runner_events_recorded.py`
+- **test_drive_feeds_each_event_when_pexpect_returns_multi_event_blob()** (8 connections) — `tests/unit/test_runner_events_recorded.py`
+- **test_runner_events_recorded.py** (7 connections) — `tests/unit/test_runner_events_recorded.py`
+- **test_run_playbook_writes_all_events_to_disk()** (5 connections) — `tests/unit/test_runner_events_recorded.py`
+- **_events_fixture()** (4 connections) — `tests/unit/test_runner_events_recorded.py`
+- **.close()** (1 connections) — `tests/unit/test_runner_events_recorded.py`
+- **.expect()** (1 connections) — `tests/unit/test_runner_events_recorded.py`
+- **.__init__()** (1 connections) — `tests/unit/test_runner_events_recorded.py`
+- **.isalive()** (1 connections) — `tests/unit/test_runner_events_recorded.py`
+- **.sendintr()** (1 connections) — `tests/unit/test_runner_events_recorded.py`
+- **.end()** (1 connections) — `tests/unit/test_runner_events_recorded.py`
+- **.__init__()** (1 connections) — `tests/unit/test_runner_events_recorded.py`
+- **.record_event()** (1 connections) — `tests/unit/test_runner_events_recorded.py`
+- **.record_stderr()** (1 connections) — `tests/unit/test_runner_events_recorded.py`
+- **Path** (1 connections)
+- **Regression tests for the multi-event PTY read bug.  Bug summary (R-INTERMITTENT-** (1 connections) — `tests/unit/test_runner_events_recorded.py`
+- **Stand-in for the runner's session sink — records calls for assertions.** (1 connections) — `tests/unit/test_runner_events_recorded.py`
+- **Single ``expect()`` returning a multi-event blob must still record     every eve** (1 connections) — `tests/unit/test_runner_events_recorded.py`
+- **End-to-end: a real subprocess emitting the 8-event fixture must     produce an `** (1 connections) — `tests/unit/test_runner_events_recorded.py`
+- **The 8-event fixture the original bug report used.** (1 connections) — `tests/unit/test_runner_events_recorded.py`
+- **Fake pexpect child that simulates the multi-event PTY read.      Each ``expect()** (1 connections) — `tests/unit/test_runner_events_recorded.py`
 
 ## Relationships
 
-- [[PTY Stream Parser]] (5 shared connections)
-- [[Role Group Task Models]] (3 shared connections)
-- [[Runner Session Recording]] (3 shared connections)
-- [[CPU Sampling Probing]] (1 shared connections)
+- [Run State Completion Recap](Run_State_Completion_Recap.md) (3 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (3 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [Architecture Layering Tests](Architecture_Layering_Tests.md) (1 shared connections)
+- [Tree Block Animation](Tree_Block_Animation.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_runner_heartbeat.py`
+- `tests/unit/test_runner_events_recorded.py`
 
 ## Audit Trail
 
-- EXTRACTED: 45 (83%)
-- INFERRED: 9 (17%)
+- EXTRACTED: 51 (86%)
+- INFERRED: 8 (14%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

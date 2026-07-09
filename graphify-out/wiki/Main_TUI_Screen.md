@@ -1,46 +1,54 @@
 # Main TUI Screen
 
-> 13 nodes · cohesion 0.10
+> 28 nodes · cohesion 0.10
 
 ## Key Concepts
 
-- **MainScreen** (26 connections) — `src/ansible_aom/tui/screens/main.py`
-- **._update_elapsed_from_start()** (5 connections) — `src/ansible_aom/tui/screens/main.py`
-- **.update_from_state()** (5 connections) — `src/ansible_aom/tui/screens/main.py`
-- **main.py** (3 connections) — `src/ansible_aom/tui/screens/main.py`
-- **.on_mount()** (3 connections) — `src/ansible_aom/tui/app.py`
-- **.update_debug_from_summary()** (2 connections) — `src/ansible_aom/tui/screens/main.py`
-- **.update_elapsed()** (2 connections) — `src/ansible_aom/tui/screens/main.py`
-- **.update_hosts_progress()** (2 connections) — `src/ansible_aom/tui/screens/main.py`
-- **.update_log_line()** (2 connections) — `src/ansible_aom/tui/screens/main.py`
-- **.update_play_name()** (2 connections) — `src/ansible_aom/tui/screens/main.py`
-- **.update_tasks_progress()** (2 connections) — `src/ansible_aom/tui/screens/main.py`
-- **Main TUI screen for AOM.  See SPECIFICATION.md Section 4.2 for layout.** (1 connections) — `src/ansible_aom/tui/screens/main.py`
-- **Mount the main screen and (if configured) start the playbook.** (1 connections) — `src/ansible_aom/tui/app.py`
+- **normalize_hide_states()** (14 connections) — `src/ansible_aom/core/log_filter.py`
+- **TestNormalizeHideStates** (13 connections) — `tests/unit/test_log_filter.py`
+- **test_log_filter.py** (4 connections) — `tests/unit/test_log_filter.py`
+- **.test_all_valid_states_accepted()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_case_insensitive()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_deduplicates()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_empty_input()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_frozenset_return_type()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_iterable_not_just_list()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_mixed_known_and_unknown()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_single_value()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_unknown_list_preserves_order()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_unknown_state_returns_in_unknown_list()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_whitespace_around_tokens_not_stripped()** (3 connections) — `tests/unit/test_log_filter.py`
+- **Lowercase, deduplicate, validate, and separate unknown inputs.      Args:** (1 connections) — `src/ansible_aom/core/log_filter.py`
+- **Unit tests for core/log_filter.py --hide-state helper functions.** (1 connections) — `tests/unit/test_log_filter.py`
+- **Tests for normalize_hide_states — input validation and normalisation.** (1 connections) — `tests/unit/test_log_filter.py`
+- **Empty iterable returns empty frozenset and empty unknown list.** (1 connections) — `tests/unit/test_log_filter.py`
+- **Single known value returns frozenset with that value.** (1 connections) — `tests/unit/test_log_filter.py`
+- **Mixed-case input is lowercased and matched against VALID_STATES.** (1 connections) — `tests/unit/test_log_filter.py`
+- **Duplicate values produce a single entry in the frozenset.** (1 connections) — `tests/unit/test_log_filter.py`
+- **Every entry in VALID_STATES is accepted individually.** (1 connections) — `tests/unit/test_log_filter.py`
+- **A value not in VALID_STATES appears in the unknown list.** (1 connections) — `tests/unit/test_log_filter.py`
+- **Known values go to the frozenset; unknown values go to the list.** (1 connections) — `tests/unit/test_log_filter.py`
+- **The first return value is a frozenset, not a plain set.** (1 connections) — `tests/unit/test_log_filter.py`
+- *... and 3 more nodes in this community*
 
 ## Relationships
 
-- [[Task Definition Live Refresh]] (6 shared connections)
-- [[AOM TUI Application]] (3 shared connections)
-- [[Run History Mining]] (2 shared connections)
-- [[Run State Summary Panel]] (2 shared connections)
-- [[Play Definition Tree Population]] (2 shared connections)
-- [[Tree Projection Logic]] (1 shared connections)
-- [[TUI Keybindings Config]] (1 shared connections)
-- [[Config Loading Screen]] (1 shared connections)
-- [[Log Panel Widget]] (1 shared connections)
+- [Inspect Debug Diagnostics](Inspect_Debug_Diagnostics.md) (1 shared connections)
+- [Community 670](Community_670.md) (1 shared connections)
+- [Host Result Hide Filter](Host_Result_Hide_Filter.md) (1 shared connections)
+- [Parser Edge Cases](Parser_Edge_Cases.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/tui/app.py`
-- `src/ansible_aom/tui/screens/main.py`
+- `src/ansible_aom/core/log_filter.py`
+- `tests/unit/test_log_filter.py`
 
 ## Audit Trail
 
-- EXTRACTED: 42 (75%)
-- INFERRED: 14 (25%)
+- EXTRACTED: 55 (71%)
+- INFERRED: 23 (29%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*
