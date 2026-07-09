@@ -1,32 +1,25 @@
 # Missing Ansible Playbook
 
-> 6 nodes · cohesion 0.20
+> 1 nodes · cohesion 1.00
 
 ## Key Concepts
 
-- **TestMissingAnsiblePlaybook** (8 connections) — `tests/integration/test_error_handling.py`
-- **stderr might contain JSONL events in some cases.** (2 connections) — `tests/integration/test_error_handling.py`
-- **.test_ansible_playbook_not_found_detection()** (2 connections) — `tests/integration/test_error_handling.py`
-- **.test_ansible_playbook_not_found_error_message()** (2 connections) — `tests/integration/test_error_handling.py`
-- **.test_ansible_playbook_not_found_exit_code_127()** (2 connections) — `tests/integration/test_error_handling.py`
-- **.test_ansible_posix_missing_error_message()** (2 connections) — `tests/integration/test_error_handling.py`
+- **impl-gaps/learnings.md** (0 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
 
 ## Relationships
 
-- [[Stderr Capture Handling]] (1 shared connections)
-- [[PTY Stream Parser]] (1 shared connections)
-- [[Error Handling Tests]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/integration/test_error_handling.py`
+- `.sisyphus/notepads/impl-gaps/learnings.md`
 
 ## Audit Trail
 
-- EXTRACTED: 17 (94%)
-- INFERRED: 1 (6%)
+- EXTRACTED: 0 (0%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

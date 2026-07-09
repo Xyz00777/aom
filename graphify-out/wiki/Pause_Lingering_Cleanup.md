@@ -1,34 +1,44 @@
 # Pause Lingering Cleanup
 
-> 9 nodes · cohesion 0.40
+> 14 nodes · cohesion 0.14
 
 ## Key Concepts
 
-- **TestPauseLingerCleared** (7 connections) — `tests/unit/test_pause_lingering_cleanup.py`
-- **_state_with_two_plays()** (6 connections) — `tests/unit/test_pause_lingering_cleanup.py`
-- **test_pause_lingering_cleanup.py** (5 connections) — `tests/unit/test_pause_lingering_cleanup.py`
-- **.test_completed_prior_task_status_preserved()** (5 connections) — `tests/unit/test_pause_lingering_cleanup.py`
-- **.test_tree_shows_no_running_pause_during_second_play()** (5 connections) — `tests/unit/test_pause_lingering_cleanup.py`
-- **_play_start()** (4 connections) — `tests/unit/test_pause_lingering_cleanup.py`
-- **_task_start()** (4 connections) — `tests/unit/test_pause_lingering_cleanup.py`
-- **.test_pause_host_cleared_when_next_play_starts()** (4 connections) — `tests/unit/test_pause_lingering_cleanup.py`
-- **Regression: a pause task that is the last task of its play must not linger as RU** (1 connections) — `tests/unit/test_pause_lingering_cleanup.py`
+- **TestTUIModePasswordMasking** (9 connections) — `tests/compact/test_password.py`
+- **test_password.py** (7 connections) — `tests/compact/test_password.py`
+- **.test_compact_password_uses_getpass_which_masks()** (3 connections) — `tests/compact/test_password.py`
+- **.test_password_masking_all_prompt_types()** (3 connections) — `tests/compact/test_password.py`
+- **.test_tui_password_input_documented_for_modal_migration()** (3 connections) — `tests/compact/test_password.py`
+- **.test_tui_password_masking_via_getpass_not_visible()** (3 connections) — `tests/compact/test_password.py`
+- **.test_tui_password_uses_getpass_which_masks()** (3 connections) — `tests/compact/test_password.py`
+- **Tests for password prompt handling — TC-143 through TC-148.  Covers: - TC-143: P** (1 connections) — `tests/compact/test_password.py`
+- **TC-147: Verify Input(password=True) used for masking.      The TUI mode currentl** (1 connections) — `tests/compact/test_password.py`
+- **TC-147: TUI mode uses getpass which provides password masking (no echo).** (1 connections) — `tests/compact/test_password.py`
+- **TC-147: Password entered via getpass is not echoed to terminal.** (1 connections) — `tests/compact/test_password.py`
+- **TC-147: Compact mode also uses getpass which provides password masking.** (1 connections) — `tests/compact/test_password.py`
+- **TC-147: All password prompt types use masking (via getpass).** (1 connections) — `tests/compact/test_password.py`
+- **TC-147: Document that TUI mode should eventually use Input(password=True).** (1 connections) — `tests/compact/test_password.py`
 
 ## Relationships
 
-- [[Play Definition Tree Population]] (2 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
+- [Status Bar Liveness Tests](Status_Bar_Liveness_Tests.md) (3 shared connections)
+- [Session Recording Tests](Session_Recording_Tests.md) (3 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (2 shared connections)
+- [Golden Frame Tests](Golden_Frame_Tests.md) (1 shared connections)
+- [Display Helper Class](Display_Helper_Class.md) (1 shared connections)
+- [View Mode Selection](View_Mode_Selection.md) (1 shared connections)
+- [Interactive Prompt Tests](Interactive_Prompt_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_pause_lingering_cleanup.py`
+- `tests/compact/test_password.py`
 
 ## Audit Trail
 
-- EXTRACTED: 37 (90%)
-- INFERRED: 4 (10%)
+- EXTRACTED: 31 (82%)
+- INFERRED: 7 (18%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,39 +1,40 @@
 # Task Tree Navigation
 
-> 9 nodes · cohesion 0.33
+> 15 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **TaskTreeNode** (23 connections) — `src/ansible_aom/core/inspect_model.py`
-- **._failure_pairs()** (7 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **._focus_failure_at()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **._add_node()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **.action_next_failure()** (4 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **.action_prev_failure()** (4 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **._current_failure_index()** (4 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **._iter_failures()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **._should_auto_expand()** (3 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **test_ctrl_c_race.py** (5 connections) — `tests/integration/test_ctrl_c_race.py`
+- **_fake_ansible_command()** (5 connections) — `tests/integration/test_ctrl_c_race.py`
+- **TestCtrlCAfterCompletion** (5 connections) — `tests/integration/test_ctrl_c_race.py`
+- **.test_signal_after_drive_returns_non_zero_exit_code()** (4 connections) — `tests/integration/test_ctrl_c_race.py`
+- **.test_signal_after_drive_returns_real_exit_code()** (4 connections) — `tests/integration/test_ctrl_c_race.py`
+- **.test_signal_after_drive_returns_run_result_when_handler_already_ran()** (4 connections) — `tests/integration/test_ctrl_c_race.py`
+- **.test_keyboard_interrupt_during_drive_returns_130()** (4 connections) — `tests/integration/test_ctrl_c_race.py`
+- **TestCtrlCDuringRun** (3 connections) — `tests/integration/test_ctrl_c_race.py`
+- **Batch E item #10b — R7 Ctrl-C race with completion.  SIGINT can arrive at any of** (1 connections) — `tests/integration/test_ctrl_c_race.py`
+- **Same as above but the child failed (exit 2). The real exit         code still wi** (1 connections) — `tests/integration/test_ctrl_c_race.py`
+- **If SIGINT arrives *after* ``handle_completion`` has fully run         (i.e. insi** (1 connections) — `tests/integration/test_ctrl_c_race.py`
+- **SIGINT before ``playbook_on_stats`` — runner returns 130.** (1 connections) — `tests/integration/test_ctrl_c_race.py`
+- **Variant A: signal arrives mid-stream, completion never happens.** (1 connections) — `tests/integration/test_ctrl_c_race.py`
+- **Variant B: completion arrives first, then SIGINT.      R7 spec: completion wins.** (1 connections) — `tests/integration/test_ctrl_c_race.py`
+- **The run completed cleanly (exit 0). SIGINT arrives during the         ``renderer** (1 connections) — `tests/integration/test_ctrl_c_race.py`
 
 ## Relationships
 
-- [[Three-Pane Inspect App]] (9 shared connections)
-- [[Inspect TUI Widget Data]] (7 shared connections)
-- [[Inspect Data Model Builders]] (3 shared connections)
-- [[Inspect Text Golden Tests]] (2 shared connections)
-- [[Session List View]] (2 shared connections)
-- [[Pane Focus Navigation]] (1 shared connections)
+- [Tree Block Animation](Tree_Block_Animation.md) (4 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/inspect_model.py`
-- `src/ansible_aom/tui/screens/inspect.py`
+- `tests/integration/test_ctrl_c_race.py`
 
 ## Audit Trail
 
-- EXTRACTED: 49 (83%)
-- INFERRED: 10 (17%)
+- EXTRACTED: 37 (90%)
+- INFERRED: 4 (10%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

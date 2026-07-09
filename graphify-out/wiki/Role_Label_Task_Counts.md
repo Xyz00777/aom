@@ -1,34 +1,46 @@
 # Role Label Task Counts
 
-> 7 nodes · cohesion 0.32
+> 22 nodes · cohesion 0.09
 
 ## Key Concepts
 
-- **TestRuntimeRoleLabelTaskCountFromDefinitions** (11 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
-- **._multi_task_role_with_completed_task()** (9 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
-- **.test_role_label_count_with_all_tasks_completed()** (4 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
-- **.test_role_label_shows_total_task_count_not_running_count()** (4 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
-- **Regression guard: role labels in the runtime play must show the     total task c** (1 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
-- **Build a state where one role task is completed and another is         running. T** (1 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
-- **When a role has 2 tasks and 1 is completed, the runtime role         label shows** (1 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
+- **Section 9: Session Inspection** (22 connections) — `TEST_SPECIFICATION.md`
+- **TC-319: Session Inspect List Command** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-320: Session UUID Display 8 Chars in List** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-321: Session Inspect Show Summary** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-322: Session Inspect Filter Failed** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-323: Session Inspect Filter Host** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-324: Recursive role nesting renders as sub-branches** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-325: Session Diff Command** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-326: Session Diff Task Matching UUID Priority** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-327: Session Diff Task Matching Path Fallback** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-328: Session Diff Task Matching Name Fallback** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-329: Session Diff Cross-Playbook Warning** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-330: Session Diff Changes Only Flag** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-331: Session Diff Default Shows All Tasks** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-332: Session Diff Classification Colors** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-333: Session Diff Duration Exclusion** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-334: Session Prune Command** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-335: Session Output Format JSON** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-336: Session Output Format JSONL** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-337: Session Full UUID in Inspect** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-338: Session Corrupted Handling in Inspect** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-339: Session Rotation Policy Enforcement** (1 connections) — `TEST_SPECIFICATION.md`
 
 ## Relationships
 
-- [[Role Group Task Models]] (3 shared connections)
-- [[Play Definition Tree Population]] (3 shared connections)
-- [[Task Definition Live Refresh]] (2 shared connections)
-- [[Run State Completion Recap]] (1 shared connections)
+- [Failure Recap Formatting](Failure_Recap_Formatting.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_tree_classify_and_role_labels.py`
+- `TEST_SPECIFICATION.md`
 
 ## Audit Trail
 
-- EXTRACTED: 23 (74%)
-- INFERRED: 8 (26%)
+- EXTRACTED: 43 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,56 +1,63 @@
 # Heartbeat Liveness Tracker
 
-> 33 nodes · cohesion 0.09
+> 41 nodes · cohesion 0.07
 
 ## Key Concepts
 
-- **HeartbeatTracker** (27 connections) — `src/ansible_aom/core/heartbeat.py`
-- **test_heartbeat.py** (22 connections) — `tests/unit/test_heartbeat.py`
-- **test_cpu_active_too_long_ago_does_not_promote_to_live()** (3 connections) — `tests/unit/test_heartbeat.py`
-- **test_cpu_activity_keeps_state_working_past_stuck_threshold()** (3 connections) — `tests/unit/test_heartbeat.py`
-- **test_cpu_activity_promotes_state_to_live_during_silent_window()** (3 connections) — `tests/unit/test_heartbeat.py`
-- **test_inactive_cpu_sample_does_not_promote_to_live()** (3 connections) — `tests/unit/test_heartbeat.py`
-- **test_live_immediately_after_first_bytes()** (3 connections) — `tests/unit/test_heartbeat.py`
-- **test_reason_cpu_for_stuck_window_rescue()** (3 connections) — `tests/unit/test_heartbeat.py`
-- **test_reason_silent_when_working_via_byte_age_only()** (3 connections) — `tests/unit/test_heartbeat.py`
-- **test_silent_task_after_initial_byte_progresses_through_levels()** (3 connections) — `tests/unit/test_heartbeat.py`
-- **test_stuck_when_bytes_old_and_no_cpu_activity()** (3 connections) — `tests/unit/test_heartbeat.py`
-- **test_working_state_via_byte_age_alone()** (3 connections) — `tests/unit/test_heartbeat.py`
-- **.state()** (2 connections) — `src/ansible_aom/core/heartbeat.py`
-- **test_age_seconds_truncates_toward_zero()** (2 connections) — `tests/unit/test_heartbeat.py`
-- **test_live_window_uses_configured_threshold()** (2 connections) — `tests/unit/test_heartbeat.py`
-- **test_liveness_state_is_frozen_dataclass()** (2 connections) — `tests/unit/test_heartbeat.py`
-- **test_new_bytes_return_tracker_to_live_after_stuck()** (2 connections) — `tests/unit/test_heartbeat.py`
-- **test_reason_cpu_when_promoted_from_working_to_live()** (2 connections) — `tests/unit/test_heartbeat.py`
-- **test_reason_pty_for_recent_bytes()** (2 connections) — `tests/unit/test_heartbeat.py`
-- **test_reason_stuck_when_no_signals_at_all()** (2 connections) — `tests/unit/test_heartbeat.py`
-- **test_state_is_none_before_any_bytes_observed()** (2 connections) — `tests/unit/test_heartbeat.py`
-- **test_stuck_when_only_inactive_cpu_samples_received()** (2 connections) — `tests/unit/test_heartbeat.py`
-- **.__init__()** (1 connections) — `src/ansible_aom/core/heartbeat.py`
-- **.note_bytes()** (1 connections) — `src/ansible_aom/core/heartbeat.py`
-- **.note_cpu_sample()** (1 connections) — `src/ansible_aom/core/heartbeat.py`
-- *... and 8 more nodes in this community*
+- **._emit_event_log()** (22 connections) — `src/ansible_aom/compact/renderer.py`
+- **.print_log()** (10 connections) — `src/ansible_aom/compact/renderer.py`
+- **._announce_task()** (9 connections) — `src/ansible_aom/compact/renderer.py`
+- **._emit_previous_task_summary()** (8 connections) — `src/ansible_aom/compact/renderer.py`
+- **._flush_pending_skips()** (7 connections) — `src/ansible_aom/compact/renderer.py`
+- **._format_loop_item_line()** (7 connections) — `src/ansible_aom/compact/renderer.py`
+- **._inline_duration_suffix()** (6 connections) — `src/ansible_aom/compact/renderer.py`
+- **renderer.py** (5 connections) — `src/ansible_aom/compact/renderer.py`
+- **.add()** (5 connections) — `src/ansible_aom/compact/renderer.py`
+- **.add_warning()** (5 connections) — `src/ansible_aom/compact/renderer.py`
+- **._enter_terminal_event()** (5 connections) — `src/ansible_aom/compact/renderer.py`
+- **._format_duration()** (5 connections) — `src/ansible_aom/compact/renderer.py`
+- **._maybe_emit_pause_seconds_hint()** (5 connections) — `src/ansible_aom/compact/renderer.py`
+- **.set_definitions()** (5 connections) — `src/ansible_aom/compact/renderer.py`
+- **_extract_error_msg()** (5 connections) — `src/ansible_aom/compact/renderer.py`
+- **is_async_poll_payload()** (5 connections) — `src/ansible_aom/core/_async_poll.py`
+- **._hosts_dict()** (4 connections) — `src/ansible_aom/compact/renderer.py`
+- **._loop_item_lines()** (4 connections) — `src/ansible_aom/compact/renderer.py`
+- **_first_line()** (3 connections) — `src/ansible_aom/compact/renderer.py`
+- **format_duration_decimal()** (3 connections) — `src/ansible_aom/core/duration.py`
+- **_async_poll.py** (2 connections) — `src/ansible_aom/core/_async_poll.py`
+- **Compact renderer — Rich Live lifecycle and per-event log emission.  Pure formatt** (1 connections) — `src/ansible_aom/compact/renderer.py`
+- **Surface a one-line hint when a pause-with-seconds task starts.          ``ansibl** (1 connections) — `src/ansible_aom/compact/renderer.py`
+- **Compact human duration: ``0.4s`` / ``12.3s`` / ``1m23s`` / ``1h02m``.          T** (1 connections) — `src/ansible_aom/compact/renderer.py`
+- **Print a one-line summary of the task that just finished.          Triggered righ** (1 connections) — `src/ansible_aom/compact/renderer.py`
+- *... and 16 more nodes in this community*
 
 ## Relationships
 
-- [[Status Bar Liveness Tests]] (5 shared connections)
-- [[Stuck CPU Rescue Logic]] (2 shared connections)
-- [[Compact Renderer Implementation]] (1 shared connections)
-- [[Color ASCII Fallback]] (1 shared connections)
-- [[Heartbeat Liveness Machine]] (1 shared connections)
-- [[Liveness State Reason]] (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (15 shared connections)
+- [Renderer Set Definitions](Renderer_Set_Definitions.md) (6 shared connections)
+- [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (5 shared connections)
+- [Crash Recovery Panels](Crash_Recovery_Panels.md) (4 shared connections)
+- [Inspect Debug Diagnostics](Inspect_Debug_Diagnostics.md) (2 shared connections)
+- [Host Result Hide Filter](Host_Result_Hide_Filter.md) (2 shared connections)
+- [Community 560](Community_560.md) (2 shared connections)
+- [StatusBarConfig Model](StatusBarConfig_Model.md) (1 shared connections)
+- [Parser Edge Cases](Parser_Edge_Cases.md) (1 shared connections)
+- [TUI Keybindings Config](TUI_Keybindings_Config.md) (1 shared connections)
+- [Host Overview Table](Host_Overview_Table.md) (1 shared connections)
+- [Community 503](Community_503.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/heartbeat.py`
-- `tests/unit/test_heartbeat.py`
+- `src/ansible_aom/compact/renderer.py`
+- `src/ansible_aom/core/_async_poll.py`
+- `src/ansible_aom/core/duration.py`
 
 ## Audit Trail
 
-- EXTRACTED: 66 (60%)
-- INFERRED: 44 (40%)
+- EXTRACTED: 133 (89%)
+- INFERRED: 17 (11%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

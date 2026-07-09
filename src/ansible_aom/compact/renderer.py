@@ -79,8 +79,7 @@ from ansible_aom.core.log_filter import (
     should_hide_event,
     should_hide_host_result,
 )
-from ansible_aom.core.models import Status
-from ansible_aom.core.run_state import RunState
+from ansible_aom.core.models import RunState, Status
 from ansible_aom.core.tree import TreeProjection
 
 if TYPE_CHECKING:

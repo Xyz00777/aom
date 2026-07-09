@@ -1,12 +1,10 @@
 # Status Bar Duration Format
 
-> 3 nodes · cohesion 0.67
+> 1 nodes · cohesion 1.00
 
 ## Key Concepts
 
-- **remaining_seconds display segment** (2 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
-- **format_duration_compact** (1 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
-- **format_status_bar()** (1 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
+- **format_duration_compact** (0 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
 
 ## Relationships
 
@@ -18,10 +16,10 @@
 
 ## Audit Trail
 
-- EXTRACTED: 4 (100%)
+- EXTRACTED: 0 (0%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

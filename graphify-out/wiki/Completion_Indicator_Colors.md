@@ -1,34 +1,36 @@
 # Completion Indicator Colors
 
-> 7 nodes · cohesion 0.48
+> 12 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **TestFinalCompletionIndicator** (12 connections) — `tests/compact/test_status_bar_colors.py`
-- **._final_line()** (6 connections) — `tests/compact/test_status_bar_colors.py`
-- **.test_cancelled_indicator_is_yellow()** (2 connections) — `tests/compact/test_status_bar_colors.py`
-- **.test_completed_indicator_is_green()** (2 connections) — `tests/compact/test_status_bar_colors.py`
-- **.test_failed_indicator_is_red()** (2 connections) — `tests/compact/test_status_bar_colors.py`
-- **.test_no_color_when_disabled()** (2 connections) — `tests/compact/test_status_bar_colors.py`
-- **The trailing ●/✖ indicator picks its colour from the state.** (1 connections) — `tests/compact/test_status_bar_colors.py`
+- **2026-05-24 — Post-Implementation Bugfix Decisions** (8 connections) — `.sisyphus/notepads/implementation/decisions.md`
+- **2026-04-24 Implementation Order Decisions** (3 connections) — `.sisyphus/notepads/implementation/decisions.md`
+- **decisions.md** (2 connections) — `.sisyphus/notepads/implementation/decisions.md`
+- **Cross-play completion scope: same-play only** (1 connections) — `.sisyphus/notepads/implementation/decisions.md`
+- **Execution Order (dependency-based)** (1 connections) — `.sisyphus/notepads/implementation/decisions.md`
+- **Parallelization** (1 connections) — `.sisyphus/notepads/implementation/decisions.md`
+- **Runtime role prefixes: no-space only** (1 connections) — `.sisyphus/notepads/implementation/decisions.md`
+- **Shared traversal helper** (1 connections) — `.sisyphus/notepads/implementation/decisions.md`
+- **Strategy detection: flip on runner_on_start** (1 connections) — `.sisyphus/notepads/implementation/decisions.md`
+- **Tree play selection: three-tier sticky fallback** (1 connections) — `.sisyphus/notepads/implementation/decisions.md`
+- **Tree traversal: recurse through grouped roles and children** (1 connections) — `.sisyphus/notepads/implementation/decisions.md`
+- **Upcoming plays: empty runtime.tasks ≠ completed** (1 connections) — `.sisyphus/notepads/implementation/decisions.md`
 
 ## Relationships
 
-- [[Run State Completion Recap]] (3 shared connections)
-- [[Compact Renderer Implementation]] (2 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
-- [[Status Bar Color Tests]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/compact/test_status_bar_colors.py`
+- `.sisyphus/notepads/implementation/decisions.md`
 
 ## Audit Trail
 
-- EXTRACTED: 22 (81%)
-- INFERRED: 5 (19%)
+- EXTRACTED: 22 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

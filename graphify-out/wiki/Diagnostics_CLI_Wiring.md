@@ -1,39 +1,50 @@
 # Diagnostics CLI Wiring
 
-> 14 nodes · cohesion 0.19
+> 19 nodes · cohesion 0.11
 
 ## Key Concepts
 
-- **test_diagnostics_wiring.py** (8 connections) — `tests/unit/test_diagnostics_wiring.py`
-- **_assert_installed()** (5 connections) — `tests/unit/test_diagnostics_wiring.py`
-- **test_cli_main_installs_diagnostics()** (4 connections) — `tests/unit/test_diagnostics_wiring.py`
-- **test_inspect_main_installs_diagnostics()** (4 connections) — `tests/unit/test_diagnostics_wiring.py`
-- **test_replay_main_installs_diagnostics()** (3 connections) — `tests/unit/test_diagnostics_wiring.py`
-- **test_rerun_main_installs_diagnostics()** (3 connections) — `tests/unit/test_diagnostics_wiring.py`
-- **test_runner_trace_enabled_follows_aom_debug()** (3 connections) — `tests/unit/test_diagnostics_wiring.py`
-- **Verify every CLI entry point installs the diagnostics layer.  Phase 2 of docs/su** (1 connections) — `tests/unit/test_diagnostics_wiring.py`
-- **``aom`` with no args prints help and exits cleanly.** (1 connections) — `tests/unit/test_diagnostics_wiring.py`
-- **``aom inspect --text`` with empty state-dir prints "no sessions".** (1 connections) — `tests/unit/test_diagnostics_wiring.py`
-- **``aom rerun --help`` exits via argparse before any rerun logic runs.** (1 connections) — `tests/unit/test_diagnostics_wiring.py`
-- **``aom replay --help`` exits via argparse before any replay runs.** (1 connections) — `tests/unit/test_diagnostics_wiring.py`
-- **The runner's per-loop pexpect trace is now folded into AOM_DEBUG.** (1 connections) — `tests/unit/test_diagnostics_wiring.py`
-- **_reset()** (1 connections) — `tests/unit/test_diagnostics_wiring.py`
+- **StatusBar** (25 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **.update_play_name()** (4 connections) — `src/ansible_aom/tui/screens/main.py`
+- **.__init__()** (3 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **.set_current_task()** (2 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **.set_host_count()** (2 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **.set_memory_usage()** (2 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **.set_playbook_name()** (2 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **.set_subprocess_pid()** (2 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **.set_task_progress()** (2 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **Update play name on SummaryPanel and playbook name on StatusBar.** (1 connections) — `src/ansible_aom/tui/screens/main.py`
+- **Widget** (1 connections)
+- **Set memory usage.          Args:             rss_mb: Resident set size in MB** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **Set the subprocess PID.          Args:             pid: The subprocess PID (or N** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **Configurable status bar showing playbook name, time, progress.** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **Initialize the status bar widget.          Args:             config: Status bar** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **Set the playbook name.          Args:             name: The playbook file name** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **Set task progress.          Args:             completed: Number of completed tas** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **Set the current task name.          Args:             task: The current task nam** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **Set host progress count.          Args:             completed: Number of complet** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
 
 ## Relationships
 
-- [[Inventory Auto Detection]] (2 shared connections)
-- [[Run Config Key Normalization]] (1 shared connections)
+- [Non-Interactive Renderers](Non-Interactive_Renderers.md) (5 shared connections)
+- [Session Recording Tests](Session_Recording_Tests.md) (4 shared connections)
+- [Compact Display Logic](Compact_Display_Logic.md) (3 shared connections)
+- [Run State Summary Panel](Run_State_Summary_Panel.md) (2 shared connections)
+- [Community 605](Community_605.md) (2 shared connections)
+- [Community 684](Community_684.md) (1 shared connections)
+- [Community 477](Community_477.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_diagnostics_wiring.py`
+- `src/ansible_aom/tui/screens/main.py`
+- `src/ansible_aom/tui/widgets/status_bar.py`
 
 ## Audit Trail
 
-- EXTRACTED: 37 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 44 (81%)
+- INFERRED: 10 (19%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

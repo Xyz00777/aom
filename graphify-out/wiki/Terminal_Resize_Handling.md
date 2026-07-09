@@ -1,32 +1,36 @@
 # Terminal Resize Handling
 
-> 7 nodes · cohesion 0.29
+> 12 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **TestReEnableOnResize** (7 connections) — `tests/compact/test_small_terminal.py`
-- **.test_update_without_force_size_falls_back_to_real_terminal()** (3 connections) — `tests/compact/test_small_terminal.py`
-- **.test_re_enable_does_not_reprint_warning()** (2 connections) — `tests/compact/test_small_terminal.py`
-- **.test_update_drops_into_degraded_mode_when_terminal_shrinks()** (2 connections) — `tests/compact/test_small_terminal.py`
-- **.test_update_re_enables_panel_when_terminal_grows()** (2 connections) — `tests/compact/test_small_terminal.py`
-- **The 'SIGWINCH' equivalent: a previously-degraded display     re-enables its live** (1 connections) — `tests/compact/test_small_terminal.py`
-- **force_size is the test seam; production calls don't pass it.         Verify the** (1 connections) — `tests/compact/test_small_terminal.py`
+- **Raw PTY Tab Verification: Does `aom inspect <sid>` surface full `stderr.log`?** (6 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/raw-pty-tab-verification.md`
+- **3. If no: where does `stderr.log` content go? Is it accessible at all via `aom inspect`? What command/flag would surface it?** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/raw-pty-tab-verification.md`
+- **5. Verdict** (2 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/raw-pty-tab-verification.md`
+- **raw-pty-tab-verification.md** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/raw-pty-tab-verification.md`
+- **1. Does the inspect TUI have a tab/panel/section that shows `stderr.log` content?** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/raw-pty-tab-verification.md`
+- **2. If yes: how is it loaded? Is it the full content, or truncated? Is there a flag to enable it, or is it always visible?** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/raw-pty-tab-verification.md`
+- **4. Code evidence (file path + line numbers)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/raw-pty-tab-verification.md`
+- **How `stderr.log` is loaded** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/raw-pty-tab-verification.md`
+- **In the CLI (`aom inspect --debug`)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/raw-pty-tab-verification.md`
+- **In the text mode (`aom inspect --text`)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/raw-pty-tab-verification.md`
+- **In the TUI (`aom inspect <sid>` — no flags)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/raw-pty-tab-verification.md`
+- **What needs to happen** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/raw-pty-tab-verification.md`
 
 ## Relationships
 
-- [[Terminal Display Manager]] (5 shared connections)
-- [[Small Terminal Handling]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/compact/test_small_terminal.py`
+- `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/raw-pty-tab-verification.md`
 
 ## Audit Trail
 
-- EXTRACTED: 13 (72%)
-- INFERRED: 5 (28%)
+- EXTRACTED: 22 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,51 +1,50 @@
 # Debug Panel Widget
 
-> 34 nodes · cohesion 0.06
+> 42 nodes · cohesion 0.07
 
 ## Key Concepts
 
-- **DebugPanel** (19 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **debug_panel.py** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.get_debug_summary()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.__init__()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_callback_status()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_command()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_env_overrides()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_event_count()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_event_latency()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_memory_usage()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_parsing_errors()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_pending_events()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_renderer_fps()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_state_tree()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_subprocess_pid()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_timing_stats()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.toggle_visibility()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **Debug panel widget for AOM TUI.  Shows internal state for debugging. See SPECIFI** (1 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **Set subprocess PID.          Args:             pid: The subprocess PID (or None** (1 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **Set state tree stats.          Args:             tree: Dictionary of state count** (1 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **Debug panel showing internal state.** (1 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **Set pending event count.          Args:             count: Number of pending eve** (1 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **Set memory usage.          Args:             rss_mb: Resident set size in MB** (1 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **Set renderer FPS.          Args:             fps: Frames per second** (1 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **Set event latency.          Args:             latency_ms: Event processing laten** (1 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- *... and 9 more nodes in this community*
+- **_run_aom()** (14 connections) — `tests/integration/test_include_import_role.py`
+- **test_include_import_role.py** (11 connections) — `tests/integration/test_include_import_role.py`
+- **Path** (10 connections)
+- **.test_dynamic_path_include()** (4 connections) — `tests/integration/test_include_import_role.py`
+- **TestImportTasksTree** (4 connections) — `tests/integration/test_include_import_role.py`
+- **.test_import_tasks_counter()** (4 connections) — `tests/integration/test_include_import_role.py`
+- **.test_imported_tasks_appear_in_output()** (4 connections) — `tests/integration/test_include_import_role.py`
+- **.test_dynamic_role_tasks_with_grouping()** (4 connections) — `tests/integration/test_include_import_role.py`
+- **TestIncludeTasksDynamic** (4 connections) — `tests/integration/test_include_import_role.py`
+- **.test_completion_counter_matches_runtime_tasks()** (4 connections) — `tests/integration/test_include_import_role.py`
+- **.test_dynamic_include_children_appear()** (4 connections) — `tests/integration/test_include_import_role.py`
+- **.test_cross_play_counters()** (4 connections) — `tests/integration/test_include_import_role.py`
+- **.test_all_three_levels_visible()** (4 connections) — `tests/integration/test_include_import_role.py`
+- **.test_static_role_counter()** (4 connections) — `tests/integration/test_include_import_role.py`
+- **_ansible_collection_paths()** (3 connections) — `tests/integration/test_include_import_role.py`
+- **TestDynamicIncludePath** (3 connections) — `tests/integration/test_include_import_role.py`
+- **TestIncludeRole** (3 connections) — `tests/integration/test_include_import_role.py`
+- **TestMultiPlayCrossPlay** (3 connections) — `tests/integration/test_include_import_role.py`
+- **TestNestedInclude** (3 connections) — `tests/integration/test_include_import_role.py`
+- **TestStaticRoleKeyword** (3 connections) — `tests/integration/test_include_import_role.py`
+- **_has_ansible_posix()** (2 connections) — `tests/integration/test_include_import_role.py`
+- **CompletedProcess** (1 connections)
+- **Integration tests for include/import/role task variants.  Covers TC-330 through** (1 connections) — `tests/integration/test_include_import_role.py`
+- **TC-330 / TC-331: import_tasks tree rendering and counter accuracy.** (1 connections) — `tests/integration/test_include_import_role.py`
+- **TC-330: import_tasks are expanded — all task names visible.** (1 connections) — `tests/integration/test_include_import_role.py`
+- *... and 17 more nodes in this community*
 
 ## Relationships
 
-- [[Summary Panel Widget]] (1 shared connections)
-- [[Renderer Render Methods]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `src/ansible_aom/tui/widgets/debug_panel.py`
+- `tests/integration/test_include_import_role.py`
 
 ## Audit Trail
 
-- EXTRACTED: 68 (100%)
+- EXTRACTED: 120 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

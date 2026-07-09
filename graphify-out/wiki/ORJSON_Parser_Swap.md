@@ -1,33 +1,37 @@
 # ORJSON Parser Swap
 
-> 8 nodes · cohesion 0.25
+> 13 nodes · cohesion 0.15
 
 ## Key Concepts
 
-- **test_parser_orjson_swap.py** (4 connections) — `tests/unit/test_parser_orjson_swap.py`
-- **test_perf_005_parser_byte_equal_to_stdlib()** (4 connections) — `tests/unit/test_parser_orjson_swap.py`
-- **test_perf_006_carry_buffer_still_works_after_swap()** (3 connections) — `tests/unit/test_parser_orjson_swap.py`
-- **test_perf_007_non_dict_json_rejected()** (3 connections) — `tests/unit/test_parser_orjson_swap.py`
-- **TC-PERF-005..007 — orjson swap equivalency tests.  Pin behaviour of ``JsonLineSt** (1 connections) — `tests/unit/test_parser_orjson_swap.py`
-- **TC-PERF-005: orjson swap is byte-equivalent for real-world fixtures.** (1 connections) — `tests/unit/test_parser_orjson_swap.py`
-- **TC-PERF-006: truncated JSON head is stashed and re-joined.      Equivalent behav** (1 connections) — `tests/unit/test_parser_orjson_swap.py`
-- **TC-PERF-007: top-level JSON that's not an object is rejected.      A JSON top-le** (1 connections) — `tests/unit/test_parser_orjson_swap.py`
+- **v1 Verbosity — Learnings (Phase 8 / Task 8.3: schema-boundary test)** (7 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Key design decisions** (6 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Critical gotcha** (2 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **1. The branch is a one-liner, the test is ten tests** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **1. The test catches the most likely regression mode** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **2. Hand-built fixtures, not `SessionManager` for the v1 case** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **3. The "round trip" test is the writer-side leg** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **4. The symmetry test (`test_replay_both_regimes_with_identical_event_stream`) is the load-bearing one** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **5. Parametrised test as a v3-prep hook** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Followups (out of scope for Phase 8.3 — wired by later tasks)** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Test count tally for Phase 8 (updated)** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Verification log** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **What was built** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
 
 ## Relationships
 
-- [[Role Group Task Models]] (3 shared connections)
-- [[Run Config Key Normalization]] (1 shared connections)
+- [Runtime Event Handlers](Runtime_Event_Handlers.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_parser_orjson_swap.py`
+- `.sisyphus/notepads/v1-verbosity/learnings.md`
 
 ## Audit Trail
 
-- EXTRACTED: 15 (83%)
-- INFERRED: 3 (17%)
+- EXTRACTED: 25 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

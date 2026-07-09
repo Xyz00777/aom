@@ -1,38 +1,46 @@
 # Plaintext Line Handling
 
-> 12 nodes · cohesion 0.17
+> 17 nodes · cohesion 0.16
 
 ## Key Concepts
 
-- **TestPlaintextLineHandling** (10 connections) — `tests/unit/test_pty_stream.py`
-- **.test_plaintext_lines_in_execution_phase()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_plaintext_lines_not_warning()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_plaintext_lines_order_preserved()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_plaintext_lines_stored()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_plaintext_vs_warning_classification()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **TC-142: _handle_plaintext classification.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-142: Non-JSON, non-special lines go to plaintext_lines.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Plaintext lines that aren't warnings are stored.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Plaintext during EXECUTION phase collected.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Lines classified correctly between warning vs plaintext.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Plaintext lines maintain order.** (1 connections) — `tests/unit/test_pty_stream.py`
+- **test_invariants_session_roundtrip.py** (12 connections) — `tests/integration/test_invariants_session_roundtrip.py`
+- **test_tree_builder_matches_live_runstate_totals()** (9 connections) — `tests/integration/test_invariants_session_roundtrip.py`
+- **test_session_roundtrip_preserves_state_shape()** (7 connections) — `tests/integration/test_invariants_session_roundtrip.py`
+- **event_sequences()** (6 connections) — `tests/integration/test_invariants_session_roundtrip.py`
+- **_runstate_status_totals()** (5 connections) — `tests/integration/test_invariants_session_roundtrip.py`
+- **_tree_status_totals()** (4 connections) — `tests/integration/test_invariants_session_roundtrip.py`
+- **_make_play_start()** (2 connections) — `tests/integration/test_invariants_session_roundtrip.py`
+- **_make_result()** (2 connections) — `tests/integration/test_invariants_session_roundtrip.py`
+- **_make_task_start()** (2 connections) — `tests/integration/test_invariants_session_roundtrip.py`
+- **TempPathFactory** (2 connections)
+- **DrawFn** (1 connections)
+- **Stateful invariants over the session persistence round-trip.  A single sequence** (1 connections) — `tests/integration/test_invariants_session_roundtrip.py`
+- **Aggregate ``StatusCounts`` across every task node in the tree.      ``build_task** (1 connections) — `tests/integration/test_invariants_session_roundtrip.py`
+- **Walk RunState the way the tree builder walks events.** (1 connections) — `tests/integration/test_invariants_session_roundtrip.py`
+- **Persist → load → replay yields the same structural state.** (1 connections) — `tests/integration/test_invariants_session_roundtrip.py`
+- **``build_task_tree`` over the persisted session agrees with the live RunState.** (1 connections) — `tests/integration/test_invariants_session_roundtrip.py`
+- **Generate a coherent (play_start → task_start → result*) sequence.      Coherence** (1 connections) — `tests/integration/test_invariants_session_roundtrip.py`
 
 ## Relationships
 
-- [[PTY Stream Parser]] (6 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
-- [[PTY Stream Parser Tests]] (1 shared connections)
+- [Architecture Layering Tests](Architecture_Layering_Tests.md) (4 shared connections)
+- [Playbook Parser Integration Tests](Playbook_Parser_Integration_Tests.md) (3 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (2 shared connections)
+- [Run Config Key Normalization](Run_Config_Key_Normalization.md) (2 shared connections)
+- [Total Task Counting](Total_Task_Counting.md) (2 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_pty_stream.py`
+- `tests/integration/test_invariants_session_roundtrip.py`
 
 ## Audit Trail
 
-- EXTRACTED: 23 (74%)
-- INFERRED: 8 (26%)
+- EXTRACTED: 53 (91%)
+- INFERRED: 5 (9%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

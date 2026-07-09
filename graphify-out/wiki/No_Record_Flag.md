@@ -1,38 +1,39 @@
 # No Record Flag
 
-> 11 nodes · cohesion 0.22
+> 15 nodes · cohesion 0.13
 
 ## Key Concepts
 
-- **test_no_record.py** (6 connections) — `tests/unit/test_no_record.py`
-- **TestNoRecordCompactPlumbing** (5 connections) — `tests/unit/test_no_record.py`
-- **TestRunPlaybookRecordParameter** (5 connections) — `tests/unit/test_no_record.py`
-- **.test_record_false_skips_session_directory()** (4 connections) — `tests/unit/test_no_record.py`
-- **.test_record_true_default_still_writes()** (4 connections) — `tests/unit/test_no_record.py`
-- **_fake_ansible_command()** (3 connections) — `tests/unit/test_no_record.py`
-- **Unit tests for F3 --no-record plumbing.** (1 connections) — `tests/unit/test_no_record.py`
-- **run_playbook accepts a record=bool kwarg; default is True.** (1 connections) — `tests/unit/test_no_record.py`
-- **`aom --no-record playbook.yml` calls run_playbook(..., record=False).** (1 connections) — `tests/unit/test_no_record.py`
-- **.test_default_propagates_record_true()** (1 connections) — `tests/unit/test_no_record.py`
-- **.test_no_record_propagates_to_runner()** (1 connections) — `tests/unit/test_no_record.py`
+- **GQ1: Inspect TUI - How to create a readonly Textual TUI that reuses main TUI components?** (6 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **GQ2: Re-run Dialog - How to create Shift+R dialog for modifying ansible-playbook arguments?** (6 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **NEW QUESTIONS - TUI Features Research (2026-04-20)** (5 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- ****Command Line String vs Structured Fields**** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- ****Component Reuse Strategy**** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- ****Disabling Interactive Widgets**** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **GQ3: How to load session data from .aom artifact files into the state machine?** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **GQ4: How to integrate inspect TUI with CLI?** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- ****Hiding Action Buttons in Readonly Mode**** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- ****ModalScreen for Complex Forms**** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- ****Navigation in Readonly Mode**** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- ****Preserving Session State**** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- ****Rolling History Pattern**** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- ****Textual ModalScreen for Readonly Views**** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- ****Validation**** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
 
 ## Relationships
 
-- [[AOM TUI Application]] (3 shared connections)
-- [[Run Config Key Normalization]] (2 shared connections)
-- [[Playbook Run Integration Tests]] (2 shared connections)
-- [[CLI Argument Parser]] (1 shared connections)
+- [Real Ansible Integration](Real_Ansible_Integration.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_no_record.py`
+- `.sisyphus/notepads/new-spec/open-questions.md`
 
 ## Audit Trail
 
-- EXTRACTED: 28 (88%)
-- INFERRED: 4 (12%)
+- EXTRACTED: 29 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

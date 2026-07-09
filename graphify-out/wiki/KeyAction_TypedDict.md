@@ -1,35 +1,47 @@
 # KeyAction TypedDict
 
-> 10 nodes · cohesion 0.20
+> 14 nodes · cohesion 0.32
 
 ## Key Concepts
 
-- **TestKeyActionTypedDict** (8 connections) — `tests/tui/test_keybindings.py`
-- **.test_key_action_has_action_field()** (2 connections) — `tests/tui/test_keybindings.py`
-- **.test_key_action_has_confirmation_field()** (2 connections) — `tests/tui/test_keybindings.py`
-- **.test_key_action_has_context_field()** (2 connections) — `tests/tui/test_keybindings.py`
-- **.test_key_action_has_description_field()** (2 connections) — `tests/tui/test_keybindings.py`
-- **KeyAction must have 'requires_confirmation' field.** (1 connections) — `tests/tui/test_keybindings.py`
-- **Tests for KeyAction typed dict structure.** (1 connections) — `tests/tui/test_keybindings.py`
-- **KeyAction must have 'action' field.** (1 connections) — `tests/tui/test_keybindings.py`
-- **KeyAction must have 'description' field.** (1 connections) — `tests/tui/test_keybindings.py`
-- **KeyAction must have 'context' field.** (1 connections) — `tests/tui/test_keybindings.py`
+- **_compose_host_set()** (13 connections) — `src/ansible_aom/rerun/cli.py`
+- **test_rerun_cli.py** (13 connections) — `tests/unit/test_rerun_cli.py`
+- **TestComposeHostSet** (8 connections) — `tests/unit/test_rerun_cli.py`
+- **_session_dict()** (7 connections) — `tests/unit/test_rerun_cli.py`
+- **._events()** (6 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_unreachable_flag_includes_failed_and_unreachable()** (5 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_changes_only_returns_changed_hosts()** (4 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_combined_flags_union()** (4 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_default_no_flag_returns_failed_only()** (4 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_failed_flag_returns_failed_hosts()** (4 connections) — `tests/unit/test_rerun_cli.py`
+- **.test_no_matching_hosts_returns_empty()** (3 connections) — `tests/unit/test_rerun_cli.py`
+- **Combine the requested host categories into a single set.      Semantics (from th** (1 connections) — `src/ansible_aom/rerun/cli.py`
+- **Unit tests for the aom rerun subcommand.** (1 connections) — `tests/unit/test_rerun_cli.py`
+- **--unreachable is a strict superset of --failed (per spec).** (1 connections) — `tests/unit/test_rerun_cli.py`
 
 ## Relationships
 
-- [[TUI Keybindings Config]] (2 shared connections)
-- [[TUI Keybindings Tests]] (1 shared connections)
+- [Compact Renderer Formatters](Compact_Renderer_Formatters.md) (4 shared connections)
+- [Shell Completion Helpers](Shell_Completion_Helpers.md) (3 shared connections)
+- [Dynamic Include Expansion](Dynamic_Include_Expansion.md) (3 shared connections)
+- [Event Source Adapters](Event_Source_Adapters.md) (1 shared connections)
+- [Frame Parameter Handling](Frame_Parameter_Handling.md) (1 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [Rerun Subcommand Module](Rerun_Subcommand_Module.md) (1 shared connections)
+- [Exit Code Constants](Exit_Code_Constants.md) (1 shared connections)
+- [TUI Widgets Module](TUI_Widgets_Module.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/tui/test_keybindings.py`
+- `src/ansible_aom/rerun/cli.py`
+- `tests/unit/test_rerun_cli.py`
 
 ## Audit Trail
 
-- EXTRACTED: 19 (90%)
-- INFERRED: 2 (10%)
+- EXTRACTED: 58 (78%)
+- INFERRED: 16 (22%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

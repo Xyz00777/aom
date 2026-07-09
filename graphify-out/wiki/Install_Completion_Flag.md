@@ -1,23 +1,30 @@
 # Install Completion Flag
 
-> 5 nodes · cohesion 0.33
+> 12 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **TestInstallCompletionFlag** (14 connections) — `tests/unit/test_cli.py`
-- **.test_bash_prints_snippet_to_stdout()** (1 connections) — `tests/unit/test_cli.py`
-- **.test_fish_prints_snippet_to_stdout()** (1 connections) — `tests/unit/test_cli.py`
-- **.test_unknown_shell_returns_exit_2_and_prints_to_stderr()** (1 connections) — `tests/unit/test_cli.py`
-- **.test_zsh_prints_snippet_to_stdout()** (1 connections) — `tests/unit/test_cli.py`
+- **TestExitCodes** (15 connections) — `tests/unit/test_cli.py`
+- **.test_exit_code_0_for_help()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_exit_code_0_for_version()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_exit_code_127_for_missing_ansible()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_exit_code_130_for_sigint()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_main_returns_int()** (2 connections) — `tests/unit/test_cli.py`
+- **Tests for TC-024, TC-025, TC-027, TC-028: Exit Codes.** (1 connections) — `tests/unit/test_cli.py`
+- **TC-024: Exit code 0 for --help.** (1 connections) — `tests/unit/test_cli.py`
+- **TC-024: Exit code 0 for --version.** (1 connections) — `tests/unit/test_cli.py`
+- **TC-027: Exit code 127 when ansible-playbook not found.          The runner is re** (1 connections) — `tests/unit/test_cli.py`
+- **TC-028: Exit code 130 for user cancelled (Ctrl+C).** (1 connections) — `tests/unit/test_cli.py`
+- **TC-024: main() returns integer exit code.** (1 connections) — `tests/unit/test_cli.py`
 
 ## Relationships
 
-- [[Run State Completion Recap]] (3 shared connections)
-- [[Compact Renderer Implementation]] (1 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
-- [[JSON Renderer]] (1 shared connections)
-- [[AOM TUI Application]] (1 shared connections)
-- [[CLI Interface Tests]] (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (4 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (1 shared connections)
+- [Inspect Data Model Builders](Inspect_Data_Model_Builders.md) (1 shared connections)
+- [Session Recording Tests](Session_Recording_Tests.md) (1 shared connections)
 
 ## Source Files
 
@@ -25,10 +32,10 @@
 
 ## Audit Trail
 
-- EXTRACTED: 10 (56%)
-- INFERRED: 8 (44%)
+- EXTRACTED: 23 (74%)
+- INFERRED: 8 (26%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

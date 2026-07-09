@@ -1,30 +1,39 @@
 # Stderr Capture Handling
 
-> 4 nodes · cohesion 0.25
+> 13 nodes · cohesion 0.15
 
 ## Key Concepts
 
-- **TestStderrCapture** (6 connections) — `tests/integration/test_error_handling.py`
-- **.test_stderr_captured_and_stored()** (4 connections) — `tests/integration/test_error_handling.py`
-- **.test_stderr_displayed_in_view()** (2 connections) — `tests/integration/test_error_handling.py`
-- **.test_stderr_json_parsing_attempt()** (2 connections) — `tests/integration/test_error_handling.py`
+- **FINAL RECAP** (10 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Q&A log (continued, session 2)** (6 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Key design decisions in the plan (locked in)** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Open decisions to sign off** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Q10 — Size caps** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Q6 — Live view: failed-task hint** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Q7 — Warnings & deprecations** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Q8 — Inspect view layout** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Q9 — Schema versioning** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Research summary (5 parallel investigations + 1 re-verification)** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **Suggested next step** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **The reframe (most important takeaway)** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
+- **What's captured in this file** (1 connections) — `docs/brainstorms/2026-06-29-verbosity-handling.md`
 
 ## Relationships
 
-- [[PTY Stream Parser]] (1 shared connections)
-- [[Error Handling Tests]] (1 shared connections)
-- [[Run Config Key Normalization]] (1 shared connections)
+- [Community 466](Community_466.md) (1 shared connections)
+- [Community 533](Community_533.md) (1 shared connections)
+- [Crash Recovery Stay Open](Crash_Recovery_Stay_Open.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_error_handling.py`
+- `docs/brainstorms/2026-06-29-verbosity-handling.md`
 
 ## Audit Trail
 
-- EXTRACTED: 13 (93%)
-- INFERRED: 1 (7%)
+- EXTRACTED: 27 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

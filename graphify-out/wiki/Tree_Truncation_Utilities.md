@@ -1,47 +1,44 @@
 # Tree Truncation Utilities
 
-> 9 nodes · cohesion 0.18
+> 14 nodes · cohesion 0.15
 
 ## Key Concepts
 
-- **Recursive nesting in tree view (unlimited depth + nested role sub-branches)** (14 connections) — `.sisyphus/plans/recursive-nesting.md`
-- **Two-level 'more tasks' truncation with vertical spines** (6 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **--hide-state flag for compact mode** (3 connections) — `.sisyphus/plans/hide-state.md`
-- **Two-level truncation learnings (T1-T8 + F1)** (3 connections) — `.sisyphus/notepads/two-level-truncation/learnings.md`
-- **with_nested_role.yml (NEW)** (1 connections) — `.sisyphus/test-fixtures/with_nested_role.yml`
-- **Fix --hide-state hiding error message on failed loop items** (1 connections) — `.sisyphus/plans/hide-state-item-event-bug.md`
-- **impl-gaps/learnings.md** (1 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
-- **implementation/issues.md** (1 connections) — `.sisyphus/notepads/implementation/issues.md`
-- **implementation/learnings.md** (1 connections) — `.sisyphus/notepads/implementation/learnings.md`
+- **SPECIFICATION.md** (12 connections) — `SPECIFICATION.md`
+- **ARCHITECTURE.md** (4 connections) — `ARCHITECTURE.md`
+- **AGENTS.md** (3 connections) — `AGENTS.md`
+- **README.md** (3 connections) — `README.md`
+- **Default ansible args** (1 connections) — `SPECIFICATION.md`
+- **Keybindings (override defaults)** (1 connections) — `SPECIFICATION.md`
+- **Log settings** (1 connections) — `SPECIFICATION.md`
+- **Panel defaults** (1 connections) — `SPECIFICATION.md`
+- **patterns don't type cleanly); vendored ansible code has no stubs.** (1 connections) — `SPECIFICATION.md`
+- **Per-module overrides: GUI modules relax strict typing (Textual/Rich metaclass** (1 connections) — `SPECIFICATION.md`
+- **Secret redaction** (1 connections) — `SPECIFICATION.md`
+- **Session storage** (1 connections) — `SPECIFICATION.md`
+- **Status bar configuration** (1 connections) — `SPECIFICATION.md`
+- **Warning display** (1 connections) — `SPECIFICATION.md`
 
 ## Relationships
 
-- [[Include Role Discovery]] (2 shared connections)
-- [[Role Inference Indexes]] (2 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
-- [[Task Definition Live Refresh]] (1 shared connections)
-- [[Tree Projection Logic]] (1 shared connections)
-- [[Run State Completion Recap]] (1 shared connections)
-- [[Tree Block Animation]] (1 shared connections)
+- [Commit Hygiene Policy](Commit_Hygiene_Policy.md) (1 shared connections)
+- [Library-First Principle](Library-First_Principle.md) (1 shared connections)
+- [SSH Password Prompt](SSH_Password_Prompt.md) (1 shared connections)
+- [Ansible Core Version Check](Ansible_Core_Version_Check.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/impl-gaps/learnings.md`
-- `.sisyphus/notepads/implementation/issues.md`
-- `.sisyphus/notepads/implementation/learnings.md`
-- `.sisyphus/notepads/two-level-truncation/learnings.md`
-- `.sisyphus/plans/hide-state-item-event-bug.md`
-- `.sisyphus/plans/hide-state.md`
-- `.sisyphus/plans/recursive-nesting.md`
-- `.sisyphus/plans/two-level-truncation.md`
-- `.sisyphus/test-fixtures/with_nested_role.yml`
+- `AGENTS.md`
+- `ARCHITECTURE.md`
+- `README.md`
+- `SPECIFICATION.md`
 
 ## Audit Trail
 
-- EXTRACTED: 27 (87%)
-- INFERRED: 4 (13%)
+- EXTRACTED: 32 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

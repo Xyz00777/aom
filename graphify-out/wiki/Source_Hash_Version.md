@@ -1,38 +1,46 @@
 # Source Hash Version
 
-> 12 nodes · cohesion 0.18
+> 18 nodes · cohesion 0.16
 
 ## Key Concepts
 
-- **source_hash()** (6 connections) — `src/ansible_aom/__init__.py`
-- **_compute_source_hash()** (4 connections) — `src/ansible_aom/__init__.py`
-- **__init__.py** (3 connections) — `src/ansible_aom/__init__.py`
-- **.test_cli_version_includes_source_hash()** (3 connections) — `tests/unit/test_cli.py`
-- **.test_source_hash_changes_when_source_changes()** (3 connections) — `tests/unit/test_cli.py`
-- **.test_source_hash_is_short_stable_hex()** (3 connections) — `tests/unit/test_cli.py`
-- **AOM (Ansible Output Monitor) - nom-style terminal interface for ansible-playbook** (1 connections) — `src/ansible_aom/__init__.py`
-- **Short stable hash of every .py source file under the package.      Companion to** (1 connections) — `src/ansible_aom/__init__.py`
-- **Public wrapper for ``_compute_source_hash``. Cached on first call.** (1 connections) — `src/ansible_aom/__init__.py`
-- **``aom --version`` prints version AND source hash.** (1 connections) — `tests/unit/test_cli.py`
-- **``source_hash()`` returns a deterministic short hex digest.** (1 connections) — `tests/unit/test_cli.py`
-- **A source-file content change must alter the hash.          Verifies the hash act** (1 connections) — `tests/unit/test_cli.py`
+- **format_age()** (9 connections) — `src/ansible_aom/core/duration.py`
+- **test_duration.py** (9 connections) — `tests/unit/test_duration.py`
+- **format_duration_compact()** (7 connections) — `src/ansible_aom/core/duration.py`
+- **duration.py** (6 connections) — `src/ansible_aom/core/duration.py`
+- **test_format_age_clamps_future_to_zero()** (3 connections) — `tests/unit/test_duration.py`
+- **datetime** (2 connections)
+- **test_format_age_days()** (2 connections) — `tests/unit/test_duration.py`
+- **test_format_age_hours()** (2 connections) — `tests/unit/test_duration.py`
+- **test_format_age_minutes()** (2 connections) — `tests/unit/test_duration.py`
+- **test_format_age_seconds()** (2 connections) — `tests/unit/test_duration.py`
+- **test_format_duration_hours_pads_minutes()** (2 connections) — `tests/unit/test_duration.py`
+- **test_format_duration_minutes_pads_seconds()** (2 connections) — `tests/unit/test_duration.py`
+- **test_format_duration_seconds()** (2 connections) — `tests/unit/test_duration.py`
+- **Pure formatters for durations and relative ages.  These functions are used where** (1 connections) — `src/ansible_aom/core/duration.py`
+- **Render a duration as the most compact human form ("42s", "1m23s", "1h05m").** (1 connections) — `src/ansible_aom/core/duration.py`
+- **Render an absolute UTC ``end_time`` as a relative ``"Xs/m/h/d ago"`` string.** (1 connections) — `src/ansible_aom/core/duration.py`
+- **Unit tests for the pure duration / age formatters in core.duration.** (1 connections) — `tests/unit/test_duration.py`
+- **Clock skew shouldn't produce '-Ns ago'.** (1 connections) — `tests/unit/test_duration.py`
 
 ## Relationships
 
-- [[CLI Interface Tests]] (3 shared connections)
-- [[CLI Main Entry Point]] (1 shared connections)
+- [TUI Keybindings Config](TUI_Keybindings_Config.md) (2 shared connections)
+- [Heartbeat Liveness Tracker](Heartbeat_Liveness_Tracker.md) (1 shared connections)
+- [Community 477](Community_477.md) (1 shared connections)
+- [Renderer Set Definitions](Renderer_Set_Definitions.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/__init__.py`
-- `tests/unit/test_cli.py`
+- `src/ansible_aom/core/duration.py`
+- `tests/unit/test_duration.py`
 
 ## Audit Trail
 
-- EXTRACTED: 21 (75%)
-- INFERRED: 7 (25%)
+- EXTRACTED: 36 (65%)
+- INFERRED: 19 (35%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,56 +1,56 @@
 # Status Bar Liveness Tests
 
-> 28 nodes · cohesion 0.11
+> 37 nodes · cohesion 0.07
 
 ## Key Concepts
 
-- **LivenessState** (28 connections) — `src/ansible_aom/core/heartbeat.py`
-- **test_status_bar_liveness.py** (18 connections) — `tests/compact/test_status_bar_liveness.py`
-- **test_live_cpu_annotated_with_cpu_marker()** (3 connections) — `tests/compact/test_status_bar_liveness.py`
-- **test_live_pty_has_no_reason_annotation()** (3 connections) — `tests/compact/test_status_bar_liveness.py`
-- **test_reason_annotation_is_dim_when_colorized()** (3 connections) — `tests/compact/test_status_bar_liveness.py`
-- **test_segment_inserted_directly_before_elapsed_no_separator_after_predecessor()** (3 connections) — `tests/compact/test_status_bar_liveness.py`
-- **test_stuck_carries_no_reason_annotation()** (3 connections) — `tests/compact/test_status_bar_liveness.py`
-- **test_working_cpu_annotated_with_cpu_marker()** (3 connections) — `tests/compact/test_status_bar_liveness.py`
-- **test_working_silent_annotated_with_silent_marker()** (3 connections) — `tests/compact/test_status_bar_liveness.py`
-- **test_ascii_mode_falls_back_to_plain_glyphs()** (2 connections) — `tests/compact/test_status_bar_liveness.py`
-- **test_live_segment_is_green_when_colorized()** (2 connections) — `tests/compact/test_status_bar_liveness.py`
-- **test_live_segment_rendered_with_dot_and_age()** (2 connections) — `tests/compact/test_status_bar_liveness.py`
-- **test_no_color_in_segment_when_colorize_off()** (2 connections) — `tests/compact/test_status_bar_liveness.py`
-- **test_segment_present_even_with_zero_deprecations_and_warnings()** (2 connections) — `tests/compact/test_status_bar_liveness.py`
-- **test_stuck_segment_is_red_when_colorized()** (2 connections) — `tests/compact/test_status_bar_liveness.py`
-- **test_stuck_segment_rendered_with_bang()** (2 connections) — `tests/compact/test_status_bar_liveness.py`
-- **test_working_segment_is_dim_when_colorized()** (2 connections) — `tests/compact/test_status_bar_liveness.py`
-- **test_working_segment_rendered_with_open_circle()** (2 connections) — `tests/compact/test_status_bar_liveness.py`
-- **Tests for the liveness segment in ``format_status_bar``.  When a ``LivenessState** (1 connections) — `tests/compact/test_status_bar_liveness.py`
-- **The common case (●, recent PTY bytes) carries no annotation —     the dot alone** (1 connections) — `tests/compact/test_status_bar_liveness.py`
-- **LIVE rescued by CPU activity (no recent PTY but subprocess tree is     busy) — m** (1 connections) — `tests/compact/test_status_bar_liveness.py`
-- **WORKING via byte-age alone: nothing positive to report. The     annotation tells** (1 connections) — `tests/compact/test_status_bar_liveness.py`
-- **WORKING rescued from STUCK by an old-ish CPU sample (5–30s).** (1 connections) — `tests/compact/test_status_bar_liveness.py`
-- **STUCK is unambiguous on its own — the red ! already says it all.** (1 connections) — `tests/compact/test_status_bar_liveness.py`
-- **The (cpu)/(silent) suffix is metadata — render it dim so it     sits visually be** (1 connections) — `tests/compact/test_status_bar_liveness.py`
-- *... and 3 more nodes in this community*
+- **.handle_password_prompt()** (22 connections) — `tests/unit/test_event_source.py`
+- **TestCompactModeTerminalPassThrough** (13 connections) — `tests/compact/test_password.py`
+- **.test_all_password_types_use_same_pass_through()** (3 connections) — `tests/compact/test_password.py`
+- **.test_cursor_positioning_before_getpass()** (3 connections) — `tests/compact/test_password.py`
+- **.test_cursor_positioning_silent_on_non_tty()** (3 connections) — `tests/compact/test_password.py`
+- **.test_empty_password_returned_as_empty_string()** (3 connections) — `tests/compact/test_password.py`
+- **.test_getpass_masks_password_input()** (3 connections) — `tests/compact/test_password.py`
+- **.test_password_prompt_text_displayed_to_user()** (3 connections) — `tests/compact/test_password.py`
+- **.test_password_returned_as_string()** (3 connections) — `tests/compact/test_password.py`
+- **.test_password_with_special_characters()** (3 connections) — `tests/compact/test_password.py`
+- **.test_password_with_unicode_characters()** (3 connections) — `tests/compact/test_password.py`
+- **.test_handle_password_prompt_cursor_positioning_on_tty()** (3 connections) — `tests/compact/test_password.py`
+- **.test_handle_password_prompt_delegates_to_getpass()** (3 connections) — `tests/compact/test_password.py`
+- **.test_handle_password_prompt_empty_child_param()** (3 connections) — `tests/compact/test_password.py`
+- **.test_handle_password_prompt_passes_prompt_text_to_getpass()** (3 connections) — `tests/compact/test_password.py`
+- **.test_handle_password_prompt_returns_empty_on_eof()** (3 connections) — `tests/compact/test_password.py`
+- **.test_handle_password_prompt_returns_empty_on_keyboard_interrupt()** (3 connections) — `tests/compact/test_password.py`
+- **.test_handle_password_prompt_returns_empty_on_os_error()** (3 connections) — `tests/compact/test_password.py`
+- **.test_handle_password_prompt_with_mock_pexpect_child()** (3 connections) — `tests/compact/test_password.py`
+- **TC-143: handle_password_prompt uses getpass.getpass for PTY integration.** (1 connections) — `tests/compact/test_password.py`
+- **TC-143: The prompt text is passed to getpass for display on /dev/tty.** (1 connections) — `tests/compact/test_password.py`
+- **TC-143: child param exists for interface compatibility but unused in compact mod** (1 connections) — `tests/compact/test_password.py`
+- **TC-143: child param accepted for TUI interface compatibility.** (1 connections) — `tests/compact/test_password.py`
+- **TC-143: Cursor positioning escape sequence written before getpass.** (1 connections) — `tests/compact/test_password.py`
+- **TC-143: EOFError from getpass returns empty string (user cancelled).** (1 connections) — `tests/compact/test_password.py`
+- *... and 12 more nodes in this community*
 
 ## Relationships
 
-- [[Heartbeat Liveness Tracker]] (5 shared connections)
-- [[Compact Renderer Formatters]] (1 shared connections)
-- [[Compact Renderer Implementation]] (1 shared connections)
-- [[Heartbeat Liveness Machine]] (1 shared connections)
-- [[Terminal Row Counting]] (1 shared connections)
-- [[Liveness State Reason]] (1 shared connections)
+- [Golden Frame Tests](Golden_Frame_Tests.md) (8 shared connections)
+- [Pause Lingering Cleanup](Pause_Lingering_Cleanup.md) (3 shared connections)
+- [Display Helper Class](Display_Helper_Class.md) (2 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
+- [Session Recording Tests](Session_Recording_Tests.md) (1 shared connections)
+- [Narrow Terminal View](Narrow_Terminal_View.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/heartbeat.py`
-- `tests/compact/test_status_bar_liveness.py`
+- `tests/compact/test_password.py`
+- `tests/unit/test_event_source.py`
 
 ## Audit Trail
 
-- EXTRACTED: 55 (58%)
-- INFERRED: 40 (42%)
+- EXTRACTED: 64 (62%)
+- INFERRED: 40 (38%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

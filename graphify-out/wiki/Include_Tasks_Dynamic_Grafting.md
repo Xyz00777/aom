@@ -1,31 +1,38 @@
 # Include Tasks Dynamic Grafting
 
-> 6 nodes · cohesion 0.33
+> 12 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **TestIncludeTasksDynamic** (4 connections) — `tests/integration/test_include_import_role.py`
-- **.test_completion_counter_matches_runtime_tasks()** (4 connections) — `tests/integration/test_include_import_role.py`
-- **.test_dynamic_include_children_appear()** (4 connections) — `tests/integration/test_include_import_role.py`
-- **TC-332 / TC-338: include_tasks dynamic grafting and counter accuracy.** (1 connections) — `tests/integration/test_include_import_role.py`
-- **TC-332: dynamic include children appear with status icons.** (1 connections) — `tests/integration/test_include_import_role.py`
-- **TC-338: completion counter = total runtime tasks.** (1 connections) — `tests/integration/test_include_import_role.py`
+- **TestPanelToggleKeybindings** (9 connections) — `tests/tui/test_keybindings.py`
+- **.test_key_1_toggles_status_bar()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_key_2_toggles_tree_view()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_key_3_toggles_summary_panel()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_key_4_toggles_log_panel()** (3 connections) — `tests/tui/test_keybindings.py`
+- **.test_key_5_toggles_footer()** (3 connections) — `tests/tui/test_keybindings.py`
+- **Tests for panel toggle keybindings - TC-355 through TC-360.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-356: '1' toggles Status Bar visibility.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-357: '2' toggles Tree View visibility.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-358: '3' toggles Summary Panel visibility.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-359: '4' toggles Log Panel visibility.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-360: '5' toggles Footer visibility.** (1 connections) — `tests/tui/test_keybindings.py`
 
 ## Relationships
 
-- [[Include Import Role Tasks]] (3 shared connections)
-- [[Run Config Key Normalization]] (2 shared connections)
+- [Runner Event Batching](Runner_Event_Batching.md) (5 shared connections)
+- [State Machine Invariants](State_Machine_Invariants.md) (2 shared connections)
+- [Warning Color Formatting](Warning_Color_Formatting.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_include_import_role.py`
+- `tests/tui/test_keybindings.py`
 
 ## Audit Trail
 
-- EXTRACTED: 15 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 23 (77%)
+- INFERRED: 7 (23%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,31 +1,39 @@
 # Watchdog Timer
 
-> 5 nodes · cohesion 0.20
+> 15 nodes · cohesion 0.21
 
 ## Key Concepts
 
-- **TestWatchdogTimer** (7 connections) — `tests/integration/test_error_handling.py`
-- **.test_watchdog_disabled_during_password()** (2 connections) — `tests/integration/test_error_handling.py`
-- **.test_watchdog_error_at_300_seconds()** (2 connections) — `tests/integration/test_error_handling.py`
-- **.test_watchdog_resets_on_output()** (2 connections) — `tests/integration/test_error_handling.py`
-- **.test_watchdog_warning_at_60_seconds()** (2 connections) — `tests/integration/test_error_handling.py`
+- **test_layering.py** (9 connections) — `tests/unit/test_layering.py`
+- **_violations()** (6 connections) — `tests/unit/test_layering.py`
+- **_imports_in()** (5 connections) — `tests/unit/test_layering.py`
+- **_module_name_for()** (3 connections) — `tests/unit/test_layering.py`
+- **Path** (3 connections)
+- **test_core_does_not_depend_on_infrastructure()** (3 connections) — `tests/unit/test_layering.py`
+- **test_drivers_do_not_depend_on_concrete_renderers()** (3 connections) — `tests/unit/test_layering.py`
+- **test_renderer_protocol_does_not_import_concrete_renderers()** (3 connections) — `tests/unit/test_layering.py`
+- **_iter_modules()** (2 connections) — `tests/unit/test_layering.py`
+- **test_concrete_renderers_do_not_cross_import()** (2 connections) — `tests/unit/test_layering.py`
+- **Architecture layering enforcement (ARCHITECTURE.md §7.8).  These tests parse eve** (1 connections) — `tests/unit/test_layering.py`
+- **``renderer/protocol.py`` is the port; it must stay abstract.** (1 connections) — `tests/unit/test_layering.py`
+- **``drivers/`` couples to the Renderer Protocol, not to a concrete impl.      The** (1 connections) — `tests/unit/test_layering.py`
+- **Return every ansible_aom.* module name imported by ``path``.      Walks the AST** (1 connections) — `tests/unit/test_layering.py`
+- **``core/`` must not import any infrastructure package.      This is the load-bear** (1 connections) — `tests/unit/test_layering.py`
 
 ## Relationships
 
-- [[PTY Stream Parser]] (2 shared connections)
-- [[Error Handling Tests]] (1 shared connections)
-- [[Password Timeout]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/integration/test_error_handling.py`
+- `tests/unit/test_layering.py`
 
 ## Audit Trail
 
-- EXTRACTED: 14 (93%)
-- INFERRED: 1 (7%)
+- EXTRACTED: 44 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,32 +1,42 @@
 # Password Timeout
 
-> 5 nodes · cohesion 0.25
+> 14 nodes · cohesion 0.14
 
 ## Key Concepts
 
-- **TestPasswordTimeout** (6 connections) — `tests/integration/test_error_handling.py`
-- **.test_password_timeout_retry_option()** (3 connections) — `tests/integration/test_error_handling.py`
-- **TC-484 to TC-487: Watchdog timer tests.** (2 connections) — `tests/integration/test_error_handling.py`
-- **.test_password_timeout_cancels_with_error()** (2 connections) — `tests/integration/test_error_handling.py`
-- **.test_password_timeout_default_is_60_seconds()** (2 connections) — `tests/integration/test_error_handling.py`
+- **TestWarningPatternsEdgeCases** (14 connections) — `tests/unit/test_warnings.py`
+- **.test_empty_line_not_warning()** (3 connections) — `tests/unit/test_warnings.py`
+- **.test_json_line_not_treated_as_warning()** (3 connections) — `tests/unit/test_warnings.py`
+- **.test_mixed_warning_types()** (3 connections) — `tests/unit/test_warnings.py`
+- **.test_multiple_deprecation_warnings()** (3 connections) — `tests/unit/test_warnings.py`
+- **.test_non_warning_plaintext_added_to_plaintext_lines()** (3 connections) — `tests/unit/test_warnings.py`
+- **.test_warning_in_pre_run_prompts_phase_not_captured()** (3 connections) — `tests/unit/test_warnings.py`
+- **Edge cases for warning pattern matching.** (1 connections) — `tests/unit/test_warnings.py`
+- **Multiple [DEPRECATION WARNING]: lines are all classified correctly.** (1 connections) — `tests/unit/test_warnings.py`
+- **Mixed WARNING and DEPRECATION lines classified correctly.** (1 connections) — `tests/unit/test_warnings.py`
+- **Warnings before EXECUTION phase may not be captured.** (1 connections) — `tests/unit/test_warnings.py`
+- **JSONL lines are not treated as warnings even if they contain warning text.** (1 connections) — `tests/unit/test_warnings.py`
+- **Empty lines are not treated as warnings.** (1 connections) — `tests/unit/test_warnings.py`
+- **Non-warning plaintext lines go to plaintext_lines, not warnings.** (1 connections) — `tests/unit/test_warnings.py`
 
 ## Relationships
 
-- [[Watchdog Timer]] (1 shared connections)
-- [[PTY Stream Parser]] (1 shared connections)
-- [[Error Handling Tests]] (1 shared connections)
-- [[Crash Recovery Notification]] (1 shared connections)
+- [Run State Completion Recap](Run_State_Completion_Recap.md) (7 shared connections)
+- [Run State Summary Panel](Run_State_Summary_Panel.md) (2 shared connections)
+- [AOM TUI Application](AOM_TUI_Application.md) (2 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_error_handling.py`
+- `tests/unit/test_warnings.py`
 
 ## Audit Trail
 
-- EXTRACTED: 14 (93%)
-- INFERRED: 1 (7%)
+- EXTRACTED: 27 (69%)
+- INFERRED: 12 (31%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

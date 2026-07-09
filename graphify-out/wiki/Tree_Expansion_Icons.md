@@ -1,40 +1,44 @@
 # Tree Expansion Icons
 
-> 14 nodes · cohesion 0.15
+> 20 nodes · cohesion 0.19
 
 ## Key Concepts
 
-- **TestTreeIcons** (7 connections) — `tests/unit/test_icons.py`
-- **get_tree_icon()** (4 connections) — `src/ansible_aom/core/icons.py`
-- **.test_get_tree_icon_collapsed()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_get_tree_icon_expanded()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_tree_collapsed_icon()** (2 connections) — `tests/unit/test_icons.py`
-- **.test_tree_expanded_icon()** (2 connections) — `tests/unit/test_icons.py`
-- **.test_tree_icons_are_unicode()** (2 connections) — `tests/unit/test_icons.py`
-- **Get tree expansion icon.      Args:         expanded: True for expanded node (▼)** (1 connections) — `src/ansible_aom/core/icons.py`
-- **Tests for TC-373 and TC-374.** (1 connections) — `tests/unit/test_icons.py`
-- **TC-373: Collapsed tree node displays right arrow (▶).** (1 connections) — `tests/unit/test_icons.py`
-- **TC-374: Expanded tree node displays down arrow (▼).** (1 connections) — `tests/unit/test_icons.py`
-- **TC-373: get_tree_icon returns correct icon for collapsed node.** (1 connections) — `tests/unit/test_icons.py`
-- **TC-374: get_tree_icon returns correct icon for expanded node.** (1 connections) — `tests/unit/test_icons.py`
-- **Tree icons are valid Unicode characters.** (1 connections) — `tests/unit/test_icons.py`
+- **test_emit_event_log_batching.py** (11 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **_renderer()** (7 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **_task_start()** (6 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **_print_log_calls()** (5 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **.test_failed_event_batched()** (5 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **.test_perf_001_one_print_log_call_per_event()** (5 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **.test_perf_002_all_host_lines_present_in_single_call()** (5 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **.test_changed_and_ok_hosts_in_one_call()** (5 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **.test_unreachable_event_batched()** (5 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **TestRunnerOkBatching** (4 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **_runner_ok_multi()** (3 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **TestRunnerFailedBatching** (3 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **TestRunnerOkMixedChanged** (3 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **TestRunnerUnreachableBatching** (3 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **_runner_failed_multi()** (2 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **_runner_unreachable_multi()** (2 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **TC-PERF-001..002 — batched print_log per runner event.  A single runner event (`** (1 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **ok event with some hosts changed=True still produces one call.** (1 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **14 hosts in one ok event → exactly one print_log call.** (1 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **The single print_log argument carries every host line.** (1 connections) — `tests/compact/test_emit_event_log_batching.py`
 
 ## Relationships
 
-- [[Compact Display Module Layout]] (1 shared connections)
-- [[Status Icon Mapping]] (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (6 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/icons.py`
-- `tests/unit/test_icons.py`
+- `tests/compact/test_emit_event_log_batching.py`
 
 ## Audit Trail
 
-- EXTRACTED: 26 (87%)
-- INFERRED: 4 (13%)
+- EXTRACTED: 74 (95%)
+- INFERRED: 4 (5%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

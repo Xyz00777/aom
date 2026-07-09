@@ -1,6 +1,6 @@
 # RunState Renderer Invariants
 
-> 34 nodes · cohesion 0.07
+> 35 nodes · cohesion 0.07
 
 ## Key Concepts
 
@@ -25,21 +25,20 @@
 - **.runner_on_unreachable()** (2 connections) — `tests/unit/test_invariants_runstate_renderer.py`
 - **.task_start()** (2 connections) — `tests/unit/test_invariants_runstate_renderer.py`
 - **.tick()** (2 connections) — `tests/unit/test_invariants_runstate_renderer.py`
+- **RuleBasedStateMachine** (1 connections)
 - **Stateful invariants over RunState and the CompactRenderer mirror.  The HS-2..HS-** (1 connections) — `tests/unit/test_invariants_runstate_renderer.py`
 - **Free-strategy entry point — task_id appears via runner_on_start.** (1 connections) — `tests/unit/test_invariants_runstate_renderer.py`
 - **Quiet-period refresh; must not perturb any counter or index.** (1 connections) — `tests/unit/test_invariants_runstate_renderer.py`
-- **HS-2: incremental counter == authoritative full-state walk.** (1 connections) — `tests/unit/test_invariants_runstate_renderer.py`
-- *... and 9 more nodes in this community*
+- *... and 10 more nodes in this community*
 
 ## Relationships
 
-- [[Compact Renderer Implementation]] (2 shared connections)
-- [[Play Definition Tree Population]] (2 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
-- [[Task Definition Live Refresh]] (1 shared connections)
-- [[State Machine Invariants]] (1 shared connections)
-- [[Run State Completion Recap]] (1 shared connections)
-- [[Total Task Counting]] (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (2 shared connections)
+- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (2 shared connections)
+- [CLI Argument Parser](CLI_Argument_Parser.md) (2 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
+- [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (1 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (1 shared connections)
 
 ## Source Files
 
@@ -47,10 +46,10 @@
 
 ## Audit Trail
 
-- EXTRACTED: 87 (93%)
+- EXTRACTED: 88 (93%)
 - INFERRED: 7 (7%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

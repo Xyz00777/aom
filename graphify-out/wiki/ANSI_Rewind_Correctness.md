@@ -1,34 +1,39 @@
 # ANSI Rewind Correctness
 
-> 10 nodes · cohesion 0.20
+> 15 nodes · cohesion 0.13
 
 ## Key Concepts
 
-- **TestRewindCorrectness** (6 connections) — `tests/compact/test_display_ansi.py`
-- **test_display_ansi.py** (3 connections) — `tests/compact/test_display_ansi.py`
-- **.test_multi_row_rewind_moves_up_rows_minus_one()** (3 connections) — `tests/compact/test_display_ansi.py`
-- **.test_print_log_does_not_erase_line_above_single_row_status()** (3 connections) — `tests/compact/test_display_ansi.py`
-- **.test_single_row_rewind_uses_carriage_return_not_F()** (3 connections) — `tests/compact/test_display_ansi.py`
-- **Tests for nom-style ANSI rendering in compact mode.  These tests pin the new-spe** (1 connections) — `tests/compact/test_display_ansi.py`
-- **The flow that triggered the bug: status, then print_log.** (1 connections) — `tests/compact/test_display_ansi.py`
-- **The status-block rewind must land on the start of the block, not above it.** (1 connections) — `tests/compact/test_display_ansi.py`
-- **For a 1-row status, rewind is a carriage return, not cursor-up.** (1 connections) — `tests/compact/test_display_ansi.py`
-- **For an N-row status, cursor is on the last row, so we rewind N-1 lines.** (1 connections) — `tests/compact/test_display_ansi.py`
+- **v1 Verbosity — Learnings (Task 7.3: footer focus indicator + V flash)** (10 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Critical design decisions** (6 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **1. The `UNKNOWN` source is essential, even though the plan says "12 values"** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **[2026-07-01] Task 8.1 fuzz test** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **2. SSH return tuple needs its own rule (8b)** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **3. SSH agent must come BEFORE generic SSH** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **4. Connection lifecycle has NO host in the message text** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **5. The 12-source caplevel mapping is part of the public contract** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Followups (out of scope for Phase 4.2 — wired by later tasks)** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Gotchas** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Performance / hot-path notes** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Phase 4.1 note** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Verification log** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **Verification notes** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
+- **What changed in practice** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
 
 ## Relationships
 
-- [[Terminal Display Manager]] (5 shared connections)
+- [Runtime Event Handlers](Runtime_Event_Handlers.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/compact/test_display_ansi.py`
+- `.sisyphus/notepads/v1-verbosity/learnings.md`
 
 ## Audit Trail
 
-- EXTRACTED: 19 (83%)
-- INFERRED: 4 (17%)
+- EXTRACTED: 29 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

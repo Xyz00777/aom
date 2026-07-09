@@ -1,58 +1,62 @@
 # Inspect Data Model Builders
 
-> 42 nodes · cohesion 0.07
+> 62 nodes · cohesion 0.04
 
 ## Key Concepts
 
-- **StatusCounts** (40 connections) — `src/ansible_aom/core/inspect_model.py`
-- **build_task_tree()** (28 connections) — `src/ansible_aom/core/inspect_model.py`
-- **test_inspect_model.py** (28 connections) — `tests/unit/test_inspect_model.py`
-- **inspect_model.py** (21 connections) — `src/ansible_aom/core/inspect_model.py`
-- **build_run_summary()** (14 connections) — `src/ansible_aom/core/inspect_model.py`
-- **build_detail_block()** (13 connections) — `src/ansible_aom/core/inspect_model.py`
-- **_load_fixture()** (13 connections) — `tests/unit/test_inspect_model.py`
-- **_make_loop_item()** (7 connections) — `src/ansible_aom/core/inspect_model.py`
-- **build_run_summaries()** (5 connections) — `src/ansible_aom/core/inspect_model.py`
-- **_parse_iso()** (5 connections) — `src/ansible_aom/core/inspect_model.py`
-- **LoopItem** (4 connections) — `src/ansible_aom/core/inspect_model.py`
-- **.add_event()** (4 connections) — `src/ansible_aom/core/inspect_model.py`
-- **test_detail_block_loop_failure()** (4 connections) — `tests/unit/test_inspect_model.py`
-- **test_detail_block_ok_task_no_failure_items()** (4 connections) — `tests/unit/test_inspect_model.py`
-- **test_detail_block_unreachable()** (4 connections) — `tests/unit/test_inspect_model.py`
-- **test_run_summary_clean()** (4 connections) — `tests/unit/test_inspect_model.py`
-- **test_run_summary_failed_loop()** (4 connections) — `tests/unit/test_inspect_model.py`
-- **test_run_summary_string_task_field()** (4 connections) — `tests/unit/test_inspect_model.py`
-- **test_task_tree_clean_run_groups_by_role()** (4 connections) — `tests/unit/test_inspect_model.py`
-- **test_task_tree_failed_loop_marks_failure_path()** (4 connections) — `tests/unit/test_inspect_model.py`
-- **test_task_tree_multi_host_per_host_breakdown()** (4 connections) — `tests/unit/test_inspect_model.py`
-- **test_task_tree_real_event_shape()** (4 connections) — `tests/unit/test_inspect_model.py`
-- **test_task_tree_string_task_field()** (4 connections) — `tests/unit/test_inspect_model.py`
-- **_group_key()** (3 connections) — `src/ansible_aom/core/inspect_model.py`
-- **test_run_summaries_sorted_newest_first()** (3 connections) — `tests/unit/test_inspect_model.py`
-- *... and 17 more nodes in this community*
+- **JsonRenderer** (76 connections) — `src/ansible_aom/formats/json.py`
+- **test_json_renderer.py** (26 connections) — `tests/unit/test_json_renderer.py`
+- **_state_two_hosts_one_failure()** (12 connections) — `tests/unit/test_json_renderer.py`
+- **test_handle_completion_aggregates_per_host_counts()** (4 connections) — `tests/unit/test_json_renderer.py`
+- **test_handle_completion_emits_one_json_object()** (4 connections) — `tests/unit/test_json_renderer.py`
+- **test_handle_completion_lists_failed_tasks()** (4 connections) — `tests/unit/test_json_renderer.py`
+- **test_handle_completion_uses_state_timestamps()** (4 connections) — `tests/unit/test_json_renderer.py`
+- **test_json_renderer_satisfies_renderer_protocol()** (4 connections) — `tests/unit/test_json_renderer.py`
+- **.handle_interactive_prompt()** (3 connections) — `src/ansible_aom/formats/json.py`
+- **.handle_password_prompt()** (3 connections) — `src/ansible_aom/formats/json.py`
+- **.start()** (3 connections) — `src/ansible_aom/formats/json.py`
+- **.update_state()** (3 connections) — `src/ansible_aom/formats/json.py`
+- **test_factory_returns_json_renderer_for_json_format()** (3 connections) — `tests/unit/test_json_renderer.py`
+- **test_handle_completion_empty_state_emits_zero_exit()** (3 connections) — `tests/unit/test_json_renderer.py`
+- **test_handle_completion_records_playbook_and_exit_code()** (3 connections) — `tests/unit/test_json_renderer.py`
+- **test_handle_completion_schema_version_is_one()** (3 connections) — `tests/unit/test_json_renderer.py`
+- **test_interactive_prompt_refuses_to_stderr()** (3 connections) — `tests/unit/test_json_renderer.py`
+- **test_json_renderer_noop_methods_emit_nothing()** (3 connections) — `tests/unit/test_json_renderer.py`
+- **test_json_renderer_set_definitions_stores_them()** (3 connections) — `tests/unit/test_json_renderer.py`
+- **test_json_renderer_start_records_playbook_and_args()** (3 connections) — `tests/unit/test_json_renderer.py`
+- **test_json_renderer_through_full_lifecycle()** (3 connections) — `tests/unit/test_json_renderer.py`
+- **test_password_prompt_refuses_to_stderr()** (3 connections) — `tests/unit/test_json_renderer.py`
+- **test_prompt_refusal_does_not_corrupt_completion_json()** (3 connections) — `tests/unit/test_json_renderer.py`
+- **.add_warning()** (2 connections) — `src/ansible_aom/formats/json.py`
+- **.note_pty_bytes()** (2 connections) — `src/ansible_aom/formats/json.py`
+- *... and 37 more nodes in this community*
 
 ## Relationships
 
-- [[Inspect TUI Widget Data]] (13 shared connections)
-- [[Inspect Text Golden Tests]] (5 shared connections)
-- [[Three-Pane Inspect App]] (4 shared connections)
-- [[Task Tree Navigation]] (3 shared connections)
-- [[Design Specs Plans]] (3 shared connections)
-- [[Session Roundtrip Invariants]] (3 shared connections)
-- [[Session List View]] (2 shared connections)
-- [[Pane Focus Navigation]] (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (24 shared connections)
+- [Preflight Summary Rendering](Preflight_Summary_Rendering.md) (5 shared connections)
+- [Terminal Display Manager](Terminal_Display_Manager.md) (5 shared connections)
+- [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (4 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (3 shared connections)
+- [PTY Stream Parser](PTY_Stream_Parser.md) (3 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (2 shared connections)
+- [Community 602](Community_602.md) (2 shared connections)
+- [Invalid Key Handling](Invalid_Key_Handling.md) (2 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
+- [Status Bar Rerender](Status_Bar_Rerender.md) (1 shared connections)
+- [Community 570](Community_570.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/inspect_model.py`
-- `tests/unit/test_inspect_model.py`
+- `src/ansible_aom/formats/json.py`
+- `tests/unit/test_json_renderer.py`
 
 ## Audit Trail
 
-- EXTRACTED: 173 (66%)
-- INFERRED: 90 (34%)
+- EXTRACTED: 144 (63%)
+- INFERRED: 83 (37%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

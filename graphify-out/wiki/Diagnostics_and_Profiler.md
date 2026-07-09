@@ -1,54 +1,63 @@
 # Diagnostics and Profiler
 
-> 29 nodes · cohesion 0.06
+> 46 nodes · cohesion 0.06
 
 ## Key Concepts
 
-- **diagnostics.py** (30 connections) — `src/ansible_aom/core/diagnostics.py`
-- **install_from_env()** (7 connections) — `src/ansible_aom/core/diagnostics.py`
-- **lifecycle_mark()** (5 connections) — `src/ansible_aom/core/diagnostics.py`
-- **dump_profile()** (4 connections) — `src/ansible_aom/core/diagnostics.py`
-- **get_profiler()** (3 connections) — `src/ansible_aom/core/diagnostics.py`
-- **_is_truthy()** (3 connections) — `src/ansible_aom/core/diagnostics.py`
-- **_parse_watchdog()** (3 connections) — `src/ansible_aom/core/diagnostics.py`
-- **get_lifecycle_marks()** (2 connections) — `src/ansible_aom/core/diagnostics.py`
-- **record_tracemalloc_peak()** (2 connections) — `src/ansible_aom/core/diagnostics.py`
-- **_reset_for_testing()** (2 connections) — `src/ansible_aom/core/diagnostics.py`
-- **.note_event()** (2 connections) — `src/ansible_aom/core/diagnostics.py`
-- **set_last_renderer_stats()** (2 connections) — `src/ansible_aom/core/diagnostics.py`
-- **set_psutil_disabled()** (2 connections) — `src/ansible_aom/core/diagnostics.py`
-- **set_session_recording_disabled()** (2 connections) — `src/ansible_aom/core/diagnostics.py`
-- **get_last_renderer_stats()** (1 connections) — `src/ansible_aom/core/diagnostics.py`
-- **get_tracemalloc_peak_kb()** (1 connections) — `src/ansible_aom/core/diagnostics.py`
-- **is_debug()** (1 connections) — `src/ansible_aom/core/diagnostics.py`
-- **is_profile()** (1 connections) — `src/ansible_aom/core/diagnostics.py`
-- **is_tracemalloc()** (1 connections) — `src/ansible_aom/core/diagnostics.py`
-- **psutil_disabled_reason()** (1 connections) — `src/ansible_aom/core/diagnostics.py`
-- **Opt-in diagnostics / observability layer for AOM.  Pure module — reads ``os.envi** (1 connections) — `src/ansible_aom/core/diagnostics.py`
-- **Test-only: undo all module state so each test gets a fresh install.      Cancels** (1 connections) — `src/ansible_aom/core/diagnostics.py`
-- **Publish the just-finished run's diagnostics for post-hoc readers.      Phase 5 u** (1 connections) — `src/ansible_aom/core/diagnostics.py`
-- **Return True iff ``value`` is set and not a known falsy literal.** (1 connections) — `src/ansible_aom/core/diagnostics.py`
-- **Parse ``AOM_WATCHDOG`` into a positive int, else None.** (1 connections) — `src/ansible_aom/core/diagnostics.py`
-- *... and 4 more nodes in this community*
+- **parse_list_hosts_output()** (27 connections) — `src/ansible_aom/core/parser.py`
+- **TestListHostsEdgeCases** (23 connections) — `tests/unit/test_parser.py`
+- **TestListHostsParser** (20 connections) — `tests/unit/test_parser.py`
+- **TestListHostsFallback** (17 connections) — `tests/unit/test_parser.py`
+- **.test_list_hosts_output_populates_resolved_hosts()** (3 connections) — `tests/unit/test_host_resolution.py`
+- **.test_list_hosts_all_inventory()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_list_hosts_dynamic_inventory_timeout()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_list_hosts_dynamic_pattern_empty_hosts()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_list_hosts_dynamic_pattern_fallback()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_list_hosts_multiple_plays_hosts()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_list_hosts_no_duplicate_hosts()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_list_hosts_pattern_filtering()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_list_hosts_play_number_sequential()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_list_hosts_with_limit()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_list_hosts_empty_result_fallback()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_list_hosts_fallback_warning_logged()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_list_hosts_partial_error_output()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_empty_output_returns_empty_list()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_localhost_handling()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_parse_hostname_extraction()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_parse_play_line_pattern()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_playbook_header_skipped()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_skip_non_host_lines()** (3 connections) — `tests/unit/test_parser.py`
+- **Parse --list-hosts output into structured data.      Returns list of dicts with** (1 connections) — `src/ansible_aom/core/parser.py`
+- **TC-149: parse_list_hosts_output extracts hostnames per play.** (1 connections) — `tests/unit/test_host_resolution.py`
+- *... and 21 more nodes in this community*
 
 ## Relationships
 
-- [[Run Diagnostics Accumulator]] (5 shared connections)
-- [[Diagnostics Record Building]] (3 shared connections)
-- [[Design Specs Plans]] (2 shared connections)
-- [[Debug Diagnostics Summary]] (1 shared connections)
-- [[Run Config Key Normalization]] (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (9 shared connections)
+- [Secret Redaction Configuration](Secret_Redaction_Configuration.md) (8 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (4 shared connections)
+- [State Machine Module](State_Machine_Module.md) (3 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (3 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (3 shared connections)
+- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (3 shared connections)
+- [Per-Task Overhead Analysis](Per-Task_Overhead_Analysis.md) (3 shared connections)
+- [CLI Argument Parser](CLI_Argument_Parser.md) (3 shared connections)
+- [Three-Pane Inspect App](Three-Pane_Inspect_App.md) (3 shared connections)
+- [Run State Completion Recap](Run_State_Completion_Recap.md) (3 shared connections)
+- [List Hosts Output Parser](List_Hosts_Output_Parser.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/diagnostics.py`
+- `src/ansible_aom/core/parser.py`
+- `tests/unit/test_host_resolution.py`
+- `tests/unit/test_parser.py`
 
 ## Audit Trail
 
-- EXTRACTED: 84 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 87 (52%)
+- INFERRED: 80 (48%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

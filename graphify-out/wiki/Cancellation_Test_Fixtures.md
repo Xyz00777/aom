@@ -4,8 +4,8 @@
 
 ## Key Concepts
 
-- **Test playbook: user cancellation (24)** (1 connections) — `tests/playbooks/24-user-cancellation/site.yml`
 - **Golden fixture: cancelled 80x24** (1 connections) — `tests/compact/golden/cancelled__80x24.txt`
+- **Test playbook: user cancellation (24)** (1 connections) — `tests/playbooks/24-user-cancellation/site.yml`
 
 ## Relationships
 
@@ -24,4 +24,4 @@
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

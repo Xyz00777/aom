@@ -1,43 +1,50 @@
 # Template Name Regression
 
-> 16 nodes · cohesion 0.21
+> 39 nodes · cohesion 0.05
 
 ## Key Concepts
 
-- **TestTemplateVariableNameMismatch** (19 connections) — `tests/unit/test_template_variable_names.py`
-- **_play_def()** (11 connections) — `tests/unit/test_template_variable_names.py`
-- **_td()** (11 connections) — `tests/unit/test_template_variable_names.py`
-- **.test_completed_template_task_dropped_from_tree()** (6 connections) — `tests/unit/test_template_variable_names.py`
-- **.test_host_leaf_under_resolved_template_task()** (6 connections) — `tests/unit/test_template_variable_names.py`
-- **.test_no_duplicate_for_template_and_resolved_name()** (6 connections) — `tests/unit/test_template_variable_names.py`
-- **.test_template_variable_in_role_task()** (6 connections) — `tests/unit/test_template_variable_names.py`
-- **.test_template_variable_resolved()** (6 connections) — `tests/unit/test_template_variable_names.py`
-- **test_template_variable_names.py** (4 connections) — `tests/unit/test_template_variable_names.py`
-- **Regression tests for Jinja2 template variable names in preflight tasks.  ansible** (1 connections) — `tests/unit/test_template_variable_names.py`
-- **Host leaves must appear under a running task whose preflight         name has {{** (1 connections) — `tests/unit/test_template_variable_names.py`
-- **A task with {{ variable }} in preflight must not appear twice         in the tre** (1 connections) — `tests/unit/test_template_variable_names.py`
-- **A role task with {{ variable }} must match the resolved runtime         name and** (1 connections) — `tests/unit/test_template_variable_names.py`
-- **A preflight task with {{ variable }} that has completed at         runtime must** (1 connections) — `tests/unit/test_template_variable_names.py`
-- **Preflight tasks with {{ variable }} must match resolved runtime names.** (1 connections) — `tests/unit/test_template_variable_names.py`
-- **A preflight task 'Get ID for {{ user }}' must match the runtime         task 'Ge** (1 connections) — `tests/unit/test_template_variable_names.py`
+- **Section 4: View Modes** (39 connections) — `TEST_SPECIFICATION.md`
+- **TC-029: Compact View Default Layout** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-030: Compact View Status Icons** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-031: Compact View Elapsed Time** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-032: Compact View Progress Bar** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-033: Rich Live Rendering for Compact Mode** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-034: Compact Password Pass-Through** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-035: Compact Mode Dependencies** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-036: TUI Multi-Panel Layout** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-037: TUI Tree Navigation** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-038: TUI Search in Log Panel** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-039: TUI Status Bar Configuration** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-040: TUI Footer Shortcuts** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-041: Non-TTY Output Format** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-042: Non-TTY No Interactive Features** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-043: Minimum Terminal Size Check** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-044: Terminal Size Error Message** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-045: Terminal Graceful Degradation** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-046: Signal Handling - SIGINT First Press** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-047: Signal Handling - SIGINT Second Press** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-048: Signal Handling - SIGQUIT** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-049: Signal Handling - SIGTERM** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-050: Signal Handling - SIGHUP** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-051: Signal Handling - SIGWINCH** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-052: Signal Handling - SIGPIPE** (1 connections) — `TEST_SPECIFICATION.md`
+- *... and 14 more nodes in this community*
 
 ## Relationships
 
-- [[Play Definition Tree Population]] (2 shared connections)
-- [[Task Definition Live Refresh]] (2 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
-- [[Run State Completion Recap]] (2 shared connections)
+- [Failure Recap Formatting](Failure_Recap_Formatting.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_template_variable_names.py`
+- `TEST_SPECIFICATION.md`
 
 ## Audit Trail
 
-- EXTRACTED: 70 (85%)
-- INFERRED: 12 (15%)
+- EXTRACTED: 77 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

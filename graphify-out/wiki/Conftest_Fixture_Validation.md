@@ -1,35 +1,48 @@
 # Conftest Fixture Validation
 
-> 9 nodes · cohesion 0.11
+> 22 nodes · cohesion 0.15
 
 ## Key Concepts
 
-- **TestConftestFixtures** (13 connections) — `tests/unit/test_pty_stream.py`
-- **.test_deprecated_removed_fixture()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_deprecation_warning_fixture()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_jsonl_line_fixture()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_password_prompt_become_fixture()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_password_prompt_ssh_fixture()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_password_prompt_vault_fixture()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_recap_line_fixture()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_warning_line_fixture()** (3 connections) — `tests/unit/test_pty_stream.py`
+- **test_throttle.py** (8 connections) — `tests/integration/test_throttle.py`
+- **_run_aom()** (8 connections) — `tests/integration/test_throttle.py`
+- **TestThrottleAwareness** (7 connections) — `tests/integration/test_throttle.py`
+- **_find_session()** (6 connections) — `tests/integration/test_throttle.py`
+- **Path** (6 connections)
+- **.test_throttle_cap_recorded_on_task_definition()** (6 connections) — `tests/integration/test_throttle.py`
+- **.test_wave_assignment_matches_host_bursts()** (6 connections) — `tests/integration/test_throttle.py`
+- **_parse_jsonl_through_core()** (5 connections) — `tests/integration/test_throttle.py`
+- **.test_wave_progress_records_three_waves()** (5 connections) — `tests/integration/test_throttle.py`
+- **_ansible_collection_paths()** (3 connections) — `tests/integration/test_throttle.py`
+- **_has_ansible_posix()** (2 connections) — `tests/integration/test_throttle.py`
+- **CompletedProcess** (1 connections)
+- **Real-ansible throttle awareness test (RED — TDD failing test).  This test is **i** (1 connections) — `tests/integration/test_throttle.py`
+- **Spawn ``python -m ansible_aom <playbook>`` against a sandboxed HOME.      The fi** (1 connections) — `tests/integration/test_throttle.py`
+- **Return the lone session directory under ``home_dir`` or fail loudly.** (1 connections) — `tests/integration/test_throttle.py`
+- **Feed each recorded line through ``JsonLineStream``.      Same code path the live** (1 connections) — `tests/integration/test_throttle.py`
+- **Behavioural contract: aom must surface ``throttle:`` and wave progress.      Run** (1 connections) — `tests/integration/test_throttle.py`
+- **``TaskDefinition.throttle == 2`` for the throttled task after the run.** (1 connections) — `tests/integration/test_throttle.py`
+- **``RunState.wave_progress.wave_count == 3`` for 6 hosts @ throttle 2.          6** (1 connections) — `tests/integration/test_throttle.py`
+- **``RunState.wave_progress.per_host`` matches the observed burst pattern.** (1 connections) — `tests/integration/test_throttle.py`
+- **Search-path entries reported by ``ansible-galaxy collection list``.      Mirror** (1 connections) — `tests/integration/test_throttle.py`
+- **True if ``ansible.posix`` is installed and discoverable.      Without it the JSO** (1 connections) — `tests/integration/test_throttle.py`
 
 ## Relationships
 
-- [[PTY Stream Parser]] (9 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
-- [[PTY Stream Parser Tests]] (1 shared connections)
+- [Three-Pane Inspect App](Three-Pane_Inspect_App.md) (2 shared connections)
+- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (2 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_pty_stream.py`
+- `tests/integration/test_throttle.py`
 
 ## Audit Trail
 
-- EXTRACTED: 26 (70%)
-- INFERRED: 11 (30%)
+- EXTRACTED: 69 (95%)
+- INFERRED: 4 (5%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

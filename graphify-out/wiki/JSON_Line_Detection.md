@@ -1,29 +1,37 @@
 # JSON Line Detection
 
-> 14 nodes · cohesion 0.14
+> 20 nodes · cohesion 0.10
 
 ## Key Concepts
 
-- **TestLogPanelJsonLineDetection** (15 connections) — `tests/tui/test_panels.py`
-- **.test_json_line_detection_startswith_brace()** (2 connections) — `tests/tui/test_panels.py`
-- **.test_json_line_parsing_attempts_parse()** (2 connections) — `tests/tui/test_panels.py`
-- **.test_json_within_text_not_parsed()** (2 connections) — `tests/tui/test_panels.py`
-- **.test_malformed_json_falls_back_to_text()** (2 connections) — `tests/tui/test_panels.py`
-- **.test_plain_text_line_not_json()** (2 connections) — `tests/tui/test_panels.py`
-- **.test_whitespace_ignored_before_brace()** (2 connections) — `tests/tui/test_panels.py`
-- **Tests for JSON vs text line detection - TC-276.** (1 connections) — `tests/tui/test_panels.py`
-- **TC-276: Lines starting with '{' are JSON-parsed.** (1 connections) — `tests/tui/test_panels.py`
-- **TC-276: Plain text lines (not starting with '{') are raw text.** (1 connections) — `tests/tui/test_panels.py`
-- **TC-276: Malformed JSON falls back to text rendering.** (1 connections) — `tests/tui/test_panels.py`
-- **TC-276 edge case: JSON embedded in text is not parsed.** (1 connections) — `tests/tui/test_panels.py`
-- **TC-276: JSON lines attempt json.loads().** (1 connections) — `tests/tui/test_panels.py`
-- **TC-276: Leading whitespace doesn't prevent JSON detection.** (1 connections) — `tests/tui/test_panels.py`
+- **TestStatusBarAvailableElements** (18 connections) — `tests/tui/test_panels.py`
+- **.test_current_task_displays_correctly()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_elapsed_time_displays_correctly()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_host_count_displays_correctly()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_memory_usage_displays_correctly()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_memory_usage_not_available()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_playbook_name_displays_correctly()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_subprocess_pid_displays_correctly()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_subprocess_pid_not_available()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_task_progress_displays_correctly()** (2 connections) — `tests/tui/test_panels.py`
+- **Tests for available status bar elements - TC-291.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-291: playbook_name element renders with correct data.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-291: elapsed_time element renders HH:MM:SS.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-291: task_progress element shows completed/total.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-291: current_task element shows task name.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-291: host_count element shows completed/total hosts.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-291: subprocess_pid element shows PID when available.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-291 edge case: PID not available shows N/A or hides.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-291: memory_usage element shows RSS/VSZ.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-291 edge case: Memory unavailable shows N/A.** (1 connections) — `tests/tui/test_panels.py`
 
 ## Relationships
 
-- [[Status Bar Warning Panels]] (3 shared connections)
-- [[Run State Completion Recap]] (3 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (3 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (2 shared connections)
+- [Run State Summary Panel](Run_State_Summary_Panel.md) (1 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
+- [AOM TUI Application](AOM_TUI_Application.md) (1 shared connections)
 
 ## Source Files
 
@@ -31,10 +39,10 @@
 
 ## Audit Trail
 
-- EXTRACTED: 27 (79%)
-- INFERRED: 7 (21%)
+- EXTRACTED: 39 (85%)
+- INFERRED: 7 (15%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

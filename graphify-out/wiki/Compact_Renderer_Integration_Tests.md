@@ -1,61 +1,65 @@
 # Compact Renderer Integration Tests
 
-> 109 nodes · cohesion 0.02
+> 163 nodes · cohesion 0.02
 
 ## Key Concepts
 
-- **test_compact_renderer.py** (23 connections) — `tests/integration/test_compact_renderer.py`
+- **Status** (287 connections) — `src/ansible_aom/core/models.py`
+- **Display** (45 connections) — `src/ansible_aom/compact/display.py`
+- **test_compact_renderer.py** (24 connections) — `tests/integration/test_compact_renderer.py`
 - **TestStatusBarFormat** (21 connections) — `tests/integration/test_compact_renderer.py`
+- **models.py** (20 connections) — `src/ansible_aom/core/models.py`
 - **TestSignalHandling** (19 connections) — `tests/integration/test_compact_renderer.py`
+- **TestPasswordPromptPatterns** (18 connections) — `tests/integration/test_compact_renderer.py`
 - **TestStatusIcons** (18 connections) — `tests/integration/test_compact_renderer.py`
 - **TestStatusIconFallback** (17 connections) — `tests/integration/test_compact_renderer.py`
+- **TestDisplayClass** (16 connections) — `tests/integration/test_compact_renderer.py`
+- **TestHostStatusIndicators** (16 connections) — `tests/integration/test_compact_renderer.py`
 - **TestNonTTYBehavior** (16 connections) — `tests/integration/test_compact_renderer.py`
 - **TestRefreshStrategy** (16 connections) — `tests/integration/test_compact_renderer.py`
-- **TestTerminalSizeCheck** (16 connections) — `tests/integration/test_compact_renderer.py`
 - **TestCompactRendererHandleCompletion** (15 connections) — `tests/integration/test_compact_renderer.py`
 - **TestCompactRendererProtocol** (15 connections) — `tests/integration/test_compact_renderer.py`
 - **TestPasswordPassThrough** (13 connections) — `tests/integration/test_compact_renderer.py`
 - **TestViewModeSelection** (13 connections) — `tests/integration/test_compact_renderer.py`
 - **TestCompactDependencies** (12 connections) — `tests/integration/test_compact_renderer.py`
 - **TestCompactRendererStart** (12 connections) — `tests/integration/test_compact_renderer.py`
-- **TestCompactRendererStop** (12 connections) — `tests/integration/test_compact_renderer.py`
 - **TestNonTTYRefreshFallback** (12 connections) — `tests/integration/test_compact_renderer.py`
 - **TestRichLiveConfiguration** (12 connections) — `tests/integration/test_compact_renderer.py`
 - **TestCompactRendererHandlePasswordPrompt** (11 connections) — `tests/integration/test_compact_renderer.py`
+- **TestCompactRendererStop** (11 connections) — `tests/integration/test_compact_renderer.py`
 - **TestCompactRendererUpdateState** (11 connections) — `tests/integration/test_compact_renderer.py`
-- **Tests for CompactRenderer.update_state() method.** (2 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_blessed_library_optional()** (2 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_rich_library_importable()** (2 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_compact_renderer_has_handle_completion_method()** (2 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_compact_renderer_has_handle_password_prompt_method()** (2 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_compact_renderer_has_start_method()** (2 connections) — `tests/integration/test_compact_renderer.py`
-- *... and 84 more nodes in this community*
+- **_shape()** (5 connections) — `tests/integration/test_invariants_session_roundtrip.py`
+- *... and 138 more nodes in this community*
 
 ## Relationships
 
-- [[Run State Completion Recap]] (55 shared connections)
-- [[Compact Renderer Implementation]] (39 shared connections)
-- [[Terminal Display Manager]] (25 shared connections)
-- [[Role Group Task Models]] (18 shared connections)
-- [[Task Definition Live Refresh]] (18 shared connections)
-- [[Play Definition Tree Population]] (18 shared connections)
-- [[Status Bar Rerender]] (8 shared connections)
-- [[Terminal Size Check]] (5 shared connections)
-- [[Renderer Factory Function]] (3 shared connections)
-- [[Display Helper Class]] (1 shared connections)
-- [[Host Status Indicators]] (1 shared connections)
-- [[Password Prompt Patterns]] (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (100 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (49 shared connections)
+- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (37 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (30 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (26 shared connections)
+- [CLI Argument Parser](CLI_Argument_Parser.md) (24 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (21 shared connections)
+- [Per-Task Overhead Analysis](Per-Task_Overhead_Analysis.md) (17 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (14 shared connections)
+- [Secret Redaction Configuration](Secret_Redaction_Configuration.md) (13 shared connections)
+- [Session Recording Tests](Session_Recording_Tests.md) (10 shared connections)
+- [Ctrl-C Race Handling](Ctrl-C_Race_Handling.md) (7 shared connections)
 
 ## Source Files
 
+- `src/ansible_aom/compact/display.py`
+- `src/ansible_aom/core/models.py`
+- `src/ansible_aom/tui/app.py`
 - `tests/integration/test_compact_renderer.py`
+- `tests/integration/test_invariants_session_roundtrip.py`
 
 ## Audit Trail
 
-- EXTRACTED: 267 (65%)
-- INFERRED: 144 (35%)
+- EXTRACTED: 402 (46%)
+- INFERRED: 470 (54%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

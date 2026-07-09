@@ -1,36 +1,38 @@
 # Tree Preservation On Cancel
 
-> 9 nodes · cohesion 0.31
+> 14 nodes · cohesion 0.25
 
 ## Key Concepts
 
-- **_renderer_with_running_task()** (10 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
-- **test_preserve_tree_on_cancel.py** (5 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
-- **test_tree_not_duplicated_on_clean_exit()** (3 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
-- **test_tree_printed_after_cancel()** (3 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
-- **test_tree_printed_after_failure()** (3 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
-- **On Ctrl-C / failure exit, the compact panel's tree + host overview must persist** (1 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
-- **Exit 130 (Ctrl-C) → tree + host snapshot lands in scrollback.** (1 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
-- **Non-zero exit on a "failed" state preserves the panel too.** (1 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
-- **A clean exit omits the tree snapshot — the host table still prints     for per-h** (1 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
+- **test_inspect_cli.py** (12 connections) — `tests/integration/test_inspect_cli.py`
+- **Path** (11 connections)
+- **state_dir()** (2 connections) — `tests/integration/test_inspect_cli.py`
+- **test_no_arg_invocation_falls_back_to_text_when_non_tty()** (2 connections) — `tests/integration/test_inspect_cli.py`
+- **test_old_diff_subcommand_is_gone()** (2 connections) — `tests/integration/test_inspect_cli.py`
+- **test_old_list_subcommand_is_gone()** (2 connections) — `tests/integration/test_inspect_cli.py`
+- **test_old_show_subcommand_is_gone()** (2 connections) — `tests/integration/test_inspect_cli.py`
+- **test_prune_subcommand()** (2 connections) — `tests/integration/test_inspect_cli.py`
+- **test_text_mode_dumps_latest_session()** (2 connections) — `tests/integration/test_inspect_cli.py`
+- **test_text_mode_with_empty_state_returns_zero_and_message()** (2 connections) — `tests/integration/test_inspect_cli.py`
+- **test_text_mode_with_play_and_task_flags()** (2 connections) — `tests/integration/test_inspect_cli.py`
+- **test_text_mode_with_play_flag()** (2 connections) — `tests/integration/test_inspect_cli.py`
+- **test_text_mode_with_task_flag()** (2 connections) — `tests/integration/test_inspect_cli.py`
+- **Integration tests for the rebuilt `aom inspect` CLI.** (1 connections) — `tests/integration/test_inspect_cli.py`
 
 ## Relationships
 
-- [[Run State Completion Recap]] (3 shared connections)
-- [[Compact Renderer Implementation]] (1 shared connections)
-- [[Task Definition Live Refresh]] (1 shared connections)
-- [[Play Definition Tree Population]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/compact/test_preserve_tree_on_cancel.py`
+- `tests/integration/test_inspect_cli.py`
 
 ## Audit Trail
 
-- EXTRACTED: 23 (82%)
-- INFERRED: 5 (18%)
+- EXTRACTED: 46 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

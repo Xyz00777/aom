@@ -1,55 +1,50 @@
 # PTY Stream Parser Tests
 
-> 20 nodes · cohesion 0.07
+> 37 nodes · cohesion 0.05
 
 ## Key Concepts
 
-- **test_pty_stream.py** (15 connections) — `tests/unit/test_pty_stream.py`
-- **TestMixedStreamHandling** (10 connections) — `tests/unit/test_pty_stream.py`
-- **TestPatternRegexes** (8 connections) — `tests/unit/test_pty_stream.py`
-- **TestRendererProtocolPasswordHandling** (8 connections) — `tests/unit/test_pty_stream.py`
-- **.test_invalid_json_returns_empty()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_jsonl_and_plaintext_interleaved()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_jsonl_returns_events()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_plaintext_before_jsonl_start()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_full_workflow_simulation()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_password_prompt_detected_before_jsonl()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_pending_password_prompt_interface()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_password_patterns_match_expected_prompts()** (2 connections) — `tests/unit/test_pty_stream.py`
-- **.test_recap_pattern_matches_various_formats()** (2 connections) — `tests/unit/test_pty_stream.py`
-- **.test_warning_patterns_match_expected_lines()** (2 connections) — `tests/unit/test_pty_stream.py`
-- **Unit tests for PTY stream parsing.  Covers TEST_SPECIFICATION.md Sections 5.5, 5** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Section 5.6: JSONL events interleaved with plaintext.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **JSONL events and plaintext interleaved correctly.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Plaintext before v2_playbook_on_start is captured.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **feed_line returns parsed events for JSONL.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **feed_line returns aom_stderr_line for plaintext.** (1 connections) — `tests/unit/test_pty_stream.py`
+- **CLI/TUI Implementation Research - 2026-04-20** (12 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **OPEN QUESTIONS** (6 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **1. Rich Console Output (Non-TUI Mode)** (5 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **2. CLI Framework: Click vs Typer vs argparse** (4 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **3. TUI vs CLI Detection** (4 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **6. Pipe-Friendly Output** (4 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **7. Pager Integration** (4 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **5. Readonly Textual TUI** (3 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **4. Rich Tables for Diff Display** (2 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **cli-tui-implementation.md** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **Auto-TUI Detection Logic** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **Best Practice Pattern:** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **Click Integration** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **Click (Recommended for Complex CLIs)** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **Comparison: Click vs Typer** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **Complete Diff Table Implementation** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **Console Class Usage** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **Final Recommendations** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **JSON Mode** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **JSONL for Event Streams** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **Key Readonly Design Principles:** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **Key Rich Console Features:** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **Multiple Output Formats** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **OQ1: Should `aom inspect` default to TUI or text mode?** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **OQ2: How to handle long table output - auto-pager or require --pager?** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- *... and 12 more nodes in this community*
 
 ## Relationships
 
-- [[PTY Stream Parser]] (10 shared connections)
-- [[Role Group Task Models]] (6 shared connections)
-- [[Compact Password Passthrough]] (1 shared connections)
-- [[Conftest Fixture Validation]] (1 shared connections)
-- [[Parser Edge Cases]] (1 shared connections)
-- [[Password Prompt Handling]] (1 shared connections)
-- [[Password Pattern Detection]] (1 shared connections)
-- [[Phase State Machine]] (1 shared connections)
-- [[Plaintext Line Handling]] (1 shared connections)
-- [[Play Recap Detection]] (1 shared connections)
-- [[Parser Phase Transitions]] (1 shared connections)
-- [[StreamPhase Enum]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/unit/test_pty_stream.py`
+- `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
 
 ## Audit Trail
 
-- EXTRACTED: 58 (78%)
-- INFERRED: 16 (22%)
+- EXTRACTED: 72 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

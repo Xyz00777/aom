@@ -1,40 +1,43 @@
 # Play Recap Detection
 
-> 14 nodes · cohesion 0.14
+> 19 nodes · cohesion 0.14
 
 ## Key Concepts
 
-- **TestPlayRecapDetection** (11 connections) — `tests/unit/test_pty_stream.py`
-- **.test_play_recap_fewer_asterisks_not_matched()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_play_recap_many_asterisks()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_play_recap_minimum_asterisks()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_play_recap_not_detected_in_pre_run_phase()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_play_recap_pattern_detected()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_recap_lines_collected_in_post_phase()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **TC-140: PLAY RECAP pattern detection.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-140: PLAY RECAP line matches pattern.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **PLAY RECAP requires minimum 5 asterisks.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **PLAY RECAP with fewer than 5 asterisks not matched.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **PLAY RECAP with many asterisks matched.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **PLAY RECAP in PRE_RUN_PROMPTS phase routes differently.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Multiple recap lines collected in POST_RUN_RECAP.** (1 connections) — `tests/unit/test_pty_stream.py`
+- **test_properties_state.py** (11 connections) — `tests/unit/test_properties_state.py`
+- **event_sequences()** (7 connections) — `tests/unit/test_properties_state.py`
+- **_check_invariants()** (4 connections) — `tests/unit/test_properties_state.py`
+- **_run_level_failure_seen()** (4 connections) — `tests/unit/test_properties_state.py`
+- **test_failure_propagates_to_run_status()** (4 connections) — `tests/unit/test_properties_state.py`
+- **test_runstate_invariants_hold_after_every_event()** (4 connections) — `tests/unit/test_properties_state.py`
+- **test_host_terminal_states_are_disjoint()** (3 connections) — `tests/unit/test_properties_state.py`
+- **_make_play_start()** (2 connections) — `tests/unit/test_properties_state.py`
+- **_make_result()** (2 connections) — `tests/unit/test_properties_state.py`
+- **_make_stats()** (2 connections) — `tests/unit/test_properties_state.py`
+- **_make_task_start()** (2 connections) — `tests/unit/test_properties_state.py`
+- **DrawFn** (1 connections)
+- **Property-based tests for RunState invariants (Batch C, family #5c).  These tests** (1 connections) — `tests/unit/test_properties_state.py`
+- **Generate a realistic event sequence over n_plays × n_tasks × n_hosts.** (1 connections) — `tests/unit/test_properties_state.py`
+- **Assert every documented invariant on ``state``.** (1 connections) — `tests/unit/test_properties_state.py`
+- **True if any task's host result is FAILED or UNREACHABLE.** (1 connections) — `tests/unit/test_properties_state.py`
+- **Every event leaves RunState in an internally consistent state.** (1 connections) — `tests/unit/test_properties_state.py`
+- **If any host result is FAILED or UNREACHABLE, run status is FAILED.      This mus** (1 connections) — `tests/unit/test_properties_state.py`
+- **For each (play, task, host), the recorded HostRunState has exactly one status.** (1 connections) — `tests/unit/test_properties_state.py`
 
 ## Relationships
 
-- [[PTY Stream Parser]] (7 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
-- [[PTY Stream Parser Tests]] (1 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (5 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_pty_stream.py`
+- `tests/unit/test_properties_state.py`
 
 ## Audit Trail
 
-- EXTRACTED: 27 (75%)
-- INFERRED: 9 (25%)
+- EXTRACTED: 53 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

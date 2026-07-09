@@ -1,30 +1,37 @@
 # Rerun Command Integration
 
-> 6 nodes · cohesion 0.33
+> 12 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **test_rerun.py** (3 connections) — `tests/integration/test_rerun.py`
-- **test_aom_rerun_failed_spawns_with_correct_limit()** (3 connections) — `tests/integration/test_rerun.py`
-- **test_aom_rerun_no_failures_exits_1_without_spawning()** (3 connections) — `tests/integration/test_rerun.py`
-- **End-to-end integration test for `aom rerun`.  Wires the real ``run_playbook`` ag** (1 connections) — `tests/integration/test_rerun.py`
-- **`aom rerun --failed --yes` spawns ansible-playbook with --limit web2,web3.** (1 connections) — `tests/integration/test_rerun.py`
-- **When the session has no failures, `--failed` exits 1 and never spawns.** (1 connections) — `tests/integration/test_rerun.py`
+- **TestKeyContextEnum** (9 connections) — `tests/tui/test_keybindings.py`
+- **.test_all_contexts_are_strings()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_global_context_exists()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_log_context_exists()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_post_run_context_exists()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_tree_context_exists()** (2 connections) — `tests/tui/test_keybindings.py`
+- **Tests for KeyContext enum - TC-361, TC-362, TC-363, TC-364.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-364: Global context is defined.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-361: Tree context is defined.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-362: Log context is defined.** (1 connections) — `tests/tui/test_keybindings.py`
+- **TC-363: Post-run context is defined.** (1 connections) — `tests/tui/test_keybindings.py`
+- **All KeyContext values are strings for serialization.** (1 connections) — `tests/tui/test_keybindings.py`
 
 ## Relationships
 
-- [[Run Config Key Normalization]] (2 shared connections)
+- [State Machine Invariants](State_Machine_Invariants.md) (2 shared connections)
+- [Warning Color Formatting](Warning_Color_Formatting.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_rerun.py`
+- `tests/tui/test_keybindings.py`
 
 ## Audit Trail
 
-- EXTRACTED: 12 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 23 (92%)
+- INFERRED: 2 (8%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

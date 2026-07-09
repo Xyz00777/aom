@@ -1,38 +1,39 @@
 # Log Line Colors
 
-> 11 nodes · cohesion 0.40
+> 15 nodes · cohesion 0.13
 
 ## Key Concepts
 
-- **TestPerEventLogColors** (15 connections) — `tests/compact/test_status_bar_colors.py`
-- **._logged()** (8 connections) — `tests/compact/test_status_bar_colors.py`
-- **._renderer()** (8 connections) — `tests/compact/test_status_bar_colors.py`
-- **.test_skipping_line_is_cyan()** (4 connections) — `tests/compact/test_status_bar_colors.py`
-- **.test_changed_line_is_yellow()** (3 connections) — `tests/compact/test_status_bar_colors.py`
-- **.test_failed_line_is_red()** (3 connections) — `tests/compact/test_status_bar_colors.py`
-- **.test_no_color_when_renderer_colorize_off()** (3 connections) — `tests/compact/test_status_bar_colors.py`
-- **.test_ok_line_is_green()** (3 connections) — `tests/compact/test_status_bar_colors.py`
-- **.test_unreachable_line_is_magenta()** (3 connections) — `tests/compact/test_status_bar_colors.py`
-- **Per-task log lines (ok/changed/fatal/unreachable/skipping) carry     semantic co** (1 connections) — `tests/compact/test_status_bar_colors.py`
-- **Skipped hosts are buffered (collapsed-on-flush). Force the         mixed-task fl** (1 connections) — `tests/compact/test_status_bar_colors.py`
+- **Tree view for the compact renderer** (14 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
+- **2026-05-19-free-strategy-tree-view-design.md** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
+- **Architecture** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
+- **Data model: `core/tree.py`** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
+- **Decision: per-host summary row (PQ3 — counts + current task, worst-status colour)** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
+- **Decision: tree leaf shape (PQ2 — host leaves under running tasks)** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
+- **Goal** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
+- **Height budget & pruning** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
+- **Open notes (deferred but signposted)** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
+- **Ordering & include/import handling** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
+- **Problem** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
+- **Renderer integration: `compact/renderer.py`** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
+- **Status-icon colour mapping** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
+- **Testing** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
+- **Tree lifecycle** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
 
 ## Relationships
 
-- [[Compact Renderer Implementation]] (3 shared connections)
-- [[Run State Completion Recap]] (3 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
-- [[Status Bar Color Tests]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/compact/test_status_bar_colors.py`
+- `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
 
 ## Audit Trail
 
-- EXTRACTED: 47 (90%)
-- INFERRED: 5 (10%)
+- EXTRACTED: 28 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

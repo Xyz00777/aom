@@ -1,67 +1,66 @@
 # Compact Renderer Implementation
 
-> 102 nodes · cohesion 0.02
+> 147 nodes · cohesion 0.02
 
 ## Key Concepts
 
-- **CompactRenderer** (288 connections) — `src/ansible_aom/compact/renderer.py`
-- **TestCompactRendererInteractivePrompt** (10 connections) — `tests/unit/test_interactive_prompt.py`
-- **test_renderer_stats.py** (9 connections) — `tests/compact/test_renderer_stats.py`
-- **.start()** (8 connections) — `src/ansible_aom/compact/renderer.py`
-- **TestPauseSecondsLogged** (8 connections) — `tests/unit/test_compact_pause_visibility.py`
-- **test_warning_visibility.py** (7 connections) — `tests/compact/test_warning_visibility.py`
-- **.stop()** (6 connections) — `src/ansible_aom/compact/renderer.py`
-- **test_long_output_cap.py** (6 connections) — `tests/compact/test_long_output_cap.py`
-- **renderer.py** (5 connections) — `src/ansible_aom/compact/renderer.py`
-- **_pause_task_event()** (5 connections) — `tests/unit/test_compact_pause_visibility.py`
-- **.collect_stats()** (4 connections) — `src/ansible_aom/compact/renderer.py`
-- **.handle_interactive_prompt()** (4 connections) — `src/ansible_aom/compact/renderer.py`
-- **.handle_password_prompt()** (4 connections) — `src/ansible_aom/compact/renderer.py`
-- **_ok_event()** (4 connections) — `tests/compact/test_renderer_stats.py`
-- **.test_pause_short_action_name_also_caught()** (4 connections) — `tests/unit/test_compact_pause_visibility.py`
-- **.test_pause_with_string_seconds_handled()** (4 connections) — `tests/unit/test_compact_pause_visibility.py`
-- **.test_pause_without_seconds_does_not_emit_sleeping_line()** (4 connections) — `tests/unit/test_compact_pause_visibility.py`
-- **test_short_msg_not_truncated()** (3 connections) — `tests/compact/test_long_output_cap.py`
-- **test_collect_stats_returns_snapshot()** (3 connections) — `tests/compact/test_renderer_stats.py`
-- **test_stop_publishes_last_renderer_stats()** (3 connections) — `tests/compact/test_renderer_stats.py`
-- **test_update_state_increments_render_calls()** (3 connections) — `tests/compact/test_renderer_stats.py`
-- **test_add_warning_counter_still_bumps()** (3 connections) — `tests/compact/test_warning_visibility.py`
-- **test_add_warning_dedupes_repeated_messages()** (3 connections) — `tests/compact/test_warning_visibility.py`
-- **test_add_warning_message_is_prefixed_for_classification()** (3 connections) — `tests/compact/test_warning_visibility.py`
-- **.test_handle_completion_accepts_exit_code_and_state()** (3 connections) — `tests/integration/test_compact_renderer.py`
-- *... and 77 more nodes in this community*
+- **TaskDefinition** (393 connections) — `src/ansible_aom/core/models.py`
+- **TestTaskDefinition** (24 connections) — `tests/unit/test_models.py`
+- **test_models.py** (17 connections) — `tests/unit/test_models.py`
+- **TestTaskMatchingAlgorithm** (16 connections) — `tests/unit/test_event_processing.py`
+- **TestDefinitionVsStateSeparation** (15 connections) — `tests/unit/test_models.py`
+- **TestLinearForceCompletion** (15 connections) — `tests/unit/test_models.py`
+- **TestTaskMatching** (15 connections) — `tests/unit/test_models.py`
+- **TestRunnerTaskCompletionPromotion** (14 connections) — `tests/unit/test_models.py`
+- **TestDynamicChildrenAsPendingInTree** (13 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
+- **TestFreeStrategyMetaTaskVisibility** (12 connections) — `tests/unit/test_models.py`
+- **TestStickyFallbackTreeRender** (12 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
+- **TestIncludeStubHiding** (10 connections) — `tests/unit/test_tree_projection.py`
+- **TestTreeLinesAsyncTaskIdentity** (8 connections) — `tests/unit/test_tree_projection.py`
+- **TestTreeLinesDelegatedTaskIdentity** (8 connections) — `tests/unit/test_tree_projection.py`
+- **TestTreeLinesNestedChildIdentity** (8 connections) — `tests/unit/test_tree_projection.py`
+- **TestTreeLinesPreflightTaskIdentity** (8 connections) — `tests/unit/test_tree_projection.py`
+- **TestTreeLinesSerialWindowIdentity** (8 connections) — `tests/unit/test_tree_projection.py`
+- **.test_host_leaves_for_running_dynamic_child()** (7 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
+- **.test_sticky_2_two_plays_both_running()** (7 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
+- **._active_state()** (7 connections) — `tests/unit/test_tree_projection.py`
+- **TestTreeProjectionCacheRefresh** (7 connections) — `tests/unit/test_tree_projection.py`
+- **.test_completed_dynamic_child_filtered_from_tree()** (6 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
+- **.test_dynamic_child_under_role_header()** (6 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
+- **.test_dynamic_children_show_pending_before_announcement()** (6 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
+- **.test_no_duplicate_for_runtime_announced_dynamic_child()** (6 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
+- *... and 122 more nodes in this community*
 
 ## Relationships
 
-- [[Compact Renderer Integration Tests]] (39 shared connections)
-- [[Event Log Emission]] (22 shared connections)
-- [[CLI Interface Tests]] (17 shared connections)
-- [[Task Summary Count Tests]] (14 shared connections)
-- [[Hide State Gating Tests]] (13 shared connections)
-- [[Run State Completion Recap]] (9 shared connections)
-- [[Loop Item Line Tests]] (7 shared connections)
-- [[Loop Item Stream Tests]] (7 shared connections)
-- [[Renderer Set Definitions]] (7 shared connections)
-- [[Color ASCII Fallback]] (6 shared connections)
-- [[Runner Event Batching]] (6 shared connections)
-- [[Renderer ETA Wiring]] (6 shared connections)
+- [CLI Argument Parser](CLI_Argument_Parser.md) (75 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (60 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (60 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (53 shared connections)
+- [Per-Task Overhead Analysis](Per-Task_Overhead_Analysis.md) (47 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (37 shared connections)
+- [Secret Redaction Configuration](Secret_Redaction_Configuration.md) (28 shared connections)
+- [Runner Session Recording](Runner_Session_Recording.md) (20 shared connections)
+- [Session Recording Tests](Session_Recording_Tests.md) (14 shared connections)
+- [Run Diagnostics Tests](Run_Diagnostics_Tests.md) (12 shared connections)
+- [Status Bar Color Tests](Status_Bar_Color_Tests.md) (11 shared connections)
+- [WarningType Enum](WarningType_Enum.md) (8 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/compact/renderer.py`
-- `tests/compact/test_long_output_cap.py`
-- `tests/compact/test_renderer_stats.py`
-- `tests/compact/test_warning_visibility.py`
-- `tests/integration/test_compact_renderer.py`
-- `tests/unit/test_compact_pause_visibility.py`
-- `tests/unit/test_interactive_prompt.py`
+- `src/ansible_aom/core/models.py`
+- `tests/unit/test_event_processing.py`
+- `tests/unit/test_invariants_runstate_renderer.py`
+- `tests/unit/test_models.py`
+- `tests/unit/test_tree_classify_and_role_labels.py`
+- `tests/unit/test_tree_projection.py`
 
 ## Audit Trail
 
-- EXTRACTED: 279 (52%)
-- INFERRED: 262 (48%)
+- EXTRACTED: 411 (44%)
+- INFERRED: 521 (56%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

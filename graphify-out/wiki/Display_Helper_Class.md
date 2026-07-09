@@ -1,44 +1,47 @@
 # Display Helper Class
 
-> 14 nodes · cohesion 0.14
+> 20 nodes · cohesion 0.10
 
 ## Key Concepts
 
-- **TestDisplayClass** (16 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_display_class_exists()** (2 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_display_has_clear_method()** (2 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_display_has_print_log_method()** (2 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_display_has_start_method()** (2 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_display_has_stop_method()** (2 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_display_has_update_method()** (2 connections) — `tests/integration/test_compact_renderer.py`
-- **Tests for Display helper class.** (1 connections) — `tests/integration/test_compact_renderer.py`
-- **Display class exists in compact module.** (1 connections) — `tests/integration/test_compact_renderer.py`
-- **Display has start() method.** (1 connections) — `tests/integration/test_compact_renderer.py`
-- **Display has stop() method.** (1 connections) — `tests/integration/test_compact_renderer.py`
-- **Display has update() method.** (1 connections) — `tests/integration/test_compact_renderer.py`
-- **Display has print_log() method.** (1 connections) — `tests/integration/test_compact_renderer.py`
-- **Display has clear() method.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **TestPasswordTimeoutDefault** (13 connections) — `tests/compact/test_password.py`
+- **.test_compact_renderer_exists_for_password_handling()** (3 connections) — `tests/compact/test_password.py`
+- **.test_password_handler_returns_empty_for_cancellation()** (3 connections) — `tests/compact/test_password.py`
+- **.test_password_handler_returns_string_for_success()** (3 connections) — `tests/compact/test_password.py`
+- **.test_default_password_timeout_is_60()** (2 connections) — `tests/compact/test_password.py`
+- **.test_default_password_timeout_is_integer()** (2 connections) — `tests/compact/test_password.py`
+- **.test_default_password_timeout_positive()** (2 connections) — `tests/compact/test_password.py`
+- **.test_password_handler_timeout_constant_usable_in_expect()** (2 connections) — `tests/compact/test_password.py`
+- **.test_password_timeout_available_in_password_module()** (2 connections) — `tests/compact/test_password.py`
+- **.test_timeout_behavior_with_mock_clock_getpass()** (2 connections) — `tests/compact/test_password.py`
+- **TC-148: Verify 60s timeout default, exception on timeout.      The DEFAULT_PASSW** (1 connections) — `tests/compact/test_password.py`
+- **TC-148: DEFAULT_PASSWORD_TIMEOUT equals 60 seconds.** (1 connections) — `tests/compact/test_password.py`
+- **TC-148: DEFAULT_PASSWORD_TIMEOUT is an integer (seconds).** (1 connections) — `tests/compact/test_password.py`
+- **TC-148: DEFAULT_PASSWORD_TIMEOUT is a positive value.** (1 connections) — `tests/compact/test_password.py`
+- **TC-148: Password handling respects timeout — getpass blocks until input or timeo** (1 connections) — `tests/compact/test_password.py`
+- **TC-148: CompactRenderer provides handle_password_prompt for timeout integration.** (1 connections) — `tests/compact/test_password.py`
+- **TC-148: DEFAULT_PASSWORD_TIMEOUT is importable from password module.** (1 connections) — `tests/compact/test_password.py`
+- **TC-148: On successful password entry, returns the password string.** (1 connections) — `tests/compact/test_password.py`
+- **TC-148: On cancellation (Ctrl+C/Ctrl+D), returns empty string.          This pre** (1 connections) — `tests/compact/test_password.py`
+- **TC-148: DEFAULT_PASSWORD_TIMEOUT can be used as pexpect timeout value.** (1 connections) — `tests/compact/test_password.py`
 
 ## Relationships
 
-- [[Run State Completion Recap]] (3 shared connections)
-- [[Terminal Display Manager]] (1 shared connections)
-- [[Compact Renderer Implementation]] (1 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
-- [[Task Definition Live Refresh]] (1 shared connections)
-- [[Play Definition Tree Population]] (1 shared connections)
-- [[Compact Renderer Integration Tests]] (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (2 shared connections)
+- [Status Bar Liveness Tests](Status_Bar_Liveness_Tests.md) (2 shared connections)
+- [Session Recording Tests](Session_Recording_Tests.md) (1 shared connections)
+- [Pause Lingering Cleanup](Pause_Lingering_Cleanup.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_compact_renderer.py`
+- `tests/compact/test_password.py`
 
 ## Audit Trail
 
-- EXTRACTED: 27 (77%)
-- INFERRED: 8 (23%)
+- EXTRACTED: 39 (89%)
+- INFERRED: 5 (11%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,26 +1,34 @@
 # Runner Changed Event
 
-> 2 nodes · cohesion 1.00
+> 10 nodes · cohesion 0.20
 
 ## Key Concepts
 
-- **event_runner_ok_changed()** (2 connections) — `tests/conftest.py`
-- **v2_runner_on_ok event with changed=True.** (1 connections) — `tests/conftest.py`
+- **Playbook 7: Vault and Become (Password Prompts)** (10 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Edge Cases Covered** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Encrypted Vault File** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Execution Command** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Expected AOM Behavior** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Expected Events** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Expected Exit Code** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Features Tested (SPEC Mapping)** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Purpose** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **YAML Structure (Outline)** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
 
 ## Relationships
 
-- [[Test Event Fixtures]] (1 shared connections)
+- [Community 489](Community_489.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/conftest.py`
+- `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
 
 ## Audit Trail
 
-- EXTRACTED: 3 (100%)
+- EXTRACTED: 19 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

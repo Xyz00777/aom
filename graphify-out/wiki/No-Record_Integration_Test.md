@@ -1,32 +1,36 @@
 # No-Record Integration Test
 
-> 7 nodes · cohesion 0.38
+> 12 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **.test_record_false_does_not_touch_default_state_dir()** (5 connections) — `tests/integration/test_no_record.py`
-- **.test_record_false_writes_no_session_dir()** (4 connections) — `tests/integration/test_no_record.py`
-- **test_no_record.py** (3 connections) — `tests/integration/test_no_record.py`
-- **_fake_ansible_command()** (3 connections) — `tests/integration/test_no_record.py`
-- **TestNoRecordIntegration** (3 connections) — `tests/integration/test_no_record.py`
-- **Integration test for F3 --no-record at the runner level.  The unit tests cover a** (1 connections) — `tests/integration/test_no_record.py`
-- **Even if session_dir is None, record=False must not create the default.** (1 connections) — `tests/integration/test_no_record.py`
+- **ANSIBLE PASSWORD PROMPT HANDLING IN COMPACT/ANSI MODE (2026-04-20)** (12 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **IMPLEMENTATION SUMMARY** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **OVERVIEW** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **PQ10: How does Rich Live stop/start work with terminal state?** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **PQ11: Do we need terminal raw mode for password input?** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **PQ12: What is the simplest approach for password prompt handling?** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **PQ13: How to detect password prompts from ansible-playbook?** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **PQ14: How to handle multiple password prompts in sequence?** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **PQ15: How to handle password prompts with --ask-vault-pass, --ask-become-pass flags?** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **PQ7: How does getpass.getpass() work with pexpect PTY?** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **PQ8: How to pause and resume Rich Live rendering for password prompts?** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **PQ9: Can we just let pexpect's default behavior handle password prompts in compact mode?** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
 
 ## Relationships
 
-- [[Run Config Key Normalization]] (2 shared connections)
-- [[Playbook Run Integration Tests]] (2 shared connections)
+- [Real Ansible Integration](Real_Ansible_Integration.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_no_record.py`
+- `.sisyphus/notepads/new-spec/open-questions.md`
 
 ## Audit Trail
 
-- EXTRACTED: 18 (90%)
-- INFERRED: 2 (10%)
+- EXTRACTED: 23 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

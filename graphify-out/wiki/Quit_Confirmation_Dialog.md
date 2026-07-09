@@ -1,34 +1,42 @@
 # Quit Confirmation Dialog
 
-> 8 nodes · cohesion 0.22
+> 14 nodes · cohesion 0.14
 
 ## Key Concepts
 
-- **QuitConfirmScreen** (7 connections) — `src/ansible_aom/tui/screens/quit_confirm.py`
-- **.compose()** (3 connections) — `src/ansible_aom/tui/screens/quit_confirm.py`
-- **.action_quit()** (3 connections) — `src/ansible_aom/tui/app.py`
-- **quit_confirm.py** (2 connections) — `src/ansible_aom/tui/screens/quit_confirm.py`
-- **.action_cancel()** (1 connections) — `src/ansible_aom/tui/screens/quit_confirm.py`
-- **.action_confirm()** (1 connections) — `src/ansible_aom/tui/screens/quit_confirm.py`
-- **Quit confirmation dialog for AOM TUI.  Triggered by 'q' key when a playbook is r** (1 connections) — `src/ansible_aom/tui/screens/quit_confirm.py`
-- **Modal dialog confirming quit action.      Returns:         True: User confirmed** (1 connections) — `src/ansible_aom/tui/screens/quit_confirm.py`
+- **TestLogPanelJsonLineDetection** (15 connections) — `tests/tui/test_panels.py`
+- **.test_json_line_detection_startswith_brace()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_json_line_parsing_attempts_parse()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_json_within_text_not_parsed()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_malformed_json_falls_back_to_text()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_plain_text_line_not_json()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_whitespace_ignored_before_brace()** (2 connections) — `tests/tui/test_panels.py`
+- **Tests for JSON vs text line detection - TC-276.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-276: Lines starting with '{' are JSON-parsed.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-276: Plain text lines (not starting with '{') are raw text.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-276: Malformed JSON falls back to text rendering.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-276 edge case: JSON embedded in text is not parsed.** (1 connections) — `tests/tui/test_panels.py`
+- **TC-276: JSON lines attempt json.loads().** (1 connections) — `tests/tui/test_panels.py`
+- **TC-276: Leading whitespace doesn't prevent JSON detection.** (1 connections) — `tests/tui/test_panels.py`
 
 ## Relationships
 
-- [[AOM TUI Application]] (2 shared connections)
-- [[Inspect TUI Widget Data]] (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (3 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (2 shared connections)
+- [Run State Summary Panel](Run_State_Summary_Panel.md) (1 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
+- [AOM TUI Application](AOM_TUI_Application.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/tui/app.py`
-- `src/ansible_aom/tui/screens/quit_confirm.py`
+- `tests/tui/test_panels.py`
 
 ## Audit Trail
 
-- EXTRACTED: 15 (79%)
-- INFERRED: 4 (21%)
+- EXTRACTED: 27 (79%)
+- INFERRED: 7 (21%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

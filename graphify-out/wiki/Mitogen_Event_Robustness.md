@@ -1,47 +1,50 @@
 # Mitogen Event Robustness
 
-> 23 nodes · cohesion 0.18
+> 32 nodes · cohesion 0.16
 
 ## Key Concepts
 
-- **TestUpdateStateMalformedPayloads** (11 connections) — `tests/compact/test_mitogen_robustness.py`
-- **_renderer()** (10 connections) — `tests/compact/test_mitogen_robustness.py`
-- **_runner_start()** (9 connections) — `tests/compact/test_mitogen_robustness.py`
-- **_task_start()** (9 connections) — `tests/compact/test_mitogen_robustness.py`
-- **test_mitogen_robustness.py** (5 connections) — `tests/compact/test_mitogen_robustness.py`
-- **.test_mitogen_100_runner_unreachable_task_as_string()** (5 connections) — `tests/compact/test_mitogen_robustness.py`
-- **.test_mitogen_101_runner_failed_task_as_none()** (5 connections) — `tests/compact/test_mitogen_robustness.py`
-- **.test_mitogen_102_runner_ok_hosts_as_list()** (5 connections) — `tests/compact/test_mitogen_robustness.py`
-- **.test_mitogen_103_runner_unreachable_hosts_as_list()** (5 connections) — `tests/compact/test_mitogen_robustness.py`
-- **.test_mitogen_104_runner_failed_hosts_as_list()** (5 connections) — `tests/compact/test_mitogen_robustness.py`
-- **.test_mitogen_105_runner_skipped_hosts_as_list()** (5 connections) — `tests/compact/test_mitogen_robustness.py`
-- **.test_mitogen_106_recovery_after_malformed_event()** (5 connections) — `tests/compact/test_mitogen_robustness.py`
-- **.test_mitogen_107_state_machine_still_updated_when_log_skipped()** (5 connections) — `tests/compact/test_mitogen_robustness.py`
-- **TC-MITOGEN-100..107 — compact renderer's tolerance for malformed JSONL events.** (1 connections) — `tests/compact/test_mitogen_robustness.py`
-- **TC-MITOGEN-103: ``hosts: list`` must not raise on unreachable.** (1 connections) — `tests/compact/test_mitogen_robustness.py`
-- **TC-MITOGEN-104: ``hosts: list`` must not raise on failed.** (1 connections) — `tests/compact/test_mitogen_robustness.py`
-- **TC-MITOGEN-105: ``hosts: list`` must not raise on skipped.** (1 connections) — `tests/compact/test_mitogen_robustness.py`
-- **TC-MITOGEN-106: a malformed event must not poison subsequent events.          Th** (1 connections) — `tests/compact/test_mitogen_robustness.py`
-- **TC-MITOGEN-107: a malformed event that crashes _emit_event_log         must not** (1 connections) — `tests/compact/test_mitogen_robustness.py`
-- **TC-MITOGEN-100..105: ``update_state`` must not raise on bad events.** (1 connections) — `tests/compact/test_mitogen_robustness.py`
-- **TC-MITOGEN-100: ``task`` as a bare UUID string must not raise.** (1 connections) — `tests/compact/test_mitogen_robustness.py`
-- **TC-MITOGEN-101: ``task: None`` must not raise.** (1 connections) — `tests/compact/test_mitogen_robustness.py`
-- **TC-MITOGEN-102: ``hosts: list`` must not raise on ``v2_runner_on_ok``.** (1 connections) — `tests/compact/test_mitogen_robustness.py`
+- **_renderer()** (18 connections) — `tests/compact/test_per_task_timing.py`
+- **_logged()** (15 connections) — `tests/compact/test_per_task_timing.py`
+- **_task_start()** (12 connections) — `tests/compact/test_per_task_timing.py`
+- **test_per_task_timing.py** (10 connections) — `tests/compact/test_per_task_timing.py`
+- **_runner_ok()** (9 connections) — `tests/compact/test_per_task_timing.py`
+- **TestPreviousTaskSummary** (9 connections) — `tests/compact/test_per_task_timing.py`
+- **TestInlineDuration** (8 connections) — `tests/compact/test_per_task_timing.py`
+- **.test_summary_drops_duration_for_single_host_task()** (6 connections) — `tests/compact/test_per_task_timing.py`
+- **.test_summary_emitted_on_stats_for_final_task()** (6 connections) — `tests/compact/test_per_task_timing.py`
+- **.test_summary_keeps_duration_for_multi_host_task()** (6 connections) — `tests/compact/test_per_task_timing.py`
+- **TestFormatDuration** (5 connections) — `tests/compact/test_per_task_timing.py`
+- **.test_changed_line_carries_duration()** (5 connections) — `tests/compact/test_per_task_timing.py`
+- **.test_failed_line_carries_duration_before_msg()** (5 connections) — `tests/compact/test_per_task_timing.py`
+- **.test_long_duration_renders_compact()** (5 connections) — `tests/compact/test_per_task_timing.py`
+- **.test_ok_line_carries_seconds_duration()** (5 connections) — `tests/compact/test_per_task_timing.py`
+- **.test_unknown_task_uuid_drops_duration_suffix()** (5 connections) — `tests/compact/test_per_task_timing.py`
+- **.test_no_summary_when_no_prior_task()** (5 connections) — `tests/compact/test_per_task_timing.py`
+- **.test_summary_contains_task_duration_when_no_per_host_duration()** (5 connections) — `tests/compact/test_per_task_timing.py`
+- **.test_summary_line_lands_before_next_task_header()** (5 connections) — `tests/compact/test_per_task_timing.py`
+- **.test_missing_timestamp_drops_duration_suffix()** (4 connections) — `tests/compact/test_per_task_timing.py`
+- **.test_summary_contains_cumulative()** (3 connections) — `tests/compact/test_per_task_timing.py`
+- **_runner_failed()** (2 connections) — `tests/compact/test_per_task_timing.py`
+- **_stats()** (2 connections) — `tests/compact/test_per_task_timing.py`
+- **.test_hour_range()** (2 connections) — `tests/compact/test_per_task_timing.py`
+- **.test_minute_range()** (2 connections) — `tests/compact/test_per_task_timing.py`
+- *... and 7 more nodes in this community*
 
 ## Relationships
 
-- [[Compact Renderer Implementation]] (2 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (5 shared connections)
 
 ## Source Files
 
-- `tests/compact/test_mitogen_robustness.py`
+- `tests/compact/test_per_task_timing.py`
 
 ## Audit Trail
 
-- EXTRACTED: 93 (99%)
-- INFERRED: 1 (1%)
+- EXTRACTED: 164 (98%)
+- INFERRED: 3 (2%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

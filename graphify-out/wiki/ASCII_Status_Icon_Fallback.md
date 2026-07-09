@@ -1,51 +1,57 @@
 # ASCII Status Icon Fallback
 
-> 24 nodes · cohesion 0.11
+> 32 nodes · cohesion 0.12
 
 ## Key Concepts
 
-- **TestAsciiFallback** (12 connections) — `tests/unit/test_icons.py`
-- **get_status_icon_ascii()** (10 connections) — `src/ansible_aom/core/icons.py`
-- **.test_changed_ascii_fallback_is_plus()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_failed_ascii_fallback_is_x()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_ok_ascii_fallback_is_asterisk()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_pending_ascii_fallback_is_dot()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_running_ascii_fallback_is_at_sign()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_skipped_ascii_fallback_is_lowercase_o()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_unreachable_ascii_fallback_is_uppercase_o()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_all_ascii_fallbacks_are_single_char()** (2 connections) — `tests/unit/test_icons.py`
-- **.test_all_status_values_have_ascii_fallback()** (2 connections) — `tests/unit/test_icons.py`
-- **.test_completed_ascii_fallback_same_as_ok()** (2 connections) — `tests/unit/test_icons.py`
-- **Get ASCII fallback icon for terminals without Unicode support.      Args:** (1 connections) — `src/ansible_aom/core/icons.py`
-- **Tests for TC-377: Unicode fallback to ASCII.** (1 connections) — `tests/unit/test_icons.py`
-- **TC-377: OK falls back to * in ASCII mode.** (1 connections) — `tests/unit/test_icons.py`
-- **TC-377: CHANGED falls back to + in ASCII mode.** (1 connections) — `tests/unit/test_icons.py`
-- **TC-377: FAILED falls back to X in ASCII mode.** (1 connections) — `tests/unit/test_icons.py`
-- **TC-377: RUNNING falls back to @ in ASCII mode.** (1 connections) — `tests/unit/test_icons.py`
-- **TC-377: PENDING falls back to . in ASCII mode.** (1 connections) — `tests/unit/test_icons.py`
-- **TC-377: SKIPPED falls back to o in ASCII mode.** (1 connections) — `tests/unit/test_icons.py`
-- **TC-377: UNREACHABLE falls back to O in ASCII mode.** (1 connections) — `tests/unit/test_icons.py`
-- **COMPLETED uses same ASCII fallback as OK.** (1 connections) — `tests/unit/test_icons.py`
-- **Every Status enum value has an ASCII fallback.** (1 connections) — `tests/unit/test_icons.py`
-- **All ASCII fallbacks are single ASCII characters.** (1 connections) — `tests/unit/test_icons.py`
+- **render_session()** (17 connections) — `src/ansible_aom/inspect/text.py`
+- **text.py** (12 connections) — `src/ansible_aom/inspect/text.py`
+- **test_inspect_text_golden.py** (12 connections) — `tests/compact/test_inspect_text_golden.py`
+- **_load()** (11 connections) — `tests/compact/test_inspect_text_golden.py`
+- **_render_verbose()** (7 connections) — `src/ansible_aom/inspect/text.py`
+- **_render_failures()** (6 connections) — `src/ansible_aom/inspect/text.py`
+- **_iter_tree()** (5 connections) — `src/ansible_aom/inspect/text.py`
+- **_play_name_for_task()** (5 connections) — `src/ansible_aom/inspect/text.py`
+- **_render_header()** (5 connections) — `src/ansible_aom/inspect/text.py`
+- **_fmt_duration()** (4 connections) — `src/ansible_aom/inspect/text.py`
+- **_iter_failed_tasks()** (4 connections) — `src/ansible_aom/inspect/text.py`
+- **_render_detail()** (4 connections) — `src/ansible_aom/inspect/text.py`
+- **render_session_list()** (4 connections) — `src/ansible_aom/inspect/text.py`
+- **_host_counts_line()** (3 connections) — `src/ansible_aom/inspect/text.py`
+- **test_render_clean_run_has_header_and_no_failure_block()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **test_render_failed_loop_shows_msg_and_failed_items()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **test_render_includes_verbose_section_when_stderr_lines_exist()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **test_render_no_verbose_section_when_no_stderr_events()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **test_render_running_shows_running_status()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **test_render_unreachable_shows_connection_msg()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **test_render_verbose_not_gated_on_failed_status()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **test_render_verbose_play_scoping()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **test_render_verbose_task_scoping()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **RunSummary** (2 connections)
+- **Plain-text rendering of an inspect session.  Used by ``aom inspect --text`` (and** (1 connections) — `src/ansible_aom/inspect/text.py`
+- *... and 7 more nodes in this community*
 
 ## Relationships
 
-- [[Compact Display Module Layout]] (1 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
-- [[Status Icon Mapping]] (1 shared connections)
+- [Playbook Parser Integration Tests](Playbook_Parser_Integration_Tests.md) (5 shared connections)
+- [PTY Buffer Stall Handling](PTY_Buffer_Stall_Handling.md) (4 shared connections)
+- [Data Model Unit Tests](Data_Model_Unit_Tests.md) (1 shared connections)
+- [Status Bar Widget](Status_Bar_Widget.md) (1 shared connections)
+- [Log Filter Helpers](Log_Filter_Helpers.md) (1 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [RunSummary Schema Contract](RunSummary_Schema_Contract.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/icons.py`
-- `tests/unit/test_icons.py`
+- `src/ansible_aom/inspect/text.py`
+- `tests/compact/test_inspect_text_golden.py`
 
 ## Audit Trail
 
-- EXTRACTED: 47 (77%)
-- INFERRED: 14 (23%)
+- EXTRACTED: 111 (82%)
+- INFERRED: 25 (18%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

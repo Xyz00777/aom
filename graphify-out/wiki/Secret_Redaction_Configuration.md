@@ -1,63 +1,62 @@
 # Secret Redaction Configuration
 
-> 55 nodes · cohesion 0.04
+> 110 nodes · cohesion 0.02
 
 ## Key Concepts
 
-- **RedactionConfig** (123 connections) — `src/ansible_aom/core/config.py`
-- **redact_event()** (70 connections) — `src/ansible_aom/core/redaction.py`
-- **test_redaction.py** (26 connections) — `tests/unit/test_redaction.py`
-- **TestSanitizationAppliedFields** (8 connections) — `tests/unit/test_redaction.py`
-- **TestLayer1AnsibleNoLog** (7 connections) — `tests/unit/test_redaction.py`
-- **TestRedactionHelperFunctions** (7 connections) — `tests/unit/test_redaction.py`
-- **TestRedactionIntegration** (7 connections) — `tests/unit/test_redaction.py`
-- **TestInvocationModuleArgs** (6 connections) — `tests/unit/test_redaction.py`
-- **.test_inspect_shows_redacted()** (6 connections) — `tests/unit/test_redaction.py`
-- **.test_all_panels_show_redacted()** (6 connections) — `tests/unit/test_redaction.py`
-- **.test_deeply_nested_args()** (5 connections) — `tests/unit/test_redaction.py`
-- **.test_module_args_list_values()** (5 connections) — `tests/unit/test_redaction.py`
-- **.test_module_args_recursive_redaction()** (5 connections) — `tests/unit/test_redaction.py`
-- **.test_no_log_censors_result_field()** (5 connections) — `tests/unit/test_redaction.py`
-- **.test_no_log_loop_items_individually_censored()** (5 connections) — `tests/unit/test_redaction.py`
-- **.test_no_log_mixed_loop_items()** (5 connections) — `tests/unit/test_redaction.py`
-- **.test_no_log_replaces_entire_result()** (5 connections) — `tests/unit/test_redaction.py`
-- **.test_redact_event_function()** (5 connections) — `tests/unit/test_redaction.py`
-- **.test_password_shows_asterisks_in_log()** (5 connections) — `tests/unit/test_redaction.py`
-- **TestRedactionInInspectOutput** (5 connections) — `tests/unit/test_redaction.py`
-- **.test_json_output_redacted()** (5 connections) — `tests/unit/test_redaction.py`
-- **.test_artifact_file_redacted()** (5 connections) — `tests/unit/test_redaction.py`
-- **.test_empty_event_handling()** (5 connections) — `tests/unit/test_redaction.py`
-- **.test_full_event_redaction()** (5 connections) — `tests/unit/test_redaction.py`
-- **.test_layer1_takes_precedence()** (5 connections) — `tests/unit/test_redaction.py`
-- *... and 30 more nodes in this community*
+- **PreParseResult** (40 connections) — `src/ansible_aom/core/parser.py`
+- **test_parser.py** (28 connections) — `tests/unit/test_parser.py`
+- **TestRoleGrouping** (21 connections) — `tests/unit/test_parser.py`
+- **TestTaskDefinition** (20 connections) — `tests/unit/test_parser.py`
+- **TestRunStateUnknownEvent** (19 connections) — `tests/unit/test_parser.py`
+- **TestPlayDefinition** (18 connections) — `tests/unit/test_parser.py`
+- **TestPtyStreamParserJsonlEvents** (18 connections) — `tests/unit/test_parser.py`
+- **TestPlayRunState** (17 connections) — `tests/unit/test_parser.py`
+- **TestHostRunState** (16 connections) — `tests/unit/test_parser.py`
+- **TestListTasksListHostsIntegration** (16 connections) — `tests/unit/test_parser.py`
+- **TestParallelPreParse** (16 connections) — `tests/unit/test_parser.py`
+- **TestPtyStreamParserPlaintextCap** (16 connections) — `tests/unit/test_parser.py`
+- **TestRoleGroupDefinition** (16 connections) — `tests/unit/test_parser.py`
+- **TestStatusEnum** (16 connections) — `tests/unit/test_parser.py`
+- **TestTaskRunState** (16 connections) — `tests/unit/test_parser.py`
+- **group_roles()** (10 connections) — `src/ansible_aom/core/parser.py`
+- **.test_preparse_result_assembly()** (5 connections) — `tests/unit/test_parser.py`
+- **.test_five_same_role_tasks_creates_group()** (5 connections) — `tests/unit/test_parser.py`
+- **.test_role_group_at_end_of_list()** (5 connections) — `tests/unit/test_parser.py`
+- **.test_parallel_parse_does_not_corrupt_data()** (4 connections) — `tests/unit/test_parser.py`
+- **.test_role_group_definition_creation()** (4 connections) — `tests/unit/test_parser.py`
+- **.test_role_group_name_property()** (4 connections) — `tests/unit/test_parser.py`
+- **.test_four_same_role_tasks_no_grouping()** (4 connections) — `tests/unit/test_parser.py`
+- **.test_mixed_roles_no_grouping()** (4 connections) — `tests/unit/test_parser.py`
+- **.test_multiple_role_groups()** (4 connections) — `tests/unit/test_parser.py`
+- *... and 85 more nodes in this community*
 
 ## Relationships
 
-- [[Four-Layer Redaction System]] (25 shared connections)
-- [[Credential String Sanitization]] (17 shared connections)
-- [[Redaction Config Model]] (14 shared connections)
-- [[App Config Model Tests]] (9 shared connections)
-- [[App Configuration Settings]] (5 shared connections)
-- [[Property Based Tests]] (5 shared connections)
-- [[Pydantic Model Basics]] (2 shared connections)
-- [[Ansible Password Redaction]] (2 shared connections)
-- [[Generic Secret Redaction]] (2 shared connections)
-- [[Password Field Regex]] (2 shared connections)
-- [[Redaction Always Active]] (2 shared connections)
-- [[Compact Display Module Layout]] (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (46 shared connections)
+- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (28 shared connections)
+- [Run State Completion Recap](Run_State_Completion_Recap.md) (25 shared connections)
+- [Per-Task Overhead Analysis](Per-Task_Overhead_Analysis.md) (20 shared connections)
+- [Three-Pane Inspect App](Three-Pane_Inspect_App.md) (19 shared connections)
+- [CLI Argument Parser](CLI_Argument_Parser.md) (18 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (15 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (14 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (13 shared connections)
+- [Diagnostics and Profiler](Diagnostics_and_Profiler.md) (8 shared connections)
+- [List Hosts Output Parser](List_Hosts_Output_Parser.md) (7 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (5 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/config.py`
-- `src/ansible_aom/core/redaction.py`
-- `tests/unit/test_redaction.py`
+- `src/ansible_aom/core/parser.py`
+- `tests/unit/test_parser.py`
 
 ## Audit Trail
 
-- EXTRACTED: 270 (62%)
-- INFERRED: 167 (38%)
+- EXTRACTED: 233 (48%)
+- INFERRED: 254 (52%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

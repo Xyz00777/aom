@@ -1,43 +1,43 @@
 # Host Status Indicators
 
-> 13 nodes · cohesion 0.23
+> 18 nodes · cohesion 0.20
 
 ## Key Concepts
 
-- **TestHostStatusIndicators** (16 connections) — `tests/integration/test_compact_renderer.py`
-- **.format_host_summary()** (7 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_host_summary_with_failures()** (4 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_host_summary_all_ok()** (3 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_host_summary_with_changes()** (3 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_host_summary_with_skipped()** (3 connections) — `tests/integration/test_compact_renderer.py`
-- **.test_host_summary_with_unreachable()** (3 connections) — `tests/integration/test_compact_renderer.py`
-- **Host summary shows changed count.** (2 connections) — `tests/integration/test_compact_renderer.py`
-- **Tests for host status with changed/ok/failed indicators.** (1 connections) — `tests/integration/test_compact_renderer.py`
-- **Format host summary line.** (1 connections) — `tests/integration/test_compact_renderer.py`
-- **Host summary shows all ok count.** (1 connections) — `tests/integration/test_compact_renderer.py`
-- **Host summary shows unreachable count.** (1 connections) — `tests/integration/test_compact_renderer.py`
-- **Host summary shows skipped count.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **merge_limit_args()** (18 connections) — `src/ansible_aom/cli.py`
+- **TestMergeLimitArgs** (16 connections) — `tests/unit/test_cli_limit_merge.py`
+- **.test_comma_value_combined_with_single_value()** (2 connections) — `tests/unit/test_cli_limit_merge.py`
+- **.test_does_not_dedupe_intentionally()** (2 connections) — `tests/unit/test_cli_limit_merge.py`
+- **.test_equals_form_merged()** (2 connections) — `tests/unit/test_cli_limit_merge.py`
+- **.test_merged_flag_lives_at_first_limit_position()** (2 connections) — `tests/unit/test_cli_limit_merge.py`
+- **.test_mixed_short_and_long_uses_first_form()** (2 connections) — `tests/unit/test_cli_limit_merge.py`
+- **.test_no_limit_args_unchanged()** (2 connections) — `tests/unit/test_cli_limit_merge.py`
+- **.test_preserves_surrounding_args()** (2 connections) — `tests/unit/test_cli_limit_merge.py`
+- **.test_single_long_equals_form_unchanged()** (2 connections) — `tests/unit/test_cli_limit_merge.py`
+- **.test_single_long_limit_unchanged()** (2 connections) — `tests/unit/test_cli_limit_merge.py`
+- **.test_single_short_limit_unchanged()** (2 connections) — `tests/unit/test_cli_limit_merge.py`
+- **.test_three_flags_merged()** (2 connections) — `tests/unit/test_cli_limit_merge.py`
+- **.test_trailing_lone_short_flag_is_left_alone()** (2 connections) — `tests/unit/test_cli_limit_merge.py`
+- **.test_trailing_lone_short_flag_with_one_preceding_pair()** (2 connections) — `tests/unit/test_cli_limit_merge.py`
+- **.test_two_long_flags_merged()** (2 connections) — `tests/unit/test_cli_limit_merge.py`
+- **.test_two_short_flags_merged()** (2 connections) — `tests/unit/test_cli_limit_merge.py`
+- **Collapse repeated ``-l`` / ``--limit`` flags into a single comma-joined one.** (1 connections) — `src/ansible_aom/cli.py`
 
 ## Relationships
 
-- [[Run State Completion Recap]] (3 shared connections)
-- [[Terminal Display Manager]] (1 shared connections)
-- [[Compact Renderer Implementation]] (1 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
-- [[Task Definition Live Refresh]] (1 shared connections)
-- [[Play Definition Tree Population]] (1 shared connections)
-- [[Compact Renderer Integration Tests]] (1 shared connections)
+- [State Transition Validation](State_Transition_Validation.md) (3 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_compact_renderer.py`
+- `src/ansible_aom/cli.py`
+- `tests/unit/test_cli_limit_merge.py`
 
 ## Audit Trail
 
-- EXTRACTED: 38 (83%)
-- INFERRED: 8 (17%)
+- EXTRACTED: 35 (54%)
+- INFERRED: 30 (46%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

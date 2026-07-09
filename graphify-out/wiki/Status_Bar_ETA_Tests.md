@@ -1,31 +1,36 @@
 # Status Bar ETA Tests
 
-> 7 nodes · cohesion 0.29
+> 12 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **test_status_bar_eta.py** (6 connections) — `tests/compact/test_status_bar_eta.py`
-- **Tests for the remaining-time (ETA) segment in ``format_status_bar``.  When ``rem** (1 connections) — `tests/compact/test_status_bar_eta.py`
-- **test_no_segment_when_remaining_is_none()** (1 connections) — `tests/compact/test_status_bar_eta.py`
-- **test_remaining_segment_has_no_separator_pipe_before_it()** (1 connections) — `tests/compact/test_status_bar_eta.py`
-- **test_remaining_segment_is_dimmed_when_colorized()** (1 connections) — `tests/compact/test_status_bar_eta.py`
-- **test_remaining_segment_rendered_after_elapsed()** (1 connections) — `tests/compact/test_status_bar_eta.py`
-- **test_remaining_zero_still_renders()** (1 connections) — `tests/compact/test_status_bar_eta.py`
+- **Playbook 12: Interrupt and Signal Handling** (8 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Test Scenarios** (5 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Edge Cases Covered** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Expected Events** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Expected Exit Codes** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Features Tested (SPEC Mapping)** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Purpose** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Scenario A: First SIGINT (Ctrl+C)** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Scenario B: Second SIGINT (within 2 seconds)** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Scenario C: SIGTERM** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **Scenario D: SIGWINCH (Terminal Resize)** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
+- **YAML Structure (Outline)** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [Community 489](Community_489.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/compact/test_status_bar_eta.py`
+- `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
 
 ## Audit Trail
 
-- EXTRACTED: 12 (100%)
+- EXTRACTED: 23 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

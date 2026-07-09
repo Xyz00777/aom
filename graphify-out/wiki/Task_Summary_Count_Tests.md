@@ -1,50 +1,54 @@
 # Task Summary Count Tests
 
-> 54 nodes · cohesion 0.09
+> 61 nodes · cohesion 0.05
 
 ## Key Concepts
 
-- **test_task_summary.py** (21 connections) — `tests/compact/test_task_summary.py`
-- **_last_summary_line()** (16 connections) — `tests/compact/test_task_summary.py`
-- **_play_start()** (16 connections) — `tests/compact/test_task_summary.py`
-- **_renderer()** (16 connections) — `tests/compact/test_task_summary.py`
-- **_task_start()** (16 connections) — `tests/compact/test_task_summary.py`
-- **_ok()** (10 connections) — `tests/compact/test_task_summary.py`
-- **.test_changed_ok_shows_both()** (8 connections) — `tests/compact/test_task_summary.py`
-- **TestTaskSummaryHideState** (8 connections) — `tests/compact/test_task_summary.py`
-- **.test_hide_changed_suppresses_changed_from_summary()** (8 connections) — `tests/compact/test_task_summary.py`
-- **.test_hide_ok_suppresses_ok_from_summary()** (8 connections) — `tests/compact/test_task_summary.py`
-- **.test_mixed_failed_ok_shows_both()** (8 connections) — `tests/compact/test_task_summary.py`
-- **.test_failed_before_ok_in_summary()** (8 connections) — `tests/compact/test_task_summary.py`
-- **.test_mixed_unreachable_ok_shows_both()** (8 connections) — `tests/compact/test_task_summary.py`
-- **.test_colored_output_has_ansi_codes()** (8 connections) — `tests/compact/test_task_summary.py`
-- **_failed()** (7 connections) — `tests/compact/test_task_summary.py`
-- **.test_all_ok_shows_ok_count()** (7 connections) — `tests/compact/test_task_summary.py`
-- **.test_all_skipped_shows_skipped_count()** (7 connections) — `tests/compact/test_task_summary.py`
-- **.test_failed_always_shows_even_with_hide_state_failed()** (7 connections) — `tests/compact/test_task_summary.py`
-- **.test_hide_ok_with_only_ok_shows_no_suffix()** (7 connections) — `tests/compact/test_task_summary.py`
-- **.test_hide_skipped_suppresses_skipped()** (7 connections) — `tests/compact/test_task_summary.py`
-- **.test_unreachable_always_shows_even_with_hide_state_unreachable()** (7 connections) — `tests/compact/test_task_summary.py`
-- **.test_only_failed_shows_failed()** (7 connections) — `tests/compact/test_task_summary.py`
-- **.test_no_hosts_no_suffix()** (6 connections) — `tests/compact/test_task_summary.py`
-- **_last_print_log()** (5 connections) — `tests/compact/test_task_summary.py`
-- **_changed()** (3 connections) — `tests/compact/test_task_summary.py`
-- *... and 29 more nodes in this community*
+- **test_inspect_screen.py** (41 connections) — `tests/tui/test_inspect_screen.py`
+- **Path** (37 connections)
+- **test_detail_pane_handles_huge_stdout_quickly()** (6 connections) — `tests/tui/test_inspect_screen.py`
+- **test_highlighting_successful_task_updates_detail()** (6 connections) — `tests/tui/test_inspect_screen.py`
+- **test_v_populates_verbose_panel_from_session_events()** (6 connections) — `tests/tui/test_inspect_screen.py`
+- **_find_tree_node_by_kind()** (5 connections) — `tests/tui/test_inspect_screen.py`
+- **test_e_expands_all_and_c_collapses_all()** (5 connections) — `tests/tui/test_inspect_screen.py`
+- **test_footer_focus_text_tracks_run_play_task_and_v_flash()** (5 connections) — `tests/tui/test_inspect_screen.py`
+- **test_left_arrow_collapses_or_walks_up_tree()** (5 connections) — `tests/tui/test_inspect_screen.py`
+- **test_left_does_not_steal_focus_to_detail_pane()** (5 connections) — `tests/tui/test_inspect_screen.py`
+- **test_question_mark_opens_help()** (5 connections) — `tests/tui/test_inspect_screen.py`
+- **test_run_row_renders_multi_line_content()** (5 connections) — `tests/tui/test_inspect_screen.py`
+- **test_v_opens_verbose_from_play_and_host_scopes()** (5 connections) — `tests/tui/test_inspect_screen.py`
+- **test_ctrl_c_quits_the_app()** (4 connections) — `tests/tui/test_inspect_screen.py`
+- **test_d_cancel_keeps_session()** (4 connections) — `tests/tui/test_inspect_screen.py`
+- **test_d_opens_confirm_then_y_deletes()** (4 connections) — `tests/tui/test_inspect_screen.py`
+- **test_dd_double_tap_deletes()** (4 connections) — `tests/tui/test_inspect_screen.py`
+- **test_delete_auto_selects_next_session()** (4 connections) — `tests/tui/test_inspect_screen.py`
+- **test_detail_block_includes_action_and_no_session_stderr()** (4 connections) — `tests/tui/test_inspect_screen.py`
+- **test_enter_on_run_row_focuses_tasks_pane()** (4 connections) — `tests/tui/test_inspect_screen.py`
+- **test_enter_on_task_focuses_detail_pane()** (4 connections) — `tests/tui/test_inspect_screen.py`
+- **test_escape_steps_back_to_previous_pane()** (4 connections) — `tests/tui/test_inspect_screen.py`
+- **test_focused_pane_gets_visual_class()** (4 connections) — `tests/tui/test_inspect_screen.py`
+- **test_n_and_shift_n_cycle_through_failures()** (4 connections) — `tests/tui/test_inspect_screen.py`
+- **test_r_reloads_runs_from_disk()** (4 connections) — `tests/tui/test_inspect_screen.py`
+- *... and 36 more nodes in this community*
 
 ## Relationships
 
-- [[Compact Renderer Implementation]] (14 shared connections)
+- [PTY Buffer Stall Handling](PTY_Buffer_Stall_Handling.md) (39 shared connections)
+- [Data Model Unit Tests](Data_Model_Unit_Tests.md) (6 shared connections)
+- [Playbook Parser Integration Tests](Playbook_Parser_Integration_Tests.md) (2 shared connections)
+- [Total Task Counting](Total_Task_Counting.md) (2 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/compact/test_task_summary.py`
+- `tests/tui/test_inspect_screen.py`
 
 ## Audit Trail
 
-- EXTRACTED: 270 (96%)
-- INFERRED: 10 (4%)
+- EXTRACTED: 203 (82%)
+- INFERRED: 45 (18%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

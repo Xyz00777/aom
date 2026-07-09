@@ -1,51 +1,50 @@
 # Inspect Session List
 
-> 18 nodes · cohesion 0.12
+> 96 nodes · cohesion 0.02
 
 ## Key Concepts
 
-- **list_sessions()** (15 connections) — `src/ansible_aom/session/store.py`
-- **_resolve_session_id()** (12 connections) — `src/ansible_aom/rerun/cli.py`
-- **TestInspectList** (8 connections) — `tests/integration/test_session.py`
-- **_make_session()** (8 connections) — `tests/unit/test_rerun_cli.py`
-- **TestResolveSessionId** (7 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_list_sessions_empty()** (5 connections) — `tests/integration/test_session.py`
-- **.test_list_sessions_includes_status()** (5 connections) — `tests/integration/test_session.py`
-- **.test_list_sessions_returns_all_sessions()** (5 connections) — `tests/integration/test_session.py`
-- **.test_list_sessions_shows_8_char_uuid_prefix()** (5 connections) — `tests/integration/test_session.py`
-- **.test_list_sessions_sorted_by_time()** (5 connections) — `tests/integration/test_session.py`
-- **.test_ambiguous_short_id_raises()** (4 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_explicit_full_id_returned_as_is()** (4 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_explicit_short_id_resolved_to_full()** (4 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_omitted_returns_most_recent()** (4 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_unknown_id_raises()** (4 connections) — `tests/unit/test_rerun_cli.py`
-- **.test_no_sessions_at_all_raises()** (3 connections) — `tests/unit/test_rerun_cli.py`
-- **Resolve an explicit session ID, short prefix, or "most recent" intent.      Mirr** (1 connections) — `src/ansible_aom/rerun/cli.py`
-- **Helper: create a session directory with a minimal meta.json.** (1 connections) — `tests/unit/test_rerun_cli.py`
+- **Section 6: State Management** (96 connections) — `TEST_SPECIFICATION.md`
+- **Section 6.1: Data Models** (1 connections) — `TEST_SPECIFICATION.md`
+- **Section 6.2: Event Processing** (1 connections) — `TEST_SPECIFICATION.md`
+- **Section 6.3: Session Recording** (1 connections) — `TEST_SPECIFICATION.md`
+- **Section 6.4: Execution State Machine** (1 connections) — `TEST_SPECIFICATION.md`
+- **Section 6.5: Memory Bounds** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-174: TaskDefinition Field Validation** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-175: TaskDefinition is_dynamic Flag Default** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-176: TaskDefinition UUID Field Nullability** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-177: TaskDefinition Path Field Nullability** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-178: TaskDefinition children Field Default** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-179: TaskDefinition task_order for Dynamic Tasks** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-180: RoleGroupDefinition Initialization** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-181: RoleGroupDefinition Name Property Format** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-182: PlayDefinition Field Validation** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-183: PlayDefinition id Sequential Number Format** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-184: PlayDefinition hosts vs resolved_hosts** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-185: PlayDefinition resolved_hosts Empty List Default** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-186: Status Enum All Values** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-187: HostRunState Field Validation** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-188: HostRunState Mutable Status Transitions** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-189: TaskRunState Field Validation** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-190: TaskRunState hosts Dict Key Type** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-191: PlayRunState Field Validation** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-192: PlayRunState detected_strategy Default None** (1 connections) — `TEST_SPECIFICATION.md`
+- *... and 71 more nodes in this community*
 
 ## Relationships
 
-- [[Run Config Key Normalization]] (14 shared connections)
-- [[Session Recording Tests]] (2 shared connections)
-- [[Rerun CLI Entry]] (2 shared connections)
-- [[Inspect CLI Commands]] (2 shared connections)
-- [[Rerun Host Set Composition]] (2 shared connections)
-- [[Playbook Event Parsing]] (1 shared connections)
-- [[Session List View]] (1 shared connections)
+- [Failure Recap Formatting](Failure_Recap_Formatting.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/rerun/cli.py`
-- `src/ansible_aom/session/store.py`
-- `tests/integration/test_session.py`
-- `tests/unit/test_rerun_cli.py`
+- `TEST_SPECIFICATION.md`
 
 ## Audit Trail
 
-- EXTRACTED: 72 (72%)
-- INFERRED: 28 (28%)
+- EXTRACTED: 191 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

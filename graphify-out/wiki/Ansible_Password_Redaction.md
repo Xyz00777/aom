@@ -1,28 +1,35 @@
 # Ansible Password Redaction
 
-> 4 nodes · cohesion 0.50
+> 11 nodes · cohesion 0.18
 
 ## Key Concepts
 
-- **TestAnsiblePasswordFields** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_ansible_fields_redacted()** (2 connections) — `tests/unit/test_redaction.py`
-- **Tests for TC-156: ANSIBLE_PASSWORD_FIELDS set.** (1 connections) — `tests/unit/test_redaction.py`
-- **TC-156: All Ansible connection password fields are redacted.** (1 connections) — `tests/unit/test_redaction.py`
+- **stderr Classification Taxonomy for ansible-core 2.20.4** (8 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Section 4: Regex Table for the Classifier** (3 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Section 3: Proposed `source` Enum for AOM Classifier** (2 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **stderr-classification-taxonomy.md** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Appendix: Quick Reference — Host Extraction** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Host Extraction Logic** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **How stderr Routing Works** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Level Mapping** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Run-level vs Task-level Distinction** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Section 2: Summary Table — All stderr Categories** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- **Section 5: Open Questions** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
 
 ## Relationships
 
-- [[Secret Redaction Configuration]] (2 shared connections)
+- [Per-Task Timing Tests](Per-Task_Timing_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_redaction.py`
+- `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
 
 ## Audit Trail
 
-- EXTRACTED: 7 (88%)
-- INFERRED: 1 (12%)
+- EXTRACTED: 21 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

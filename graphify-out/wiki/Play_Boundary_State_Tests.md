@@ -1,52 +1,53 @@
 # Play Boundary State Tests
 
-> 25 nodes · cohesion 0.20
+> 33 nodes · cohesion 0.10
 
 ## Key Concepts
 
-- **TestPlayBoundaryState** (15 connections) — `tests/unit/test_play_boundary_state.py`
-- **_two_play_state()** (13 connections) — `tests/unit/test_play_boundary_state.py`
-- **_start_play()** (11 connections) — `tests/unit/test_play_boundary_state.py`
-- **_start_task()** (11 connections) — `tests/unit/test_play_boundary_state.py`
-- **test_play_boundary_state.py** (8 connections) — `tests/unit/test_play_boundary_state.py`
-- **_ts()** (8 connections) — `tests/unit/test_play_boundary_state.py`
-- **.test_terminal_runner_events_route_to_task_owner_play()** (7 connections) — `tests/unit/test_play_boundary_state.py`
-- **.test_free_strategy_prior_play_not_force_finalised()** (6 connections) — `tests/unit/test_play_boundary_state.py`
-- **.test_runner_events_route_to_task_owner_play()** (6 connections) — `tests/unit/test_play_boundary_state.py`
-- **.test_same_play_id_replace_keeps_completed_count()** (6 connections) — `tests/unit/test_play_boundary_state.py`
-- **.test_same_play_id_replacement_keeps_tasks()** (6 connections) — `tests/unit/test_play_boundary_state.py`
-- **_runner_ok()** (5 connections) — `tests/unit/test_play_boundary_state.py`
-- **_runner_start()** (5 connections) — `tests/unit/test_play_boundary_state.py`
-- **.test_cross_play_graft_cursor_resets_on_play_boundary()** (5 connections) — `tests/unit/test_play_boundary_state.py`
-- **.test_linear_strategy_prior_play_still_force_finalised()** (5 connections) — `tests/unit/test_play_boundary_state.py`
-- **.test_meta_task_force_completed_across_plays()** (5 connections) — `tests/unit/test_play_boundary_state.py`
-- **_task_def()** (3 connections) — `tests/unit/test_play_boundary_state.py`
-- **TC-BOUNDARY-1: Duplicate play_start for the same play_id must not         destro** (1 connections) — `tests/unit/test_play_boundary_state.py`
-- **TC-BOUNDARY-2: Re-emitting the same play_start must preserve the         task co** (1 connections) — `tests/unit/test_play_boundary_state.py`
-- **TC-BOUNDARY-3: A RUNNING meta task from play 1 must be force-         completed** (1 connections) — `tests/unit/test_play_boundary_state.py`
-- **TC-BOUNDARY-4: The dynamic-graft cursor ``_last_matched_task_def``         must** (1 connections) — `tests/unit/test_play_boundary_state.py`
-- **TC-BOUNDARY-5: Under ``strategy: free`` a play_start for play N         can arri** (1 connections) — `tests/unit/test_play_boundary_state.py`
-- **TC-BOUNDARY-6: The free-strategy skip must NOT regress the linear         case —** (1 connections) — `tests/unit/test_play_boundary_state.py`
-- **TC-BOUNDARY-7: A ``v2_runner_on_*`` event that arrives WITHOUT a         ``play`** (1 connections) — `tests/unit/test_play_boundary_state.py`
-- **TC-BOUNDARY-8: A terminal ``v2_runner_on_ok`` event that arrives         WITHOUT** (1 connections) — `tests/unit/test_play_boundary_state.py`
+- **Path** (12 connections)
+- **test_replay_schema_boundary.py** (9 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **_make_v1_and_v2_sessions()** (8 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **_make_v1_session()** (7 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **_make_v2_session()** (7 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **TestLoadSessionSchemaBranch** (6 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **TestReplayHonorsSchemaBoundary** (6 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **.test_replay_both_regimes_with_identical_event_stream()** (6 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **test_load_session_branches_at_schema_boundary()** (5 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **.test_v1_session_loads_with_defaulted_schema_version_1()** (5 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **.test_v2_session_loads_with_schema_version_2_verbatim()** (5 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **.test_v2_session_written_by_session_manager_round_trips_as_v2()** (5 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **.test_replay_v1_session_drives_renderer_to_completion()** (5 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **.test_replay_v2_session_drives_renderer_to_completion()** (5 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **TestSchemaBoundarySideBySide** (5 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **.test_replay_v1_and_v2_in_same_dir_both_complete()** (5 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **.test_v1_and_v2_loaded_from_same_dir_branch_independently()** (5 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **Schema-boundary regression test (Phase 8 / Task 8.3).  What this test pins -----** (1 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **Build a current AOM v2 session: meta.json carries ``_schema_version: 2``.      T** (1 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **Build both regimes side-by-side in the same ``base`` directory.      Returning t** (1 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **``load_session`` is the branch site. Pin both sides here.** (1 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **Legacy v1 meta.json → ``_schema_version`` defaults to ``1``.** (1 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **v2 meta.json → ``_schema_version`` stays at ``2``, not rewritten to ``1``.** (1 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **End-to-end: ``SessionManager`` writes ``2``; ``load_session`` returns ``2``.** (1 connections) — `tests/unit/test_replay_schema_boundary.py`
+- **The schema boundary must be invisible to ``replay_session`` and the renderer.** (1 connections) — `tests/unit/test_replay_schema_boundary.py`
+- *... and 8 more nodes in this community*
 
 ## Relationships
 
-- [[Run State Completion Recap]] (3 shared connections)
-- [[Task Definition Live Refresh]] (2 shared connections)
-- [[Play Definition Tree Population]] (2 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
+- [Total Task Counting](Total_Task_Counting.md) (5 shared connections)
+- [Run Config Key Normalization](Run_Config_Key_Normalization.md) (4 shared connections)
+- [Hide State Normalization](Hide_State_Normalization.md) (4 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_play_boundary_state.py`
+- `tests/unit/test_replay_schema_boundary.py`
 
 ## Audit Trail
 
-- EXTRACTED: 126 (95%)
-- INFERRED: 7 (5%)
+- EXTRACTED: 109 (89%)
+- INFERRED: 13 (11%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

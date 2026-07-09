@@ -1,36 +1,39 @@
 # Loop Item Counter
 
-> 11 nodes · cohesion 0.29
+> 15 nodes · cohesion 0.13
 
 ## Key Concepts
 
-- **_running_loop_state()** (7 connections) — `tests/unit/test_loop_item_count.py`
-- **TestRunStateCounter** (6 connections) — `tests/unit/test_loop_item_count.py`
-- **TestTreeRendersCount** (6 connections) — `tests/unit/test_loop_item_count.py`
-- **test_loop_item_count.py** (5 connections) — `tests/unit/test_loop_item_count.py`
-- **.test_running_host_leaf_shows_n_over_total_when_known()** (4 connections) — `tests/unit/test_loop_item_count.py`
-- **_item_event()** (3 connections) — `tests/unit/test_loop_item_count.py`
-- **.test_running_host_leaf_shows_item_count()** (3 connections) — `tests/unit/test_loop_item_count.py`
-- **.test_item_events_do_not_inflate_status_counts()** (2 connections) — `tests/unit/test_loop_item_count.py`
-- **.test_item_events_increment_per_host_counter()** (2 connections) — `tests/unit/test_loop_item_count.py`
-- **.test_item_events_keep_host_running()** (2 connections) — `tests/unit/test_loop_item_count.py`
-- **Per-host loop item counting for the TUI task tree.  The bundled ``aom_jsonl`` ca** (1 connections) — `tests/unit/test_loop_item_count.py`
+- **4. Code quotes for all matches found** (6 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
+- **Existing stderr Classification in AOM** (6 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
+- **1. Does AOM's PTY parser already classify stderr lines by type?** (4 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
+- **existing-stderr-classification.md** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
+- **2. Does AOM's model carry a "kind" or "type" field on stderr lines?** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
+- **3. Are there existing regex patterns for SSH, CONNECTION, etc.?** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
+- **5. Verdict: PARTIAL-EXISTS** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
+- **Category 1: Warnings / Deprecations** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
+- **Category 2: Password prompts** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
+- **Category 3: Everything else (unclassified plaintext)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
+- **Interactive prompt detection (pure functions in core/)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
+- **Password prompt patterns (duplicated in runner.py for pexpect)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
+- **Stderr consumption points in runner.py** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
+- **Stderr recording (no classification)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
+- **Warning classification (parser.py)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
 
 ## Relationships
 
-- [[Role Group Task Models]] (2 shared connections)
-- [[Play Definition Tree Population]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/unit/test_loop_item_count.py`
+- `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
 
 ## Audit Trail
 
-- EXTRACTED: 37 (90%)
-- INFERRED: 4 (10%)
+- EXTRACTED: 28 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

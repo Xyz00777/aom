@@ -1,59 +1,50 @@
 # Replay Determinism Tests
 
-> 33 nodes · cohesion 0.10
+> 42 nodes · cohesion 0.08
 
 ## Key Concepts
 
-- **test_replay_determinism.py** (22 connections) — `tests/integration/test_replay_determinism.py`
-- **_record_live_compact()** (10 connections) — `tests/integration/test_replay_determinism.py`
-- **CaptureFixture** (9 connections)
-- **_record_live_json()** (8 connections) — `tests/integration/test_replay_determinism.py`
-- **_replay_compact()** (8 connections) — `tests/integration/test_replay_determinism.py`
-- **test_compact_record_then_replay_matches()** (7 connections) — `tests/integration/test_replay_determinism.py`
-- **test_compact_replay_is_idempotent()** (7 connections) — `tests/integration/test_replay_determinism.py`
-- **test_json_record_then_replay_matches()** (7 connections) — `tests/integration/test_replay_determinism.py`
-- **_replay_json()** (6 connections) — `tests/integration/test_replay_determinism.py`
-- **_empty_preflight()** (5 connections) — `tests/integration/test_replay_determinism.py`
-- **normalize_render_output()** (5 connections) — `tests/_utils.py`
-- **_fake_ansible_command()** (4 connections) — `tests/integration/test_replay_determinism.py`
-- **test_tree_replay_keeps_run_once_rows_separate_across_serial_windows()** (4 connections) — `tests/integration/test_replay_determinism.py`
-- **test_tree_replay_keeps_same_name_task_rows_separate_across_frames()** (4 connections) — `tests/integration/test_replay_determinism.py`
-- **_utils.py** (4 connections) — `tests/_utils.py`
-- **normalize_json_summary()** (4 connections) — `tests/_utils.py`
-- **_events_same_name_concurrent_tasks_repro()** (2 connections) — `tests/integration/test_replay_determinism.py`
-- **_events_serial_run_once_repro()** (2 connections) — `tests/integration/test_replay_determinism.py`
-- **_events_multi_host_mixed()** (1 connections) — `tests/integration/test_replay_determinism.py`
-- **_events_single_ok()** (1 connections) — `tests/integration/test_replay_determinism.py`
-- **_events_with_failure()** (1 connections) — `tests/integration/test_replay_determinism.py`
-- **Build a (cmd, args) pair that emits ``events`` as JSONL then exits.** (1 connections) — `tests/integration/test_replay_determinism.py`
-- **Preflight result that contributes nothing — mirrors a fake shim where     ``--li** (1 connections) — `tests/integration/test_replay_determinism.py`
-- **Run the compact renderer live; return (session_id, captured_stdout).** (1 connections) — `tests/integration/test_replay_determinism.py`
-- **Replay through a fresh CompactRenderer; return captured stdout.** (1 connections) — `tests/integration/test_replay_determinism.py`
-- *... and 8 more nodes in this community*
+- **Path** (15 connections)
+- **test_runner_interactive_prompts.py** (10 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **_fake_pause_prompt_command()** (10 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **TestNewlineTerminatedPromptPath** (5 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **._fake_newline_terminated_prompt()** (5 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_pause_prompt_answer_forwarded_to_child()** (5 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_custom_pause_prompt_without_press_enter_phrasing()** (5 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_default_bracketed_format_is_caught()** (5 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_question_mark_prompt_is_caught()** (5 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_yes_no_prompt_triggers_handler()** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **TestKeyboardInterruptDuringPromptAborts** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **._fake_pause_with_capture()** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_ctrl_c_at_prompt_returns_130_not_zero()** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **TestMultilineBlockPromptColonOnOwnLine** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_colon_on_own_line_block_round_trip()** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_newline_terminated_vars_prompt_round_trip()** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_real_ansible_pause_newline_terminated_round_trip()** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **TestPausePromptDetected** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_pause_prompt_triggers_handle_interactive_prompt()** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **TestRealAnsiblePauseFormat** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_full_real_ansible_pause_round_trip()** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **TestVarsPromptDetected** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **TestConfirmationPromptDetected** (3 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **._fake_block_prompt()** (3 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **TestNoPromptNoSpuriousInteractiveCall** (3 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- *... and 17 more nodes in this community*
 
 ## Relationships
 
-- [[Run Config Key Normalization]] (7 shared connections)
-- [[Replay Frame Signatures]] (3 shared connections)
-- [[Renderer Parity Invariant]] (2 shared connections)
-- [[Playbook Run Integration Tests]] (2 shared connections)
-- [[Compact Renderer Implementation]] (2 shared connections)
-- [[JSON Renderer]] (2 shared connections)
-- [[Session Replay Round Trip]] (2 shared connections)
-- [[Playbook Event Parsing]] (2 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
+- [Tree Block Animation](Tree_Block_Animation.md) (12 shared connections)
 
 ## Source Files
 
-- `tests/_utils.py`
-- `tests/integration/test_replay_determinism.py`
+- `tests/integration/test_runner_interactive_prompts.py`
 
 ## Audit Trail
 
-- EXTRACTED: 123 (92%)
-- INFERRED: 10 (8%)
+- EXTRACTED: 132 (92%)
+- INFERRED: 12 (8%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

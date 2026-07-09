@@ -1,42 +1,40 @@
 # Config Loading Screen
 
-> 8 nodes · cohesion 0.22
+> 15 nodes · cohesion 0.13
 
 ## Key Concepts
 
-- **SettingsScreen** (9 connections) — `src/ansible_aom/tui/screens/settings.py`
-- **load_config()** (8 connections) — `src/ansible_aom/core/config.py`
-- **.compose()** (7 connections) — `src/ansible_aom/tui/screens/settings.py`
-- **._build_display_lines()** (4 connections) — `src/ansible_aom/tui/screens/settings.py`
-- **.action_dismiss()** (3 connections) — `src/ansible_aom/tui/screens/settings.py`
-- **.test_load_config_returns_app_config()** (3 connections) — `tests/unit/test_config.py`
-- **settings.py** (1 connections) — `src/ansible_aom/tui/screens/settings.py`
-- **load_config returns AppConfig instance.** (1 connections) — `tests/unit/test_config.py`
+- **TestRewindCorrectness** (6 connections) — `tests/compact/test_display_ansi.py`
+- **TestSynchronizedOutput** (5 connections) — `tests/compact/test_display_ansi.py`
+- **test_display_ansi.py** (4 connections) — `tests/compact/test_display_ansi.py`
+- **.test_multi_row_rewind_moves_up_rows_minus_one()** (2 connections) — `tests/compact/test_display_ansi.py`
+- **.test_print_log_does_not_erase_line_above_single_row_status()** (2 connections) — `tests/compact/test_display_ansi.py`
+- **.test_single_row_rewind_uses_carriage_return_not_F()** (2 connections) — `tests/compact/test_display_ansi.py`
+- **.test_non_tty_update_emits_no_ansi()** (2 connections) — `tests/compact/test_display_ansi.py`
+- **Tests for nom-style ANSI rendering in compact mode.  These tests pin the new-spe** (1 connections) — `tests/compact/test_display_ansi.py`
+- **The flow that triggered the bug: status, then print_log.** (1 connections) — `tests/compact/test_display_ansi.py`
+- **Each Display.update() in TTY mode emits a single DEC 2026 frame.** (1 connections) — `tests/compact/test_display_ansi.py`
+- **is_tty=False is the pipe/CI fallback (PQ6): never emit positioning.** (1 connections) — `tests/compact/test_display_ansi.py`
+- **The status-block rewind must land on the start of the block, not above it.** (1 connections) — `tests/compact/test_display_ansi.py`
+- **For a 1-row status, rewind is a carriage return, not cursor-up.** (1 connections) — `tests/compact/test_display_ansi.py`
+- **For an N-row status, cursor is on the last row, so we rewind N-1 lines.** (1 connections) — `tests/compact/test_display_ansi.py`
+- **.test_update_wraps_content_in_dec_2026_sync()** (1 connections) — `tests/compact/test_display_ansi.py`
 
 ## Relationships
 
-- [[App Configuration Settings]] (3 shared connections)
-- [[Compact Display Module Layout]] (1 shared connections)
-- [[Status Bar Warning Panels]] (1 shared connections)
-- [[Secret Redaction Configuration]] (1 shared connections)
-- [[Warnings Display Config]] (1 shared connections)
-- [[AOM TUI Application]] (1 shared connections)
-- [[Playbook Event Parsing]] (1 shared connections)
-- [[Inspect TUI Widget Data]] (1 shared connections)
-- [[App Config Model Tests]] (1 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (2 shared connections)
+- [Frame Parameter Handling](Frame_Parameter_Handling.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/config.py`
-- `src/ansible_aom/tui/screens/settings.py`
-- `tests/unit/test_config.py`
+- `tests/compact/test_display_ansi.py`
 
 ## Audit Trail
 
-- EXTRACTED: 26 (72%)
-- INFERRED: 10 (28%)
+- EXTRACTED: 29 (94%)
+- INFERRED: 2 (6%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

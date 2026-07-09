@@ -1,47 +1,47 @@
 # Renderer Parity Invariant
 
-> 17 nodes · cohesion 0.17
+> 23 nodes · cohesion 0.26
 
 ## Key Concepts
 
-- **reduce_state_for_parity()** (10 connections) — `src/ansible_aom/core/parity.py`
-- **test_renderer_parity.py** (7 connections) — `tests/integration/test_renderer_parity.py`
-- **test_all_renderers_agree_on_reduced_state()** (7 connections) — `tests/integration/test_renderer_parity.py`
-- **_drive_compact()** (6 connections) — `tests/integration/test_renderer_parity.py`
-- **_drive_json()** (6 connections) — `tests/integration/test_renderer_parity.py`
-- **_drive_tui()** (5 connections) — `tests/integration/test_renderer_parity.py`
-- **_load_events()** (4 connections) — `tests/integration/test_renderer_parity.py`
-- **test_reduced_state_shape_is_stable()** (4 connections) — `tests/integration/test_renderer_parity.py`
-- **parity.py** (3 connections) — `src/ansible_aom/core/parity.py`
-- **_empty_host_counts()** (2 connections) — `src/ansible_aom/core/parity.py`
-- **Reduce a ``RunState`` into a renderer-agnostic dict.  This is the canonical "wha** (1 connections) — `src/ansible_aom/core/parity.py`
-- **Cross-renderer parity invariant.  Feed the same recorded JSONL stream through al** (1 connections) — `tests/integration/test_renderer_parity.py`
-- **For each fixture, all three renderers must reduce to the same dict.** (1 connections) — `tests/integration/test_renderer_parity.py`
-- **Sanity check the shape on a known-good fixture.      Locks in the keys other con** (1 connections) — `tests/integration/test_renderer_parity.py`
-- **Drive a CompactRenderer through every event and reduce the final state.** (1 connections) — `tests/integration/test_renderer_parity.py`
-- **Drive a JsonRenderer through every event and reduce its RunState.      The rende** (1 connections) — `tests/integration/test_renderer_parity.py`
-- **Drive an AOMApp through every event and reduce its RunState.      AOMApp's rende** (1 connections) — `tests/integration/test_renderer_parity.py`
+- **test_loop_item_lines.py** (13 connections) — `tests/compact/test_loop_item_lines.py`
+- **_renderer()** (11 connections) — `tests/compact/test_loop_item_lines.py`
+- **_task_start()** (10 connections) — `tests/compact/test_loop_item_lines.py`
+- **_item()** (9 connections) — `tests/compact/test_loop_item_lines.py`
+- **_logged()** (9 connections) — `tests/compact/test_loop_item_lines.py`
+- **_all_text()** (7 connections) — `tests/compact/test_loop_item_lines.py`
+- **.test_no_bare_aggregate_host_line()** (7 connections) — `tests/compact/test_loop_item_lines.py`
+- **_loop_ok()** (6 connections) — `tests/compact/test_loop_item_lines.py`
+- **.test_failed_item_is_red()** (6 connections) — `tests/compact/test_loop_item_lines.py`
+- **.test_failed_item_uses_failed_prefix()** (6 connections) — `tests/compact/test_loop_item_lines.py`
+- **.test_no_aggregate_fatal_line_for_loop()** (6 connections) — `tests/compact/test_loop_item_lines.py`
+- **.test_item_colors_match_status()** (6 connections) — `tests/compact/test_loop_item_lines.py`
+- **.test_one_line_per_item_with_label()** (6 connections) — `tests/compact/test_loop_item_lines.py`
+- **.test_skipped_item_is_cyan()** (6 connections) — `tests/compact/test_loop_item_lines.py`
+- **.test_skipped_item_renders_inline()** (6 connections) — `tests/compact/test_loop_item_lines.py`
+- **TestFailedLoop** (5 connections) — `tests/compact/test_loop_item_lines.py`
+- **TestOkChangedLoop** (5 connections) — `tests/compact/test_loop_item_lines.py`
+- **_loop_failed()** (4 connections) — `tests/compact/test_loop_item_lines.py`
+- **.test_plain_task_still_emits_aggregate_line()** (4 connections) — `tests/compact/test_loop_item_lines.py`
+- **TestSkippedItem** (4 connections) — `tests/compact/test_loop_item_lines.py`
+- **TestNonLoopUnaffected** (3 connections) — `tests/compact/test_loop_item_lines.py`
+- **Tests for per-item loop rendering in the streaming log.  The ``ansible.posix.jso** (1 connections) — `tests/compact/test_loop_item_lines.py`
+- **_stats()** (1 connections) — `tests/compact/test_loop_item_lines.py`
 
 ## Relationships
 
-- [[Replay Determinism Tests]] (2 shared connections)
-- [[Playbook Event Parsing]] (1 shared connections)
-- [[Compact Renderer Implementation]] (1 shared connections)
-- [[JSON Renderer]] (1 shared connections)
-- [[AOM TUI Application]] (1 shared connections)
-- [[Run Config Key Normalization]] (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (7 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/parity.py`
-- `tests/integration/test_renderer_parity.py`
+- `tests/compact/test_loop_item_lines.py`
 
 ## Audit Trail
 
-- EXTRACTED: 51 (84%)
-- INFERRED: 10 (16%)
+- EXTRACTED: 137 (97%)
+- INFERRED: 4 (3%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

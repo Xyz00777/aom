@@ -1,58 +1,55 @@
 # Warning Classification Tests
 
-> 30 nodes · cohesion 0.07
+> 37 nodes · cohesion 0.14
 
 ## Key Concepts
 
-- **TestWarningPatternsEdgeCases** (14 connections) — `tests/unit/test_warnings.py`
-- **TestWarningEntrySourceField** (11 connections) — `tests/unit/test_warnings.py`
-- **test_warnings.py** (10 connections) — `tests/unit/test_warnings.py`
-- **TestWarningEntryTimestamp** (10 connections) — `tests/unit/test_warnings.py`
-- **.test_source_field_can_be_set()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_source_field_controller_for_pty_warnings()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_source_field_empty_string_default()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_timestamp_captured_on_creation()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_timestamp_is_datetime_or_none()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_empty_line_not_warning()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_json_line_not_treated_as_warning()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_mixed_warning_types()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_multiple_deprecation_warnings()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_non_warning_plaintext_added_to_plaintext_lines()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_warning_in_pre_run_prompts_phase_not_captured()** (3 connections) — `tests/unit/test_warnings.py`
-- **Unit tests for warning classification and filtering (v1.8).  Covers TEST_SPECIFI** (1 connections) — `tests/unit/test_warnings.py`
-- **TC-502: WarningEntry source field for PTY stream.** (1 connections) — `tests/unit/test_warnings.py`
-- **TC-502: WarningEntry from PtyStreamParser has source='controller'.** (1 connections) — `tests/unit/test_warnings.py`
-- **TC-502: WarningEntry source defaults to empty string if not provided.** (1 connections) — `tests/unit/test_warnings.py`
-- **TC-502: WarningEntry source can be explicitly set.** (1 connections) — `tests/unit/test_warnings.py`
-- **TC-503: WarningEntry timestamp from PTY stream.** (1 connections) — `tests/unit/test_warnings.py`
-- **TC-503: WarningEntry captures timestamp when created.** (1 connections) — `tests/unit/test_warnings.py`
-- **TC-503: Timestamp is either datetime or None.** (1 connections) — `tests/unit/test_warnings.py`
-- **Edge cases for warning pattern matching.** (1 connections) — `tests/unit/test_warnings.py`
-- **Multiple [DEPRECATION WARNING]: lines are all classified correctly.** (1 connections) — `tests/unit/test_warnings.py`
-- *... and 5 more nodes in this community*
+- **RunProgress** (26 connections) — `src/ansible_aom/core/estimate.py`
+- **test_estimate.py** (19 connections) — `tests/unit/test_estimate.py`
+- **_est()** (19 connections) — `tests/unit/test_estimate.py`
+- **project_remaining()** (15 connections) — `src/ansible_aom/core/estimate.py`
+- **RunEstimate** (11 connections) — `src/ansible_aom/core/estimate.py`
+- **add_completed()** (9 connections) — `src/ansible_aom/core/estimate.py`
+- **add_in_flight()** (9 connections) — `src/ansible_aom/core/estimate.py`
+- **estimate.py** (6 connections) — `src/ansible_aom/core/estimate.py`
+- **test_add_completed_buckets_by_prior_result()** (4 connections) — `tests/unit/test_estimate.py`
+- **test_add_completed_fixed_task_does_not_touch_var_actual()** (4 connections) — `tests/unit/test_estimate.py`
+- **test_add_completed_ignores_unmatched_path()** (4 connections) — `tests/unit/test_estimate.py`
+- **test_add_in_flight_caps_credit_at_prior_but_not_actual()** (4 connections) — `tests/unit/test_estimate.py`
+- **test_add_in_flight_credits_variable_bucket_and_actual()** (4 connections) — `tests/unit/test_estimate.py`
+- **test_add_in_flight_fixed_task_credits_floor_only()** (4 connections) — `tests/unit/test_estimate.py`
+- **test_fast_rerun_keeps_floor_but_collapses_variable()** (4 connections) — `tests/unit/test_estimate.py`
+- **test_fixed_floor_projected_unscaled()** (4 connections) — `tests/unit/test_estimate.py`
+- **test_no_prior_returns_none()** (4 connections) — `tests/unit/test_estimate.py`
+- **test_remaining_never_negative()** (4 connections) — `tests/unit/test_estimate.py`
+- **test_variable_remainder_scaled_by_work_pace()** (4 connections) — `tests/unit/test_estimate.py`
+- **test_warmup_fraction_gate()** (4 connections) — `tests/unit/test_estimate.py`
+- **test_warmup_min_tasks_gate()** (4 connections) — `tests/unit/test_estimate.py`
+- **test_work_pace_clamped_high()** (4 connections) — `tests/unit/test_estimate.py`
+- **test_work_pace_clamped_low()** (4 connections) — `tests/unit/test_estimate.py`
+- **test_work_pace_defaults_to_one_before_any_variable_completes()** (4 connections) — `tests/unit/test_estimate.py`
+- **.set_prior_run()** (3 connections) — `src/ansible_aom/compact/renderer.py`
+- *... and 12 more nodes in this community*
 
 ## Relationships
 
-- [[PTY Stream Parser]] (12 shared connections)
-- [[Role Group Task Models]] (6 shared connections)
-- [[Status Bar Warning Panels]] (5 shared connections)
-- [[Warnings Display Config]] (4 shared connections)
-- [[App Configuration Settings]] (4 shared connections)
-- [[Parser Warnings List]] (1 shared connections)
-- [[Warning Pattern Classification]] (1 shared connections)
-- [[WarningEntry Dataclass]] (1 shared connections)
-- [[WarningType Enum]] (1 shared connections)
+- [Inspect Debug Diagnostics](Inspect_Debug_Diagnostics.md) (4 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (3 shared connections)
+- [Community 560](Community_560.md) (2 shared connections)
+- [Crash Recovery Panels](Crash_Recovery_Panels.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_warnings.py`
+- `src/ansible_aom/compact/renderer.py`
+- `src/ansible_aom/core/estimate.py`
+- `tests/unit/test_estimate.py`
 
 ## Audit Trail
 
-- EXTRACTED: 64 (69%)
-- INFERRED: 29 (31%)
+- EXTRACTED: 121 (62%)
+- INFERRED: 75 (38%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

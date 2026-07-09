@@ -1,35 +1,39 @@
 # Completion State Labels
 
-> 11 nodes · cohesion 0.27
+> 15 nodes · cohesion 0.13
 
 ## Key Concepts
 
-- **_final_line()** (7 connections) — `tests/compact/test_completion_label.py`
-- **TestCompletionLabel** (7 connections) — `tests/compact/test_completion_label.py`
-- **test_completion_label.py** (3 connections) — `tests/compact/test_completion_label.py`
-- **.test_ctrl_c_shows_cancelled()** (3 connections) — `tests/compact/test_completion_label.py`
-- **.test_executable_missing_shows_not_found()** (3 connections) — `tests/compact/test_completion_label.py`
-- **.test_completed_has_no_label()** (2 connections) — `tests/compact/test_completion_label.py`
-- **.test_failed_state_is_labeled()** (2 connections) — `tests/compact/test_completion_label.py`
-- **.test_other_crash_shows_crashed()** (2 connections) — `tests/compact/test_completion_label.py`
-- **Tests for the labeled final-state line in handle_completion.  A bare ✖ told the** (1 connections) — `tests/compact/test_completion_label.py`
-- **Exit code 130 (KeyboardInterrupt) shows 'cancelled by user'.** (1 connections) — `tests/compact/test_completion_label.py`
-- **Exit code 127 (command not found) gets its own label.** (1 connections) — `tests/compact/test_completion_label.py`
+- **Tree view for the compact renderer — Implementation Plan** (14 connections) — `docs/superpowers/plans/2026-05-19-free-strategy-tree-view.md`
+- **2026-05-19-free-strategy-tree-view.md** (1 connections) — `docs/superpowers/plans/2026-05-19-free-strategy-tree-view.md`
+- **Conventions used in every task** (1 connections) — `docs/superpowers/plans/2026-05-19-free-strategy-tree-view.md`
+- **File structure** (1 connections) — `docs/superpowers/plans/2026-05-19-free-strategy-tree-view.md`
+- **Final check** (1 connections) — `docs/superpowers/plans/2026-05-19-free-strategy-tree-view.md`
+- **Spec coverage check (post-write self-review)** (1 connections) — `docs/superpowers/plans/2026-05-19-free-strategy-tree-view.md`
+- **Task 1: `core/tree.py` — dataclasses + `TreeProjection` skeleton with visibility methods** (1 connections) — `docs/superpowers/plans/2026-05-19-free-strategy-tree-view.md`
+- **Task 2: `host_rows()` — counts, worst-status, current-task suffix** (1 connections) — `docs/superpowers/plans/2026-05-19-free-strategy-tree-view.md`
+- **Task 3: `tree_lines()` — basic shape for a single running task** (1 connections) — `docs/superpowers/plans/2026-05-19-free-strategy-tree-view.md`
+- **Task 4: `tree_lines()` — role grouping + free-strategy fan-out** (1 connections) — `docs/superpowers/plans/2026-05-19-free-strategy-tree-view.md`
+- **Task 5: `tree_lines()` — height-budget pruning + invariants** (1 connections) — `docs/superpowers/plans/2026-05-19-free-strategy-tree-view.md`
+- **Task 6: `format_host_rows()` formatter + count-cells refactor** (1 connections) — `docs/superpowers/plans/2026-05-19-free-strategy-tree-view.md`
+- **Task 7: `format_tree_block()` formatter** (1 connections) — `docs/superpowers/plans/2026-05-19-free-strategy-tree-view.md`
+- **Task 8: Wire tree + host rows into `CompactRenderer._render_status_panel`** (1 connections) — `docs/superpowers/plans/2026-05-19-free-strategy-tree-view.md`
+- **Task 9: End-to-end snapshot of linear, free, and post-recap shapes** (1 connections) — `docs/superpowers/plans/2026-05-19-free-strategy-tree-view.md`
 
 ## Relationships
 
-- [[Compact Renderer Implementation]] (2 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/compact/test_completion_label.py`
+- `docs/superpowers/plans/2026-05-19-free-strategy-tree-view.md`
 
 ## Audit Trail
 
-- EXTRACTED: 30 (94%)
-- INFERRED: 2 (6%)
+- EXTRACTED: 28 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

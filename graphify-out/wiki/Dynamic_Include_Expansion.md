@@ -1,53 +1,53 @@
 # Dynamic Include Expansion
 
-> 30 nodes · cohesion 0.11
+> 38 nodes · cohesion 0.10
 
 ## Key Concepts
 
-- **_play_start()** (16 connections) — `tests/unit/test_dynamic_expansion.py`
-- **TestDynamicExpansion** (14 connections) — `tests/unit/test_dynamic_expansion.py`
-- **_task_start()** (13 connections) — `tests/unit/test_dynamic_expansion.py`
-- **.test_runtime_cache_reuses_preflight_entry()** (10 connections) — `tests/unit/test_dynamic_expansion.py`
-- **test_dynamic_expansion.py** (9 connections) — `tests/unit/test_dynamic_expansion.py`
-- **.test_task_path_populates_include_cache()** (9 connections) — `tests/unit/test_dynamic_expansion.py`
-- **.test_repeated_task_uuid_does_not_re_graft()** (8 connections) — `tests/unit/test_dynamic_expansion.py`
-- **TestRuntimeIncludeDiscovery** (8 connections) — `tests/unit/test_dynamic_expansion.py`
-- **.test_dynamic_task_inherits_parent_play_fields()** (7 connections) — `tests/unit/test_dynamic_expansion.py`
-- **.test_grafting_works_under_v2_runner_on_start()** (7 connections) — `tests/unit/test_dynamic_expansion.py`
-- **.test_multiple_unknown_tasks_accumulate_under_same_parent()** (7 connections) — `tests/unit/test_dynamic_expansion.py`
-- **.test_orphan_dynamic_task_when_no_parent_seen_yet()** (7 connections) — `tests/unit/test_dynamic_expansion.py`
-- **.test_static_task_following_dynamic_resets_parent()** (7 connections) — `tests/unit/test_dynamic_expansion.py`
-- **.test_unknown_task_grafted_as_child_of_last_matched_task()** (7 connections) — `tests/unit/test_dynamic_expansion.py`
-- **_runner_start()** (5 connections) — `tests/unit/test_dynamic_expansion.py`
-- **.test_no_grafting_without_definitions()** (5 connections) — `tests/unit/test_dynamic_expansion.py`
-- **_task_start_with_path()** (3 connections) — `tests/unit/test_dynamic_expansion.py`
-- **Unit tests for include_tasks dynamic expansion.  TC-094 / TC-095 from TEST_SPECI** (1 connections) — `tests/unit/test_dynamic_expansion.py`
-- **Dynamic TaskDefinition copies play_id and play_order from the parent.** (1 connections) — `tests/unit/test_dynamic_expansion.py`
-- **TC-094: Several dynamic tasks under the same include_tasks parent.** (1 connections) — `tests/unit/test_dynamic_expansion.py`
-- **A second v2_runner_on_start for the same UUID must not graft twice.** (1 connections) — `tests/unit/test_dynamic_expansion.py`
-- **A subsequent matched preflight task replaces the parent cursor.** (1 connections) — `tests/unit/test_dynamic_expansion.py`
-- **Unknown task before any preflight match is left orphan (no graft, no crash).** (1 connections) — `tests/unit/test_dynamic_expansion.py`
-- **Free-strategy plays emit v2_runner_on_start instead of task_start.          The** (1 connections) — `tests/unit/test_dynamic_expansion.py`
-- **With no preflight definitions there's no parent to graft under.** (1 connections) — `tests/unit/test_dynamic_expansion.py`
-- *... and 5 more nodes in this community*
+- **_session()** (17 connections) — `tests/unit/test_session_collectors.py`
+- **collect_failed_hosts()** (13 connections) — `src/ansible_aom/session/summary.py`
+- **collect_changed_hosts()** (10 connections) — `src/ansible_aom/session/summary.py`
+- **collect_unreachable_hosts()** (10 connections) — `src/ansible_aom/session/summary.py`
+- **TestCollectFailedHosts** (9 connections) — `tests/unit/test_session_collectors.py`
+- **TestCollectChangedHosts** (6 connections) — `tests/unit/test_session_collectors.py`
+- **TestCollectUnreachableHosts** (6 connections) — `tests/unit/test_session_collectors.py`
+- **summary.py** (5 connections) — `src/ansible_aom/session/summary.py`
+- **test_session_collectors.py** (5 connections) — `tests/unit/test_session_collectors.py`
+- **create_session_summary()** (4 connections) — `src/ansible_aom/session/summary.py`
+- **Any** (4 connections)
+- **.test_multi_host_failure_event()** (4 connections) — `tests/unit/test_session_collectors.py`
+- **.test_unreachable_events_ignored_by_failed_collector()** (4 connections) — `tests/unit/test_session_collectors.py`
+- **.test_changed_host_collected()** (3 connections) — `tests/unit/test_session_collectors.py`
+- **.test_empty_session_returns_empty_set()** (3 connections) — `tests/unit/test_session_collectors.py`
+- **.test_failed_events_ignored()** (3 connections) — `tests/unit/test_session_collectors.py`
+- **.test_multi_host_event_picks_only_changed()** (3 connections) — `tests/unit/test_session_collectors.py`
+- **.test_unchanged_ok_host_ignored()** (3 connections) — `tests/unit/test_session_collectors.py`
+- **.test_empty_session_returns_empty_set()** (3 connections) — `tests/unit/test_session_collectors.py`
+- **.test_multiple_failures_across_tasks_collected()** (3 connections) — `tests/unit/test_session_collectors.py`
+- **.test_ok_events_ignored()** (3 connections) — `tests/unit/test_session_collectors.py`
+- **.test_same_host_failing_twice_collapses_to_one_entry()** (3 connections) — `tests/unit/test_session_collectors.py`
+- **.test_session_without_events_key()** (3 connections) — `tests/unit/test_session_collectors.py`
+- **.test_single_failure_returns_one_host()** (3 connections) — `tests/unit/test_session_collectors.py`
+- **.test_empty_session_returns_empty_set()** (3 connections) — `tests/unit/test_session_collectors.py`
+- *... and 13 more nodes in this community*
 
 ## Relationships
 
-- [[Task Definition Live Refresh]] (11 shared connections)
-- [[Play Definition Tree Population]] (11 shared connections)
-- [[Include Role Discovery]] (3 shared connections)
-- [[Run Config Key Normalization]] (2 shared connections)
+- [KeyAction TypedDict](KeyAction_TypedDict.md) (3 shared connections)
+- [Crash Recovery Auto-Save](Crash_Recovery_Auto-Save.md) (3 shared connections)
+- [Total Task Counting](Total_Task_Counting.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_dynamic_expansion.py`
+- `src/ansible_aom/session/summary.py`
+- `tests/unit/test_session_collectors.py`
 
 ## Audit Trail
 
-- EXTRACTED: 118 (76%)
-- INFERRED: 37 (24%)
+- EXTRACTED: 110 (72%)
+- INFERRED: 43 (28%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

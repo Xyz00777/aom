@@ -1,41 +1,50 @@
 # Loop Item Events Integration
 
-> 16 nodes · cohesion 0.17
+> 39 nodes · cohesion 0.05
 
 ## Key Concepts
 
-- **test_loop_item_events.py** (7 connections) — `tests/integration/test_loop_item_events.py`
-- **_run_aom()** (6 connections) — `tests/integration/test_loop_item_events.py`
-- **_run_playbook()** (6 connections) — `tests/integration/test_loop_item_events.py`
-- **TestLoopItemEvents** (4 connections) — `tests/integration/test_loop_item_events.py`
-- **_ansible_collection_paths()** (3 connections) — `tests/integration/test_loop_item_events.py`
-- **TestLoopItemStreamingEndToEnd** (3 connections) — `tests/integration/test_loop_item_events.py`
-- **.test_aggregate_event_still_emitted()** (2 connections) — `tests/integration/test_loop_item_events.py`
-- **.test_item_event_carries_label_under_host()** (2 connections) — `tests/integration/test_loop_item_events.py`
-- **.test_one_item_event_per_loop_iteration()** (2 connections) — `tests/integration/test_loop_item_events.py`
-- **.test_each_item_line_appears_exactly_once()** (2 connections) — `tests/integration/test_loop_item_events.py`
-- **_has_ansible_posix()** (1 connections) — `tests/integration/test_loop_item_events.py`
-- **Integration: the bundled ``aom_jsonl`` callback emits per-item loop events.  ``a** (1 connections) — `tests/integration/test_loop_item_events.py`
-- **Spawn ``python -m ansible_aom <playbook>`` against a sandboxed HOME.      Exerci** (1 connections) — `tests/integration/test_loop_item_events.py`
-- **The full ``aom`` pipeline renders one line per loop item, once each.** (1 connections) — `tests/integration/test_loop_item_events.py`
-- **Search-path entries reported by ``ansible-galaxy collection list``.      A sandb** (1 connections) — `tests/integration/test_loop_item_events.py`
-- **Run ansible-playbook with the bundled callback; return parsed JSONL events.** (1 connections) — `tests/integration/test_loop_item_events.py`
+- **Test Playbooks for ansible-aom** (38 connections) — `TEST_PLAYBOOKS.md`
+- **TEST_PLAYBOOKS.md** (1 connections) — `TEST_PLAYBOOKS.md`
+- **10. Free Strategy** (1 connections) — `TEST_PLAYBOOKS.md`
+- **11. Role-Based Tasks (Role Grouping)** (1 connections) — `TEST_PLAYBOOKS.md`
+- **12. Vault-Encrypted Playbook** (1 connections) — `TEST_PLAYBOOKS.md`
+- **13. SSH Password Authentication** (1 connections) — `TEST_PLAYBOOKS.md`
+- **14. Become (Privilege Escalation)** (1 connections) — `TEST_PLAYBOOKS.md`
+- **15. Vault Password Change** (1 connections) — `TEST_PLAYBOOKS.md`
+- **16. Ansible Warnings** (1 connections) — `TEST_PLAYBOOKS.md`
+- **17. Deprecation Warnings** (1 connections) — `TEST_PLAYBOOKS.md`
+- **18. no_log Tasks (Secret Redaction Layer 1)** (1 connections) — `TEST_PLAYBOOKS.md`
+- **19. Password Field Redaction (Secret Redaction Layer 2)** (1 connections) — `TEST_PLAYBOOKS.md`
+- **1. Minimal Single-Task Success** (1 connections) — `TEST_PLAYBOOKS.md`
+- **20. URL and CLI Credential Redaction (Secret Redaction Layer 3)** (1 connections) — `TEST_PLAYBOOKS.md`
+- **21. Module Args Redaction (Secret Redaction Layer 4)** (1 connections) — `TEST_PLAYBOOKS.md`
+- **22. PLAY RECAP Parsing** (1 connections) — `TEST_PLAYBOOKS.md`
+- **23. ansible-playbook Command Not Found** (1 connections) — `TEST_PLAYBOOKS.md`
+- **24. User Cancellation (Ctrl+C)** (1 connections) — `TEST_PLAYBOOKS.md`
+- **25. ansible-playbook Syntax Error** (1 connections) — `TEST_PLAYBOOKS.md`
+- **26. Empty Playbook** (1 connections) — `TEST_PLAYBOOKS.md`
+- **27. Single Host (localhost)** (1 connections) — `TEST_PLAYBOOKS.md`
+- **28. Host Pattern Filtering** (1 connections) — `TEST_PLAYBOOKS.md`
+- **29. Tags** (1 connections) — `TEST_PLAYBOOKS.md`
+- **2. Single-Task with Changes** (1 connections) — `TEST_PLAYBOOKS.md`
+- **30. include_tasks vs import_tasks** (1 connections) — `TEST_PLAYBOOKS.md`
+- *... and 14 more nodes in this community*
 
 ## Relationships
 
-- [[Run Config Key Normalization]] (2 shared connections)
-- [[CLI Help Matrix]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/integration/test_loop_item_events.py`
+- `TEST_PLAYBOOKS.md`
 
 ## Audit Trail
 
-- EXTRACTED: 43 (100%)
+- EXTRACTED: 76 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

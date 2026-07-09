@@ -1,26 +1,36 @@
 # Inspect CLI Module
 
-> 2 nodes · cohesion 1.00
+> 11 nodes · cohesion 0.27
 
 ## Key Concepts
 
-- **__init__.py** (1 connections) — `src/ansible_aom/inspect/__init__.py`
-- **Inspect CLI module for AOM - text-mode session inspection.** (1 connections) — `src/ansible_aom/inspect/__init__.py`
+- **_final_line()** (7 connections) — `tests/compact/test_completion_label.py`
+- **TestCompletionLabel** (7 connections) — `tests/compact/test_completion_label.py`
+- **test_completion_label.py** (4 connections) — `tests/compact/test_completion_label.py`
+- **.test_ctrl_c_shows_cancelled()** (3 connections) — `tests/compact/test_completion_label.py`
+- **.test_executable_missing_shows_not_found()** (3 connections) — `tests/compact/test_completion_label.py`
+- **.test_completed_has_no_label()** (2 connections) — `tests/compact/test_completion_label.py`
+- **.test_failed_state_is_labeled()** (2 connections) — `tests/compact/test_completion_label.py`
+- **.test_other_crash_shows_crashed()** (2 connections) — `tests/compact/test_completion_label.py`
+- **Tests for the labeled final-state line in handle_completion.  A bare ✖ told the** (1 connections) — `tests/compact/test_completion_label.py`
+- **Exit code 130 (KeyboardInterrupt) shows 'cancelled by user'.** (1 connections) — `tests/compact/test_completion_label.py`
+- **Exit code 127 (command not found) gets its own label.** (1 connections) — `tests/compact/test_completion_label.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [App Configuration Settings](App_Configuration_Settings.md) (2 shared connections)
+- [Frame Parameter Handling](Frame_Parameter_Handling.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/inspect/__init__.py`
+- `tests/compact/test_completion_label.py`
 
 ## Audit Trail
 
-- EXTRACTED: 2 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 31 (94%)
+- INFERRED: 2 (6%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

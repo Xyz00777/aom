@@ -1,41 +1,41 @@
 # Host Result Hide Filter
 
-> 29 nodes · cohesion 0.13
+> 37 nodes · cohesion 0.09
 
 ## Key Concepts
 
-- **should_hide_host_result()** (27 connections) — `src/ansible_aom/core/log_filter.py`
-- **TestShouldHideHostResult** (26 connections) — `tests/unit/test_log_filter.py`
-- **.test_missing_changed_defaults_to_false()** (3 connections) — `tests/unit/test_log_filter.py`
-- **.test_changed_result_hidden_when_both_ok_and_changed_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_changed_result_hidden_when_changed_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_changed_result_visible_when_only_ok_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_changed_result_visible_with_empty_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_empty_event_type_never_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_failed_hidden_when_failed_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_failed_visible_with_empty_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_item_changed_hidden_when_changed_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_item_changed_visible_when_only_ok_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_item_failed_hidden_when_failed_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_item_ok_hidden_when_ok_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_item_skipped_hidden_when_skipped_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_missing_changed_visible_when_only_changed_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_ok_result_hidden_when_both_ok_and_changed_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_ok_result_hidden_when_ok_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_ok_result_visible_when_only_changed_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_ok_result_visible_when_only_failed_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_ok_result_visible_with_empty_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_skipped_hidden_when_skipped_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_skipped_visible_with_empty_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- **should_hide_event()** (28 connections) — `src/ansible_aom/core/log_filter.py`
+- **TestShouldHideEvent** (26 connections) — `tests/unit/test_log_filter.py`
+- **.test_empty_event_type_never_hidden()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_multiple_hide_states_match_any()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_multiple_hide_states_no_match()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_runner_item_on_ok_true_when_changed_hidden()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_runner_on_ok_false_when_not_hidden()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_runner_on_ok_false_when_only_failed_hidden()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_runner_on_ok_true_when_changed_hidden()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_runner_on_ok_true_when_ok_hidden()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_runner_on_start_never_hidden()** (3 connections) — `tests/unit/test_log_filter.py`
 - **.test_unknown_event_type_never_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_unreachable_hidden_when_unreachable_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
-- *... and 4 more nodes in this community*
+- **.test_v2_playbook_on_handler_task_start_never_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_playbook_on_play_start_never_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_playbook_on_start_never_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_playbook_on_stats_never_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_playbook_on_task_start_never_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_runner_item_on_failed_true()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_runner_item_on_ok_true()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_runner_item_on_skipped_true()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_runner_on_failed_false_when_not_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_runner_on_failed_true()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_runner_on_skipped_false_when_not_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_runner_on_skipped_true()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_v2_runner_on_unreachable_false_when_not_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
+- *... and 12 more nodes in this community*
 
 ## Relationships
 
-- [[Event Log Emission]] (1 shared connections)
-- [[Log Filter Helpers]] (1 shared connections)
-- [[Hide State Normalization]] (1 shared connections)
+- [Heartbeat Liveness Tracker](Heartbeat_Liveness_Tracker.md) (2 shared connections)
+- [Community 670](Community_670.md) (1 shared connections)
+- [Main TUI Screen](Main_TUI_Screen.md) (1 shared connections)
 
 ## Source Files
 
@@ -44,10 +44,10 @@
 
 ## Audit Trail
 
-- EXTRACTED: 56 (53%)
-- INFERRED: 49 (47%)
+- EXTRACTED: 72 (59%)
+- INFERRED: 50 (41%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

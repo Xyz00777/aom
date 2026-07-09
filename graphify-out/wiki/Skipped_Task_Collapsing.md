@@ -1,46 +1,62 @@
 # Skipped Task Collapsing
 
-> 22 nodes · cohesion 0.25
+> 29 nodes · cohesion 0.08
 
 ## Key Concepts
 
-- **test_skipped_collapsing.py** (10 connections) — `tests/compact/test_skipped_collapsing.py`
-- **_logged()** (10 connections) — `tests/compact/test_skipped_collapsing.py`
-- **_renderer()** (10 connections) — `tests/compact/test_skipped_collapsing.py`
-- **_skipped()** (9 connections) — `tests/compact/test_skipped_collapsing.py`
-- **_task_start()** (9 connections) — `tests/compact/test_skipped_collapsing.py`
-- **TestAllSkippedCollapsing** (7 connections) — `tests/compact/test_skipped_collapsing.py`
-- **.test_collapse_at_stats_for_final_task()** (7 connections) — `tests/compact/test_skipped_collapsing.py`
-- **.test_ok_then_skipped_only_flushed_at_transition()** (7 connections) — `tests/compact/test_skipped_collapsing.py`
-- **.test_collapsing_state_does_not_leak_to_next_task()** (7 connections) — `tests/compact/test_skipped_collapsing.py`
-- **.test_skipped_then_ok_expands_skipped_lines()** (6 connections) — `tests/compact/test_skipped_collapsing.py`
-- **.test_compressed_line_is_cyan()** (5 connections) — `tests/compact/test_skipped_collapsing.py`
-- **.test_many_hosts_shows_count_only()** (5 connections) — `tests/compact/test_skipped_collapsing.py`
-- **.test_single_skipped_host_singular_form()** (5 connections) — `tests/compact/test_skipped_collapsing.py`
-- **.test_three_or_fewer_hosts_lists_names()** (5 connections) — `tests/compact/test_skipped_collapsing.py`
-- **_ok()** (4 connections) — `tests/compact/test_skipped_collapsing.py`
-- **TestMixedTaskExpandsIndividually** (4 connections) — `tests/compact/test_skipped_collapsing.py`
-- **TestStateResetBetweenTasks** (3 connections) — `tests/compact/test_skipped_collapsing.py`
-- **_stats()** (2 connections) — `tests/compact/test_skipped_collapsing.py`
-- **Tests for skipped-task collapsing.  When a task produces only ``skipped`` result** (1 connections) — `tests/compact/test_skipped_collapsing.py`
-- **The very last task can't be flushed by a next task_start;         the stats even** (1 connections) — `tests/compact/test_skipped_collapsing.py`
-- **ok arrives first, then skipped — those skipped land at the         next task tra** (1 connections) — `tests/compact/test_skipped_collapsing.py`
-- **All-skipped task A followed by mixed task B: B must         flush its own skips** (1 connections) — `tests/compact/test_skipped_collapsing.py`
+- **StderrLevel** (26 connections) — `src/ansible_aom/core/stderr_classifier.py`
+- **test_stderr_classifier.py** (24 connections) — `tests/unit/test_stderr_classifier.py`
+- **TestClassifyConnectionLifecycle** (7 connections) — `tests/unit/test_stderr_classifier.py`
+- **TestClassifyDeprecation** (7 connections) — `tests/unit/test_stderr_classifier.py`
+- **TestClassifyInventory** (7 connections) — `tests/unit/test_stderr_classifier.py`
+- **TestClassifyPluginLoading** (7 connections) — `tests/unit/test_stderr_classifier.py`
+- **TestNoExceptions** (6 connections) — `tests/unit/test_stderr_classifier.py`
+- **TestStderrLevel** (6 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_never_raises()** (4 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_reset_call()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_reset_persistent_connection()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_deprecation_callback()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_deprecation_interpreter()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_declined_parsing()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_parsed_inventory()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_callback_loading()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_inventory_plugin_setup()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **.test_levels_cover_caplevel_zero_through_four()** (2 connections) — `tests/unit/test_stderr_classifier.py`
+- **IntEnum** (1 connections)
+- **Numeric verbosity caplevel for an ``aom_stderr_line`` event.      Mirrors ansibl** (1 connections) — `src/ansible_aom/core/stderr_classifier.py`
+- **Unit tests for the v1 stderr classifier.  Covers ``core/stderr_classifier.py`` —** (1 connections) — `tests/unit/test_stderr_classifier.py`
+- **[DEPRECATION WARNING]: lines are run-level.** (1 connections) — `tests/unit/test_stderr_classifier.py`
+- **Persistent connection reset messages (host is NOT in text).** (1 connections) — `tests/unit/test_stderr_classifier.py`
+- **Callback + inventory plugin setup.** (1 connections) — `tests/unit/test_stderr_classifier.py`
+- **Inventory parse / decline diagnostics.** (1 connections) — `tests/unit/test_stderr_classifier.py`
+- *... and 4 more nodes in this community*
 
 ## Relationships
 
-- [[Compact Renderer Implementation]] (5 shared connections)
+- [Prompt Detection Heuristics](Prompt_Detection_Heuristics.md) (17 shared connections)
+- [Profile Tracemalloc Wiring](Profile_Tracemalloc_Wiring.md) (11 shared connections)
+- [Keybinding Conflict Validation](Keybinding_Conflict_Validation.md) (11 shared connections)
+- [Community 465](Community_465.md) (2 shared connections)
+- [Community 514](Community_514.md) (2 shared connections)
+- [Community 575](Community_575.md) (2 shared connections)
+- [Community 612](Community_612.md) (2 shared connections)
+- [Community 576](Community_576.md) (2 shared connections)
+- [Community 532](Community_532.md) (2 shared connections)
+- [Community 578](Community_578.md) (2 shared connections)
+- [Community 487](Community_487.md) (2 shared connections)
+- [Community 577](Community_577.md) (2 shared connections)
 
 ## Source Files
 
-- `tests/compact/test_skipped_collapsing.py`
+- `src/ansible_aom/core/stderr_classifier.py`
+- `tests/unit/test_stderr_classifier.py`
 
 ## Audit Trail
 
-- EXTRACTED: 116 (97%)
-- INFERRED: 3 (3%)
+- EXTRACTED: 72 (59%)
+- INFERRED: 51 (41%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

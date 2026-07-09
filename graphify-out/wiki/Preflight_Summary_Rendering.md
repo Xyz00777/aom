@@ -1,59 +1,61 @@
 # Preflight Summary Rendering
 
-> 26 nodes · cohesion 0.14
+> 34 nodes · cohesion 0.06
 
 ## Key Concepts
 
-- **format_preflight_summary()** (20 connections) — `src/ansible_aom/compact/format.py`
-- **test_preflight_summary.py** (14 connections) — `tests/compact/test_preflight_summary.py`
-- **_td()** (7 connections) — `tests/compact/test_preflight_summary.py`
-- **_td_tagged()** (7 connections) — `tests/compact/test_preflight_summary.py`
-- **_play()** (7 connections) — `tests/compact/test_prior_run_line.py`
-- **test_format_preflight_summary_counts_role_grouped_tasks()** (6 connections) — `tests/compact/test_preflight_summary.py`
-- **test_prior_run_line.py** (6 connections) — `tests/compact/test_prior_run_line.py`
-- **test_collect_tags_handles_role_group_definition()** (5 connections) — `tests/compact/test_preflight_summary.py`
-- **test_format_preflight_summary_handles_no_resolved_hosts()** (5 connections) — `tests/compact/test_preflight_summary.py`
-- **test_format_preflight_summary_pluralization()** (5 connections) — `tests/compact/test_preflight_summary.py`
-- **test_collect_tags_empty_when_no_tags()** (4 connections) — `tests/compact/test_preflight_summary.py`
-- **test_collect_tags_unique_sorted_across_plays()** (4 connections) — `tests/compact/test_preflight_summary.py`
-- **test_format_preflight_summary_appends_tag_line_when_tags_present()** (4 connections) — `tests/compact/test_preflight_summary.py`
-- **test_format_preflight_summary_multi_play()** (4 connections) — `tests/compact/test_preflight_summary.py`
-- **test_format_preflight_summary_omits_tag_line_when_no_tags()** (4 connections) — `tests/compact/test_preflight_summary.py`
-- **test_format_preflight_summary_single_play()** (4 connections) — `tests/compact/test_preflight_summary.py`
-- **test_prior_run_line_hours_format()** (4 connections) — `tests/compact/test_prior_run_line.py`
-- **test_prior_run_line_seconds_only_under_a_minute()** (4 connections) — `tests/compact/test_prior_run_line.py`
-- **test_prior_run_line_shown_when_prior_exists()** (4 connections) — `tests/compact/test_prior_run_line.py`
-- **test_prior_run_line_is_omitted_when_none()** (3 connections) — `tests/compact/test_prior_run_line.py`
-- **test_format_preflight_summary_empty_returns_none()** (2 connections) — `tests/compact/test_preflight_summary.py`
-- **Tests for format_preflight_summary — startup tree preview.** (1 connections) — `tests/compact/test_preflight_summary.py`
-- **When --list-hosts failed for a play, resolved_hosts is empty.** (1 connections) — `tests/compact/test_preflight_summary.py`
-- **1 host vs N hosts; 1 task vs N tasks.** (1 connections) — `tests/compact/test_preflight_summary.py`
-- **RoleGroupDefinition should contribute its inner task count.** (1 connections) — `tests/compact/test_preflight_summary.py`
-- *... and 1 more nodes in this community*
+- **create_renderer()** (27 connections) — `src/ansible_aom/renderer/factory.py`
+- **_resolve_mode()** (5 connections) — `src/ansible_aom/renderer/factory.py`
+- **.test_factory_creates_compact_renderer_by_default()** (4 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_factory_creates_compact_renderer_when_tui_false()** (4 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_factory_forwards_failed_hint_flag_to_compact_renderer()** (4 connections) — `tests/unit/test_cli.py`
+- **.test_factory_forwards_is_tty_to_compact_renderer()** (4 connections) — `tests/unit/test_cli.py`
+- **.test_factory_forwards_recording_flags_to_compact_renderer()** (4 connections) — `tests/unit/test_cli.py`
+- **.test_factory_forwards_warning_flags_to_compact_renderer()** (4 connections) — `tests/unit/test_cli.py`
+- **test_factory_tui_mode_still_wins_over_format()** (4 connections) — `tests/unit/test_json_renderer.py`
+- **factory.py** (3 connections) — `src/ansible_aom/renderer/factory.py`
+- **.test_factory_creates_tui_renderer_when_tui_true()** (3 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_factory_default_tui_mode_false()** (3 connections) — `tests/unit/test_cli.py`
+- **.test_factory_function_exists()** (3 connections) — `tests/unit/test_cli.py`
+- **.test_factory_returns_renderer_for_compact_mode()** (3 connections) — `tests/unit/test_cli.py`
+- **.test_factory_returns_renderer_for_tui_mode()** (3 connections) — `tests/unit/test_cli.py`
+- **test_factory_compact_format_explicit_returns_compact_renderer()** (3 connections) — `tests/unit/test_json_renderer.py`
+- **test_factory_default_format_is_compact()** (3 connections) — `tests/unit/test_json_renderer.py`
+- **RenderFormat** (2 connections)
+- **RenderMode** (2 connections)
+- **Renderer factory.  One entry point — :func:`create_renderer` — that picks the co** (1 connections) — `src/ansible_aom/renderer/factory.py`
+- **Pick a single ``RenderMode`` from the user-facing parameter set.      Priority:** (1 connections) — `src/ansible_aom/renderer/factory.py`
+- **Create the renderer selected by ``mode``.      Args:         mode: ``"compact"``** (1 connections) — `src/ansible_aom/renderer/factory.py`
+- **Default view mode is compact.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **tui_mode=False creates CompactRenderer.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **tui_mode=True creates Textual AOMApp.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- *... and 9 more nodes in this community*
 
 ## Relationships
 
-- [[Play Definition Tree Population]] (12 shared connections)
-- [[Compact Renderer Formatters]] (5 shared connections)
-- [[Task Definition Live Refresh]] (3 shared connections)
-- [[Run History Mining]] (3 shared connections)
-- [[Duration Formatting Helpers]] (2 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
-- [[Total Task Counting]] (1 shared connections)
-- [[Event Log Emission]] (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (9 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (8 shared connections)
+- [Inspect Data Model Builders](Inspect_Data_Model_Builders.md) (5 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (3 shared connections)
+- [Session Recording Tests](Session_Recording_Tests.md) (2 shared connections)
+- [State Transition Validation](State_Transition_Validation.md) (1 shared connections)
+- [State Machine Happy Path](State_Machine_Happy_Path.md) (1 shared connections)
+- [Interactive Prompt Tests](Interactive_Prompt_Tests.md) (1 shared connections)
+- [Shell Completion Helpers](Shell_Completion_Helpers.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/compact/format.py`
-- `tests/compact/test_preflight_summary.py`
-- `tests/compact/test_prior_run_line.py`
+- `src/ansible_aom/renderer/factory.py`
+- `tests/integration/test_compact_renderer.py`
+- `tests/unit/test_cli.py`
+- `tests/unit/test_json_renderer.py`
 
 ## Audit Trail
 
-- EXTRACTED: 82 (64%)
-- INFERRED: 46 (36%)
+- EXTRACTED: 59 (57%)
+- INFERRED: 44 (43%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,26 +1,36 @@
 # Non-Interactive Renderers
 
-> 2 nodes · cohesion 1.00
+> 11 nodes · cohesion 0.18
 
 ## Key Concepts
 
-- **__init__.py** (1 connections) — `src/ansible_aom/formats/__init__.py`
-- **Non-interactive renderers: format adapters for CI/scripting use.  Each module he** (1 connections) — `src/ansible_aom/formats/__init__.py`
+- **.render()** (8 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **._format_host_count()** (3 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **._format_memory_usage()** (3 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **._format_pid()** (3 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **._format_task_progress()** (3 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **Text** (1 connections)
+- **Format host count.          Returns:             Formatted host count string** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **Format task progress.          Returns:             Formatted task progress stri** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **Format memory usage.          Returns:             Formatted memory string or N/** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **Format PID.          Returns:             Formatted PID string or N/A** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **Render the status bar.          Returns:             Rich Text object with confi** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [Diagnostics CLI Wiring](Diagnostics_CLI_Wiring.md) (5 shared connections)
+- [Community 477](Community_477.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/formats/__init__.py`
+- `src/ansible_aom/tui/widgets/status_bar.py`
 
 ## Audit Trail
 
-- EXTRACTED: 2 (100%)
+- EXTRACTED: 26 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

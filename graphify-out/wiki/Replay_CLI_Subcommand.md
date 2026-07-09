@@ -1,52 +1,50 @@
 # Replay CLI Subcommand
 
-> 19 nodes · cohesion 0.13
+> 47 nodes · cohesion 0.04
 
 ## Key Concepts
 
-- **cli_main()** (12 connections) — `src/ansible_aom/drivers/replay.py`
-- **TestReplayCLIMain** (8 connections) — `tests/unit/test_cli_replay.py`
-- **replay.py** (6 connections) — `src/ansible_aom/drivers/replay.py`
-- **_make_session()** (6 connections) — `tests/unit/test_cli_replay.py`
-- **ArgumentParser** (5 connections)
-- **_build_parser()** (5 connections) — `src/ansible_aom/drivers/replay.py`
-- **_parse_timestamp()** (5 connections) — `src/ansible_aom/drivers/replay.py`
-- **.test_cli_main_speed_zero_allowed()** (5 connections) — `tests/unit/test_cli_replay.py`
-- **test_cli_replay.py** (4 connections) — `tests/unit/test_cli_replay.py`
-- **.test_cli_main_default_uses_compact_renderer()** (4 connections) — `tests/unit/test_cli_replay.py`
-- **.test_cli_main_speed_forwarded()** (4 connections) — `tests/unit/test_cli_replay.py`
-- **.test_cli_main_tui_flag_selects_tui_renderer()** (4 connections) — `tests/unit/test_cli_replay.py`
-- **.test_compact_and_tui_are_mutually_exclusive()** (4 connections) — `tests/unit/test_cli_replay.py`
-- **.test_cli_main_returns_1_when_session_missing()** (3 connections) — `tests/unit/test_cli_replay.py`
-- **Replay a recorded AOM session through a Renderer (F2).  Both halves of the repla** (1 connections) — `src/ansible_aom/drivers/replay.py`
-- **CLI tests for the F2 `aom replay` subcommand dispatch.  Mirrors the inspect-disp** (1 connections) — `tests/unit/test_cli_replay.py`
-- **`--speed 0` is the documented "fast as possible" sentinel.** (1 connections) — `tests/unit/test_cli_replay.py`
-- **Passing both --compact and --tui exits with usage error (argparse SystemExit).** (1 connections) — `tests/unit/test_cli_replay.py`
-- **`replay.cli_main` parses argv, builds a renderer, calls replay_session.** (1 connections) — `tests/unit/test_cli_replay.py`
+- **Section 7: TUI Components** (47 connections) — `TEST_SPECIFICATION.md`
+- **TC-264: Tree View Hierarchy Structure** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-265: Tree View Navigation Up/Down** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-266: Tree View Expand/Collapse Arrow Keys** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-267: Tree View Enter Toggle** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-268: Tree View Uses Textual Tree Widget** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-269: Tree View Reactive Updates** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-270: Tree View Task Name Truncation** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-271: Tree View Role Name Priority in Truncation** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-272: Compact Mode Hard-Truncate at Width-20** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-273: RoleGroup Creation Threshold** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-274: Log Panel Max Lines Bound** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-275: Log Panel Auto-Scroll Behavior** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-276: Log Panel JSON Line Detection** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-277: Log Panel ANSI Color Handling** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-278: Log Panel Search Overlay Activation** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-279: Log Panel Search Plain Text Mode** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-280: Log Panel Search Regex Mode** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-281: Log Panel Search Case-Sensitive Toggle** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-282: Log Panel Search F3 Navigation** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-283: Log Panel Search Match Highlighting** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-284: Log Panel Smart Auto-Scroll Pause** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-285: Summary Panel Current Play Display** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-286: Summary Panel Hosts Progress** (1 connections) — `TEST_SPECIFICATION.md`
+- **TC-287: Summary Panel Tasks Progress** (1 connections) — `TEST_SPECIFICATION.md`
+- *... and 22 more nodes in this community*
 
 ## Relationships
 
-- [[Run Config Key Normalization]] (7 shared connections)
-- [[Session Replay Driver]] (3 shared connections)
-- [[Session Replay Round Trip]] (2 shared connections)
-- [[CLI Main Entry Point]] (1 shared connections)
-- [[CLI Argument Parser]] (1 shared connections)
-- [[Inspect CLI Commands]] (1 shared connections)
-- [[Rerun CLI Parser]] (1 shared connections)
-- [[Renderer Factory Function]] (1 shared connections)
-- [[Replay Command Dispatch]] (1 shared connections)
+- [Failure Recap Formatting](Failure_Recap_Formatting.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/drivers/replay.py`
-- `tests/unit/test_cli_replay.py`
+- `TEST_SPECIFICATION.md`
 
 ## Audit Trail
 
-- EXTRACTED: 66 (82%)
-- INFERRED: 14 (18%)
+- EXTRACTED: 93 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

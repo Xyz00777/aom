@@ -1,51 +1,52 @@
 # Include Import Role Tasks
 
-> 22 nodes · cohesion 0.11
+> 29 nodes · cohesion 0.11
 
 ## Key Concepts
 
-- **_run_aom()** (14 connections) — `tests/integration/test_include_import_role.py`
-- **test_include_import_role.py** (11 connections) — `tests/integration/test_include_import_role.py`
-- **.test_dynamic_path_include()** (4 connections) — `tests/integration/test_include_import_role.py`
-- **TestImportTasksTree** (4 connections) — `tests/integration/test_include_import_role.py`
-- **.test_import_tasks_counter()** (4 connections) — `tests/integration/test_include_import_role.py`
-- **.test_imported_tasks_appear_in_output()** (4 connections) — `tests/integration/test_include_import_role.py`
-- **.test_all_three_levels_visible()** (4 connections) — `tests/integration/test_include_import_role.py`
-- **_ansible_collection_paths()** (3 connections) — `tests/integration/test_include_import_role.py`
-- **TestDynamicIncludePath** (3 connections) — `tests/integration/test_include_import_role.py`
-- **TestNestedInclude** (3 connections) — `tests/integration/test_include_import_role.py`
-- **_has_ansible_posix()** (2 connections) — `tests/integration/test_include_import_role.py`
-- **Integration tests for include/import/role task variants.  Covers TC-330 through** (1 connections) — `tests/integration/test_include_import_role.py`
-- **TC-330 / TC-331: import_tasks tree rendering and counter accuracy.** (1 connections) — `tests/integration/test_include_import_role.py`
-- **TC-330: import_tasks are expanded — all task names visible.** (1 connections) — `tests/integration/test_include_import_role.py`
-- **TC-331: import_tasks counter = 4 runtime tasks.** (1 connections) — `tests/integration/test_include_import_role.py`
-- **TC-333: nested include_tasks — all 3 levels in tree output.** (1 connections) — `tests/integration/test_include_import_role.py`
-- **TC-333: verify all 3 nesting levels appear in output.** (1 connections) — `tests/integration/test_include_import_role.py`
-- **TC-336: Dynamic path include — ``include_tasks: \"{{ task_file }}\"``.** (1 connections) — `tests/integration/test_include_import_role.py`
-- **TC-336: dynamic include path works, tasks grafted one-by-one.** (1 connections) — `tests/integration/test_include_import_role.py`
-- **Search-path entries reported by ``ansible-galaxy collection list``.      We repu** (1 connections) — `tests/integration/test_include_import_role.py`
-- **True if the ``ansible.posix`` collection is installed and discoverable.** (1 connections) — `tests/integration/test_include_import_role.py`
-- **Spawn ``python -m ansible_aom <playbook>`` against a sandboxed HOME.      Extra** (1 connections) — `tests/integration/test_include_import_role.py`
+- **_make_partial_session()** (9 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **Path** (9 connections)
+- **test_event_store_crash_recovery.py** (7 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **.test_load_session_warns_when_meta_missing()** (6 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **.test_replay_warns_when_meta_missing()** (6 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **_spawn_killed_writer()** (5 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **TestLoadSessionMissingMeta** (5 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **.test_load_session_parses_events_when_meta_missing()** (5 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **.test_load_session_returns_non_none_for_missing_meta()** (5 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **TestReplayContinuesWithMissingMeta** (5 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **.test_replay_exits_zero_with_missing_meta()** (5 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **.test_replay_still_drives_renderer_with_missing_meta()** (5 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **.test_replay_subprocess_survives_sigkill()** (5 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **TestSubprocessReplayAfterSigkill** (3 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **LogCaptureFixture** (2 connections)
+- **CompletedProcess** (1 connections)
+- **Crash-recovery regression tests (Phase 8 / Task 8.2).  What this test pins -----** (1 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **Spawn a real Python subprocess that writes events, then SIGKILL it.      The sub** (1 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **``load_session`` degrades gracefully when meta.json is missing.** (1 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **A directory with only events.jsonl still loads (returns a dict).** (1 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **Events from events.jsonl are still loaded into the result.** (1 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **The crash-recovery warning is emitted at WARNING level.          This is the use** (1 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **``replay_session`` continues the replay instead of exploding.** (1 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **replay_session() returns 0 against a partial session.** (1 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- **Every event on disk reaches the renderer, even with no meta.** (1 connections) — `tests/unit/test_event_store_crash_recovery.py`
+- *... and 4 more nodes in this community*
 
 ## Relationships
 
-- [[Run Config Key Normalization]] (5 shared connections)
-- [[Include Tasks Dynamic Grafting]] (3 shared connections)
-- [[Include Role Dynamic Tasks]] (2 shared connections)
-- [[Multi-Play Cross Counters]] (2 shared connections)
-- [[Static Role Counter]] (2 shared connections)
-- [[CLI Help Matrix]] (1 shared connections)
+- [Total Task Counting](Total_Task_Counting.md) (4 shared connections)
+- [Hide State Normalization](Hide_State_Normalization.md) (3 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_include_import_role.py`
+- `tests/unit/test_event_store_crash_recovery.py`
 
 ## Audit Trail
 
-- EXTRACTED: 67 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 89 (93%)
+- INFERRED: 7 (7%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

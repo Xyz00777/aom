@@ -1,44 +1,46 @@
 # Parser Phase Transitions
 
-> 18 nodes · cohesion 0.11
+> 22 nodes · cohesion 0.25
 
 ## Key Concepts
 
-- **TestPtyStreamParserPhaseTransitions** (13 connections) — `tests/unit/test_pty_stream.py`
-- **.test_initial_phase_is_pre_run_prompts()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_phase_remains_execution_without_stats_event()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_phase_remains_pre_run_without_start_event()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_post_run_recap_collects_lines()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_transition_to_execution_on_first_jsonl()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_transition_to_execution_on_start_event()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_transition_to_post_run_on_recap_line()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_transition_to_post_run_on_stats_event()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **Phase stays EXECUTION without v2_playbook_on_stats.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Lines in POST_RUN_RECAP phase are collected.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-128, TC-131, TC-132: Phase transition tests.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-128: Initial phase is PRE_RUN_PROMPTS.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-131: v2_playbook_on_start triggers PRE_RUN_PROMPTS -> EXECUTION.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-131: First JSONL event triggers transition to EXECUTION.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-132: v2_playbook_on_stats triggers EXECUTION -> POST_RUN_RECAP.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **TC-132: PLAY RECAP line triggers EXECUTION -> POST_RUN_RECAP.** (1 connections) — `tests/unit/test_pty_stream.py`
-- **Phase stays PRE_RUN_PROMPTS without v2_playbook_on_start.** (1 connections) — `tests/unit/test_pty_stream.py`
+- **test_skipped_collapsing.py** (10 connections) — `tests/compact/test_skipped_collapsing.py`
+- **_logged()** (10 connections) — `tests/compact/test_skipped_collapsing.py`
+- **_renderer()** (10 connections) — `tests/compact/test_skipped_collapsing.py`
+- **_skipped()** (9 connections) — `tests/compact/test_skipped_collapsing.py`
+- **_task_start()** (9 connections) — `tests/compact/test_skipped_collapsing.py`
+- **TestAllSkippedCollapsing** (7 connections) — `tests/compact/test_skipped_collapsing.py`
+- **.test_collapse_at_stats_for_final_task()** (7 connections) — `tests/compact/test_skipped_collapsing.py`
+- **.test_ok_then_skipped_only_flushed_at_transition()** (7 connections) — `tests/compact/test_skipped_collapsing.py`
+- **.test_collapsing_state_does_not_leak_to_next_task()** (7 connections) — `tests/compact/test_skipped_collapsing.py`
+- **.test_skipped_then_ok_expands_skipped_lines()** (6 connections) — `tests/compact/test_skipped_collapsing.py`
+- **.test_compressed_line_is_cyan()** (5 connections) — `tests/compact/test_skipped_collapsing.py`
+- **.test_many_hosts_shows_count_only()** (5 connections) — `tests/compact/test_skipped_collapsing.py`
+- **.test_single_skipped_host_singular_form()** (5 connections) — `tests/compact/test_skipped_collapsing.py`
+- **.test_three_or_fewer_hosts_lists_names()** (5 connections) — `tests/compact/test_skipped_collapsing.py`
+- **_ok()** (4 connections) — `tests/compact/test_skipped_collapsing.py`
+- **TestMixedTaskExpandsIndividually** (4 connections) — `tests/compact/test_skipped_collapsing.py`
+- **TestStateResetBetweenTasks** (3 connections) — `tests/compact/test_skipped_collapsing.py`
+- **_stats()** (2 connections) — `tests/compact/test_skipped_collapsing.py`
+- **Tests for skipped-task collapsing.  When a task produces only ``skipped`` result** (1 connections) — `tests/compact/test_skipped_collapsing.py`
+- **The very last task can't be flushed by a next task_start;         the stats even** (1 connections) — `tests/compact/test_skipped_collapsing.py`
+- **ok arrives first, then skipped — those skipped land at the         next task tra** (1 connections) — `tests/compact/test_skipped_collapsing.py`
+- **All-skipped task A followed by mixed task B: B must         flush its own skips** (1 connections) — `tests/compact/test_skipped_collapsing.py`
 
 ## Relationships
 
-- [[PTY Stream Parser]] (9 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
-- [[PTY Stream Parser Tests]] (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (5 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_pty_stream.py`
+- `tests/compact/test_skipped_collapsing.py`
 
 ## Audit Trail
 
-- EXTRACTED: 35 (76%)
-- INFERRED: 11 (24%)
+- EXTRACTED: 116 (97%)
+- INFERRED: 3 (3%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

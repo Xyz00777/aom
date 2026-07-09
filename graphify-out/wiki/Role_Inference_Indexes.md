@@ -1,30 +1,42 @@
 # Role Inference Indexes
 
-> 3 nodes · cohesion 0.20
+> 15 nodes · cohesion 0.15
 
 ## Key Concepts
 
-- **runtime_role_from_task_name()** (8 connections) — `src/ansible_aom/core/models.py`
-- **Recursive Nesting Investigation Notes (T1-T5 + duplicate header bug)** (4 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **Infer an ``include_role``-style runtime role from a task name.      Accepts simp** (1 connections) — `src/ansible_aom/core/models.py`
+- **TestLogging** (9 connections) — `tests/integration/test_error_handling.py`
+- **Path** (5 connections)
+- **.test_log_path_xdg_compliant()** (3 connections) — `tests/integration/test_error_handling.py`
+- **.test_log_rotation_configuration()** (3 connections) — `tests/integration/test_error_handling.py`
+- **.test_log_silent_during_normal_operation()** (3 connections) — `tests/integration/test_error_handling.py`
+- **.test_log_levels_present()** (2 connections) — `tests/integration/test_error_handling.py`
+- **.test_verbose_flag_enables_debug()** (2 connections) — `tests/integration/test_error_handling.py`
+- **.test_verbose_flag_info_level_without_flag()** (2 connections) — `tests/integration/test_error_handling.py`
+- **TC-455 to TC-464: Logging tests.** (1 connections) — `tests/integration/test_error_handling.py`
+- **TC-455: Log file follows XDG state directory convention.** (1 connections) — `tests/integration/test_error_handling.py`
+- **TC-456: Log file written but console silent during normal operation.** (1 connections) — `tests/integration/test_error_handling.py`
+- **TC-457: RotatingFileHandler with 10MB/file, 5 backups.** (1 connections) — `tests/integration/test_error_handling.py`
+- **TC-459 to TC-462: Log levels for different event types.** (1 connections) — `tests/integration/test_error_handling.py`
+- **TC-463: --verbose flag enables DEBUG logging to file.** (1 connections) — `tests/integration/test_error_handling.py`
+- **TC-463: Without --verbose, INFO level used.** (1 connections) — `tests/integration/test_error_handling.py`
 
 ## Relationships
 
-- [[Tree Truncation Utilities]] (2 shared connections)
-- [[Include Role Discovery]] (2 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
+- [Community 507](Community_507.md) (1 shared connections)
+- [Community 564](Community_564.md) (1 shared connections)
+- [Run State Completion Recap](Run_State_Completion_Recap.md) (1 shared connections)
+- [Completion Host Table](Completion_Host_Table.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/recursive-nesting/learnings.md`
-- `src/ansible_aom/core/models.py`
+- `tests/integration/test_error_handling.py`
 
 ## Audit Trail
 
-- EXTRACTED: 9 (69%)
-- INFERRED: 4 (31%)
+- EXTRACTED: 35 (97%)
+- INFERRED: 1 (3%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

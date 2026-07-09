@@ -1,38 +1,50 @@
 # UUIDv7 Session Generation
 
-> 12 nodes · cohesion 0.18
+> 20 nodes · cohesion 0.18
 
 ## Key Concepts
 
-- **TestGenerateUUIDv7** (7 connections) — `tests/integration/test_session.py`
-- **generate_uuidv7()** (7 connections) — `src/ansible_aom/session/store.py`
-- **.test_uuidv7_contains_timestamp()** (3 connections) — `tests/integration/test_session.py`
-- **.test_uuidv7_first_8_chars_usable_for_display()** (3 connections) — `tests/integration/test_session.py`
-- **.test_uuidv7_format_matches_pattern()** (3 connections) — `tests/integration/test_session.py`
-- **.test_uuidv7_is_time_sortable()** (3 connections) — `tests/integration/test_session.py`
-- **.start_session()** (3 connections) — `src/ansible_aom/session/store.py`
-- **TC-218: Session UUIDv7 Format Validation.** (1 connections) — `tests/integration/test_session.py`
-- **UUIDv7 matches expected format pattern.** (1 connections) — `tests/integration/test_session.py`
-- **UUIDv7 values are time-sortable (earlier timestamps produce smaller UUIDs).** (1 connections) — `tests/integration/test_session.py`
-- **First 8 characters of UUIDv7 can be used for display.** (1 connections) — `tests/integration/test_session.py`
-- **UUIDv7 embeds timestamp in first segment.** (1 connections) — `tests/integration/test_session.py`
+- **TestPerEventLogColors** (15 connections) — `tests/compact/test_status_bar_colors.py`
+- **TestFinalCompletionIndicator** (12 connections) — `tests/compact/test_status_bar_colors.py`
+- **test_status_bar_colors.py** (8 connections) — `tests/compact/test_status_bar_colors.py`
+- **._logged()** (8 connections) — `tests/compact/test_status_bar_colors.py`
+- **._renderer()** (8 connections) — `tests/compact/test_status_bar_colors.py`
+- **._final_line()** (6 connections) — `tests/compact/test_status_bar_colors.py`
+- **.test_skipping_line_is_cyan()** (4 connections) — `tests/compact/test_status_bar_colors.py`
+- **.test_changed_line_is_yellow()** (3 connections) — `tests/compact/test_status_bar_colors.py`
+- **.test_failed_line_is_red()** (3 connections) — `tests/compact/test_status_bar_colors.py`
+- **.test_no_color_when_renderer_colorize_off()** (3 connections) — `tests/compact/test_status_bar_colors.py`
+- **.test_ok_line_is_green()** (3 connections) — `tests/compact/test_status_bar_colors.py`
+- **.test_unreachable_line_is_magenta()** (3 connections) — `tests/compact/test_status_bar_colors.py`
+- **.test_cancelled_indicator_is_yellow()** (2 connections) — `tests/compact/test_status_bar_colors.py`
+- **.test_completed_indicator_is_green()** (2 connections) — `tests/compact/test_status_bar_colors.py`
+- **.test_failed_indicator_is_red()** (2 connections) — `tests/compact/test_status_bar_colors.py`
+- **.test_no_color_when_disabled()** (2 connections) — `tests/compact/test_status_bar_colors.py`
+- **Tests for semantic SGR colouring in the compact status output.  Colour rules (wh** (1 connections) — `tests/compact/test_status_bar_colors.py`
+- **The trailing ●/✖ indicator picks its colour from the state.** (1 connections) — `tests/compact/test_status_bar_colors.py`
+- **Per-task log lines (ok/changed/fatal/unreachable/skipping) carry     semantic co** (1 connections) — `tests/compact/test_status_bar_colors.py`
+- **Skipped hosts are buffered (collapsed-on-flush). Force the         mixed-task fl** (1 connections) — `tests/compact/test_status_bar_colors.py`
 
 ## Relationships
 
-- [[Session Recording Tests]] (3 shared connections)
-- [[Inspect CLI Commands]] (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (7 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (5 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (2 shared connections)
+- [Frame Parameter Handling](Frame_Parameter_Handling.md) (1 shared connections)
+- [Inspect Debug Diagnostics](Inspect_Debug_Diagnostics.md) (1 shared connections)
+- [Task Wall Duration Mining](Task_Wall_Duration_Mining.md) (1 shared connections)
+- [Community 505](Community_505.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/session/store.py`
-- `tests/integration/test_session.py`
+- `tests/compact/test_status_bar_colors.py`
 
 ## Audit Trail
 
-- EXTRACTED: 25 (74%)
-- INFERRED: 9 (26%)
+- EXTRACTED: 78 (89%)
+- INFERRED: 10 (11%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

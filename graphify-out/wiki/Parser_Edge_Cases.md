@@ -1,37 +1,53 @@
 # Parser Edge Cases
 
-> 11 nodes · cohesion 0.09
+> 29 nodes · cohesion 0.13
 
 ## Key Concepts
 
-- **TestEdgeCases** (15 connections) — `tests/unit/test_pty_stream.py`
-- **.test_case_sensitivity_warning_patterns()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_consecutive_stats_events()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_empty_line_handled()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_json_with_newline()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_json_without_event_field()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_malformed_json_handled()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_password_prompt_with_variant_text()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_unicode_in_plaintext()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_very_long_line()** (3 connections) — `tests/unit/test_pty_stream.py`
-- **.test_whitespace_line_handled()** (3 connections) — `tests/unit/test_pty_stream.py`
+- **should_hide_host_result()** (27 connections) — `src/ansible_aom/core/log_filter.py`
+- **TestShouldHideHostResult** (26 connections) — `tests/unit/test_log_filter.py`
+- **.test_missing_changed_defaults_to_false()** (3 connections) — `tests/unit/test_log_filter.py`
+- **.test_changed_result_hidden_when_both_ok_and_changed_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_changed_result_hidden_when_changed_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_changed_result_visible_when_only_ok_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_changed_result_visible_with_empty_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_empty_event_type_never_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_failed_hidden_when_failed_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_failed_visible_with_empty_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_item_changed_hidden_when_changed_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_item_changed_visible_when_only_ok_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_item_failed_hidden_when_failed_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_item_ok_hidden_when_ok_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_item_skipped_hidden_when_skipped_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_missing_changed_visible_when_only_changed_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_ok_result_hidden_when_both_ok_and_changed_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_ok_result_hidden_when_ok_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_ok_result_visible_when_only_changed_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_ok_result_visible_when_only_failed_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_ok_result_visible_with_empty_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_skipped_hidden_when_skipped_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_skipped_visible_with_empty_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_unknown_event_type_never_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
+- **.test_unreachable_hidden_when_unreachable_in_hide_states()** (2 connections) — `tests/unit/test_log_filter.py`
+- *... and 4 more nodes in this community*
 
 ## Relationships
 
-- [[PTY Stream Parser]] (11 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
-- [[PTY Stream Parser Tests]] (1 shared connections)
+- [Heartbeat Liveness Tracker](Heartbeat_Liveness_Tracker.md) (1 shared connections)
+- [Community 670](Community_670.md) (1 shared connections)
+- [Main TUI Screen](Main_TUI_Screen.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_pty_stream.py`
+- `src/ansible_aom/core/log_filter.py`
+- `tests/unit/test_log_filter.py`
 
 ## Audit Trail
 
-- EXTRACTED: 32 (71%)
-- INFERRED: 13 (29%)
+- EXTRACTED: 56 (53%)
+- INFERRED: 49 (47%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

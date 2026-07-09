@@ -1,68 +1,63 @@
 # Run Config Key Normalization
 
-> 78 nodes · cohesion 0.06
+> 109 nodes · cohesion 0.03
 
 ## Key Concepts
 
-- **Path** (416 connections)
-- **build_run_config_key()** (37 connections) — `src/ansible_aom/core/run_config.py`
-- **find_previous_run()** (31 connections) — `src/ansible_aom/session/history.py`
-- **test_history.py** (14 connections) — `tests/unit/test_history.py`
-- **test_run_config.py** (13 connections) — `tests/unit/test_run_config.py`
-- **test_inspect_cli.py** (12 connections) — `tests/integration/test_inspect_cli.py`
-- **_write_session()** (12 connections) — `tests/unit/test_history.py`
-- **test_history_roundtrip.py** (8 connections) — `tests/integration/test_history_roundtrip.py`
-- **test_runner_pushes_prior_run_into_renderer()** (7 connections) — `tests/integration/test_history_roundtrip.py`
-- **test_history_loop_totals.py** (7 connections) — `tests/unit/test_history_loop_totals.py`
-- **_prior()** (7 connections) — `tests/unit/test_history_loop_totals.py`
+- **SessionManager** (86 connections) — `src/ansible_aom/session/store.py`
+- **Path** (45 connections)
+- **test_session.py** (17 connections) — `tests/integration/test_session.py`
+- **TestStartSession** (10 connections) — `tests/integration/test_session.py`
+- **test_history_roundtrip.py** (9 connections) — `tests/integration/test_history_roundtrip.py`
+- **Path** (8 connections)
+- **test_runner_pushes_prior_run_into_renderer()** (8 connections) — `tests/integration/test_history_roundtrip.py`
+- **TestCreateArtifact** (7 connections) — `tests/integration/test_session.py`
+- **TestEndSession** (7 connections) — `tests/integration/test_session.py`
+- **TestSessionFilePermissions** (7 connections) — `tests/integration/test_session.py`
+- **Path** (6 connections)
 - **test_different_tags_match_via_fallback()** (6 connections) — `tests/integration/test_history_roundtrip.py`
 - **test_failed_session_is_not_returned()** (6 connections) — `tests/integration/test_history_roundtrip.py`
-- **test_corrupt_meta_is_skipped()** (6 connections) — `tests/unit/test_history.py`
-- **test_fallback_loose_match_when_config_differs()** (6 connections) — `tests/unit/test_history.py`
-- **test_loose_match_filters_mismatched_host_count()** (6 connections) — `tests/unit/test_history.py`
-- **test_loose_match_works_with_any_flag_variation()** (6 connections) — `tests/unit/test_history.py`
-- **test_skips_non_completed_status()** (6 connections) — `tests/unit/test_history.py`
-- **test_skips_sessions_missing_counts()** (6 connections) — `tests/unit/test_history.py`
-- **test_strict_match_takes_precedence_over_loose()** (6 connections) — `tests/unit/test_history.py`
+- **TestRecordEvent** (6 connections) — `tests/integration/test_session.py`
 - **test_different_host_count_does_not_match()** (5 connections) — `tests/integration/test_history_roundtrip.py`
 - **test_most_recent_completed_wins()** (5 connections) — `tests/integration/test_history_roundtrip.py`
 - **test_session_then_history_roundtrip()** (5 connections) — `tests/integration/test_history_roundtrip.py`
-- **test_mines_loop_total_per_task_path_and_host()** (5 connections) — `tests/unit/test_history_loop_totals.py`
-- **test_filters_out_mismatched_host_count()** (5 connections) — `tests/unit/test_history.py`
-- *... and 53 more nodes in this community*
+- **TestRecordStderr** (5 connections) — `tests/integration/test_session.py`
+- **TestSessionManagerInit** (5 connections) — `tests/integration/test_session.py`
+- **TestArtifactPermissions** (4 connections) — `tests/integration/test_session.py`
+- **.test_artifact_file_permissions()** (4 connections) — `tests/integration/test_session.py`
+- **.test_create_artifact_creates_aom_file()** (4 connections) — `tests/integration/test_session.py`
+- **.test_create_artifact_event_lines()** (4 connections) — `tests/integration/test_session.py`
+- **.test_create_artifact_metadata_header()** (4 connections) — `tests/integration/test_session.py`
+- **.test_create_artifact_stats_line()** (4 connections) — `tests/integration/test_session.py`
+- *... and 84 more nodes in this community*
 
 ## Relationships
 
-- [[Include Role Discovery]] (58 shared connections)
-- [[Session Recording Tests]] (38 shared connections)
-- [[Three-Pane Inspect App]] (30 shared connections)
-- [[Inspect CLI Commands]] (24 shared connections)
-- [[Run History Mining]] (17 shared connections)
-- [[Session Replay Round Trip]] (16 shared connections)
-- [[Interactive Prompt Tests]] (15 shared connections)
-- [[Inventory Auto Detection]] (15 shared connections)
-- [[Inspect Session List]] (14 shared connections)
-- [[Playbook Run Integration Tests]] (13 shared connections)
-- [[Task Wall Duration Mining]] (11 shared connections)
-- [[Version Bump Script]] (10 shared connections)
+- [Total Task Counting](Total_Task_Counting.md) (18 shared connections)
+- [Loop Item Line Tests](Loop_Item_Line_Tests.md) (12 shared connections)
+- [JSON Renderer](JSON_Renderer.md) (11 shared connections)
+- [StatusBarConfig Model](StatusBarConfig_Model.md) (7 shared connections)
+- [Status Color Mapping](Status_Color_Mapping.md) (6 shared connections)
+- [Tree Block Animation](Tree_Block_Animation.md) (4 shared connections)
+- [Play Boundary State Tests](Play_Boundary_State_Tests.md) (4 shared connections)
+- [Keybinding Context Coverage](Keybinding_Context_Coverage.md) (3 shared connections)
+- [Session Storage Module](Session_Storage_Module.md) (3 shared connections)
+- [Plaintext Line Handling](Plaintext_Line_Handling.md) (2 shared connections)
+- [Panel Refresh Snapshot](Panel_Refresh_Snapshot.md) (2 shared connections)
+- [Community 574](Community_574.md) (2 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/run_config.py`
-- `src/ansible_aom/session/history.py`
+- `src/ansible_aom/session/store.py`
 - `tests/integration/test_history_roundtrip.py`
-- `tests/integration/test_inspect_cli.py`
-- `tests/integration/test_playbook_parser.py`
-- `tests/unit/test_history.py`
-- `tests/unit/test_history_loop_totals.py`
-- `tests/unit/test_run_config.py`
+- `tests/integration/test_session.py`
 
 ## Audit Trail
 
-- EXTRACTED: 664 (86%)
-- INFERRED: 109 (14%)
+- EXTRACTED: 317 (71%)
+- INFERRED: 132 (29%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

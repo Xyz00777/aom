@@ -1,26 +1,34 @@
 # Block Task Flattening
 
-> 1 nodes · cohesion 1.00
+> 10 nodes · cohesion 0.20
 
 ## Key Concepts
 
-- **.test_blocks_flattened()** (3 connections) — `tests/unit/test_parser.py`
+- **Plan: Recursive nesting in the tree view (unlimited depth + nested role sub-branches)** (9 connections) — `.sisyphus/plans/recursive-nesting.md`
+- **recursive-nesting.md** (1 connections) — `.sisyphus/plans/recursive-nesting.md`
+- **Approach (data-model-first, TDD)** (1 connections) — `.sisyphus/plans/recursive-nesting.md`
+- **Goals** (1 connections) — `.sisyphus/plans/recursive-nesting.md`
+- **Non-goals** (1 connections) — `.sisyphus/plans/recursive-nesting.md`
+- **Open questions** (1 connections) — `.sisyphus/plans/recursive-nesting.md`
+- **Problem** (1 connections) — `.sisyphus/plans/recursive-nesting.md`
+- **Status** (1 connections) — `.sisyphus/plans/recursive-nesting.md`
+- **TODOs** (1 connections) — `.sisyphus/plans/recursive-nesting.md`
+- **Verification (F1)** (1 connections) — `.sisyphus/plans/recursive-nesting.md`
 
 ## Relationships
 
-- [[List Tasks Output Parser]] (1 shared connections)
-- [[Role Group Task Models]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/unit/test_parser.py`
+- `.sisyphus/plans/recursive-nesting.md`
 
 ## Audit Trail
 
-- EXTRACTED: 2 (67%)
-- INFERRED: 1 (33%)
+- EXTRACTED: 18 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

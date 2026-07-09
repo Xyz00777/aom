@@ -1,46 +1,61 @@
 # Real Ansible Integration
 
-> 20 nodes · cohesion 0.14
+> 27 nodes · cohesion 0.07
 
 ## Key Concepts
 
-- **_run_aom()** (8 connections) — `tests/integration/test_real_ansible.py`
-- **test_real_ansible.py** (7 connections) — `tests/integration/test_real_ansible.py`
-- **_parse_jsonl_through_core()** (6 connections) — `tests/integration/test_real_ansible.py`
-- **TestRealAnsibleSmoke** (6 connections) — `tests/integration/test_real_ansible.py`
-- **.test_simple_playbook_localhost_appears_exactly_once_in_summary()** (6 connections) — `tests/integration/test_real_ansible.py`
-- **.test_simple_playbook_runs_and_records_session()** (6 connections) — `tests/integration/test_real_ansible.py`
-- **_find_session()** (5 connections) — `tests/integration/test_real_ansible.py`
-- **.test_syntax_error_playbook_returns_nonzero()** (4 connections) — `tests/integration/test_real_ansible.py`
-- **_ansible_collection_paths()** (3 connections) — `tests/integration/test_real_ansible.py`
-- **_has_ansible_posix()** (2 connections) — `tests/integration/test_real_ansible.py`
-- **Real-ansible smoke tests.  Every other "integration" test in this suite uses a f** (1 connections) — `tests/integration/test_real_ansible.py`
-- **Return the lone session directory under ``home_dir`` or fail loudly.** (1 connections) — `tests/integration/test_real_ansible.py`
-- **Feed each recorded line through ``JsonLineStream``.      This is the same code p** (1 connections) — `tests/integration/test_real_ansible.py`
-- **Live ansible-playbook integration — fixtures that work with ``-c local``.      O** (1 connections) — `tests/integration/test_real_ansible.py`
-- **Happy-path: simple.yml exits 0, writes a parseable session.** (1 connections) — `tests/integration/test_real_ansible.py`
-- **For a single-host run, ``localhost`` shows up once in stats.** (1 connections) — `tests/integration/test_real_ansible.py`
-- **A YAML syntax error in the playbook must surface as a non-zero exit.          an** (1 connections) — `tests/integration/test_real_ansible.py`
-- **Search-path entries reported by ``ansible-galaxy collection list``.      The out** (1 connections) — `tests/integration/test_real_ansible.py`
-- **True if the ``ansible.posix`` collection is installed and discoverable.      We** (1 connections) — `tests/integration/test_real_ansible.py`
-- **Spawn ``python -m ansible_aom <playbook>`` against a sandboxed HOME.      Using** (1 connections) — `tests/integration/test_real_ansible.py`
+- **Open Questions: `nom` (nix-output-monitor) Research** (38 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **6. Compact Mode** (4 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **8. Comparison with `nix build`** (4 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **Implementation Plan** (3 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **Summary: AOM Logging Architecture** (3 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **Summary: Recommended Architecture** (3 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **TERMINAL COMPATIBILITY AND SIGNAL HANDLING RESEARCH (2026-04-20)** (2 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **open-questions.md** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **Executive Summary** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **Final Recommendations** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **Final Recommendations** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **For Compact Mode (nom-style)** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **For Full TUI Mode** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **Implementation Skeleton** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **JSON Mode vs Human-Readable Mode** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **`nom build` Output** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **OVERVIEW** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **Phase 1: Compact View (MVP)** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **Phase 2: Full TUI Mode** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **Plain `nix build` Output** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **References** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **Related Open Issue** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **Summary: Module Structure Decisions** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **Summary of nom-Style Compact View Research** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- **Summary of TUI Features Research** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
+- *... and 2 more nodes in this community*
 
 ## Relationships
 
-- [[Run Config Key Normalization]] (6 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
-- [[CLI Help Matrix]] (1 shared connections)
+- [Community 550](Community_550.md) (1 shared connections)
+- [Community 597](Community_597.md) (1 shared connections)
+- [Community 598](Community_598.md) (1 shared connections)
+- [Community 638](Community_638.md) (1 shared connections)
+- [Community 552](Community_552.md) (1 shared connections)
+- [Community 639](Community_639.md) (1 shared connections)
+- [Community 554](Community_554.md) (1 shared connections)
+- [Community 553](Community_553.md) (1 shared connections)
+- [Community 599](Community_599.md) (1 shared connections)
+- [Community 600](Community_600.md) (1 shared connections)
+- [Community 556](Community_556.md) (1 shared connections)
+- [Community 520](Community_520.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_real_ansible.py`
+- `.sisyphus/notepads/new-spec/open-questions.md`
 
 ## Audit Trail
 
-- EXTRACTED: 61 (97%)
-- INFERRED: 2 (3%)
+- EXTRACTED: 77 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

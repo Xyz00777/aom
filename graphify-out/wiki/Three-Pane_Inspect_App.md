@@ -1,57 +1,64 @@
 # Three-Pane Inspect App
 
-> 37 nodes · cohesion 0.05
+> 84 nodes · cohesion 0.03
 
 ## Key Concepts
 
-- **InspectApp** (94 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **test_inspect_screen.py** (40 connections) — `tests/tui/test_inspect_screen.py`
-- **test_status_labels_carry_colour_markup()** (8 connections) — `tests/tui/test_inspect_screen.py`
-- **test_detail_pane_handles_huge_stdout_quickly()** (7 connections) — `tests/tui/test_inspect_screen.py`
-- **test_highlighting_successful_task_updates_detail()** (7 connections) — `tests/tui/test_inspect_screen.py`
-- **test_run_row_renders_local_timezone()** (6 connections) — `tests/tui/test_inspect_screen.py`
-- **_copy_to_clipboard()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
-- **test_ctrl_c_quits_the_app()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- **test_d_cancel_keeps_session()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- **test_d_opens_confirm_then_y_deletes()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- **test_dd_double_tap_deletes()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- **test_delete_auto_selects_next_session()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- **test_detail_block_includes_action_and_no_session_stderr()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- **test_e_expands_all_and_c_collapses_all()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- **test_enter_on_run_row_focuses_tasks_pane()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- **test_enter_on_task_focuses_detail_pane()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- **test_escape_steps_back_to_previous_pane()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- **test_focused_pane_gets_visual_class()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- **test_left_arrow_collapses_or_walks_up_tree()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- **test_left_does_not_steal_focus_to_detail_pane()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- **test_n_and_shift_n_cycle_through_failures()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- **test_question_mark_opens_help()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- **test_r_reloads_runs_from_disk()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- **test_right_arrow_on_runs_drills_into_tasks()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- **test_run_row_renders_multi_line_content()** (5 connections) — `tests/tui/test_inspect_screen.py`
-- *... and 12 more nodes in this community*
+- **JsonLineStream** (83 connections) — `src/ansible_aom/core/parser.py`
+- **TestJsonLineStreamBasics** (31 connections) — `tests/unit/test_parser.py`
+- **TestJsonLineStreamCarryBuffer** (19 connections) — `tests/unit/test_parser.py`
+- **TestPreParsePhase** (17 connections) — `tests/unit/test_parser.py`
+- **TestJsonLineStreamSurvivesMojibake** (9 connections) — `tests/unit/test_encoding_robustness.py`
+- **_decode_pexpect_style()** (8 connections) — `tests/unit/test_encoding_robustness.py`
+- **TestPtyStreamParserSurvivesMojibake** (7 connections) — `tests/unit/test_encoding_robustness.py`
+- **TestR6ParserAcceptsSurrogateLines** (5 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **test_encoding_robustness.py** (5 connections) — `tests/unit/test_encoding_robustness.py`
+- **.test_latin1_bytes_decoded_via_replace_do_not_raise()** (4 connections) — `tests/unit/test_encoding_robustness.py`
+- **.test_partial_multibyte_sequence_does_not_break_carry()** (4 connections) — `tests/unit/test_encoding_robustness.py`
+- **.test_utf8_bom_at_line_start_does_not_break_parse()** (4 connections) — `tests/unit/test_encoding_robustness.py`
+- **.test_replacement_char_in_plaintext_line_is_recorded_not_crashed()** (4 connections) — `tests/unit/test_encoding_robustness.py`
+- **.test_mojibake_subsequent_lines_still_parse()** (3 connections) — `tests/integration/test_r6_encoding_roundtrip.py`
+- **.test_invalid_utf8_byte_between_events_does_not_drop_surroundings()** (3 connections) — `tests/unit/test_encoding_robustness.py`
+- **.test_mojibake_in_execution_phase_keeps_state()** (3 connections) — `tests/unit/test_encoding_robustness.py`
+- **.test_feed_line_event_play_start()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_feed_line_event_playbook_start()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_feed_line_event_runner_failed()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_feed_line_event_runner_ok()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_feed_line_event_runner_ok_changed()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_feed_line_event_runner_skipped()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_feed_line_event_runner_start()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_feed_line_event_runner_unreachable()** (3 connections) — `tests/unit/test_parser.py`
+- **.test_feed_line_event_stats()** (3 connections) — `tests/unit/test_parser.py`
+- *... and 59 more nodes in this community*
 
 ## Relationships
 
-- [[Run Config Key Normalization]] (30 shared connections)
-- [[Inspect TUI Widget Data]] (16 shared connections)
-- [[Session List View]] (10 shared connections)
-- [[Task Tree Navigation]] (9 shared connections)
-- [[Pane Focus Navigation]] (9 shared connections)
-- [[Inspect Data Model Builders]] (4 shared connections)
-- [[Inspect CLI Commands]] (3 shared connections)
+- [Secret Redaction Configuration](Secret_Redaction_Configuration.md) (19 shared connections)
+- [Run State Completion Recap](Run_State_Completion_Recap.md) (10 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (9 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (6 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (4 shared connections)
+- [Per-Task Overhead Analysis](Per-Task_Overhead_Analysis.md) (4 shared connections)
+- [CLI Argument Parser](CLI_Argument_Parser.md) (4 shared connections)
+- [Host Overview Table](Host_Overview_Table.md) (4 shared connections)
+- [Community 484](Community_484.md) (3 shared connections)
+- [Diagnostics and Profiler](Diagnostics_and_Profiler.md) (3 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (3 shared connections)
+- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (3 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/tui/screens/inspect.py`
-- `tests/tui/test_inspect_screen.py`
+- `src/ansible_aom/core/parser.py`
+- `tests/integration/test_r6_encoding_roundtrip.py`
+- `tests/unit/test_encoding_robustness.py`
+- `tests/unit/test_parser.py`
 
 ## Audit Trail
 
-- EXTRACTED: 220 (74%)
-- INFERRED: 77 (26%)
+- EXTRACTED: 175 (53%)
+- INFERRED: 154 (47%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

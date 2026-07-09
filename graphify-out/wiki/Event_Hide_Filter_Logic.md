@@ -1,53 +1,50 @@
 # Event Hide Filter Logic
 
-> 37 nodes · cohesion 0.09
+> 45 nodes · cohesion 0.05
 
 ## Key Concepts
 
-- **should_hide_event()** (28 connections) — `src/ansible_aom/core/log_filter.py`
-- **TestShouldHideEvent** (26 connections) — `tests/unit/test_log_filter.py`
-- **.test_empty_event_type_never_hidden()** (3 connections) — `tests/unit/test_log_filter.py`
-- **.test_multiple_hide_states_match_any()** (3 connections) — `tests/unit/test_log_filter.py`
-- **.test_multiple_hide_states_no_match()** (3 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_runner_item_on_ok_true_when_changed_hidden()** (3 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_runner_on_ok_false_when_not_hidden()** (3 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_runner_on_ok_false_when_only_failed_hidden()** (3 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_runner_on_ok_true_when_changed_hidden()** (3 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_runner_on_ok_true_when_ok_hidden()** (3 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_runner_on_start_never_hidden()** (3 connections) — `tests/unit/test_log_filter.py`
-- **.test_unknown_event_type_never_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_playbook_on_handler_task_start_never_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_playbook_on_play_start_never_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_playbook_on_start_never_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_playbook_on_stats_never_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_playbook_on_task_start_never_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_runner_item_on_failed_true()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_runner_item_on_ok_true()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_runner_item_on_skipped_true()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_runner_on_failed_false_when_not_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_runner_on_failed_true()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_runner_on_skipped_false_when_not_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_runner_on_skipped_true()** (2 connections) — `tests/unit/test_log_filter.py`
-- **.test_v2_runner_on_unreachable_false_when_not_hidden()** (2 connections) — `tests/unit/test_log_filter.py`
-- *... and 12 more nodes in this community*
+- **TestJsonlEnvironmentVariable** (7 connections) — `tests/unit/test_posix_callback.py`
+- **test_posix_callback.py** (6 connections) — `tests/unit/test_posix_callback.py`
+- **TestAnsibleCoreVersionCheck** (5 connections) — `tests/unit/test_posix_callback.py`
+- **TestAnsiblePosixAvailability** (5 connections) — `tests/unit/test_posix_callback.py`
+- **TestAnsiblePosixVersionCheck** (5 connections) — `tests/unit/test_posix_callback.py`
+- **TestAnsiblePosixInstallPrompt** (4 connections) — `tests/unit/test_posix_callback.py`
+- **.test_callback_env_callable_for_any_ansible_core_state()** (3 connections) — `tests/unit/test_posix_callback.py`
+- **.test_callback_env_does_not_mutate_os_environ()** (3 connections) — `tests/unit/test_posix_callback.py`
+- **MonkeyPatch** (2 connections)
+- **.test_callback_env_does_not_pin_ansible_core_version()** (2 connections) — `tests/unit/test_posix_callback.py`
+- **.test_callback_env_returns_dict_with_required_key()** (2 connections) — `tests/unit/test_posix_callback.py`
+- **.test_bundled_callback_dir_none_when_file_missing()** (2 connections) — `tests/unit/test_posix_callback.py`
+- **.test_bundled_callback_dir_resolves_when_present()** (2 connections) — `tests/unit/test_posix_callback.py`
+- **.test_bundled_callback_plugin_file_exists()** (2 connections) — `tests/unit/test_posix_callback.py`
+- **.test_bundled_preferred_over_posix_fallback()** (2 connections) — `tests/unit/test_posix_callback.py`
+- **.test_fallback_selects_ansible_posix_jsonl()** (2 connections) — `tests/unit/test_posix_callback.py`
+- **.test_bundled_plugin_does_not_require_ansible_posix_collection()** (2 connections) — `tests/unit/test_posix_callback.py`
+- **.test_fallback_callback_name_is_ansible_posix_jsonl()** (2 connections) — `tests/unit/test_posix_callback.py`
+- **.test_fallback_callback_name_split_correctly()** (2 connections) — `tests/unit/test_posix_callback.py`
+- **.test_callback_env_bundled_sets_callback_plugins()** (2 connections) — `tests/unit/test_posix_callback.py`
+- **.test_callback_env_fallback_omits_callback_plugins()** (2 connections) — `tests/unit/test_posix_callback.py`
+- **.test_callback_env_preserves_user_override()** (2 connections) — `tests/unit/test_posix_callback.py`
+- **.test_callback_env_sets_ansible_stdout_callback()** (2 connections) — `tests/unit/test_posix_callback.py`
+- **Tests for JSONL callback plugin configuration (TC-067 to TC-071).  Test cases co** (1 connections) — `tests/unit/test_posix_callback.py`
+- **TC-068: When bundled dir resolves, aom_jsonl wins over ansible.posix.jsonl.** (1 connections) — `tests/unit/test_posix_callback.py`
+- *... and 20 more nodes in this community*
 
 ## Relationships
 
-- [[Event Log Emission]] (2 shared connections)
-- [[Log Filter Helpers]] (1 shared connections)
-- [[Hide State Normalization]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `src/ansible_aom/core/log_filter.py`
-- `tests/unit/test_log_filter.py`
+- `tests/unit/test_posix_callback.py`
 
 ## Audit Trail
 
-- EXTRACTED: 72 (59%)
-- INFERRED: 50 (41%)
+- EXTRACTED: 90 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

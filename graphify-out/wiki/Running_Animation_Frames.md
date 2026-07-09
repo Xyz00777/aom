@@ -1,36 +1,42 @@
 # Running Animation Frames
 
-> 8 nodes · cohesion 0.25
+> 14 nodes · cohesion 0.19
 
 ## Key Concepts
 
-- **get_running_frame()** (7 connections) — `src/ansible_aom/core/icons.py`
-- **.test_four_frames_per_second_timing()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_get_running_frame_cycles_correctly()** (3 connections) — `tests/unit/test_icons.py`
-- **.test_get_running_frame_large_counter()** (3 connections) — `tests/unit/test_icons.py`
-- **Get the current animation frame for RUNNING status.      Cycles through the 4 qu** (1 connections) — `src/ansible_aom/core/icons.py`
-- **TC-372: get_running_frame cycles through 4 frames correctly.** (1 connections) — `tests/unit/test_icons.py`
-- **TC-372: Large counter values still cycle correctly.** (1 connections) — `tests/unit/test_icons.py`
-- **TC-372: Animation completes full cycle in 1 second (4 frames @ 4 FPS).** (1 connections) — `tests/unit/test_icons.py`
+- **_make_state_with_stale_running()** (11 connections) — `tests/unit/test_stale_running_cleanup.py`
+- **TestStaleRunningCleanup** (11 connections) — `tests/unit/test_stale_running_cleanup.py`
+- **test_stale_running_cleanup.py** (4 connections) — `tests/unit/test_stale_running_cleanup.py`
+- **.test_host_rows_no_stale_running_after_stats()** (4 connections) — `tests/unit/test_stale_running_cleanup.py`
+- **.test_completed_hosts_preserved_after_stats_cleanup()** (3 connections) — `tests/unit/test_stale_running_cleanup.py`
+- **.test_task_status_cleared_after_stats_cleanup()** (3 connections) — `tests/unit/test_stale_running_cleanup.py`
+- **.test_v2_playbook_on_stats_clears_stale_running_hosts()** (3 connections) — `tests/unit/test_stale_running_cleanup.py`
+- **Regression tests for stale RUNNING hosts in the state model.  When terminal even** (1 connections) — `tests/unit/test_stale_running_cleanup.py`
+- **host_rows() should not show any host as still running after         the playbook** (1 connections) — `tests/unit/test_stale_running_cleanup.py`
+- **Cleaning up stale RUNNING hosts must not alter hosts that already         have t** (1 connections) — `tests/unit/test_stale_running_cleanup.py`
+- **TaskRunState.status should be cleared from RUNNING after         playbook comple** (1 connections) — `tests/unit/test_stale_running_cleanup.py`
+- **Build a RunState where ipa1 completed task A but is stuck as RUNNING     on task** (1 connections) — `tests/unit/test_stale_running_cleanup.py`
+- **When playbook ends, stale RUNNING hosts must be cleaned up.** (1 connections) — `tests/unit/test_stale_running_cleanup.py`
+- **After v2_playbook_on_stats, hosts stuck as RUNNING must be         transitioned** (1 connections) — `tests/unit/test_stale_running_cleanup.py`
 
 ## Relationships
 
-- [[Status Icon Animation Tests]] (3 shared connections)
-- [[Host Overview Table]] (1 shared connections)
-- [[Tree Block Animation]] (1 shared connections)
-- [[Compact Display Module Layout]] (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (7 shared connections)
+- [CLI Argument Parser](CLI_Argument_Parser.md) (2 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (1 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/icons.py`
-- `tests/unit/test_icons.py`
+- `tests/unit/test_stale_running_cleanup.py`
 
 ## Audit Trail
 
-- EXTRACTED: 12 (60%)
-- INFERRED: 8 (40%)
+- EXTRACTED: 37 (80%)
+- INFERRED: 9 (20%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

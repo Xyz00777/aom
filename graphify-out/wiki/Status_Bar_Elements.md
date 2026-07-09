@@ -1,46 +1,59 @@
 # Status Bar Elements
 
-> 20 nodes · cohesion 0.10
+> 27 nodes · cohesion 0.09
 
 ## Key Concepts
 
-- **TestStatusBarAvailableElements** (18 connections) — `tests/tui/test_panels.py`
-- **.test_current_task_displays_correctly()** (2 connections) — `tests/tui/test_panels.py`
-- **.test_elapsed_time_displays_correctly()** (2 connections) — `tests/tui/test_panels.py`
-- **.test_host_count_displays_correctly()** (2 connections) — `tests/tui/test_panels.py`
-- **.test_memory_usage_displays_correctly()** (2 connections) — `tests/tui/test_panels.py`
-- **.test_memory_usage_not_available()** (2 connections) — `tests/tui/test_panels.py`
-- **.test_playbook_name_displays_correctly()** (2 connections) — `tests/tui/test_panels.py`
-- **.test_subprocess_pid_displays_correctly()** (2 connections) — `tests/tui/test_panels.py`
-- **.test_subprocess_pid_not_available()** (2 connections) — `tests/tui/test_panels.py`
-- **.test_task_progress_displays_correctly()** (2 connections) — `tests/tui/test_panels.py`
-- **Tests for available status bar elements - TC-291.** (1 connections) — `tests/tui/test_panels.py`
-- **TC-291: playbook_name element renders with correct data.** (1 connections) — `tests/tui/test_panels.py`
-- **TC-291: elapsed_time element renders HH:MM:SS.** (1 connections) — `tests/tui/test_panels.py`
-- **TC-291: task_progress element shows completed/total.** (1 connections) — `tests/tui/test_panels.py`
-- **TC-291: current_task element shows task name.** (1 connections) — `tests/tui/test_panels.py`
-- **TC-291: host_count element shows completed/total hosts.** (1 connections) — `tests/tui/test_panels.py`
-- **TC-291: subprocess_pid element shows PID when available.** (1 connections) — `tests/tui/test_panels.py`
-- **TC-291 edge case: PID not available shows N/A or hides.** (1 connections) — `tests/tui/test_panels.py`
-- **TC-291: memory_usage element shows RSS/VSZ.** (1 connections) — `tests/tui/test_panels.py`
-- **TC-291 edge case: Memory unavailable shows N/A.** (1 connections) — `tests/tui/test_panels.py`
+- **sanitize_string()** (17 connections) — `src/ansible_aom/core/redaction.py`
+- **TestSanitizeStringLayer3Unchanged** (6 connections) — `tests/unit/test_redaction_layer4.py`
+- **TestURLCredentialSanitization** (6 connections) — `tests/unit/test_redaction.py`
+- **TestCLICredentialSanitization** (5 connections) — `tests/unit/test_redaction.py`
+- **TestConfigCustomPatterns** (5 connections) — `tests/unit/test_redaction.py`
+- **.test_cli_credentials_redacted()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_variant_formats()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_custom_pattern_redacts_matching_strings()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_multiple_custom_patterns()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_url_credentials_redacted()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_url_encoded_password()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_url_without_credentials_unchanged()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_cli_password_sanitized()** (3 connections) — `tests/unit/test_redaction_layer4.py`
+- **.test_custom_patterns_applied_to_strings()** (3 connections) — `tests/unit/test_redaction_layer4.py`
+- **.test_url_credentials_sanitized()** (3 connections) — `tests/unit/test_redaction_layer4.py`
+- **Sanitize credentials in a single string (Layer 3).      Applies in order:     1.** (1 connections) — `src/ansible_aom/core/redaction.py`
+- **URL/CLI string sanitization is independent of the key-match rewrite.** (1 connections) — `tests/unit/test_redaction_layer4.py`
+- **Tests for TC-160: URL credential sanitization.** (1 connections) — `tests/unit/test_redaction.py`
+- **TC-160: URL credentials are sanitized.** (1 connections) — `tests/unit/test_redaction.py`
+- **TC-160 edge case: URL-encoded passwords.** (1 connections) — `tests/unit/test_redaction.py`
+- **TC-160 edge: URLs without credentials remain unchanged.** (1 connections) — `tests/unit/test_redaction.py`
+- **Tests for TC-161: CLI argument credential sanitization.** (1 connections) — `tests/unit/test_redaction.py`
+- **TC-161: CLI credentials are sanitized.** (1 connections) — `tests/unit/test_redaction.py`
+- **TC-161 edge case: Variant CLI formats.** (1 connections) — `tests/unit/test_redaction.py`
+- **Tests for TC-173: Config custom_patterns for string sanitization.** (1 connections) — `tests/unit/test_redaction.py`
+- *... and 2 more nodes in this community*
 
 ## Relationships
 
-- [[Status Bar Warning Panels]] (3 shared connections)
-- [[Run State Completion Recap]] (3 shared connections)
-- [[Role Group Task Models]] (2 shared connections)
+- [Warnings Display Config](Warnings_Display_Config.md) (7 shared connections)
+- [Inspect TUI Widget Data](Inspect_TUI_Widget_Data.md) (5 shared connections)
+- [Run State Summary Panel](Run_State_Summary_Panel.md) (4 shared connections)
+- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (3 shared connections)
+- [Summary Panel Widget](Summary_Panel_Widget.md) (2 shared connections)
+- [Rerun Round Trip Tests](Rerun_Round_Trip_Tests.md) (1 shared connections)
+- [TUI Tree View Tests](TUI_Tree_View_Tests.md) (1 shared connections)
+- [Community 463](Community_463.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/tui/test_panels.py`
+- `src/ansible_aom/core/redaction.py`
+- `tests/unit/test_redaction.py`
+- `tests/unit/test_redaction_layer4.py`
 
 ## Audit Trail
 
-- EXTRACTED: 39 (85%)
-- INFERRED: 7 (15%)
+- EXTRACTED: 61 (69%)
+- INFERRED: 27 (31%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

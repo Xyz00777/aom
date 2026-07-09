@@ -1,53 +1,60 @@
 # PTY Buffer Stall Handling
 
-> 50 nodes · cohesion 0.07
+> 64 nodes · cohesion 0.07
 
 ## Key Concepts
 
-- **_handle_timeout_branch()** (27 connections) — `src/ansible_aom/ansible/runner.py`
-- **_FakeSink** (21 connections) — `tests/unit/test_runner_stall_flush.py`
-- **_FakeChild** (20 connections) — `tests/unit/test_runner_stall_flush.py`
-- **test_runner_stall_flush.py** (10 connections) — `tests/unit/test_runner_stall_flush.py`
-- **_fire_prompt()** (8 connections) — `src/ansible_aom/ansible/runner.py`
-- **_peek_unread()** (6 connections) — `src/ansible_aom/ansible/runner.py`
-- **TestStallFlushDoesNotBlock** (6 connections) — `tests/unit/test_runner_stall_flush.py`
-- **_consume_unread()** (5 connections) — `src/ansible_aom/ansible/runner.py`
-- **.test_renderer_crash_sends_empty_line_to_avoid_hang()** (5 connections) — `tests/unit/test_runner_stall_flush.py`
-- **TestMultilinePauseBlock** (5 connections) — `tests/unit/test_runner_stall_flush.py`
-- **.test_no_block_and_bare_colon_prior_does_not_fire()** (5 connections) — `tests/unit/test_runner_stall_flush.py`
-- **.test_prior_non_prompt_does_not_fire()** (5 connections) — `tests/unit/test_runner_stall_flush.py`
-- **TestSentinelPreventsRefiring** (5 connections) — `tests/unit/test_runner_stall_flush.py`
-- **.test_negative_stall_count_with_prior_prompt_still_skips()** (5 connections) — `tests/unit/test_runner_stall_flush.py`
-- **.test_prompt_path_emits_visible_breadcrumb()** (5 connections) — `tests/unit/test_runner_stall_flush.py`
-- **.test_quiet_child_just_ticks()** (5 connections) — `tests/unit/test_runner_stall_flush.py`
-- **.test_hint_only_fires_once()** (5 connections) — `tests/unit/test_runner_stall_flush.py`
-- **TestHighConfidencePromptPath** (4 connections) — `tests/unit/test_runner_stall_flush.py`
-- **.test_known_prompt_drains_buffer_and_calls_handler()** (4 connections) — `tests/unit/test_runner_stall_flush.py`
-- **.test_reconstructed_block_fires_prompt()** (4 connections) — `tests/unit/test_runner_stall_flush.py`
-- **.test_sentinel_blocks_reconstructed_block_refiring()** (4 connections) — `tests/unit/test_runner_stall_flush.py`
-- **TestPriorPlaintextPromptPath** (4 connections) — `tests/unit/test_runner_stall_flush.py`
-- **.test_prior_prompt_with_empty_buffer_fires()** (4 connections) — `tests/unit/test_runner_stall_flush.py`
-- **.test_negative_stall_count_skips_prompt_path()** (4 connections) — `tests/unit/test_runner_stall_flush.py`
-- **.test_at_threshold_flushes_buffer_as_log()** (4 connections) — `tests/unit/test_runner_stall_flush.py`
-- *... and 25 more nodes in this community*
+- **InspectApp** (98 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **TaskTreeNode** (27 connections) — `src/ansible_aom/core/inspect_model.py`
+- **_NavTree** (23 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **VerboseScope** (11 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._update_detail()** (10 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._load_tasks_for()** (9 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._refresh_footer()** (9 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._focus_pane_id()** (8 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._current_pane()** (7 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._failure_pairs()** (7 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._footer_scope()** (7 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **.on_mount()** (7 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._reload_runs()** (7 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._verbose_scope_from_focus()** (7 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **.focus_detail()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._focus_failure_at()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._refresh_pane_focus_classes()** (6 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **_copy_to_clipboard()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **.action_open_verbose()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._add_node()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **.focus_tasks()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._set_verbose_flash()** (5 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **.action_next_failure()** (4 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **.action_prev_failure()** (4 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- **._ancestor_tree_node()** (4 connections) — `src/ansible_aom/tui/screens/inspect.py`
+- *... and 39 more nodes in this community*
 
 ## Relationships
 
-- [[Runner Session Recording]] (12 shared connections)
-- [[Renderer Event Protocol]] (2 shared connections)
-- [[Pause Prompt Heuristic]] (1 shared connections)
+- [Task Summary Count Tests](Task_Summary_Count_Tests.md) (39 shared connections)
+- [Data Model Unit Tests](Data_Model_Unit_Tests.md) (38 shared connections)
+- [Playbook Parser Integration Tests](Playbook_Parser_Integration_Tests.md) (10 shared connections)
+- [ASCII Status Icon Fallback](ASCII_Status_Icon_Fallback.md) (4 shared connections)
+- [Total Task Counting](Total_Task_Counting.md) (2 shared connections)
+- [Community 503](Community_503.md) (1 shared connections)
+- [Status Bar Widget](Status_Bar_Widget.md) (1 shared connections)
+- [Event Source Adapters](Event_Source_Adapters.md) (1 shared connections)
+- [Loop Item Line Tests](Loop_Item_Line_Tests.md) (1 shared connections)
+- [Log Filter Helpers](Log_Filter_Helpers.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/ansible/runner.py`
-- `tests/unit/test_runner_stall_flush.py`
+- `src/ansible_aom/core/inspect_model.py`
+- `src/ansible_aom/tui/screens/inspect.py`
 
 ## Audit Trail
 
-- EXTRACTED: 185 (85%)
-- INFERRED: 32 (15%)
+- EXTRACTED: 286 (74%)
+- INFERRED: 100 (26%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

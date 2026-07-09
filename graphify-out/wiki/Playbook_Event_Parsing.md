@@ -1,42 +1,50 @@
 # Playbook Event Parsing
 
-> 6 nodes · cohesion 0.12
+> 28 nodes · cohesion 0.07
 
 ## Key Concepts
 
-- **Any** (27 connections)
-- **iter_tree_frames()** (11 connections) — `src/ansible_aom/core/replay.py`
-- **_event_timestamp()** (6 connections) — `src/ansible_aom/core/replay.py`
-- **.record_event()** (4 connections) — `src/ansible_aom/session/store.py`
-- **replay.py** (3 connections) — `src/ansible_aom/core/replay.py`
-- **Deterministic replay helpers for frame-by-frame tree capture.  These helpers sta** (1 connections) — `src/ansible_aom/core/replay.py`
+- **AOM Codebase Verification Report** (7 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **Task 1: `aom inspect prune` exists and is tested** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **Task 2: `--yes` doesn't already exist as a global flag** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **Task 3: Pre-commit / CI hook setup** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **Task 4: Inspect TUI's existing refresh rate** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **Task 5: `core/redaction.py:280-283` is the real Layer 4 location** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **aom-codebase-verification.md** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **Implication for v1 plan** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **Implication for v1 plan** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **Implication for v1 plan** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **Implication for v1 plan** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **Implication for v1 plan** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **Summary** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **Verdict: **PASS**** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **Verdict: **PASS** (but with a nuance)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **Verdict: **PASS** (documentation is accurate)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **Verdict: **PASS** (minor line number drift — 279-283 vs 280-283)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **Verdict: **PASS** (the claim is correct — `--yes` does NOT exist as a global flag)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **What was checked** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **What was checked** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **What was checked** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **What was checked** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **What was checked** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **What was found** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- **What was found** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- *... and 3 more nodes in this community*
 
 ## Relationships
 
-- [[Run History Mining]] (4 shared connections)
-- [[Session Replay Driver]] (3 shared connections)
-- [[CPU Sampling Probing]] (2 shared connections)
-- [[Host Collection Helpers]] (2 shared connections)
-- [[Replay Determinism Tests]] (2 shared connections)
-- [[Session ID Completion]] (1 shared connections)
-- [[Diagnostics Record Building]] (1 shared connections)
-- [[Per-Task Overhead Analysis]] (1 shared connections)
-- [[Renderer Parity Invariant]] (1 shared connections)
-- [[Inspect Debug Diagnostics]] (1 shared connections)
-- [[Help Overlay TUI]] (1 shared connections)
-- [[Config Loading Screen]] (1 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `src/ansible_aom/core/replay.py`
-- `src/ansible_aom/session/store.py`
+- `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
 
 ## Audit Trail
 
-- EXTRACTED: 47 (90%)
-- INFERRED: 5 (10%)
+- EXTRACTED: 54 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*

@@ -1,42 +1,46 @@
 # PTY Encoding Robustness
 
-> 17 nodes · cohesion 0.15
+> 22 nodes · cohesion 0.09
 
 ## Key Concepts
 
-- **TestJsonLineStreamSurvivesMojibake** (9 connections) — `tests/unit/test_encoding_robustness.py`
-- **_decode_pexpect_style()** (8 connections) — `tests/unit/test_encoding_robustness.py`
-- **TestPtyStreamParserSurvivesMojibake** (7 connections) — `tests/unit/test_encoding_robustness.py`
-- **test_encoding_robustness.py** (4 connections) — `tests/unit/test_encoding_robustness.py`
-- **.test_latin1_bytes_decoded_via_replace_do_not_raise()** (4 connections) — `tests/unit/test_encoding_robustness.py`
-- **.test_partial_multibyte_sequence_does_not_break_carry()** (4 connections) — `tests/unit/test_encoding_robustness.py`
-- **.test_utf8_bom_at_line_start_does_not_break_parse()** (4 connections) — `tests/unit/test_encoding_robustness.py`
-- **.test_replacement_char_in_plaintext_line_is_recorded_not_crashed()** (4 connections) — `tests/unit/test_encoding_robustness.py`
-- **.test_invalid_utf8_byte_between_events_does_not_drop_surroundings()** (3 connections) — `tests/unit/test_encoding_robustness.py`
-- **.test_mojibake_in_execution_phase_keeps_state()** (3 connections) — `tests/unit/test_encoding_robustness.py`
-- **Batch E item #10a — R6 encoding robustness.  The PTY-side decode (``pexpect.spaw** (1 connections) — `tests/unit/test_encoding_robustness.py`
-- **Mimic pexpect's ``codec_errors='replace'`` decode.** (1 connections) — `tests/unit/test_encoding_robustness.py`
-- **``JsonLineStream.feed_line`` must not crash on mojibake interleaved     with rea** (1 connections) — `tests/unit/test_encoding_robustness.py`
-- **A UTF-8 BOM (``\\ufeff``) mid-stream must not corrupt subsequent         lines.** (1 connections) — `tests/unit/test_encoding_robustness.py`
-- **Latin-1 bytes (``b'\\xe9\\xe8\\xea'`` for ``éèê``) interpreted         as UTF-8** (1 connections) — `tests/unit/test_encoding_robustness.py`
-- **A truncated UTF-8 lead byte (``b'\\xc3'``) followed by a real         JSONL even** (1 connections) — `tests/unit/test_encoding_robustness.py`
-- **The 3-phase ``PtyStreamParser`` must also tolerate mojibake at any     phase bou** (1 connections) — `tests/unit/test_encoding_robustness.py`
+- **Tree Flicker and Task Row Stability Remediation Plan** (12 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Implementation Plan** (7 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Minimal Repro and Validation Matrix** (4 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **tree-flicker-remediation.md** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Acceptance Criteria** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Confirmed Findings** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Estimated Effort** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Execution Order** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Open Questions** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Out of Scope** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Phase 0: Replay Harness and Repro-First Test Bed (Priority: Critical)** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Phase 1: Core Execution Identity Model (Priority: Critical)** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Phase 2: Durable Projection and Row Leases (Priority: Critical)** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Phase 3: Play-Boundary and Active-Play Borrowing Fixes (Priority: High)** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Phase 4: Meta, Handler, Include, Async, and Delegation Normalization (Priority: High)** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Phase 5: Regression Shielding and Real-Workload Validation (Priority: High)** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Problem Statement** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Related Files** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Root Causes** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Targeted fixture additions for repo-local testing** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Top real repro playbooks** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **Validation matrix** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
 
 ## Relationships
 
-- [[Role Group Task Models]] (8 shared connections)
-- [[PTY Stream Parser]] (4 shared connections)
+- No strong cross-community connections detected
 
 ## Source Files
 
-- `tests/unit/test_encoding_robustness.py`
+- `.sisyphus/notepads/plans/tree-flicker-remediation.md`
 
 ## Audit Trail
 
-- EXTRACTED: 45 (79%)
-- INFERRED: 12 (21%)
+- EXTRACTED: 42 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---
 
-*Part of the graphify knowledge wiki. See [[index]] to navigate.*
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*
