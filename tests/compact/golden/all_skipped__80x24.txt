@@ -8,4 +8,4 @@ host    ok  changed  skipped  failed  on
 host-a   0        0        1       0  (idle)
 host-b   0        0        1       0  (idle)
 host-c   0        0        1       0  (idle)
-site.yml | 3/3 hosts | 1/1 tasks | 0:00:00 *
+site.yml | 3/3 hosts | 1/1 tasks | *0 +0 o3 | 0:00:00 *

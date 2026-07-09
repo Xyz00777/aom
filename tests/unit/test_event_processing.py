@@ -710,6 +710,44 @@ class TestRunnerOnFailedIgnoreErrors:
         host_state = run_state.plays["play-uuid-1"].tasks["task-uuid-1"].hosts["web1"]
         assert host_state.status == Status.OK
 
+    def test_runner_failed_ignore_errors_top_level_location(self) -> None:
+        """The real emitted shape: ``ignore_errors: true`` at the top level of
+        the host result (as the aom_jsonl callback now emits) → OK, run not
+        failed. Regression guard for ignore_errors failures counted as ✖.
+        """
+        run_state = RunState(playbook="test.yml")
+
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "play-uuid-1", "name": "Setup"},
+            }
+        )
+        run_state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "task-uuid-1", "name": "Task"},
+                "host": "web1",
+                "play": {"id": "play-uuid-1"},
+            }
+        )
+        run_state.handle_event(
+            {
+                "_event": "v2_runner_on_failed",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "task-uuid-1", "name": "Task"},
+                "hosts": {"web1": {"failed": True, "ignore_errors": True}},
+                "play": {"id": "play-uuid-1"},
+            }
+        )
+
+        host_state = run_state.plays["play-uuid-1"].tasks["task-uuid-1"].hosts["web1"]
+        assert host_state.status == Status.OK
+        # An ignored failure must not flip the whole run to FAILED.
+        assert run_state.status != Status.FAILED
+
     def test_runner_failed_ignore_errors_nested_location(self) -> None:
         """TC-209: Nested ignore_errors location in _ansible_verbose_always."""
         run_state = RunState(playbook="test.yml")

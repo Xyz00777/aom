@@ -34,6 +34,16 @@ class PriorRun:
     task_count: int
     host_count: int
     end_time: datetime
+    # Actual number of ``v2_playbook_on_task_start`` events this run
+    # produced — the realistic total once dynamic ``include_tasks``
+    # expanded, unlike ``task_count`` (the static preflight count). 0 for
+    # sessions recorded before event capture. Used to seed the live
+    # status-bar denominator and the "Last run: N tasks" hint.
+    observed_task_count: int = 0
+    # True when this prior was a strict ``RunConfigKey`` match; False for
+    # the loose playbook+host-count fallback. The renderer trusts a strict
+    # count as the denominator plainly and marks a loose one as an estimate.
+    exact_match: bool = True
     # Loop item totals mined from this session's recorded aggregate
     # events: ``{task.path: {host: item_count}}``. Lets a re-run show a
     # live ``N/total`` loop count. Empty for sessions recorded before
@@ -96,10 +106,12 @@ def _mine_loop_totals(session_path: Path) -> dict[str, dict[str, int]]:
 
 def _mine_task_wall(
     session_path: Path,
-) -> tuple[dict[str, float], float, frozenset[str], float]:
+) -> tuple[dict[str, float], float, frozenset[str], float, int]:
     """Mine the per-task wall profile + result segmentation from a session.
 
-    Returns ``(averages, total_s, variable_paths, variable_total_s)``:
+    Returns ``(averages, total_s, variable_paths, variable_total_s,
+    task_starts)`` where ``task_starts`` is the raw count of
+    ``v2_playbook_on_task_start`` events (independent of timing validity):
 
     - ``averages`` maps ``task.path`` to its per-occurrence average wall, the
       gap between its ``v2_playbook_on_task_start`` and the *next* task start
@@ -117,13 +129,14 @@ def _mine_task_wall(
     """
     events_file = session_path / "events.jsonl"
     if not events_file.is_file():
-        return {}, 0.0, frozenset(), 0.0
+        return {}, 0.0, frozenset(), 0.0, 0
     totals: dict[str, float] = {}
     counts: dict[str, int] = {}
     variable: set[str] = set()
     prev_path: str | None = None
     prev_ts: datetime | None = None
     grand_total = 0.0
+    task_starts = 0
 
     def _close(path: str | None, start: datetime | None, end: datetime | None) -> None:
         nonlocal grand_total
@@ -148,6 +161,7 @@ def _mine_task_wall(
                     continue
                 kind = event.get("_event")
                 if kind == "v2_playbook_on_task_start":
+                    task_starts += 1
                     ts = _parse_iso(event.get("_timestamp"))
                     _close(prev_path, prev_ts, ts)
                     prev_path = event.get("task", {}).get("path")
@@ -168,11 +182,11 @@ def _mine_task_wall(
                     ):
                         variable.add(path)
     except OSError:
-        return {}, 0.0, frozenset(), 0.0
+        return {}, 0.0, frozenset(), 0.0, 0
 
     averages = {path: totals[path] / counts[path] for path in totals}
     variable_total = sum(totals[path] for path in variable if path in totals)
-    return averages, grand_total, frozenset(variable), variable_total
+    return averages, grand_total, frozenset(variable), variable_total, task_starts
 
 
 def _parse_iso(value: str | None) -> datetime | None:
@@ -264,9 +278,13 @@ def _build_prior(meta: dict[str, Any], entry: Path, end_time: datetime) -> Prior
 
 def _mine_and_replace(prior: PriorRun, session_path: Path) -> PriorRun:
     """Mine per-task wall and loop totals for *prior*, returning a new PriorRun."""
-    task_wall_s, prior_wall_total_s, variable_paths, prior_var_total_s = _mine_task_wall(
-        session_path
-    )
+    (
+        task_wall_s,
+        prior_wall_total_s,
+        variable_paths,
+        prior_var_total_s,
+        observed_task_count,
+    ) = _mine_task_wall(session_path)
     return replace(
         prior,
         loop_totals=_mine_loop_totals(session_path),
@@ -274,6 +292,7 @@ def _mine_and_replace(prior: PriorRun, session_path: Path) -> PriorRun:
         prior_wall_total_s=prior_wall_total_s,
         variable_paths=variable_paths,
         prior_var_total_s=prior_var_total_s,
+        observed_task_count=observed_task_count,
     )
 
 
@@ -314,10 +333,12 @@ def find_previous_run(
 
     for end_time, meta, entry in candidates:
         if _match_strict(meta, key, host_count):
-            return _mine_and_replace(_build_prior(meta, entry, end_time), entry)
+            prior = _mine_and_replace(_build_prior(meta, entry, end_time), entry)
+            return replace(prior, exact_match=True)
 
     for end_time, meta, entry in candidates:
         if _match_loose(meta, key, host_count):
-            return _mine_and_replace(_build_prior(meta, entry, end_time), entry)
+            prior = _mine_and_replace(_build_prior(meta, entry, end_time), entry)
+            return replace(prior, exact_match=False)
 
     return None

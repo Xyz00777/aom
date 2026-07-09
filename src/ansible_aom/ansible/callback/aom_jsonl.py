@@ -63,6 +63,21 @@ from ansible_collections.ansible.posix.plugins.callback import jsonl
 class CallbackModule(jsonl.CallbackModule):
     CALLBACK_NAME = "aom_jsonl"
 
+    def _record_task_result(self, event_name, on_info, result, **kwargs):
+        """Preserve ``ignore_errors`` in the emitted event.
+
+        Ansible calls ``v2_runner_on_failed(result, ignore_errors=...)``;
+        the parent routes every runner hook through this method with the
+        extra kwargs, but drops ``ignore_errors`` on the floor. Without it a
+        task that failed under ``ignore_errors: true`` is indistinguishable
+        on the wire from a real failure. Merge the flag into ``on_info`` so
+        it lands at the top level of the host result (next to ``failed``),
+        where AOM's state machine reads it to classify the task as tolerated.
+        """
+        if kwargs.get("ignore_errors"):
+            on_info = dict(on_info, ignore_errors=True)
+        return super()._record_task_result(event_name, on_info, result, **kwargs)
+
     def v2_runner_item_on_ok(self, result):
         self._emit_item("v2_runner_item_on_ok", result)
 
