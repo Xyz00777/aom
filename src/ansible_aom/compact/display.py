@@ -45,6 +45,14 @@ MINIMUM_SIZE = (MINIMUM_COLUMNS, MINIMUM_LINES)
 # the latest state happens to be. Matches Rich Live's old refresh_per_second=4.
 _THROTTLE_INTERVAL_S = 0.25
 
+# Log-line flush window (~30 Hz). Every log frame rewinds and repaints
+# the whole status block; at hundreds of events/sec that repaint storm
+# is visible flicker even on DEC-2026 terminals (kitty times out
+# synchronized updates under sustained back-to-back frames). Leading
+# edge: the first line after a quiet gap renders immediately, lines
+# arriving within the window buffer and go out together in one frame.
+_LOG_FLUSH_INTERVAL_S = 1 / 30
+
 # DEC mode 2026 — Synchronized Output. Wrapping a frame between BSU/ESU
 # tells the terminal to buffer the bytes and apply them atomically, so
 # multi-line redraws never produce a torn frame. Terminals that don't
@@ -151,6 +159,13 @@ class Display:
         # Tracks whether we've already printed the "terminal too small"
         # warning so we don't spam it on every update() while degraded.
         self._degraded_warning_printed = False
+        # Log lines waiting for the next flush window. Every frame-writing
+        # path (print_log flush, update, stop, clear, shrink-to-degraded)
+        # drains this so lines are never lost or reordered.
+        self._pending_logs: list[str] = []
+        # Monotonic timestamp of the last frame that carried log lines.
+        # 0.0 means "never" — the next print_log flushes immediately.
+        self._last_log_flush_time = 0.0
 
     def start(self, force_size: tuple[int, int] | None = None) -> None:
         """Begin owning the bottom of the terminal.
@@ -192,8 +207,16 @@ class Display:
             self._is_running = False
             return
         # Wipe whatever status block is currently visible so the user's
-        # shell prompt doesn't appear on top of leftover content.
-        frame = _BSU + self._rewind_status() + _CLEAR_TO_EOS + _SHOW_CURSOR + _ESU
+        # shell prompt doesn't appear on top of leftover content. Any
+        # buffered log lines ride along into scrollback first.
+        frame = (
+            _BSU
+            + self._rewind_status()
+            + _CLEAR_TO_EOS
+            + self._drain_pending_logs()
+            + _SHOW_CURSOR
+            + _ESU
+        )
         sys.stdout.write(frame)
         sys.stdout.flush()
         self._is_running = False
@@ -240,13 +263,27 @@ class Display:
         too_small = (cols, rows) < MINIMUM_SIZE
 
         if too_small and not self._degraded:
-            # Terminal shrank mid-run: wipe the live panel before going dark.
+            # Terminal shrank mid-run: wipe the live panel before going
+            # dark, carrying any buffered log lines into the wipe frame
+            # so they land in scrollback instead of being dropped.
             if self._is_running:
-                frame = _BSU + self._rewind_status() + _CLEAR_TO_EOS + _SHOW_CURSOR + _ESU
+                frame = (
+                    _BSU
+                    + self._rewind_status()
+                    + _CLEAR_TO_EOS
+                    + self._drain_pending_logs()
+                    + _SHOW_CURSOR
+                    + _ESU
+                )
                 sys.stdout.write(frame)
                 sys.stdout.flush()
                 self._status_rows = 0
                 self._is_running = False
+            elif self._pending_logs:
+                # No panel to wipe but lines are still queued — print
+                # them plainly before degraded mode takes over.
+                sys.stdout.write(self._drain_pending_logs())
+                sys.stdout.flush()
             self._degraded = True
             if not self._degraded_warning_printed:
                 print(
@@ -277,22 +314,27 @@ class Display:
             self._last_status_update_time
             and (now - self._last_status_update_time) < _THROTTLE_INTERVAL_S
         ):
+            # Status write throttled — but stale pending logs still owe
+            # the user a frame (which carries the latest content anyway).
+            if self._pending_logs and self._log_flush_due(now):
+                self._write_frame(now)
+                self._last_status_update_time = now
             return
 
-        rendered = self._content
-        new_rows = _row_count(rendered, _terminal_width())
-        frame = _BSU + self._rewind_status() + _CLEAR_TO_EOS + rendered + _ESU
-        sys.stdout.write(frame)
-        sys.stdout.flush()
-        self._status_rows = new_rows
+        self._write_frame(now)
         self._last_status_update_time = now
 
     def print_log(self, message: str) -> None:
-        """Print a log line above the status block.
+        """Queue a log line for printing above the status block.
 
-        Wipes the status, writes the log line, then re-renders the
-        status. The whole operation is a single synchronized frame so
-        the user never sees an intermediate state.
+        Leading-edge batching: if the flush window has elapsed since the
+        last log-carrying frame, the line (plus anything already queued)
+        goes out immediately as one synchronized frame — wipe status,
+        write logs, re-render status. Lines arriving within the window
+        are buffered; the next flush (a later print_log, ``flush_logs``,
+        ``update``, or ``stop``) emits them together. This caps the
+        repaint rate at ~30 Hz during event storms instead of one full
+        status repaint per log line.
 
         In degraded mode (R4) and non-TTY mode, falls through to a
         plain ``print()`` — there's no panel to wipe-and-restore.
@@ -303,20 +345,53 @@ class Display:
 
         # Ensure the log line ends with exactly one newline so the
         # following status rendering starts on a fresh row.
-        log = message if message.endswith("\n") else message + "\n"
+        self._pending_logs.append(message if message.endswith("\n") else message + "\n")
+        now = time.monotonic()
+        if self._log_flush_due(now):
+            self._write_frame(now)
+
+    def flush_logs(self) -> None:
+        """Drain any buffered log lines in one synchronized frame.
+
+        Called by the renderer's quiet-period tick so the tail of a
+        burst never sits buffered longer than one tick interval. No-op
+        when the buffer is empty or there's no panel to repaint.
+        """
+        if not self._is_tty or self._degraded or not self._pending_logs:
+            return
+        self._write_frame(time.monotonic())
+
+    def _log_flush_due(self, now: float) -> bool:
+        """True when the flush window has elapsed (or never started)."""
+        return (
+            not self._last_log_flush_time
+            or (now - self._last_log_flush_time) >= _LOG_FLUSH_INTERVAL_S
+        )
+
+    def _drain_pending_logs(self) -> str:
+        """Take the queued log lines (each already newline-terminated)."""
+        logs = "".join(self._pending_logs)
+        self._pending_logs = []
+        return logs
+
+    def _write_frame(self, now: float) -> None:
+        """One synchronized frame: pending logs, then the status block."""
+        logs = self._drain_pending_logs()
         rendered = self._content
         new_rows = _row_count(rendered, _terminal_width())
-        frame = _BSU + self._rewind_status() + _CLEAR_TO_EOS + log + rendered + _ESU
+        frame = _BSU + self._rewind_status() + _CLEAR_TO_EOS + logs + rendered + _ESU
         sys.stdout.write(frame)
         sys.stdout.flush()
         self._status_rows = new_rows
+        if logs:
+            self._last_log_flush_time = now
 
     def clear(self) -> None:
         """Erase the status content (but leave the display running)."""
         self._content = ""
         if not self._is_tty or not self._is_running or self._degraded:
             return
-        frame = _BSU + self._rewind_status() + _CLEAR_TO_EOS + _ESU
+        frame = _BSU + self._rewind_status() + _CLEAR_TO_EOS + self._drain_pending_logs() + _ESU
         sys.stdout.write(frame)
         sys.stdout.flush()
         self._status_rows = 0

@@ -73,6 +73,9 @@ def _run(prior: PriorRun, monkeypatch) -> list[str]:
         def print_log(self, message: str) -> None:
             pass
 
+        def flush_logs(self) -> None:
+            pass
+
     renderer = CompactRenderer(is_tty=True)
     monkeypatch.setattr(renderer, "_display", FakeDisplay())
     renderer.start("site.yml", [])
@@ -110,6 +113,9 @@ def test_no_prior_falls_back_to_seen(monkeypatch) -> None:
             captured.append(text)
 
         def print_log(self, message: str) -> None:
+            pass
+
+        def flush_logs(self) -> None:
             pass
 
     renderer = CompactRenderer(is_tty=True)

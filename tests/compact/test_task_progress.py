@@ -297,6 +297,9 @@ def test_renderer_status_bar_reflects_task_progress(monkeypatch):
         def print_log(self, message: str) -> None:
             pass
 
+        def flush_logs(self) -> None:
+            pass
+
     renderer = CompactRenderer(is_tty=True)
     monkeypatch.setattr(renderer, "_display", FakeDisplay())
 

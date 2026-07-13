@@ -615,6 +615,11 @@ class CompactRenderer:
         """
         if self._state is None:
             return
+        # Backstop flush for log batching: the last lines of a burst sit
+        # in Display's buffer until some frame carries them out. Events
+        # and panel writes do that during activity; the quiet-period
+        # tick covers the trailing edge.
+        self._display.flush_logs()
         self._render_status_panel()
 
     def note_pty_bytes(self) -> None:
