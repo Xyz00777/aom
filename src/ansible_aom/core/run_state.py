@@ -287,6 +287,13 @@ class RunState:
     # with no _event field at all are degenerate (not "future-version
     # drift") and aren't counted here.
     unknown_events: dict[str, int] = field(default_factory=dict)
+    # Terminal runner events (v2_runner_on_ok/failed/skipped/unreachable)
+    # whose (play_id, task_id) — and the path/name fallback in
+    # ``_resolve_runner_task`` — matched no known task. Each drop leaves
+    # host state stale (the exact "silently dropped" class the stats
+    # handler cleans up at run end), so it must be observable. Keyed by
+    # event type; surfaced as a completion footer by the renderers.
+    unmatched_events: dict[str, int] = field(default_factory=dict)
     # Loop item totals from a matching prior run: ``{task.path: {host:
     # item_count}}``. Injected via the renderer's ``set_prior_run`` so the
     # tree can show ``N/total`` while a loop runs. Empty when there is no
@@ -552,6 +559,64 @@ class RunState:
             if owner is not None:
                 return owner
         return self._current_play_id or ""
+
+    def _resolve_runner_task(self, event: JsonlEvent) -> TaskRunState | None:
+        """Find the TaskRunState a terminal runner event belongs to.
+
+        Terminal events (``v2_runner_on_ok`` and friends) used to be
+        dropped silently whenever the ``(play_id, task_id)`` lookup
+        missed — leaving hosts stuck as RUNNING in the tree while the
+        log already streamed their results. Resolution order:
+
+        1. ``task.id`` inside the play resolved by ``_resolve_play_id``.
+        2. ``task.id`` owned by any other play (covers events carrying a
+           stale or unknown ``play.id``).
+        3. Within the resolved play (or the ``_current_play_id`` cursor
+           when the event's play is unknown): a task with the same
+           ``task.path``, then the same ``task.name``. Among several
+           matches, prefer the most recent RUNNING one — a completed
+           earlier instance of a re-run task must not swallow results
+           meant for the live one.
+
+        Returns ``None`` when nothing matches; the caller counts the
+        drop in ``unmatched_events``.
+        """
+        task_data = self._task_dict(event)
+        task_id = task_data.get("id", "")
+        play = self.plays.get(self._resolve_play_id(event))
+        if play is not None and task_id in play.tasks:
+            return play.tasks[task_id]
+        if task_id:
+            owner_id = self._resolve_play_for_task(task_id)
+            if owner_id is not None:
+                return self.plays[owner_id].tasks[task_id]
+        if play is None:
+            play = self.plays.get(self._current_play_id or "")
+        if play is None:
+            return None
+        task_path = task_data.get("path")
+        task_name = task_data.get("name", "")
+        candidates: list[TaskRunState] = []
+        if task_path:
+            candidates = [t for t in play.tasks.values() if t.path == task_path]
+        if not candidates and task_name:
+            candidates = [t for t in play.tasks.values() if t.name == task_name]
+        if not candidates:
+            return None
+        for task in reversed(candidates):
+            if task.status == Status.RUNNING:
+                return task
+        return candidates[-1]
+
+    def _note_unmatched(self, event: JsonlEvent) -> None:
+        """Count a terminal runner event that matched no known task."""
+        event_type = event.get("_event", "")
+        self.unmatched_events[event_type] = self.unmatched_events.get(event_type, 0) + 1
+        logger.warning(
+            "Unmatched %s event dropped (task=%r); host state may go stale",
+            event_type,
+            self._task_dict(event).get("name", ""),
+        )
 
     def _parent_role_from_cache(self, task_name: str) -> str | None:
         """Return the parent role recorded in ``_role_cache`` for a runtime task.
@@ -937,12 +1002,38 @@ class RunState:
         # handlers (runner_on_ok/failed/skipped/unreachable) will
         # overwrite each host entry as the events arrive.
         resolved_hosts = self._resolve_play_hosts(play)
+        if not resolved_hosts and play.detected_strategy == "linear":
+            # No preflight match (preflight failed, or the play name in
+            # --list-tasks output differs from the JSONL play name).
+            # Under linear every host runs every task in lockstep, so
+            # the hosts seen on earlier tasks of this play are the task's
+            # host set too. Without this, the task keeps an empty hosts
+            # map and the tree falls back to rendering every play target
+            # as RUNNING forever, contradicting the streamed results.
+            # Not applicable under free strategy, where per-host
+            # v2_runner_on_start is the start signal.
+            #
+            # Hosts whose latest result is FAILED or UNREACHABLE are
+            # excluded: ansible removes them from the play, so later
+            # tasks never run on them.
+            last_status: dict[str, Status] = {}
+            for other_task in play.tasks.values():
+                if other_task.task_id == task_id:
+                    continue
+                for hostname, hs in other_task.hosts.items():
+                    last_status[hostname] = hs.status
+            resolved_hosts = sorted(
+                hostname
+                for hostname, status in last_status.items()
+                if status not in (Status.FAILED, Status.UNREACHABLE)
+            )
         for hostname in resolved_hosts:
             if hostname not in play.tasks[task_id].hosts:
                 play.tasks[task_id].hosts[hostname] = HostRunState(
                     hostname=hostname,
                     status=Status.RUNNING,
                     start_time=ts,
+                    synthesised=True,
                 )
 
         # Under linear strategy, tasks execute sequentially. When a new
@@ -1037,8 +1128,21 @@ class RunState:
             # running with lockstep enabled (the JSONL callback
             # guards runner_on_start behind `if self._is_lockstep:
             # return`). Flip to free — the earlier linear detection
-            # by task_start was premature.
+            # by task_start was premature. Any still-RUNNING host
+            # entries synthesised under that premature assumption are
+            # guesses about hosts that may not have started the task;
+            # drop them and let the per-host start events rebuild the
+            # map. Entries with real terminal results were replaced
+            # wholesale by the terminal handlers and survive.
             self.plays[play_id].detected_strategy = "free"
+            for task in self.plays[play_id].tasks.values():
+                stale = [
+                    stale_host
+                    for stale_host, hs in task.hosts.items()
+                    if hs.synthesised and hs.status == Status.RUNNING
+                ]
+                for stale_host in stale:
+                    del task.hosts[stale_host]
 
         play = self.plays[play_id]
 
@@ -1150,19 +1254,11 @@ class RunState:
 
     def _handle_v2_runner_on_ok(self, event: JsonlEvent, ts: datetime) -> None:
         """Handle v2_runner_on_ok event."""
-        task_data = self._task_dict(event)
         hosts_data = self._hosts_dict(event)
-        task_id = task_data.get("id", "")
-        play_id = self._resolve_play_id(event)
-
-        if play_id not in self.plays:
+        task = self._resolve_runner_task(event)
+        if task is None:
+            self._note_unmatched(event)
             return
-
-        play = self.plays[play_id]
-        if task_id not in play.tasks:
-            return
-
-        task = play.tasks[task_id]
 
         for hostname, host_result in hosts_data.items():
             changed = host_result.get("changed", False)
@@ -1186,19 +1282,11 @@ class RunState:
 
     def _handle_v2_runner_on_failed(self, event: JsonlEvent, ts: datetime) -> None:
         """Handle v2_runner_on_failed event."""
-        task_data = self._task_dict(event)
         hosts_data = self._hosts_dict(event)
-        task_id = task_data.get("id", "")
-        play_id = self._resolve_play_id(event)
-
-        if play_id not in self.plays:
+        task = self._resolve_runner_task(event)
+        if task is None:
+            self._note_unmatched(event)
             return
-
-        play = self.plays[play_id]
-        if task_id not in play.tasks:
-            return
-
-        task = play.tasks[task_id]
 
         for hostname, host_result in hosts_data.items():
             # Ansible passes ``ignore_errors`` as a parameter to the
@@ -1244,19 +1332,11 @@ class RunState:
 
     def _handle_v2_runner_on_skipped(self, event: JsonlEvent, ts: datetime) -> None:
         """Handle v2_runner_on_skipped event."""
-        task_data = self._task_dict(event)
         hosts_data = self._hosts_dict(event)
-        task_id = task_data.get("id", "")
-        play_id = self._resolve_play_id(event)
-
-        if play_id not in self.plays:
+        task = self._resolve_runner_task(event)
+        if task is None:
+            self._note_unmatched(event)
             return
-
-        play = self.plays[play_id]
-        if task_id not in play.tasks:
-            return
-
-        task = play.tasks[task_id]
 
         for hostname in hosts_data:
             new_hs = HostRunState(
@@ -1275,19 +1355,11 @@ class RunState:
 
     def _handle_v2_runner_on_unreachable(self, event: JsonlEvent, ts: datetime) -> None:
         """Handle v2_runner_on_unreachable event."""
-        task_data = self._task_dict(event)
         hosts_data = self._hosts_dict(event)
-        task_id = task_data.get("id", "")
-        play_id = self._resolve_play_id(event)
-
-        if play_id not in self.plays:
+        task = self._resolve_runner_task(event)
+        if task is None:
+            self._note_unmatched(event)
             return
-
-        play = self.plays[play_id]
-        if task_id not in play.tasks:
-            return
-
-        task = play.tasks[task_id]
 
         for hostname, host_result in hosts_data.items():
             msg = host_result.get("msg", "")

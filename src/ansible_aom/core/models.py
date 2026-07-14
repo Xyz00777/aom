@@ -193,6 +193,14 @@ class HostRunState:
     # ``(N items)`` progress hint while the loop runs. Reset to a fresh
     # HostRunState (count 0) when the aggregate terminal event lands.
     loop_items_done: int = 0
+    # True when this RUNNING entry was synthesised at task_start under
+    # the linear-strategy lockstep assumption (no per-host start event
+    # exists under linear). If the play later proves to be strategy:
+    # free (a v2_runner_on_start arrives), still-RUNNING synthesised
+    # entries are purged — the per-host start events are authoritative.
+    # Terminal handlers replace the entry wholesale, so the flag never
+    # survives a real result.
+    synthesised: bool = False
 
 
 @dataclass

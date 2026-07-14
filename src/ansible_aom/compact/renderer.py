@@ -502,12 +502,27 @@ class CompactRenderer:
         if event_type == "v2_playbook_on_task_start":
             self._tasks_seen += 1
             self._record_running_start(event)
+            # Under linear, RunState's task_start handler force-completes
+            # the previous task in place (flipping its RUNNING hosts to
+            # OK) when its terminal events were lost. That mutation emits
+            # no v2_runner_on_* the per-event branch below could hook, so
+            # reconcile here — same reasoning as the play-boundary case.
+            # Cheap: already-counted tasks short-circuit on a set lookup.
+            self._reconcile_completed_tasks()
             return
         if event_type == "v2_runner_on_start":
             # Free strategy announces tasks per-host here instead of via
             # task_start; record the first sighting so in-flight credit
             # works under both strategies.
             self._record_running_start(event)
+            # The first runner_on_start of a play flips RunState's
+            # strategy detection from linear to free and purges the
+            # synthesised RUNNING host guesses — which can leave an
+            # earlier task with only terminal hosts, i.e. newly
+            # completed without any terminal event. Reconcile like the
+            # boundary cases; already-counted tasks short-circuit on a
+            # set lookup so the walk stays cheap per event.
+            self._reconcile_completed_tasks()
             return
         if event_type in ("v2_playbook_on_play_start", "v2_playbook_on_stats"):
             # A new play (or the final stats event) is proof that every prior
@@ -1079,6 +1094,21 @@ class CompactRenderer:
             )
             total = sum(self._state.unknown_events.values())
             print(f"  ({total} unknown events: {parts})")
+
+        # Terminal runner events that matched no known task even after
+        # the path/name fallback. Each one left host state stale until
+        # the stats-time cleanup, so a non-zero count explains "the tree
+        # lagged behind the log" without reading debug logs.
+        if self._state is not None and self._state.unmatched_events:
+            parts = ", ".join(
+                f"{name}×{count}"
+                for name, count in sorted(
+                    self._state.unmatched_events.items(),
+                    key=lambda kv: (-kv[1], kv[0]),
+                )
+            )
+            total = sum(self._state.unmatched_events.values())
+            print(f"  ({total} unmatched result events: {parts})")
 
         # R12: surface any memory-cap hits so the user knows the run
         # was clipped. Same one-line footer shape as the unknown-events
