@@ -58,7 +58,7 @@ System design (module map, data flow, key decisions) and the full development ph
 - **Categories**: `tests/unit/` (isolated), `tests/integration/` (multi-component), `tests/tui/` (Textual widgets), `tests/compact/` (snapshot tests)
 - **Fixtures**: `tests/fixtures/` — JSONL event samples, playbook snippets
 - **Unit tests should pass without ansible-core**. Integration tests need it (`ansible-core≥2.16` in `[project.optional-dependencies] integration`).
-- Pre-commit hooks: ruff format → ruff check → mypy (pre-commit) → pytest (pre-push only)
+- Pre-commit hooks: ruff format → ruff check → mypy (pre-commit) → pytest (pre-push only, via `--testmon`: runs only tests whose covered code changed; per-machine `.testmondata` DB, first push per machine runs the full suite to build it)
 
 ## Style Rules
 
