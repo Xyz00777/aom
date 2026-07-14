@@ -1,7 +1,82 @@
 #!/usr/bin/env bash
-# pre-push hook: delegates to pre-commit framework (pre-push stage)
-# See .pre-commit-config.yaml for configured hooks (pytest at pre-push stage)
-set -e
+# pre-push: run only the tests affected by what's being pushed.
+#
+# Two phases, deliberately asymmetric about the working tree:
+#
+#   1. SELECTION (~2-3s, tree briefly stashed): testmon --collect-only
+#      against the COMMITTED state. Everything — including untracked
+#      files — is stashed so concurrent agent sessions' WIP (red TDD
+#      tests, uncommitted fixes) can't leak into the selection. The
+#      stash is popped before any test runs.
+#
+#   2. EXECUTION (live tree, no stash): the selected node IDs run
+#      against the tree as-is, so a long test run never holds other
+#      sessions' files hostage. testmon stays enabled so .testmondata
+#      keeps draining; it may further deselect tests already proven
+#      green on byte-identical code (testmon always re-selects prior
+#      failures, so a deselect implies a prior pass).
+#
+# pytest intentionally does NOT live in .pre-commit-config.yaml's
+# pre-push stage: the pre-commit framework stashes tracked-but-not-
+# untracked files around the WHOLE hook run, which both races
+# concurrent sessions and produces false failures (a session's
+# untracked red test stays visible while its uncommitted fix is
+# stashed away).
+#
+# --no-cov (not -p no:cov): keeps pytest-cov loaded so addopts'
+# --cov-fail-under still parses, while stopping the coverage
+# measurement that silently breaks testmon's DB updates.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
 
-echo "[pre-push] running pre-commit pre-push checks..."
-uv run pre-commit run --hook-stage push
+PYTEST=(uv run pytest --testmon --no-cov -q)
+
+# --- phase 1: selection against committed state -----------------------
+stashed=0
+restore_tree() {
+    if (( stashed )); then
+        stashed=0
+        # --index also restores staged-ness; plain pop is the fallback
+        # (content preserved, index state lost).
+        git stash pop --index --quiet 2>/dev/null \
+            || git stash pop --quiet \
+            || {
+                echo "pre-push: FAILED to restore stashed WIP — recover it" \
+                     "from 'git stash list' (pre-push-test-selection)" >&2
+                return 1
+            }
+    fi
+}
+trap restore_tree EXIT
+
+if [[ -n "$(git status --porcelain)" ]]; then
+    git stash push --include-untracked --quiet -m "pre-push-test-selection"
+    stashed=1
+fi
+
+collect_rc=0
+collected="$("${PYTEST[@]}" tests/ --collect-only -n0 2>&1)" || collect_rc=$?
+restore_tree # pop as soon as selection is done; the trap stays as backstop
+
+# exit 5 = "no tests collected" = nothing affected. Anything else
+# non-zero is a real collection error in the committed state: block.
+if (( collect_rc != 0 && collect_rc != 5 )); then
+    echo "$collected" >&2
+    echo "pre-push: test collection failed against the committed state" >&2
+    exit "$collect_rc"
+fi
+
+mapfile -t selected < <(grep -E '^tests/.*::' <<<"$collected" || true)
+if (( ${#selected[@]} == 0 )); then
+    echo "pre-push: no tests affected by the pushed changes"
+    exit 0
+fi
+
+# --- phase 2: run the selection against the live tree -----------------
+echo "pre-push: running ${#selected[@]} affected test(s) against the live tree"
+run_rc=0
+"${PYTEST[@]}" --tb=short "${selected[@]}" || run_rc=$?
+# exit 5 here means testmon deselected everything we passed in — all of
+# it already passed on identical code. That is a pass.
+if (( run_rc == 5 )); then run_rc=0; fi
+exit "$run_rc"

@@ -23,21 +23,14 @@ repos:
         pass_filenames: false
         require_serial: true
 
-      - id: pytest
-        name: pytest (testmon — only tests affected by the diff)
-        # --testmon selects tests whose covered code changed since the last
-        # run (per-machine .testmondata DB; first run builds it by running
-        # everything). --no-cov is required: testmon and pytest-cov both
-        # drive coverage.py, and with cov active testmon silently stops
-        # updating its DB. (Not -p no:cov — that unloads the plugin and
-        # addopts' --cov-fail-under then fails to parse.) Coverage
-        # enforcement lives in CI / full runs.
-        entry: uv run pytest tests/ -q --tb=short --testmon --no-cov
-        language: system
-        types: [python]
-        pass_filenames: false
-        always_run: true
-        stages: [pre-push]
+      # NOTE: pytest is intentionally NOT a pre-commit-framework hook.
+      # The framework stashes tracked-but-not-untracked changes around
+      # the whole hook run, which races concurrent agent sessions and
+      # produces false failures (a session's untracked red TDD test
+      # stays visible while its uncommitted fix gets stashed away).
+      # The diff-aware pytest gate lives in .githooks/pre-push instead
+      # (testmon selection against the committed state, execution
+      # against the live tree, no framework stash).
 
       - id: graphify-refresh
         name: "graphify: refresh graph + tree + wiki (AST-only)"
