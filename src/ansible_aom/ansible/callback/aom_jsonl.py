@@ -78,6 +78,27 @@ class CallbackModule(jsonl.CallbackModule):
             on_info = dict(on_info, ignore_errors=True)
         return super()._record_task_result(event_name, on_info, result, **kwargs)
 
+    def v2_runner_on_start(self, host, task):
+        """Emit the per-host start event WITH the host's name.
+
+        The parent emits ``{task, hosts: {}}`` — the starting host lives
+        only in its internal ``_task_map``, never on the wire. AOM's
+        state machine needs ``event["host"]`` to mark that host RUNNING;
+        without it, non-lockstep strategies (free, mitogen_*) never get
+        per-host running state and the tree degrades to a static
+        all-targets view. Mirrors the parent's bookkeeping exactly, but
+        writes an annotated copy of the envelope so the shared
+        ``task_result`` dict (later deep-copied into terminal events)
+        stays untouched.
+        """
+        if self._is_lockstep:
+            return
+        key = (host.get_name(), task._uuid)
+        task_result = self._new_task(task)
+        self._task_map[key] = task_result
+        self.results[-1]["tasks"].append(task_result)
+        self._write_event("v2_runner_on_start", {**task_result, "host": host.get_name()})
+
     def v2_runner_item_on_ok(self, result):
         self._emit_item("v2_runner_item_on_ok", result)
 
