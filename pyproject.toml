@@ -46,6 +46,7 @@ dev = [
     "pre-commit>=3.0",
     "jsonschema>=4.20",        # schemas/run_summary.v1.json contract test
     "hypothesis>=6",           # property-based tests (Batch C)
+    "pytest-testmon>=2.2",     # diff-aware test selection for the pre-push hook
 ]
 
 integration = [

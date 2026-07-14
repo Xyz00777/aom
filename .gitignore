@@ -73,3 +73,6 @@ graphify-out/*
 !graphify-out/wiki/
 # Date-stamped pre-overwrite backup dirs (created by graphify cluster-only):
 graphify-out/20??-??-??/
+
+# pytest-testmon per-machine coverage DB (pre-push hook)
+.testmondata*

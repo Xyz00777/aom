@@ -24,8 +24,15 @@ repos:
         require_serial: true
 
       - id: pytest
-        name: pytest
-        entry: uv run pytest tests/ -q --tb=short
+        name: pytest (testmon — only tests affected by the diff)
+        # --testmon selects tests whose covered code changed since the last
+        # run (per-machine .testmondata DB; first run builds it by running
+        # everything). --no-cov is required: testmon and pytest-cov both
+        # drive coverage.py, and with cov active testmon silently stops
+        # updating its DB. (Not -p no:cov — that unloads the plugin and
+        # addopts' --cov-fail-under then fails to parse.) Coverage
+        # enforcement lives in CI / full runs.
+        entry: uv run pytest tests/ -q --tb=short --testmon --no-cov
         language: system
         types: [python]
         pass_filenames: false
