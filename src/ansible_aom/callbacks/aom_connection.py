@@ -96,10 +96,10 @@ class CallbackModule(CallbackBase):
         except OSError:
             pass
 
-    def v2_runner_on_start(self, result) -> None:
-        host = result._host.get_name()
-        task_uuid = result._task._uuid
-        self._write_event(_make_acquired(task_uuid, host))
+    def v2_runner_on_start(self, host, task) -> None:
+        # Unlike the result-carrying runner hooks, ansible-core
+        # dispatches this one as ``v2_runner_on_start(host, task)``.
+        self._write_event(_make_acquired(task._uuid, host.get_name()))
 
     def v2_runner_on_ok(self, result) -> None:
         host = result._host.get_name()

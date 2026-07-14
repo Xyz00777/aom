@@ -132,3 +132,37 @@ class TestFileWriting:
         cb._log_path = None
         # Should not raise
         cb._write_event(_make_acquired("task-003", "host1"))
+
+
+class TestRunnerOnStartSignature:
+    """ansible-core dispatches ``v2_runner_on_start(host, task)`` — two
+    positional args, unlike the result-carrying runner hooks. The wrong
+    ``(self, result)`` signature made every dispatch fail with
+    "[WARNING]: Callback dispatch 'v2_runner_on_start' failed", so
+    connection tracking never recorded an acquire."""
+
+    def test_v2_runner_on_start_accepts_host_and_task(self) -> None:
+        class _Host:
+            def get_name(self) -> str:
+                return "web1"
+
+        class _Task:
+            _uuid = "task-start-001"
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".jsonl") as f:
+            log_path = f.name
+        try:
+            cb = CallbackModule()
+            cb._log_path = log_path
+
+            cb.v2_runner_on_start(_Host(), _Task())
+
+            with open(log_path) as f:
+                event = json.loads(f.readline())
+            assert event["_event"] == "aom_connection_acquired"
+            assert event["host"] == "web1"
+        finally:
+            try:
+                os.unlink(log_path)
+            except OSError:
+                pass
