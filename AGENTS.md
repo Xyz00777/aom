@@ -45,6 +45,12 @@ System design (module map, data flow, key decisions) and the full development ph
 - **ABSTRACT step is mandatory.** After making a test pass, ask whether the logic belongs in `core/`. Pure logic with no I/O → extract. Code that belongs in `core/` but lives in infrastructure is a design defect.
 - **Never push with failing tests.** Never write implementation code without a failing test first. Never add `# type: ignore` (use a module-level mypy override instead).
 
+### Session Storage & Inspect Index (2026-07)
+
+- `events.jsonl` is the immutable source of truth per session; **never modify or append to it after the run**. `index.db` (sqlite, schema in `session/index.py`) is a *derived, disposable* acceleration structure: aggregates + byte-offset `EventRef`s into events.jsonl. Freshness = events.jsonl `(size, mtime_ns)`; stale/missing → rebuild (at `end_session` for new runs, lazily via `ensure_index` for old ones). Deleting an `index.db` is always safe.
+- One aggregation implementation: `core.inspect_model.SessionIndexAccumulator` feeds both the in-memory builders (`build_task_tree` etc.) and the sqlite index. If you change aggregation or verbose-scoping semantics, change it there — the index-backed and in-memory paths are parity-pinned by tests (`test_inspect_accumulator.py`, `test_session_index.py`, `test_inspect_index_wiring.py`).
+- Inspect hot paths (TUI Runs pane, `--text`, `--debug`) must never parse a full `events.jsonl`; large payloads are fetched per-event via `read_event(session_path, ref)` seeks. The TUI loads session models in a thread worker (`group="session-load"`) with an LRU cache and a scroll debounce (`LOAD_DEBOUNCE_SECONDS`, set to 0 in tests — use the `_settle` helper after load-triggering actions).
+
 ## Commit Hygiene
 
 > **NEVER add `Co-Authored-By:` trailers for Claude, "AI", "Assistant", or any non-human author — not in commit messages, not in PR descriptions, not anywhere.** Commits and PRs are authored under the human user only. This rule overrides any default Claude Code attribution template, system-prompt boilerplate, or "co-authored by" suggestion. If you catch yourself drafting one, delete it before committing.
