@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
-from typing import Literal, Mapping
+from typing import Literal, Mapping, NamedTuple
 
 from ansible_aom.core._async_poll import is_async_poll_payload
 from ansible_aom.core.timestamp import parse_iso_timestamp
@@ -202,6 +202,19 @@ def build_run_summaries(sessions: list[dict]) -> list[RunSummary]:
     return summaries
 
 
+class EventRef(NamedTuple):
+    """Byte span of one event line inside ``events.jsonl``.
+
+    The streaming loader records where each retained event lives instead
+    of keeping the parsed dict — the detail pane seeks and re-parses the
+    single line on demand, so memory stays bounded by tasks×hosts rather
+    than payload bytes.
+    """
+
+    offset: int
+    length: int
+
+
 @dataclass(frozen=True)
 class TaskTreeNode:
     """Hierarchical view of a session's tasks.
@@ -210,6 +223,10 @@ class TaskTreeNode:
     role-or-source bucket (see ``_group_key``); when a task has no
     natural grouping the bucket key is ``"_root"`` and renders as a
     flat list under the play.
+
+    Exactly one of ``raw_event`` / ``raw_ref`` is set on task and host
+    nodes (both ``None`` for structural nodes): the in-memory path keeps
+    the event dict, the streaming path keeps only its byte span.
     """
 
     kind: Literal["run", "play", "group", "task", "host"]
@@ -221,6 +238,7 @@ class TaskTreeNode:
     duration: timedelta | None = None
     raw_event: dict | None = None
     task_id: str | None = None  # so the detail pane can fetch the underlying event
+    raw_ref: EventRef | None = None
 
 
 _ROLE_PATH_RE = re.compile(r"roles/([^/]+)/")
@@ -347,108 +365,303 @@ def _runner_event_type(event: dict) -> str | None:
     return None
 
 
-def build_task_tree(session: dict) -> TaskTreeNode:
-    """Build the hierarchical task tree for one session.
+class StderrRow(NamedTuple):
+    """One ``aom_stderr_line`` event, reduced to the fields verbose scoping needs.
+
+    NamedTuple rather than dataclass: verbose runs carry hundreds of
+    thousands of stderr lines and tuple construction is the accumulator's
+    hottest allocation.
+    """
+
+    line: str
+    source: str | None
+    connection_id: str | None
+    ambiguous: bool
+
+
+class TaskHostRow(NamedTuple):
+    """Aggregate for one (task, host) pair plus the last event seen for it."""
+
+    host: str
+    counts: StatusCounts
+    raw_event: dict | None
+    raw_ref: EventRef | None
+
+
+@dataclass(frozen=True)
+class TaskRow:
+    """Aggregate for one task, hosts in first-event order."""
+
+    task_id: str
+    play_id: str
+    name: str
+    path: str | None
+    group_key: str
+    counts: StatusCounts
+    hosts: tuple[TaskHostRow, ...]
+    duration: timedelta | None
+    raw_event: dict | None
+    raw_ref: EventRef | None
+
+
+@dataclass(frozen=True)
+class PlayRow:
+    play_id: str
+    name: str
+
+
+@dataclass(frozen=True)
+class SessionIndex:
+    """Everything the inspect views need, aggregated in one event pass.
+
+    Bounded by tasks×hosts (+ stderr line count), never by payload
+    bytes — large module outputs stay on disk behind ``EventRef``s when
+    the accumulator is fed with refs.
+    """
+
+    plays: tuple[PlayRow, ...]
+    tasks: tuple[TaskRow, ...]
+    host_counts: Mapping[str, StatusCounts]
+    failed_task_count: int
+    stderr: tuple[StderrRow, ...]
+    connections: Mapping[str, tuple[str, str]]  # connection_id -> (task_id, host)
+    fallback_play_name: str
+
+
+class _HostAcc:
+    __slots__ = ("counts", "raw", "ref")
+
+    def __init__(self) -> None:
+        self.counts = _MutCounts()
+        self.raw: dict | None = None
+        self.ref: EventRef | None = None
+
+
+class _TaskAcc:
+    __slots__ = ("label", "path", "group", "play_id", "counts", "hosts", "raw", "ref", "last_ts")
+
+    def __init__(self, label: str, path: str | None, group: str, play_id: str) -> None:
+        self.label = label
+        self.path = path
+        self.group = group
+        self.play_id = play_id
+        self.counts = _MutCounts()
+        self.hosts: dict[str, _HostAcc] = {}
+        self.raw: dict | None = None
+        self.ref: EventRef | None = None
+        self.last_ts: datetime | None = None
+
+
+class SessionIndexAccumulator:
+    """Single-pass, constant-per-event aggregation over a session's events.
+
+    ``feed`` each event in file order, then ``finish()`` for the
+    ``SessionIndex``. Pass ``ref`` (the event's byte span in
+    events.jsonl) to record a seekable reference instead of retaining
+    the event dict — the streaming loader does this so memory does not
+    scale with payload size. Without ``ref`` the dict is kept, matching
+    the legacy in-memory behavior the TUI detail pane relies on.
 
     Ansible's posix.jsonl emits ``v2_playbook_on_play_start`` only when
     the play opens; subsequent task/runner events do NOT carry the
-    ``play`` key. We track the current play as a sliding window during
-    iteration and attribute tasks/results to whatever play was last
-    active. Same for task_start timestamps used for duration.
+    ``play`` key. The current play is tracked as a sliding window and
+    tasks are attributed to whatever play was last active. Same for
+    task_start timestamps used for duration.
     """
-    events = session.get("events", [])
 
-    # Single linear pass: track current play / task contexts.
-    play_order: list[tuple[str, str]] = []
-    play_seen: set[str] = set()
-    task_starts: dict[str, dict] = {}
-    task_records: dict[str, dict] = {}
-    task_order: list[str] = []
+    def __init__(self) -> None:
+        self._plays: list[PlayRow] = []
+        self._play_seen: set[str] = set()
+        self._task_start_ts: dict[str, datetime] = {}
+        self._tasks: dict[str, _TaskAcc] = {}
+        self._host_counts: dict[str, _MutCounts] = {}
+        self._failed_task_ids: set[str] = set()
+        self._stderr: list[StderrRow] = []
+        self._connections: dict[str, tuple[str, str]] = {}
+        self._current_pid = ""
+        self._current_play_name = ""
 
-    current_pid: str = ""
-    current_play_name: str = ""
-
-    for event in events:
+    def feed(self, event: dict, *, ref: EventRef | None = None) -> None:
         et = event.get("_event", "")
 
         if et == "v2_playbook_on_play_start":
             play = event.get("play") or {}
             pid = str(play.get("id", ""))
             pname = str(play.get("name", "unnamed play"))
-            if pid and pid not in play_seen:
-                play_seen.add(pid)
-                play_order.append((pid, pname))
-            current_pid = pid
-            current_play_name = pname
-            continue
+            if pid and pid not in self._play_seen:
+                self._play_seen.add(pid)
+                self._plays.append(PlayRow(play_id=pid, name=pname))
+            self._current_pid = pid
+            self._current_play_name = pname
+            return
 
         if et == "v2_playbook_on_task_start":
             task_data = event.get("task")
             tid = str(task_data.get("id", "")) if isinstance(task_data, dict) else ""
             if tid:
-                task_starts[tid] = event
-            continue
+                ts = _parse_iso(event.get("_timestamp"))
+                if ts is not None:
+                    self._task_start_ts[tid] = ts
+                elif tid in self._task_start_ts:
+                    # A later start event without a parseable timestamp
+                    # overrides an earlier one, like the dict-of-events
+                    # implementation this replaced.
+                    del self._task_start_ts[tid]
+            return
+
+        if et == "aom_connection_acquired":
+            conn_id = event.get("connection_id")
+            task_id = event.get("task_id") or event.get("task_uuid")
+            host = event.get("host")
+            if isinstance(conn_id, str) and isinstance(task_id, str):
+                self._connections.setdefault(
+                    conn_id, (task_id, host if isinstance(host, str) else "")
+                )
+            return
+
+        if et == "aom_stderr_line":
+            source = event.get("source")
+            conn_id = event.get("connection_id")
+            self._stderr.append(
+                StderrRow(
+                    str(event.get("line", "")),
+                    source if isinstance(source, str) else None,
+                    conn_id if isinstance(conn_id, str) else None,
+                    event.get("attribution_confidence") == "ambiguous",
+                )
+            )
+            return
 
         runner_et = _runner_event_type(event)
         if not runner_et:
-            continue
+            return
 
-        task = event.get("task")
-        if not isinstance(task, dict):
-            continue
-        tid = str(task.get("id", ""))
-        if not tid:
-            continue
-        # Prefer the current sliding-window play; fall back to anything
-        # the event itself carries (older fixtures + future ansible
-        # versions that might attach play to runner events).
-        pid = current_pid
-        if not pid:
-            evt_play = event.get("play") or {}
-            pid = str(evt_play.get("id", ""))
-        if tid not in task_records:
-            task_order.append(tid)
-        rec = task_records.setdefault(
-            tid,
-            {
-                "label": str(task.get("name") or "unnamed task"),
-                "path": task.get("path"),
-                "group": _group_key(task),
-                "play_id": pid,
-                "events": [],
-            },
-        )
         hosts = event.get("hosts") or {}
+        task = event.get("task")
+        tid = str(task.get("id", "")) if isinstance(task, dict) else ""
+
+        # Run-level per-host tally counts every runner event, even ones
+        # without a task id (matches build_run_summary's behavior).
         for host, result in hosts.items():
             changed = bool(result.get("changed", False)) if isinstance(result, dict) else False
-            rec["events"].append((runner_et, str(host), changed, event))
+            current = self._host_counts.get(host)
+            if current is None:
+                current = self._host_counts[host] = _MutCounts()
+            current.add_event(runner_et, changed=changed)
+
+        if runner_et == "v2_runner_on_failed" and tid:
+            self._failed_task_ids.add(tid)
+
+        if not isinstance(task, dict) or not tid:
+            return
+
+        rec = self._tasks.get(tid)
+        if rec is None:
+            # Prefer the current sliding-window play; fall back to anything
+            # the event itself carries (older fixtures + future ansible
+            # versions that might attach play to runner events).
+            pid = self._current_pid
+            if not pid:
+                evt_play = event.get("play") or {}
+                pid = str(evt_play.get("id", ""))
+            rec = self._tasks[tid] = _TaskAcc(
+                label=str(task.get("name") or "unnamed task"),
+                path=task.get("path"),
+                group=_group_key(task),
+                play_id=pid,
+            )
+
+        event_ts = _parse_iso(event.get("_timestamp"))
+        if event_ts is not None and (rec.last_ts is None or event_ts > rec.last_ts):
+            rec.last_ts = event_ts
+
+        raw = None if ref is not None else event
+        for host, result in hosts.items():
+            changed = bool(result.get("changed", False)) if isinstance(result, dict) else False
+            host_key = str(host)
+            hacc = rec.hosts.get(host_key)
+            if hacc is None:
+                hacc = rec.hosts[host_key] = _HostAcc()
+            hacc.counts.add_event(runner_et, changed=changed)
+            hacc.raw = raw
+            hacc.ref = ref
+            rec.counts.add_event(runner_et, changed=changed)
+            rec.raw = raw
+            rec.ref = ref
+
+    def finish(self) -> SessionIndex:
+        tasks: list[TaskRow] = []
+        for tid, rec in self._tasks.items():
+            duration: timedelta | None = None
+            start = self._task_start_ts.get(tid)
+            if start is not None and rec.last_ts is not None:
+                duration = rec.last_ts - start
+            tasks.append(
+                TaskRow(
+                    task_id=tid,
+                    play_id=rec.play_id,
+                    name=rec.label,
+                    path=rec.path,
+                    group_key=rec.group,
+                    counts=rec.counts.freeze(),
+                    hosts=tuple(
+                        TaskHostRow(
+                            host=host,
+                            counts=hacc.counts.freeze(),
+                            raw_event=hacc.raw,
+                            raw_ref=hacc.ref,
+                        )
+                        for host, hacc in rec.hosts.items()
+                    ),
+                    duration=duration,
+                    raw_event=rec.raw,
+                    raw_ref=rec.ref,
+                )
+            )
+        return SessionIndex(
+            plays=tuple(self._plays),
+            tasks=tuple(tasks),
+            host_counts=_freeze_map(self._host_counts),
+            failed_task_count=len(self._failed_task_ids),
+            stderr=tuple(self._stderr),
+            connections=dict(self._connections),
+            fallback_play_name=self._current_play_name,
+        )
+
+
+def summary_from_index(index: SessionIndex, meta: Mapping) -> RunSummary:
+    """Derive a ``RunSummary`` from a ``SessionIndex`` plus meta.json fields."""
+    session_id = str(meta.get("session_id", ""))
+    status = str(meta.get("status") or ("running" if not meta.get("end_time") else "unknown"))
+    duration_seconds = meta.get("duration_seconds")
+    return RunSummary(
+        session_id=session_id,
+        short_id=session_id[:8],
+        playbook=str(meta.get("playbook", "")),
+        start_time=_parse_iso(meta.get("start_time")),
+        end_time=_parse_iso(meta.get("end_time")),
+        duration=timedelta(seconds=duration_seconds) if duration_seconds is not None else None,
+        status=status,
+        host_counts=dict(index.host_counts),
+        failed_task_count=index.failed_task_count,
+    )
+
+
+def tree_from_index(index: SessionIndex, *, playbook: str) -> TaskTreeNode:
+    """Assemble the hierarchical task tree from a ``SessionIndex``."""
+    play_order: list[tuple[str, str]] = [(p.play_id, p.name) for p in index.plays]
 
     # If no play_start events were captured but tasks exist, synthesise a
     # placeholder play so the tree still renders.
-    if not play_order and task_records:
-        play_order.append(("", current_play_name or "(no play header)"))
-
-    task_start_ts: dict[str, datetime] = {}
-    for tid, ts_event in task_starts.items():
-        ts = _parse_iso(ts_event.get("_timestamp"))
-        if ts is not None:
-            task_start_ts[tid] = ts
-
-    def _last_ts_for(tid: str) -> datetime | None:
-        latest: datetime | None = None
-        for _, _, _, e in task_records.get(tid, {}).get("events", []):
-            ts = _parse_iso(e.get("_timestamp"))
-            if ts is not None and (latest is None or ts > latest):
-                latest = ts
-        return latest
+    if not play_order and index.tasks:
+        play_order.append(("", index.fallback_play_name or "(no play header)"))
 
     # Build per-play, per-group structure preserving task insertion order.
     play_groups: dict[str, dict[str, list[TaskTreeNode]]] = {pid: {} for pid, _ in play_order}
     play_group_order: dict[str, list[str]] = {pid: [] for pid, _ in play_order}
 
-    for tid in task_order:
-        rec = task_records[tid]
-        pid = rec["play_id"]
+    for row in index.tasks:
+        pid = row.play_id
         if pid not in play_groups:
             # Task with no matching play_start — attribute to a synthetic
             # play so it still renders. Label intentionally indicates the
@@ -459,49 +672,31 @@ def build_task_tree(session: dict) -> TaskTreeNode:
             play_groups[pid or "_orphans"] = {}
             play_group_order[pid or "_orphans"] = []
             pid = pid or "_orphans"
-        grp = rec["group"]
-        # Aggregate stats across hosts.
-        mut_task_counts = _MutCounts()
-        mut_per_host: dict[str, _MutCounts] = {}
-        for et, host, changed, _ in rec["events"]:
-            mut_task_counts.add_event(et, changed=changed)
-            current = mut_per_host.get(host)
-            if current is None:
-                current = mut_per_host[host] = _MutCounts()
-            current.add_event(et, changed=changed)
-        task_counts = mut_task_counts.freeze()
-        per_host_counts = _freeze_map(mut_per_host)
-        host_nodes: list[TaskTreeNode] = []
-        for host, counts in per_host_counts.items():
-            last_event: dict | None = None
-            for et, h, _, e in rec["events"]:
-                if h == host:
-                    last_event = e
-            host_nodes.append(
-                TaskTreeNode(
-                    kind="host",
-                    label=host,
-                    stats=counts,
-                    raw_event=last_event,
-                    task_id=tid,
-                )
+        per_host_counts = {h.host: h.counts for h in row.hosts}
+        host_nodes = [
+            TaskTreeNode(
+                kind="host",
+                label=h.host,
+                stats=h.counts,
+                raw_event=h.raw_event,
+                task_id=row.task_id,
+                raw_ref=h.raw_ref,
             )
-        duration: timedelta | None = None
-        start = task_start_ts.get(tid)
-        last = _last_ts_for(tid)
-        if start is not None and last is not None:
-            duration = last - start
+            for h in row.hosts
+        ]
         task_node = TaskTreeNode(
             kind="task",
-            label=rec["label"],
-            stats=task_counts,
+            label=row.name,
+            stats=row.counts,
             per_host=per_host_counts,
             children=tuple(host_nodes),
-            path=rec["path"],
-            duration=duration,
-            raw_event=rec["events"][-1][3] if rec["events"] else None,
-            task_id=tid,
+            path=row.path,
+            duration=row.duration,
+            raw_event=row.raw_event,
+            task_id=row.task_id,
+            raw_ref=row.raw_ref,
         )
+        grp = row.group_key
         if grp not in play_groups[pid]:
             play_group_order[pid].append(grp)
             play_groups[pid][grp] = []
@@ -570,11 +765,30 @@ def build_task_tree(session: dict) -> TaskTreeNode:
 
     return TaskTreeNode(
         kind="run",
-        label=session.get("playbook", ""),
+        label=playbook,
         stats=mut_run_stats.freeze(),
         per_host=_freeze_map(mut_run_per_host),
         children=tuple(play_nodes),
     )
+
+
+def accumulate_session_events(events: list[dict]) -> SessionIndex:
+    """Fold an in-memory event list into a ``SessionIndex`` (no refs)."""
+    acc = SessionIndexAccumulator()
+    for event in events:
+        acc.feed(event)
+    return acc.finish()
+
+
+def build_task_tree(session: dict) -> TaskTreeNode:
+    """Build the hierarchical task tree for one session dict.
+
+    In-memory convenience wrapper over ``SessionIndexAccumulator`` /
+    ``tree_from_index`` — the streaming loader uses the same pair
+    directly, so both paths aggregate identically by construction.
+    """
+    index = accumulate_session_events(session.get("events", []))
+    return tree_from_index(index, playbook=session.get("playbook", ""))
 
 
 @dataclass(frozen=True)
