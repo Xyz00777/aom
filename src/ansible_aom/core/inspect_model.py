@@ -428,6 +428,18 @@ class SessionIndex:
     fallback_play_name: str
 
 
+def stderr_row_from_event(event: dict) -> StderrRow:
+    """Reduce an ``aom_stderr_line`` event to its verbose-scoping fields."""
+    source = event.get("source")
+    conn_id = event.get("connection_id")
+    return StderrRow(
+        str(event.get("line", "")),
+        source if isinstance(source, str) else None,
+        conn_id if isinstance(conn_id, str) else None,
+        event.get("attribution_confidence") == "ambiguous",
+    )
+
+
 class _HostAcc:
     __slots__ = ("counts", "raw", "ref")
 
@@ -469,7 +481,12 @@ class SessionIndexAccumulator:
     task_start timestamps used for duration.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, collect_stderr: bool = True) -> None:
+        # collect_stderr=False for consumers that persist stderr rows
+        # elsewhere as they stream (the sqlite index builder) — verbose
+        # runs carry 100k+ lines and holding them all is the single
+        # biggest memory term.
+        self._collect_stderr = collect_stderr
         self._plays: list[PlayRow] = []
         self._play_seen: set[str] = set()
         self._task_start_ts: dict[str, datetime] = {}
@@ -520,16 +537,8 @@ class SessionIndexAccumulator:
             return
 
         if et == "aom_stderr_line":
-            source = event.get("source")
-            conn_id = event.get("connection_id")
-            self._stderr.append(
-                StderrRow(
-                    str(event.get("line", "")),
-                    source if isinstance(source, str) else None,
-                    conn_id if isinstance(conn_id, str) else None,
-                    event.get("attribution_confidence") == "ambiguous",
-                )
-            )
+            if self._collect_stderr:
+                self._stderr.append(stderr_row_from_event(event))
             return
 
         runner_et = _runner_event_type(event)

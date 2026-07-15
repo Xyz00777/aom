@@ -125,6 +125,38 @@ def test_accumulator_collects_verbose_rows() -> None:
     assert index.stderr[0].connection_id == "conn-1"
 
 
+def test_accumulator_can_skip_stderr_collection() -> None:
+    """The sqlite builder streams stderr rows straight to disk; the
+    accumulator must not also pile them up in memory."""
+    acc = SessionIndexAccumulator(collect_stderr=False)
+    for event in _events():
+        acc.feed(event)
+    index = acc.finish()
+
+    assert index.stderr == ()
+    # Everything else is unaffected.
+    assert index.connections["conn-1"] == ("task-1", "web1")
+    assert [t.task_id for t in index.tasks] == ["task-1", "task-2"]
+
+
+def test_stderr_row_from_event_extracts_scoping_fields() -> None:
+    from ansible_aom.core.inspect_model import stderr_row_from_event
+
+    row = stderr_row_from_event(
+        {
+            "_event": "aom_stderr_line",
+            "line": "boom",
+            "source": "connection",
+            "connection_id": "conn-9",
+            "attribution_confidence": "ambiguous",
+        }
+    )
+    assert row.line == "boom"
+    assert row.source == "connection"
+    assert row.connection_id == "conn-9"
+    assert row.ambiguous is True
+
+
 def test_streaming_refs_replace_raw_events() -> None:
     events = _events()
     acc = SessionIndexAccumulator()

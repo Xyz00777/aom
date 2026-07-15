@@ -9,7 +9,9 @@ two render the same information for the same session.
 
 from __future__ import annotations
 
-from typing import Iterable, Iterator, Literal
+from dataclasses import replace
+from pathlib import Path
+from typing import Iterable, Iterator, Literal, Mapping
 
 from ansible_aom.core.inspect_model import (
     DetailBlock,
@@ -20,8 +22,11 @@ from ansible_aom.core.inspect_model import (
     build_run_summary,
     build_task_tree,
     build_verbose_lines,
+    summary_from_index,
     task_ids_by_play,
+    tree_from_index,
 )
+from ansible_aom.session.index import load_structure, query_verbose, read_event
 
 
 def _fmt_duration(seconds: float | None) -> str:
@@ -151,24 +156,17 @@ def _render_failures(session: dict, tree: TaskTreeNode) -> list[str]:
     return lines
 
 
-def _render_verbose(
-    session: dict,
+def _resolve_verbose_scope(
     tree: TaskTreeNode,
     *,
-    play_name: str | None = None,
-    task_name: str | None = None,
-) -> list[str]:
-    """Render the verbose/stderr section from ``aom_stderr_line`` events.
+    play_name: str | None,
+    task_name: str | None,
+) -> tuple[Literal["run", "play", "task"], str | None, str | None, str | None]:
+    """Resolve ``(level, play, task_id, host)`` for a verbose request.
 
-    Uses ``build_verbose_lines`` to scope lines by play and task.
-    With no scope (the default), shows all run-level lines. With
-    ``play_name``, shows run-level plus task-level lines for that play.
-    With ``task_name``, shows run-level plus lines for the matching task
-    (resolved via the task tree).
-
-    The old ``_render_stderr_tail`` was gated on ``status == "failed"``
-    and capped at 20 lines. This replacement shows verbose output for
-    every session and removes the cap.
+    ``task_name`` selects the first matching task in the tree (and its
+    first host); ``play_name`` alone scopes to that play; neither means
+    run level.
     """
     level: Literal["run", "play", "task"] = "run"
     play = play_name
@@ -190,14 +188,12 @@ def _render_verbose(
     elif play_name:
         level = "play"
 
-    lines = build_verbose_lines(
-        session,
-        level=level,
-        play_name=play,
-        task_id=task_id,
-        host=host,
-        play_task_ids=task_ids_by_play(tree),
-    )
+    return level, play, task_id, host
+
+
+def _verbose_section(
+    lines: tuple[str, ...], *, play_name: str | None, task_name: str | None
+) -> list[str]:
     if not lines:
         return []
 
@@ -211,6 +207,39 @@ def _render_verbose(
         header = f"Verbose ({scope})"
 
     return ["", header, "─" * len(header)] + [f"  {line}" for line in lines]
+
+
+def _render_verbose(
+    session: dict,
+    tree: TaskTreeNode,
+    *,
+    play_name: str | None = None,
+    task_name: str | None = None,
+) -> list[str]:
+    """Render the verbose/stderr section from ``aom_stderr_line`` events.
+
+    Uses ``build_verbose_lines`` to scope lines by play and task.
+    With no scope (the default), shows all run-level lines. With
+    ``play_name``, shows run-level plus task-level lines for that play.
+    With ``task_name``, shows run-level plus lines for the matching task
+    (resolved via the task tree).
+
+    The old ``_render_stderr_tail`` was gated on ``status == "failed"``
+    and capped at 20 lines. This replacement shows verbose output for
+    every session and removes the cap.
+    """
+    level, play, task_id, host = _resolve_verbose_scope(
+        tree, play_name=play_name, task_name=task_name
+    )
+    lines = build_verbose_lines(
+        session,
+        level=level,
+        play_name=play,
+        task_id=task_id,
+        host=host,
+        play_task_ids=task_ids_by_play(tree),
+    )
+    return _verbose_section(lines, play_name=play_name, task_name=task_name)
 
 
 def _iter_tree(node: TaskTreeNode) -> Iterator[TaskTreeNode]:
@@ -248,6 +277,70 @@ def render_session(
     parts.extend(_render_header(summary))
     parts.extend(_render_failures(session, tree))
     parts.extend(_render_verbose(session, tree, play_name=play_name, task_name=task_name))
+    return "\n".join(parts) + "\n"
+
+
+def _hydrate_node(session_path: Path, node: TaskTreeNode) -> TaskTreeNode:
+    """Resolve a node's ``raw_ref`` into ``raw_event`` by seeking events.jsonl.
+
+    Index-built trees carry byte refs instead of event dicts; the detail
+    renderer needs the dict. A failed read leaves the node as-is, which
+    renders like a payload-less legacy event.
+    """
+    if node.raw_event is None and node.raw_ref is not None:
+        event = read_event(session_path, node.raw_ref)
+        if event is not None:
+            return replace(node, raw_event=event)
+    return node
+
+
+def _render_failures_from_index(session_path: Path, tree: TaskTreeNode) -> list[str]:
+    pairs = list(_iter_failed_tasks(tree))
+    if not pairs:
+        return []
+    lines = ["", f"Failures ({len(pairs)})", "─" * 13]
+    for task_node, host_node in pairs:
+        block = build_detail_block(
+            {},
+            _hydrate_node(session_path, task_node),
+            _hydrate_node(session_path, host_node),
+        )
+        lines.extend(_render_detail(block))
+        lines.append("")
+    return lines
+
+
+def render_session_from_index(
+    session_path: Path,
+    meta: Mapping,
+    *,
+    play_name: str | None = None,
+    task_name: str | None = None,
+) -> str | None:
+    """Render a session from its sqlite index. Same output contract as
+    :func:`render_session`, without parsing events.jsonl — only the
+    failed tasks' events are seeked out for the failure details.
+
+    Returns None when the index is missing or unreadable so the caller
+    can fall back to the full-parse path.
+    """
+    index = load_structure(session_path)
+    if index is None:
+        return None
+    summary = summary_from_index(index, meta)
+    tree = tree_from_index(index, playbook=str(meta.get("playbook", "")))
+
+    level, play, task_id, host = _resolve_verbose_scope(
+        tree, play_name=play_name, task_name=task_name
+    )
+    verbose = query_verbose(
+        session_path, tree=tree, level=level, play_name=play, task_id=task_id, host=host
+    )
+
+    parts: list[str] = []
+    parts.extend(_render_header(summary))
+    parts.extend(_render_failures_from_index(session_path, tree))
+    parts.extend(_verbose_section(verbose, play_name=play_name, task_name=task_name))
     return "\n".join(parts) + "\n"
 
 

@@ -24,11 +24,13 @@ import sys
 from pathlib import Path
 
 from ansible_aom.inspect.formatters import format_diagnostics_section
-from ansible_aom.inspect.text import render_session
+from ansible_aom.inspect.text import render_session, render_session_from_index
+from ansible_aom.session.index import ensure_index
 from ansible_aom.session.store import (
     cleanup_old_sessions,
     find_latest_session,
     load_session,
+    load_session_meta,
 )
 
 
@@ -58,6 +60,22 @@ def inspect_text(
     if latest is None:
         print(f"No sessions found in {state_dir}")
         return 0
+
+    # Fast path: render from the derived sqlite index (built lazily for
+    # legacy sessions, at end_session for new ones). Never parses the
+    # full events.jsonl.
+    session_path = state_dir / latest
+    meta = load_session_meta(latest, state_dir)
+    if meta is not None and ensure_index(session_path):
+        text = render_session_from_index(
+            session_path, meta, play_name=play_name, task_name=task_name
+        )
+        if text is not None:
+            print(text, end="")
+            return 0
+
+    # Fallback: full-parse path (no events.jsonl on disk, or unreadable
+    # index) — degrades to the pre-index behavior.
     session = load_session(latest, state_dir)
     if session is None:
         print(f"Session not found: {latest}", file=sys.stderr)
@@ -105,7 +123,8 @@ def inspect_debug(
         else:
             print(f"No sessions found in {state_dir}")
         return 0
-    session = load_session(target, state_dir)
+    # Meta-only load: diagnostics.json never needs the event log parsed.
+    session = load_session_meta(target, state_dir)
     if session is None:
         print(f"Session not found: {target}", file=sys.stderr)
         return 1

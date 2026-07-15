@@ -25,6 +25,7 @@ from ansible_aom import __version__ as _AOM_VERSION
 from ansible_aom.core import diagnostics
 from ansible_aom.core.stderr_classifier import classify
 from ansible_aom.core.timestamp import parse_iso_timestamp
+from ansible_aom.session import index as session_index
 
 logger = logging.getLogger(__name__)
 
@@ -465,6 +466,15 @@ class SessionManager:
         except OSError as exc:
             logger.debug("diagnostics.json write failed for %s: %s", session_id, exc)
 
+        # Build the derived sqlite index while the run's data is hot, so
+        # the first `aom inspect` never pays the full-log streaming pass.
+        # Best-effort like diagnostics: an index failure must not turn a
+        # finished run into a crashed one — inspect rebuilds it lazily.
+        try:
+            session_index.build_index(session_info["session_path"])
+        except OSError as exc:
+            logger.debug("index build failed for %s: %s", session_id, exc)
+
         # Dump cProfile output when AOM_PROFILE=1 (phase 7). Lands in
         # ~/.local/state/aom/profile/ rather than the session dir so
         # the session is easy to ship without the (much larger) pstats.
@@ -728,6 +738,45 @@ def list_sessions(session_dir: Path) -> list[dict[str, Any]]:
     return sessions
 
 
+def load_session_meta(session_id: str, session_dir: Path) -> dict[str, Any] | None:
+    """Load a session's cheap metadata: meta.json + diagnostics.json only.
+
+    Same fields and defaults as :func:`load_session` minus ``events`` /
+    ``stderr`` / ``malformed_lines`` — never opens ``events.jsonl``, so
+    it is safe to call for every session on disk regardless of log size.
+    Returns None if the session directory doesn't exist.
+    """
+    session_path = session_dir / session_id
+    if not session_path.exists():
+        return None
+
+    meta_file = session_path / "meta.json"
+
+    result: dict[str, Any] = {}
+    if meta_file.exists():
+        try:
+            with open(meta_file) as f:
+                result = json.load(f)
+        except json.JSONDecodeError:
+            result = {"playbook": "", "status": ""}
+
+    if "_schema_version" not in result:
+        result["_schema_version"] = 1
+
+    diag_file = session_path / "diagnostics.json"
+    if diag_file.exists():
+        try:
+            with open(diag_file) as f:
+                result["diagnostics"] = json.load(f)
+        except OSError, json.JSONDecodeError:
+            result["diagnostics"] = None
+    else:
+        result["diagnostics"] = None
+
+    result["session_id"] = session_id
+    return result
+
+
 def load_session(session_id: str, session_dir: Path) -> dict[str, Any] | None:
     """Load a session by ID.
 
@@ -744,21 +793,11 @@ def load_session(session_id: str, session_dir: Path) -> dict[str, Any] | None:
         Returns None if session not found.
     """
     session_path = session_dir / session_id
-    if not session_path.exists():
+    result = load_session_meta(session_id, session_dir)
+    if result is None:
         return None
 
-    meta_file = session_path / "meta.json"
-    events_file = session_path / "events.jsonl"
-
-    result: dict[str, Any] = {}
-
-    if meta_file.exists():
-        try:
-            with open(meta_file) as f:
-                result = json.load(f)
-        except json.JSONDecodeError:
-            result = {"playbook": "", "status": ""}
-    else:
+    if not (session_path / "meta.json").exists():
         # v1 (Phase 8 / Task 8.2): crash-recovery contract. When
         # ``meta.json`` is missing the run was almost certainly
         # interrupted mid-write (kernel OOM, power loss, SIGKILL)
@@ -776,12 +815,7 @@ def load_session(session_id: str, session_dir: Path) -> dict[str, Any] | None:
             session_id,
         )
 
-    # v1 (Phase 1 / Task 1.1): default missing ``_schema_version`` to ``1``
-    # so legacy sessions pre-dating the meta-schema bump load with an
-    # explicit version consumers can branch on.
-    if "_schema_version" not in result:
-        result["_schema_version"] = 1
-
+    events_file = session_path / "events.jsonl"
     events = []
     malformed_lines = 0
 
@@ -809,21 +843,6 @@ def load_session(session_id: str, session_dir: Path) -> dict[str, Any] | None:
         if ev.get("_event") == "aom_stderr_line":
             stderr_lines.append(ev.get("line", ""))
     result["stderr"] = stderr_lines
-
-    # diagnostics.json arrived in phase 5 — older sessions don't have it.
-    # Missing or unreadable → None, so callers can branch on presence
-    # rather than dealing with exceptions.
-    diag_file = session_path / "diagnostics.json"
-    if diag_file.exists():
-        try:
-            with open(diag_file) as f:
-                result["diagnostics"] = json.load(f)
-        except OSError, json.JSONDecodeError:
-            result["diagnostics"] = None
-    else:
-        result["diagnostics"] = None
-
-    result["session_id"] = session_id
 
     return result
 

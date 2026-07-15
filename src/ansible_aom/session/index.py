@@ -31,14 +31,13 @@ from ansible_aom.core.inspect_model import (
     SessionIndex,
     SessionIndexAccumulator,
     StatusCounts,
-    StderrRow,
     TaskHostRow,
     TaskRow,
     TaskTreeNode,
+    stderr_row_from_event,
     summary_from_index,
     task_ids_by_play,
     tree_from_index,
-    verbose_lines_from_rows,
 )
 
 logger = logging.getLogger(__name__)
@@ -121,10 +120,18 @@ def index_is_fresh(session_path: Path) -> bool:
     )
 
 
+_STDERR_BATCH_SIZE = 10_000
+
+
 def build_index(session_path: Path) -> bool:
     """Stream events.jsonl into a fresh index.db. Returns False when the
     session has no events file; sqlite/OS errors also return False (the
-    index is an optimization — callers fall back to the slow path)."""
+    index is an optimization — callers fall back to the slow path).
+
+    stderr rows go straight into sqlite in batches as the file streams
+    (``collect_stderr=False``), so peak memory is bounded by tasks×hosts
+    even for verbose runs with hundreds of thousands of stderr lines.
+    """
     events_path = _events_path(session_path)
     # Stat BEFORE parsing: if the file grows while we read (running
     # session), the recorded size is smaller than reality and the index
@@ -133,32 +140,52 @@ def build_index(session_path: Path) -> bool:
     if stat is None:
         return False
 
-    acc = SessionIndexAccumulator()
-    malformed = 0
-    offset = 0
-    with open(events_path, "rb") as f:
-        for line in f:
-            length = len(line)
-            stripped = line.strip()
-            if stripped:
-                try:
-                    event = json.loads(stripped)
-                except json.JSONDecodeError:
-                    malformed += 1
-                else:
-                    if isinstance(event, dict):
-                        acc.feed(event, ref=EventRef(offset=offset, length=length))
-                    else:
-                        malformed += 1
-            offset += length
-    index = acc.finish()
-
     tmp_path = index_path(session_path).with_suffix(".db.tmp")
+    acc = SessionIndexAccumulator(collect_stderr=False)
+    malformed = 0
     try:
         tmp_path.unlink(missing_ok=True)
         conn = sqlite3.connect(tmp_path)
         try:
-            _write_index_db(conn, index, events_stat=stat, malformed=malformed)
+            conn.executescript(_SCHEMA)
+            stderr_batch: list[tuple[int, str, str | None, str | None, int]] = []
+            stderr_seq = 0
+            offset = 0
+            with open(events_path, "rb") as f:
+                for line in f:
+                    length = len(line)
+                    stripped = line.strip()
+                    if stripped:
+                        try:
+                            event = json.loads(stripped)
+                        except json.JSONDecodeError:
+                            malformed += 1
+                        else:
+                            if not isinstance(event, dict):
+                                malformed += 1
+                            elif event.get("_event") == "aom_stderr_line":
+                                row = stderr_row_from_event(event)
+                                stderr_batch.append(
+                                    (
+                                        stderr_seq,
+                                        row.line,
+                                        row.source,
+                                        row.connection_id,
+                                        int(row.ambiguous),
+                                    )
+                                )
+                                stderr_seq += 1
+                                if len(stderr_batch) >= _STDERR_BATCH_SIZE:
+                                    conn.executemany(
+                                        "INSERT INTO stderr VALUES (?, ?, ?, ?, ?)", stderr_batch
+                                    )
+                                    stderr_batch.clear()
+                            else:
+                                acc.feed(event, ref=EventRef(offset=offset, length=length))
+                    offset += length
+            if stderr_batch:
+                conn.executemany("INSERT INTO stderr VALUES (?, ?, ?, ?, ?)", stderr_batch)
+            _write_index_db(conn, acc.finish(), events_stat=stat, malformed=malformed)
         finally:
             conn.close()
         os.replace(tmp_path, index_path(session_path))
@@ -176,7 +203,8 @@ def _write_index_db(
     events_stat: tuple[int, int],
     malformed: int,
 ) -> None:
-    conn.executescript(_SCHEMA)
+    """Write all tables except ``stderr`` (streamed in by the caller)
+    into an already-schema'd connection, then commit."""
     conn.executemany(
         "INSERT INTO meta VALUES (?, ?)",
         [
@@ -244,13 +272,6 @@ def _write_index_db(
         "INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", task_rows
     )
     conn.executemany("INSERT INTO task_hosts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", task_host_rows)
-    conn.executemany(
-        "INSERT INTO stderr VALUES (?, ?, ?, ?, ?)",
-        [
-            (seq, r.line, r.source, r.connection_id, int(r.ambiguous))
-            for seq, r in enumerate(index.stderr)
-        ],
-    )
     conn.executemany(
         "INSERT INTO connections VALUES (?, ?, ?)",
         [(conn_id, task_id, host) for conn_id, (task_id, host) in index.connections.items()],
@@ -371,36 +392,6 @@ def load_summary(session_path: Path, meta: Mapping) -> RunSummary | None:
     return summary_from_index(index, meta)
 
 
-def _load_verbose_rows(
-    session_path: Path,
-) -> tuple[tuple[StderrRow, ...], dict[str, tuple[str, str]]] | None:
-    db_path = index_path(session_path)
-    if not db_path.exists():
-        return None
-    try:
-        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-    except sqlite3.Error:
-        return None
-    try:
-        stderr = tuple(
-            StderrRow(row[0], row[1], row[2], bool(row[3]))
-            for row in conn.execute(
-                "SELECT line, source, connection_id, ambiguous FROM stderr ORDER BY seq"
-            )
-        )
-        connections = {
-            row[0]: (row[1], row[2])
-            for row in conn.execute(
-                "SELECT connection_id, task_id, host FROM connections ORDER BY rowid"
-            )
-        }
-    except sqlite3.Error:
-        return None
-    finally:
-        conn.close()
-    return stderr, connections
-
-
 def query_verbose(
     session_path: Path,
     *,
@@ -410,24 +401,62 @@ def query_verbose(
     task_id: str | None = None,
     host: str | None = None,
 ) -> tuple[str, ...]:
-    """Verbose lines for a focus scope, read from index.db.
+    """Verbose lines for a focus scope, filtered inside sqlite.
 
-    Delegates the scoping decision to the same core function the
-    in-memory path uses, so both stay in lockstep.
+    The WHERE clauses implement exactly the rules of core
+    ``verbose_lines_from_rows`` (parity-pinned by tests) — pushing the
+    filter into SQL avoids materialising hundreds of thousands of
+    off-scope rows just to drop them:
+
+    - run:  ``source = 'run_level'``
+    - task: run-level OR the first connection acquired for the focused
+      ``(task_id, host)`` pair
+    - play: run-level OR any connection whose task belongs to the play
     """
-    rows = _load_verbose_rows(session_path)
-    if rows is None:
+    db_path = index_path(session_path)
+    if not db_path.exists():
         return ()
-    stderr, connections = rows
-    return verbose_lines_from_rows(
-        stderr,
-        connections,
-        level=level,
-        play_task_ids=task_ids_by_play(tree),
-        play_name=play_name,
-        task_id=task_id,
-        host=host,
-    )
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    except sqlite3.Error:
+        return ()
+    try:
+        if level == "task":
+            selected: str | None = None
+            if task_id and host:
+                found = conn.execute(
+                    "SELECT connection_id FROM connections WHERE task_id = ? AND host = ?"
+                    " ORDER BY rowid LIMIT 1",
+                    (task_id, host),
+                ).fetchone()
+                selected = found[0] if found else None
+            cursor = conn.execute(
+                "SELECT line, ambiguous FROM stderr"
+                " WHERE source = 'run_level' OR connection_id = ? ORDER BY seq",
+                (selected,),
+            )
+        elif level == "play":
+            play_ids = sorted(task_ids_by_play(tree).get(play_name or "", set()))
+            conn.execute("CREATE TEMP TABLE scope_tasks (task_id TEXT PRIMARY KEY)")
+            conn.executemany(
+                "INSERT OR IGNORE INTO scope_tasks VALUES (?)", [(t,) for t in play_ids]
+            )
+            cursor = conn.execute(
+                "SELECT line, ambiguous FROM stderr"
+                " WHERE source = 'run_level' OR connection_id IN"
+                " (SELECT connection_id FROM connections"
+                "  WHERE task_id IN (SELECT task_id FROM scope_tasks))"
+                " ORDER BY seq"
+            )
+        else:
+            cursor = conn.execute(
+                "SELECT line, ambiguous FROM stderr WHERE source = 'run_level' ORDER BY seq"
+            )
+        return tuple(f"? {line}" if ambiguous else line for line, ambiguous in cursor)
+    except sqlite3.Error:
+        return ()
+    finally:
+        conn.close()
 
 
 def read_event(session_path: Path, ref: EventRef) -> dict | None:
