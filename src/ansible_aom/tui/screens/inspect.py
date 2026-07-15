@@ -35,7 +35,6 @@ from __future__ import annotations
 import shutil
 from collections import OrderedDict
 from dataclasses import dataclass
-from dataclasses import replace as dc_replace
 from functools import partial
 from pathlib import Path
 from time import perf_counter
@@ -1332,7 +1331,7 @@ class InspectApp(App):
         event = read_event(self.state_dir / sid, node.raw_ref)
         if event is None:
             return node
-        return dc_replace(node, raw_event=event)
+        return node._replace(raw_event=event)
 
     def _render_detail_block(self, block: DetailBlock, *, full_stdout: bool = False) -> str:
         """Render the per-task detail body.

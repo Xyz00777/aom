@@ -9,7 +9,6 @@ two render the same information for the same session.
 
 from __future__ import annotations
 
-from dataclasses import replace
 from pathlib import Path
 from typing import Iterable, Iterator, Literal, Mapping
 
@@ -26,7 +25,12 @@ from ansible_aom.core.inspect_model import (
     task_ids_by_play,
     tree_from_index,
 )
-from ansible_aom.session.index import load_structure, query_verbose, read_event
+from ansible_aom.session.index import (
+    find_task_id_by_name,
+    load_structure,
+    query_verbose,
+    read_event,
+)
 
 
 def _fmt_duration(seconds: float | None) -> str:
@@ -290,7 +294,7 @@ def _hydrate_node(session_path: Path, node: TaskTreeNode) -> TaskTreeNode:
     if node.raw_event is None and node.raw_ref is not None:
         event = read_event(session_path, node.raw_ref)
         if event is not None:
-            return replace(node, raw_event=event)
+            return node._replace(raw_event=event)
     return node
 
 
@@ -324,7 +328,18 @@ def render_session_from_index(
     Returns None when the index is missing or unreadable so the caller
     can fall back to the full-parse path.
     """
-    index = load_structure(session_path)
+    # Text output renders the header (summary table), the failures, and
+    # the scoped verbose section — none of which need host rows for
+    # passing tasks. Loading failures-only keeps warm opens O(failures)
+    # even for runs with hundreds of thousands of (task, host) pairs.
+    include: set[str] = set()
+    if task_name:
+        scoped_task_id = find_task_id_by_name(session_path, task_name)
+        if scoped_task_id:
+            include.add(scoped_task_id)
+    index = load_structure(
+        session_path, failed_hosts_only=True, include_task_ids=frozenset(include)
+    )
     if index is None:
         return None
     summary = summary_from_index(index, meta)

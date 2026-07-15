@@ -14,7 +14,7 @@ render the same information for the same session.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Mapping, NamedTuple
 
@@ -22,13 +22,16 @@ from ansible_aom.core._async_poll import is_async_poll_payload
 from ansible_aom.core.timestamp import parse_iso_timestamp
 
 
-@dataclass(frozen=True)
-class StatusCounts:
+class StatusCounts(NamedTuple):
     """Aggregate status tally over (task × host) pairs.
 
     Each ``v2_runner_on_*`` event contributes exactly one bump. A task
     that ran on three hosts with two OK + one failed adds ``ok=2,
     failed=1`` to its parent's totals.
+
+    NamedTuple rather than frozen dataclass: index-backed tree loads
+    construct one per (task, host) row plus roll-ups — six-figure counts
+    on large runs — and tuple construction is several times cheaper.
     """
 
     ok: int = 0
@@ -45,14 +48,14 @@ class StatusCounts:
         """Return a new StatusCounts with the bump for one runner event."""
         if event_type == "v2_runner_on_ok":
             if changed:
-                return replace(self, changed=self.changed + 1)
-            return replace(self, ok=self.ok + 1)
+                return self._replace(changed=self.changed + 1)
+            return self._replace(ok=self.ok + 1)
         if event_type == "v2_runner_on_failed":
-            return replace(self, failed=self.failed + 1)
+            return self._replace(failed=self.failed + 1)
         if event_type == "v2_runner_on_skipped":
-            return replace(self, skipped=self.skipped + 1)
+            return self._replace(skipped=self.skipped + 1)
         if event_type == "v2_runner_on_unreachable":
-            return replace(self, unreachable=self.unreachable + 1)
+            return self._replace(unreachable=self.unreachable + 1)
         return self
 
     def merge(self, other: "StatusCounts") -> "StatusCounts":
@@ -72,11 +75,10 @@ class StatusCounts:
 class _MutCounts:
     """Mutable accumulator behind ``StatusCounts``.
 
-    The frozen ``StatusCounts.add_event`` goes through
-    ``dataclasses.replace`` — ~7 µs per call, which is seconds of pure
-    allocation churn when a session has hundreds of thousands of runner
-    events. Builders accumulate on this plain-slots class and ``freeze()``
-    to the public frozen type once per aggregate.
+    ``StatusCounts.add_event`` allocates a new tuple per bump — pure
+    churn when a session has hundreds of thousands of runner events.
+    Builders accumulate on this plain-slots class and ``freeze()`` to
+    the public immutable type once per aggregate.
     """
 
     __slots__ = ("ok", "changed", "failed", "skipped", "unreachable")
@@ -215,8 +217,7 @@ class EventRef(NamedTuple):
     length: int
 
 
-@dataclass(frozen=True)
-class TaskTreeNode:
+class TaskTreeNode(NamedTuple):
     """Hierarchical view of a session's tasks.
 
     Levels: run → play → group → task → host. ``group`` is the
@@ -227,12 +228,17 @@ class TaskTreeNode:
     Exactly one of ``raw_event`` / ``raw_ref`` is set on task and host
     nodes (both ``None`` for structural nodes): the in-memory path keeps
     the event dict, the streaming path keeps only its byte span.
+
+    NamedTuple for the same construction-cost reason as ``StatusCounts``
+    — one node per (task, host) pair on index-backed loads. The shared
+    ``{}`` default for ``per_host`` is safe because nodes are immutable
+    by convention (mutate via ``_replace``).
     """
 
     kind: Literal["run", "play", "group", "task", "host"]
     label: str
-    stats: StatusCounts = field(default_factory=StatusCounts)
-    per_host: Mapping[str, StatusCounts] = field(default_factory=dict)
+    stats: StatusCounts = StatusCounts()
+    per_host: Mapping[str, StatusCounts] = {}
     children: tuple["TaskTreeNode", ...] = ()
     path: str | None = None
     duration: timedelta | None = None
@@ -311,8 +317,7 @@ def _nest_includes(tasks: list[TaskTreeNode]) -> list[TaskTreeNode]:
             stats = stats.merge(child.stats)
             for host, counts in child.per_host.items():
                 per_host[host] = per_host.get(host, StatusCounts()).merge(counts)
-        return replace(
-            directive,
+        return directive._replace(
             children=directive.children + tuple(frame.children),
             stats=stats,
             per_host=per_host,

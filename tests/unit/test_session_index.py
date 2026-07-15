@@ -227,6 +227,67 @@ def test_load_structure_returns_index_without_stderr(tmp_path: Path) -> None:
     assert index.stderr == ()  # verbose rows load on demand, not with the structure
 
 
+def test_load_structure_failed_hosts_only(tmp_path: Path) -> None:
+    """--text renders header (summary table), failures, and verbose — none
+    of which need host rows for passing tasks. The filtered load returns
+    hosts only for tasks with failures plus explicitly included tasks."""
+    session_path = _write_session(tmp_path)
+    build_index(session_path)
+
+    index = load_structure(session_path, failed_hosts_only=True)
+
+    assert index is not None
+    task = index.tasks[0]
+    # task-1 has web1 (ok) and web2 (failed): the failing task keeps ALL
+    # its host rows so failure context stays complete.
+    assert {h.host for h in task.hosts} == {"web1", "web2"}
+    # Aggregates are unaffected by host filtering.
+    assert task.counts.failed == 1
+    assert index.host_counts["web1"].changed == 1
+
+
+def test_load_structure_failed_hosts_only_skips_passing_tasks(tmp_path: Path) -> None:
+    session_path = _write_session(tmp_path)
+    # Append a fully-ok second task, then rebuild.
+    with open(session_path / "events.jsonl", "a", encoding="utf-8") as f:
+        f.write(
+            json.dumps(
+                {
+                    "_event": "v2_runner_on_ok",
+                    "_timestamp": "2026-07-01T10:00:06Z",
+                    "task": {"id": "task-2", "name": "Verify", "path": "site.yml:9"},
+                    "hosts": {"web1": {"changed": False}},
+                }
+            )
+            + "\n"
+        )
+    build_index(session_path)
+
+    index = load_structure(session_path, failed_hosts_only=True)
+    assert index is not None
+    ok_task = next(t for t in index.tasks if t.task_id == "task-2")
+    assert ok_task.hosts == ()  # host rows skipped
+    assert ok_task.counts.ok == 1  # aggregates intact
+
+    # ...unless explicitly included (the --task <name> scope needs them).
+    index = load_structure(
+        session_path, failed_hosts_only=True, include_task_ids=frozenset({"task-2"})
+    )
+    assert index is not None
+    ok_task = next(t for t in index.tasks if t.task_id == "task-2")
+    assert [h.host for h in ok_task.hosts] == ["web1"]
+
+
+def test_find_task_id_by_name(tmp_path: Path) -> None:
+    from ansible_aom.session.index import find_task_id_by_name
+
+    session_path = _write_session(tmp_path)
+    build_index(session_path)
+
+    assert find_task_id_by_name(session_path, "Install päckages") == "task-1"
+    assert find_task_id_by_name(session_path, "no such task") is None
+
+
 def test_build_index_returns_false_without_events(tmp_path: Path) -> None:
     session_path = tmp_path / "empty-session"
     session_path.mkdir()

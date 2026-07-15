@@ -375,12 +375,24 @@ def _ref(offset: Any, length: Any) -> EventRef | None:
     return EventRef(offset=int(offset), length=int(length))
 
 
-def load_structure(session_path: Path) -> SessionIndex | None:
+def load_structure(
+    session_path: Path,
+    *,
+    failed_hosts_only: bool = False,
+    include_task_ids: frozenset[str] | None = None,
+) -> SessionIndex | None:
     """Load plays/tasks/hosts aggregates from index.db (no verbose rows).
 
     Verbose rows can number in the hundreds of thousands; they load
     on demand via :func:`query_verbose` instead of with the structure.
     Returns None when the index is missing or unreadable.
+
+    ``failed_hosts_only`` skips host rows for tasks without failures —
+    per-task aggregates are stored, so the text renderer (header +
+    failures + verbose) doesn't need host rows for passing tasks, and
+    the load becomes O(failures) instead of O(tasks × hosts).
+    ``include_task_ids`` forces host rows for specific tasks regardless
+    (the ``--task <name>`` verbose scope needs its task's hosts).
     """
     db_path = index_path(session_path)
     if not db_path.exists():
@@ -401,11 +413,21 @@ def load_structure(session_path: Path) -> SessionIndex | None:
                 "SELECT host, ok, changed, failed, skipped, unreachable FROM host_counts"
             )
         }
-        hosts_by_task: dict[int, list[TaskHostRow]] = {}
-        for row in conn.execute(
+        host_query = (
             "SELECT task_seq, host, ok, changed, failed, skipped, unreachable,"
-            " ref_offset, ref_length FROM task_hosts ORDER BY task_seq, seq"
-        ):
+            " ref_offset, ref_length FROM task_hosts"
+        )
+        params: list[str] = []
+        if failed_hosts_only:
+            included = sorted(include_task_ids or ())
+            placeholders = ",".join("?" for _ in included)
+            host_query += (
+                " WHERE task_seq IN (SELECT seq FROM tasks"
+                f" WHERE failed > 0 OR unreachable > 0 OR task_id IN ({placeholders}))"
+            )
+            params = included
+        hosts_by_task: dict[int, list[TaskHostRow]] = {}
+        for row in conn.execute(host_query + " ORDER BY task_seq, seq", params):
             hosts_by_task.setdefault(row[0], []).append(
                 TaskHostRow(
                     host=row[1],
@@ -447,6 +469,26 @@ def load_structure(session_path: Path) -> SessionIndex | None:
         connections={},
         fallback_play_name=meta.get("fallback_play_name", ""),
     )
+
+
+def find_task_id_by_name(session_path: Path, task_name: str) -> str | None:
+    """First task id whose name matches, in execution order. None if absent."""
+    db_path = index_path(session_path)
+    if not db_path.exists():
+        return None
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    except sqlite3.Error:
+        return None
+    try:
+        row = conn.execute(
+            "SELECT task_id FROM tasks WHERE name = ? ORDER BY seq LIMIT 1", (task_name,)
+        ).fetchone()
+    except sqlite3.Error:
+        return None
+    finally:
+        conn.close()
+    return row[0] if row else None
 
 
 def load_tree(session_path: Path, *, playbook: str) -> TaskTreeNode | None:
