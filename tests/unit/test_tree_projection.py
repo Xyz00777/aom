@@ -519,9 +519,10 @@ class TestTreeLinesBasic:
 
     def test_only_currently_running_hosts_appear_as_leaves_before_completion(self):
         state = self._running_task_state()
-        # Finish web1 — when at least one host is still RUNNING
-        # (web2), both hosts appear under the task. web1 shows ● (OK),
-        # web2 shows ◐ (RUNNING).
+        # Finish web1 — its result line already streamed to the log
+        # above the panel, so the tree keeps only the still-running
+        # web2 as a leaf. The task-line summary ("1 ok, 1 running")
+        # still accounts for web1.
         state.handle_event(
             {
                 "_event": "v2_runner_on_ok",
@@ -532,12 +533,154 @@ class TestTreeLinesBasic:
         )
         p = TreeProjection.from_run_state(state)
         host_lines = [ln for ln in p.tree_lines(budget=20) if ln.kind == "host"]
-        host_labels = [ln.label for ln in host_lines]
-        assert host_labels == ["web1", "web2"]
-        web1_hl = next(hl for hl in host_lines if hl.label == "web1")
-        web2_hl = next(hl for hl in host_lines if hl.label == "web2")
-        assert web1_hl.status == Status.OK
-        assert web2_hl.status == Status.RUNNING
+        assert [ln.label for ln in host_lines] == ["web2"]
+        assert host_lines[0].status == Status.RUNNING
+
+    def test_failed_host_leaf_stays_visible_while_others_run(self):
+        # FAILED/UNREACHABLE leaves must survive the running-only
+        # filter — a failure is the actionable signal the tree exists
+        # for (mirrors the failed-task keep-visible rule in _classify).
+        state = self._running_task_state()
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_failed",
+                "_timestamp": "2026-04-20T10:00:13Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "hosts": {"web1": {"failed": True, "msg": "boom"}},
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        host_lines = [ln for ln in p.tree_lines(budget=20) if ln.kind == "host"]
+        by_label = {ln.label: ln for ln in host_lines}
+        assert set(by_label) == {"web1", "web2"}
+        assert by_label["web1"].status == Status.FAILED
+        assert by_label["web2"].status == Status.RUNNING
+
+    def test_terminal_leaf_elapsed_is_frozen_at_completion(self):
+        # A terminal leaf shows how long the host took (end - start),
+        # not a clock that keeps growing after the host finished.
+        state = self._running_task_state()  # hosts started at 10:00:03
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_failed",
+                "_timestamp": "2026-04-20T10:00:13Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "hosts": {"web1": {"failed": True, "msg": "boom"}},
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        now = datetime(2026, 4, 20, 10, 5, 3, tzinfo=timezone.utc)
+        host_lines = [ln for ln in p.tree_lines(budget=20, now=now) if ln.kind == "host"]
+        by_label = {ln.label: ln for ln in host_lines}
+        assert by_label["web1"].elapsed_s == 10.0  # frozen at completion
+        assert by_label["web2"].elapsed_s == 300.0  # still ticking
+
+    def test_task_label_counts_not_yet_started_hosts_as_pending(self):
+        # Throttled/free tasks: hosts the play targets but that have
+        # not emitted v2_runner_on_start yet surface as "N pending" in
+        # the task summary instead of silently missing.
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="deploy webservers",
+                hosts="all",
+                resolved_hosts=["web1", "web2", "web3", "web4", "web5"],
+                tasks=[],
+            )
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "deploy webservers"},
+            }
+        )
+        for host in ("web1", "web2"):
+            state.handle_event(
+                {
+                    "_event": "v2_runner_on_start",
+                    "_timestamp": "2026-04-20T10:00:03Z",
+                    "task": {"id": "t1", "name": "Install nginx"},
+                    "host": host,
+                    "play": {"id": "p1"},
+                }
+            )
+        p = TreeProjection.from_run_state(state)
+        task_line = next(ln for ln in p.tree_lines(budget=20) if ln.kind == "task")
+        assert "2 running" in task_line.label
+        assert "3 pending" in task_line.label
+
+    def test_pending_count_excludes_hosts_failed_earlier_in_play(self):
+        # A host that went FAILED/UNREACHABLE earlier in the play is
+        # removed from the play by ansible — it will never start later
+        # tasks, so it must not count as pending forever.
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="deploy webservers",
+                hosts="all",
+                resolved_hosts=["web1", "web2", "web3"],
+                tasks=[],
+            )
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-04-20T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "play": {"id": "p1", "name": "deploy webservers"},
+            }
+        )
+        for host in ("web1", "web2", "web3"):
+            state.handle_event(
+                {
+                    "_event": "v2_runner_on_start",
+                    "_timestamp": "2026-04-20T10:00:02Z",
+                    "task": {"id": "t1", "name": "Check connectivity"},
+                    "host": host,
+                    "play": {"id": "p1"},
+                }
+            )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_unreachable",
+                "_timestamp": "2026-04-20T10:00:03Z",
+                "task": {"id": "t1", "name": "Check connectivity"},
+                "hosts": {"web3": {"unreachable": True, "msg": "ssh dead"}},
+                "play": {"id": "p1"},
+            }
+        )
+        for host in ("web1", "web2"):
+            state.handle_event(
+                {
+                    "_event": "v2_runner_on_ok",
+                    "_timestamp": "2026-04-20T10:00:04Z",
+                    "task": {"id": "t1", "name": "Check connectivity"},
+                    "hosts": {host: {"ok": True, "changed": False}},
+                    "play": {"id": "p1"},
+                }
+            )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:05Z",
+                "task": {"id": "t2", "name": "Install nginx"},
+                "host": "web1",
+                "play": {"id": "p1"},
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        task_line = next(
+            ln
+            for ln in p.tree_lines(budget=20)
+            if ln.kind == "task" and "Install nginx" in ln.label
+        )
+        # web1 running, web2 pending; web3 is gone from the play.
+        assert "1 running" in task_line.label
+        assert "1 pending" in task_line.label
 
     def test_no_lines_when_no_task_running(self):
         state = RunState(playbook="site.yml")

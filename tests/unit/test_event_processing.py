@@ -639,6 +639,77 @@ class TestRunnerOnOkStatus:
 
 
 # ==============================================================================
+# Terminal events preserve the host's start_time
+# ==============================================================================
+
+
+class TestTerminalEventsPreserveStartTime:
+    """Terminal runner events must not discard the per-host start_time.
+
+    v2_runner_on_start records when a host began a task. The terminal
+    handlers (ok/failed/skipped/unreachable) replace the HostRunState
+    wholesale; they must carry the prior entry's start_time forward so
+    duration displays (end_time - start_time) stay possible.
+    """
+
+    @pytest.mark.parametrize(
+        "terminal_fixture",
+        [
+            "event_runner_ok",
+            "event_runner_failed",
+            "event_runner_skipped",
+            "event_runner_unreachable",
+        ],
+    )
+    def test_terminal_event_preserves_start_time(
+        self,
+        terminal_fixture: str,
+        event_play_start: dict,
+        event_runner_start: dict,
+        request: pytest.FixtureRequest,
+    ) -> None:
+        run_state = RunState(playbook="test.yml")
+
+        run_state.handle_event(event_play_start)
+        runner_start = {**event_runner_start, "play": {"id": "play-uuid-1"}}
+        run_state.handle_event(runner_start)
+
+        terminal_event = {
+            **request.getfixturevalue(terminal_fixture),
+            "play": {"id": "play-uuid-1"},
+        }
+        run_state.handle_event(terminal_event)
+
+        host_state = run_state.plays["play-uuid-1"].tasks["task-uuid-1"].hosts["web1"]
+        assert host_state.start_time is not None
+        assert host_state.start_time.isoformat() == "2026-04-20T10:00:02+00:00"
+        assert host_state.end_time is not None
+
+    def test_terminal_event_without_prior_start_has_no_start_time(
+        self, event_play_start: dict, event_runner_ok: dict
+    ) -> None:
+        """Under linear strategy an ok can arrive with no per-host start
+        recorded (host synthesised at task_start carries the task start);
+        an ok for a host never seen at all must not invent a start_time."""
+        run_state = RunState(playbook="test.yml")
+
+        run_state.handle_event(event_play_start)
+        runner_ok = {**event_runner_ok, "play": {"id": "play-uuid-1"}}
+        run_state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:02Z",
+                "task": {"id": "task-uuid-1", "name": "Install nginx"},
+                "play": {"id": "play-uuid-1"},
+            }
+        )
+        run_state.handle_event(runner_ok)
+
+        host_state = run_state.plays["play-uuid-1"].tasks["task-uuid-1"].hosts["web1"]
+        assert host_state.status == Status.OK
+
+
+# ==============================================================================
 # TC-208: _handle_v2_runner_on_failed Creates Failed HostRunState
 # ==============================================================================
 

@@ -355,8 +355,9 @@ class TestTaskStartHostSynthesisFallback:
 
 
 class TestTreeReflectsPartialCompletion:
-    """Regression pin for the 2026-07-14 report: subset of hosts done,
-    tree must show them terminal while the rest keep their own timers."""
+    """Regression pin for the 2026-07-14 report: subset of hosts done —
+    completed hosts leave the tree (their result lines already streamed
+    to the log) while the rest keep their own timers."""
 
     def test_tree_shows_per_host_status_when_subset_completed(self):
         play_name = "Update AIDE database (manual run after changes)"
@@ -404,8 +405,10 @@ class TestTreeReflectsPartialCompletion:
         lines = projection.tree_lines(budget=30, now=now)
 
         by_label = {ln.label: ln for ln in lines if ln.kind == "host"}
-        assert by_label["h00"].status == Status.OK
-        assert by_label["h01"].status == Status.OK
+        # Completed hosts drop off the leaf list; the task-line summary
+        # below still accounts for them.
+        assert "h00" not in by_label
+        assert "h01" not in by_label
         for host in hosts[2:]:
             assert by_label[host].status == Status.RUNNING
             assert by_label[host].elapsed_s is not None

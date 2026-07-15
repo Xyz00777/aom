@@ -1252,6 +1252,17 @@ class RunState:
         hosts = event.get("hosts")
         return hosts if isinstance(hosts, dict) else {}
 
+    @staticmethod
+    def _prior_host_start_time(task: TaskRunState, hostname: str) -> datetime | None:
+        """Carry the host's recorded start_time into a terminal HostRunState.
+
+        Terminal handlers replace the host entry wholesale; without this
+        the start recorded by v2_runner_on_start (or synthesised at
+        task_start) is lost and per-host durations render as 0s.
+        """
+        prior = task.hosts.get(hostname)
+        return prior.start_time if prior is not None else None
+
     def _handle_v2_runner_on_ok(self, event: JsonlEvent, ts: datetime) -> None:
         """Handle v2_runner_on_ok event."""
         hosts_data = self._hosts_dict(event)
@@ -1266,6 +1277,7 @@ class RunState:
                 hostname=hostname,
                 status=Status.CHANGED if changed else Status.OK,
                 changed=changed,
+                start_time=self._prior_host_start_time(task, hostname),
                 end_time=ts,
             )
             # R12: enforce host caps only when the host entry is new.
@@ -1307,6 +1319,7 @@ class RunState:
                     status=Status.OK,
                     changed=False,
                     message=msg,
+                    start_time=self._prior_host_start_time(task, hostname),
                     end_time=ts,
                 )
             else:
@@ -1315,6 +1328,7 @@ class RunState:
                     status=Status.FAILED,
                     changed=False,
                     message=msg,
+                    start_time=self._prior_host_start_time(task, hostname),
                     end_time=ts,
                 )
                 self.status = Status.FAILED
@@ -1342,6 +1356,7 @@ class RunState:
             new_hs = HostRunState(
                 hostname=hostname,
                 status=Status.SKIPPED,
+                start_time=self._prior_host_start_time(task, hostname),
                 end_time=ts,
             )
             if _reserve_host_run_state(self, task, hostname, new_hs):
@@ -1367,6 +1382,7 @@ class RunState:
                 hostname=hostname,
                 status=Status.UNREACHABLE,
                 message=msg,
+                start_time=self._prior_host_start_time(task, hostname),
                 end_time=ts,
             )
             if _reserve_host_run_state(self, task, hostname, new_hs):

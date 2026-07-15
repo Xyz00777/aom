@@ -274,6 +274,55 @@ def _host_leaf_label(hostname: str, hs: HostRunState, total: int | None = None) 
     return f"{hostname}  ({hs.loop_items_done} items)"
 
 
+def _leaf_visible(hs: HostRunState) -> bool:
+    """Host-leaf visibility under a running task.
+
+    RUNNING leaves are the tree's payload; FAILED/UNREACHABLE leaves
+    stay visible because a failure is the actionable signal (mirrors
+    the failed-task keep-visible rule in ``_classify``). OK/CHANGED/
+    SKIPPED hosts drop off — their result lines already streamed to
+    the log above the panel and the task-line summary counts them.
+    """
+    return hs.status in (Status.RUNNING, Status.FAILED, Status.UNREACHABLE)
+
+
+def _leaf_elapsed_s(hs: HostRunState, now: datetime) -> float:
+    """Per-host elapsed seconds for a host leaf.
+
+    Running hosts tick against ``now``; terminal hosts freeze at
+    ``end_time - start_time`` (how long the host actually took).
+    """
+    if hs.status == Status.RUNNING:
+        return (now - hs.start_time).total_seconds() if hs.start_time is not None else 0.0
+    if hs.start_time is not None and hs.end_time is not None:
+        return (hs.end_time - hs.start_time).total_seconds()
+    return 0.0
+
+
+def _pending_host_count(
+    play: "PlayRunState", play_def: "PlayDefinition | None", runtime: TaskRunState
+) -> int:
+    """Play-target hosts that have not started ``runtime`` yet.
+
+    Under ``throttle``/``serial``/free strategy a task's host map only
+    grows as per-host start events arrive; the difference against the
+    play's target set is the "not yet started" tail. Hosts that went
+    FAILED/UNREACHABLE earlier in the play are excluded — ansible
+    removes them from the play, so they will never start this task.
+    Returns 0 when no target information is available.
+    """
+    targets = _play_target_hostnames(play, play_def)
+    if not targets:
+        return 0
+    dead = {
+        hostname
+        for task in play.tasks.values()
+        for hostname, hs in task.hosts.items()
+        if hs.status in (Status.FAILED, Status.UNREACHABLE)
+    }
+    return len(targets - set(runtime.hosts) - dead)
+
+
 def _is_meta_task(task_name: str) -> bool:
     """Return True for explicit ``meta: ...`` tasks.
 
@@ -1638,7 +1687,13 @@ class TreeProjection:
             task_depth = 2 + len(current_role_path) if current_role_path else 2
 
             if item_kind == "running" and runtime is not None:
-                lines.append(self._task_line(runtime, depth=task_depth))
+                lines.append(
+                    self._task_line(
+                        runtime,
+                        depth=task_depth,
+                        pending=_pending_host_count(play, play_def, runtime),
+                    )
+                )
                 self._touch_task_lease(play, runtime, None, now)
                 if _is_meta_task(runtime.name):
                     # Meta tasks are projection-only control flow. Keep the
@@ -1647,11 +1702,8 @@ class TreeProjection:
                 elif runtime.hosts:
                     loop_totals = self._state.loop_totals.get(runtime.path or "", {})
                     for hostname, hs in runtime.hosts.items():
-                        elapsed = (
-                            (now - hs.start_time).total_seconds()
-                            if hs.start_time is not None
-                            else 0.0
-                        )
+                        if not _leaf_visible(hs):
+                            continue
                         lines.append(
                             TreeLine(
                                 depth=task_depth + 1,
@@ -1659,7 +1711,7 @@ class TreeProjection:
                                 label=_host_leaf_label(hostname, hs, loop_totals.get(hostname)),
                                 glyph=None,
                                 status=hs.status,
-                                elapsed_s=elapsed,
+                                elapsed_s=_leaf_elapsed_s(hs, now),
                             )
                         )
                         self._touch_host_lease(hostname, now)
@@ -2135,10 +2187,13 @@ class TreeProjection:
         return result or ()
 
     @staticmethod
-    def _task_line(task: TaskRunState, depth: int) -> TreeLine:
+    def _task_line(task: TaskRunState, depth: int, pending: int = 0) -> TreeLine:
         # Count tally for the parenthesised summary on the task line.
         # Order matters for the label: ok, changed, running, failed,
-        # unreachable, skipped — same order as the spec example.
+        # unreachable, skipped, pending — same order as the spec example.
+        # ``pending`` (hosts the play targets that have not started this
+        # task yet — throttle/serial/free) is supplied by the caller;
+        # it is not derivable from ``task.hosts`` alone.
         ok = changed = running = failed = unreachable = skipped = 0
         for hs in task.hosts.values():
             if hs.status == Status.RUNNING:
@@ -2163,6 +2218,7 @@ class TreeProjection:
             ("failed", failed),
             ("unreachable", unreachable),
             ("skipped", skipped),
+            ("pending", pending),
         ):
             if n > 0:
                 parts.append(f"{n} {label}")
