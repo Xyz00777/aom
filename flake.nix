@@ -26,10 +26,8 @@
             pyyaml
             pydantic
             pydantic-settings
-            platformdirs
             pexpect
             psutil
-            blessed
           ];
 
           nativeCheckInputs = with python.pkgs; [
@@ -51,10 +49,8 @@
           ] ++ (with python.pkgs; [
             pytest
             pytest-asyncio
-            pytest-textual-snapshot
             pytest-cov
             textual-dev
-            inline-snapshot
             ansible-core
           ]);
 

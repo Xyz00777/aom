@@ -578,7 +578,7 @@ direction of dependencies.
 **Section:** 4.6
 **Category:** unit
 **Priority:** high
-**Description:** AOM detects Unicode support via blessed.Terminal() at startup
+**Description:** AOM detects Unicode support via terminal encoding / `is_tty` checks at startup
 **Test:** Unicode terminal detected, fallback on ASCII-only terminal
 **Fixture/Setup:** Mocked terminal capabilities
 **Edge Cases:** Detection failure defaults to ASCII
@@ -597,7 +597,7 @@ direction of dependencies.
 **Category:** unit
 **Priority:** high
 **Description:** AOM detects color support level: truecolor/256/16/monochrome
-**Test:** Rich Console.detect_color() or blessed.Terminal().number_of_colors returns correct level
+**Test:** Rich Console.detect_color() returns correct level
 **Fixture/Setup:** Mocked terminal capabilities
 **Edge Cases:** No color support (piped)
 
@@ -3031,7 +3031,7 @@ the count parens.
 **Category:** unit
 **Priority:** critical
 **Description:** Verify config file path follows XDG spec: ~/.config/aom/config.yaml
-**Test:** Assert default config path equals expanded ~/.config/aom/config.yaml. Verify platformdirs is used correctly
+**Test:** Assert default config path equals expanded ~/.config/aom/config.yaml (hardcoded `DEFAULT_YAML_PATH` in `core/config.py`; no platformdirs)
 **Fixture/Setup:** AppConfig with default path resolution
 **Edge Cases:** XDG_CONFIG_HOME environment variable override
 
@@ -3765,14 +3765,14 @@ the count parens.
 **Fixture/Setup:** Dependency inspection
 **Edge Cases:** Compatibility with pytest version
 
-### TC-384: Pytest-Textual-Snapshot Version
+### TC-384: Golden-File Visual Regression
 **Section:** 12.3
 **Category:** unit
 **Priority:** low
-**Description:** pytest-textual-snapshot >=0.5 is used for visual regression
-**Test:** Verify pytest-textual-snapshot version
-**Fixture/Setup:** Dependency inspection
-**Edge Cases:** Snapshot format changes
+**Description:** Visual regression uses committed golden files under `tests/compact/golden/`, not `pytest-textual-snapshot`
+**Test:** Verify golden `.txt` frames exist and are asserted byte-for-byte by `tests/compact/test_golden_frames.py`
+**Fixture/Setup:** Golden-file corpus + frozen clock / `TZ=UTC` / `is_tty=False`
+**Edge Cases:** Golden drift (regenerate with `UPDATE_GOLDEN=1`)
 
 ### TC-385: Textual Test App Running
 **Section:** 12.4
@@ -3810,23 +3810,23 @@ the count parens.
 **Fixture/Setup:** MockSpawn with configurable is_alive
 **Edge Cases:** Process dies mid-event
 
-### TC-389: Snapshot Test Main Screen
+### TC-389: Golden Frame Full-Screen Capture
 **Section:** 12.6
 **Category:** snapshot
 **Priority:** high
-**Description:** Visual regression test for main screen
-**Test:** Compare main screen snapshot with baseline
-**Fixture/Setup:** AOMApp with loaded playbook
+**Description:** Visual regression on a full 80×24 compact frame via golden file
+**Test:** Drive renderer to a frame, assert byte-equality against committed golden `.txt`
+**Fixture/Setup:** CompactRenderer with fixture events; frozen clock, `TZ=UTC`, `is_tty=False`
 **Edge Cases:** Terminal size variations
 
-### TC-390: Snapshot Test with run_before
+### TC-390: Golden Regeneration Workflow
 **Section:** 12.6
 **Category:** snapshot
 **Priority:** high
-**Description:** Snapshot tests accept run_before setup function
-**Test:** Verify snap_compare works with pilot.app.load_playbook() in run_before
-**Fixture/Setup:** snap_compare fixture
-**Edge Cases:** Async setup function
+**Description:** Goldens regenerate deterministically when behavior changes intentionally
+**Test:** `UPDATE_GOLDEN=1 uv run pytest tests/compact/test_golden_frames.py` rewrites frames; a normal run then passes byte-for-byte
+**Fixture/Setup:** Golden-file corpus + `UPDATE_GOLDEN` env toggle
+**Edge Cases:** Non-deterministic content (timestamps) must be frozen
 
 ### TC-391: Compact Renderer Rich Console Capture
 **Section:** 12.7
@@ -3837,13 +3837,13 @@ the count parens.
 **Fixture/Setup:** CompactRenderer, Rich Console
 **Edge Cases:** ANSI codes in captured output
 
-### TC-392: Compact Renderer inline-snapshot
+### TC-392: Compact Renderer Golden File
 **Section:** 12.7
 **Category:** snapshot
 **Priority:** high
-**Description:** inline-snapshot stores expected output in test file
-**Test:** Verify renderer output matches snapshot, use --inline-snapshot=review to update
-**Fixture/Setup:** inline-snapshot library
+**Description:** Expected renderer output is stored as a committed golden `.txt`, not an inline literal
+**Test:** Verify renderer output matches the golden file; regenerate with `UPDATE_GOLDEN=1`
+**Fixture/Setup:** `tests/compact/golden/` corpus
 **Edge Cases:** Snapshot drift detection
 
 ### TC-393: Diff Snapshot All Tasks
@@ -4161,7 +4161,7 @@ the count parens.
 **Category:** unit
 **Priority:** critical
 **Description:** All required dependencies listed with versions
-**Test:** Verify textual>=0.60, rich, pyyaml>=6.0, pydantic>=2.0, pydantic-settings>=2.0, platformdirs>=3.0, pexpect>=4.8, psutil>=5.9, blessed>=1.20
+**Test:** Verify textual>=0.60, rich, pyyaml>=6.0, pydantic>=2.0, pydantic-settings>=2.0, pexpect>=4.8, psutil>=5.9, argcomplete>=3.5, orjson>=3.10
 **Fixture/Setup:** TOML parsing
 **Edge Cases:** Optional dependencies
 
@@ -4179,7 +4179,7 @@ the count parens.
 **Category:** unit
 **Priority:** high
 **Description:** Dev dependencies include test frameworks
-**Test:** Verify pytest>=8.0, pytest-asyncio>=0.23, pytest-textual-snapshot>=0.5, pytest-cov, ruff, mypy, inline-snapshot>=0.10
+**Test:** Verify pytest>=8.0, pytest-asyncio>=0.23, pytest-xdist>=3.8.0, pytest-cov, ruff, mypy, pre-commit>=3.0, pytest-testmon>=2.2
 **Fixture/Setup:** TOML parsing
 **Edge Cases:** Extra dev tools
 

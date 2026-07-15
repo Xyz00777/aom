@@ -21,10 +21,8 @@ dependencies = [
     "pyyaml>=6.0",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
-    "platformdirs>=3.0",
     "pexpect>=4.8",
     "psutil>=5.9",
-    "blessed>=1.20",           # ANSI cursor positioning for compact mode
     "argcomplete>=3.5",        # bash/zsh/fish tab-completion for the CLI
     "orjson>=3.10",            # Fast JSON parser on the PTY event hot path
 ]
@@ -38,11 +36,9 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "pytest-xdist>=3.8.0",
-    "pytest-textual-snapshot>=0.5",
     "pytest-cov",
     "ruff",
     "mypy",
-    "inline-snapshot>=0.10",   # Compact mode snapshot testing
     "pre-commit>=3.0",
     "jsonschema>=4.20",        # schemas/run_summary.v1.json contract test
     "hypothesis>=6",           # property-based tests (Batch C)
@@ -55,8 +51,6 @@ integration = [
 
 lint = [
     "ansible-lint>=24.0",
-    "molecule>=24.0",
-    "molecule-plugins>=23.0",
 ]
 
 [build-system]

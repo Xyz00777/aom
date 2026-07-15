@@ -383,12 +383,13 @@ Two approaches available, use **Rich Live** for MVP:
    - `refresh_per_second=4` for smooth updates (same as nom)
    - Limitation: less control over cursor positioning than direct ANSI
 
-2. **blessed + ANSI** (advanced, for pixel-perfect nom-style):
-   - `blessed` library provides full ANSI cursor positioning API
-   - `term.location(0, term.height - N)` for bottom positioning
+2. **Raw ANSI** (advanced, for pixel-perfect nom-style):
+   - Direct cursor positioning without a helper library
    - ANSI escape sequences: `\033[s/u` (save/restore cursor), `\033[K` (clear line)
    - DEC mode 2026 (`\x1b[?2026h/l`) for synchronized output (no flicker)
    - How nom itself works — maximum control, most portability risk
+   - AOM emits these sequences directly; the `blessed` library was evaluated
+     for this (see v1.2) but never adopted and is no longer a dependency
 
 **Password Prompt Handling (Compact Mode):**
 
@@ -421,7 +422,7 @@ This works because:
 
 **Compact Mode Runtime Dependencies** (in addition to core):
 - `rich` (already required) — for Live display and Console formatting
-- Optional: `blessed` — for advanced ANSI cursor positioning (Phase 2)
+- Advanced ANSI cursor positioning is emitted directly (no `blessed` dependency)
 
 #### State Filtering
 
@@ -616,13 +617,13 @@ When AOM exits (any reason), it must:
 **Unicode Support:**
 - AOM requires Unicode support (UTF-8) for status icons (●, ◆, ✖, etc.)
 - If terminal doesn't support Unicode: fall back to ASCII equivalents (●→*, ◆→+, ✖→X, ◐→@, □→.)
-- Detection: check `blessed.Terminal()` capabilities at startup
+- Detection: terminal encoding / `is_tty` checks at startup (no `blessed` dependency)
 
 **Color Support:**
 - Full color (256/truecolor): Use full icon colors and Rich/Textual themes
 - 16-color: Fall back to standard ANSI colors (green, yellow, red, cyan, white, dim)
 - No color (monochrome/piped): Strip all colors, use text labels (OK, CHANGED, FAILED, etc.)
-- Detection: Rich's `Console.detect_color()` and `blessed.Terminal().number_of_colors`
+- Detection: Rich's `Console.detect_color()`
 
 **Minimum Terminal Width:**
 - Compact status panel is designed for 80 columns
@@ -2446,7 +2447,8 @@ Cycle through quadrant icons at 4 FPS: `◐ → ◓ → ◑ → ◒ → ◐`
 |---------|------|
 | Test runner | pytest >=8.0 |
 | Async support | pytest-asyncio >=0.23 |
-| Visual regression | pytest-textual-snapshot >=0.5 |
+| Parallelism | pytest-xdist >=3.8.0 |
+| Visual regression | committed golden-file snapshots (`tests/compact/golden/`) |
 | Coverage | pytest-cov |
 
 ### 12.4 Textual Testing
@@ -2482,15 +2484,11 @@ def mock_ansible_playbook(monkeypatch):
 
 ### 12.6 Snapshot Testing
 
-```python
-def test_main_screen(snap_compare):
-    """Visual regression test for main screen."""
-    async def setup(pilot):
-        # Setup state
-        await pilot.app.load_playbook("test.yml")
-    
-    assert snap_compare(AomApp(), run_before=setup)
-```
+Snapshot/visual-regression coverage lives entirely in the compact renderer via
+committed **golden files** (see §12.7) — full 80×24 frames captured under a
+frozen clock. There is no Textual `snap_compare` / `pytest-textual-snapshot`
+harness; TUI widgets are exercised through Textual's `run_test()` + `Pilot`
+(§12.4) instead.
 
 ### 12.7 Compact Renderer Testing
 
@@ -2501,7 +2499,7 @@ Compact mode testing requires different strategies than TUI testing since there'
 | Tier | Scope | Tools | Purpose |
 |------|-------|-------|---------|
 | Unit | State → render | `Console.capture()` + mocks | Test rendering logic in isolation |
-| Integration | Mock pexpect | `pexpect` mock + `inline-snapshot` | Test renderer with simulated JSONL |
+| Integration | Mock pexpect | `pexpect` mock + golden files | Test renderer with simulated JSONL |
 | System | Real ansible | Real `ansible-playbook` | End-to-end verification |
 
 **Unit Testing with Rich Console Capture:**
@@ -2523,31 +2521,29 @@ def test_task_status_rendering():
     assert "Configure firewall" in output
 ```
 
-**Snapshot Testing with inline-snapshot:**
+**Snapshot Testing with golden files:**
 
-The `inline-snapshot` library stores expected output directly in test files, updating them when behavior changes intentionally:
+Compact-mode snapshots are committed **golden files** under `tests/compact/golden/`,
+not inline literals. Each test drives the renderer to a full 80×24 frame and
+asserts byte-equality against the committed `.txt`. Determinism comes from a
+frozen clock, `TZ=UTC`, and `is_tty=False` (so output is ANSI-free); this makes
+full-frame goldens legible in review, which is where inline snapshots lose for
+large output.
 
 ```python
-from inline_snapshot import snapshot
-
 def test_compact_status_panel():
-    """Test compact mode status panel output."""
+    """Test compact mode status panel output against a golden file."""
     renderer = CompactRenderer()
     renderer.update_state(create_mock_event())
-    
+
     output = renderer.render_status_panel()
-    
-    # inline-snapshot stores expected value in test file
-    assert output == snapshot("""\
-┌─ Summary ────────────────────────────────────────┐
-│ web1: ● 2 ok, ◆ 0 changed, ✖ 0 failed           │
-│ web2: ◐ 1 running, ● 1 ok                       │
-│ Elapsed: 0:04:23                                 │
-└────────────────────────────────────────────────────┘
-""")
+
+    assert output == load_golden("status_panel.txt")
 ```
 
-When output changes, run `pytest --inline-snapshot=review` to update snapshots.
+When output changes intentionally, regenerate the goldens:
+`UPDATE_GOLDEN=1 uv run pytest tests/compact/test_golden_frames.py`, then review
+the diff before committing.
 
 **Snapshot Testing for Diff Output:**
 
@@ -2714,7 +2710,7 @@ ansible-aom/
 │       ├── compact/            # ANSI renderer (default mode)
 │       │   ├── __init__.py
 │       │   ├── renderer.py     # CompactRenderer (satisfies Protocol)
-│       │   ├── display.py      # Rich Live + blessed display logic
+│       │   ├── display.py      # Rich Live display logic
 │       │   ├── password.py     # Password pass-through (getpass)
 │       │   ├── format.py       # Pure formatters (tree lines, host tables)
 │       │   └── exit_code.py    # Re-export shim → core.exit_code
@@ -2781,7 +2777,7 @@ ansible-aom/
 │   │   ├── test_config.py
 │   │   ├── test_layering.py   # AST-based core/ never-imports-infra check
 │   │   └── ...
-│   ├── compact/               # Compact renderer tests + inline-snapshot golden files
+│   ├── compact/               # Compact renderer tests + golden-file snapshots
 │   │   ├── golden/
 │   │   ├── test_hide_state.py
 │   │   ├── test_tree_render.py
@@ -2820,10 +2816,8 @@ dependencies = [
     "pyyaml>=6.0",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
-    "platformdirs>=3.0",
     "pexpect>=4.8",
     "psutil>=5.9",
-    "blessed>=1.20",           # ANSI cursor positioning for compact mode
     "argcomplete>=3.5",        # bash/zsh/fish tab-completion for the CLI
     "orjson>=3.10",            # Fast JSON parser on the PTY event hot path
 ]
@@ -2837,11 +2831,9 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "pytest-xdist>=3.8.0",
-    "pytest-textual-snapshot>=0.5",
     "pytest-cov",
     "ruff",
     "mypy",
-    "inline-snapshot>=0.10",   # Compact mode snapshot testing
     "pre-commit>=3.0",
     "jsonschema>=4.20",        # schemas/run_summary.v1.json contract test
     "hypothesis>=6",           # property-based tests (Batch C)
@@ -2853,8 +2845,6 @@ integration = [
 
 lint = [
     "ansible-lint>=24.0",
-    "molecule>=24.0",
-    "molecule-plugins>=23.0",
 ]
 
 [build-system]
@@ -2917,7 +2907,7 @@ Key departures from the v1.8 snapshot:
   and **`hypothesis>=6`** added to `dev`; **`mypy` strict is relaxed**
   for GUI modules (compact, tui, inspect.display, core.config).
 - **Three optional-dependency groups**: `dev`, `integration` (ansible-core),
-  `lint` (ansible-lint + molecule).
+  `lint` (ansible-lint).
 
 ### 13.3 Nuitka Build
 
@@ -2964,7 +2954,7 @@ nuitka --standalone \
           
           propagatedBuildInputs = with python.pkgs; [
             textual pyyaml pydantic pydantic-settings
-            platformdirs pexpect psutil
+            pexpect psutil
           ];
           
           nativeCheckInputs = [ python.pkgs.pytest ];
@@ -3271,6 +3261,7 @@ This section captures the key decisions from the 55 user questions.
 | 1.6 | 2026-04-20 | Gap fixes: Strategy detection from event patterns (not JSONL field), host name resolution (actual hostnames from runner events), PtyStreamParser._handle_plaintext classification, complete RunState event handlers, TaskDefinition uuid/path/children fields, PlayDefinition.id clarification, PlayRunState.detected_strategy, Section 14.7 Subprocess Error Handling (exit codes, stderr capture, watchdog), compact renderer refresh strategy, terminal compatibility (Unicode/color fallback), memory bounds, SIGQUIT handling, timestamp convention, task name truncation, TDD starter test names, session file permissions, corrupted session handling, minimum ansible-core >=2.14 requirement |
 | 1.7 | 2026-04-20 | Inventory-based host resolution via `--list-hosts` (parallel with `--list-tasks`); `PlayDefinition.resolved_hosts` field; `--list-hosts` parser with fallback; defense-in-depth password/secret redaction (4 layers: _ansible_no_log, PASSWORD_MATCH regex + whitelist, command string sanitization, verbose invocation redaction); redaction always-on (no opt-out); redaction config schema; Section 5.2.1 --list-hosts parsing |
 | 1.8 | 2026-04-20 | Deprecation warning filtering: WARNING_PATTERNS regex updated to match both `[DEPRECATION WARNING]:` and `[DEPRECATED]:` formats; `WarningType` enum and `WarningEntry` dataclass for classified warning storage; Filter Panel (7.6) updated with Warning/Deprecation checkboxes; compact mode status line shows warning ⚠ and deprecation ✱ counts; config schema updated with warnings section; research confirmed deprecations are plaintext on stderr (not JSONL events) |
+| 1.10 | 2026-07-15 | **Dead-dependency cleanup:** dropped `platformdirs` and `blessed` (runtime — never imported; config path is hardcoded `~/.config/aom/config.yaml`, compact mode emits raw ANSI itself), `inline-snapshot` and `pytest-textual-snapshot` (dev — superseded by golden-file snapshots; no `snap_compare` usage), and `molecule` + `molecule-plugins` (lint — no scenarios exist). `lint` extra is now `ansible-lint` only. §12.3/§12.6/§12.7 rewritten to describe the golden-file snapshot mechanism instead of `inline-snapshot`/`snap_compare`; §13.2/§13.4 manifests refreshed. `blessed` remains an *optional* import per TC-035. |
 | 1.9 | 2026-06-26 | **Spec sync with v0.93 source tree (GRUMPI_QA H2):** §2.1 / §2.2 / §13.1 project structure rewritten to match reality (`state_machine.py` is now MAX_* constants only; new modules `exit_code.py`, `timestamp.py`, `duration.py`, `includes.py`, `log_filter.py`, `replay.py`, `run_config.py`, `estimate.py`, `diagnostics.py` in `core/`; new packages `drivers/`, `session/`, `formats/`, `rerun/`; `inspect/display.py` → `formatters.py`; `compact/exit_code.py` is now a re-export shim). §2.3 factory function uses `mode="compact"|"tui"|"json"` instead of legacy `tui_mode: bool`. §6.4 Execution Lifecycle marked as historical — `ExecutionState` / `VALID_TRANSITIONS` / `StateMachine` were removed in v0.93 (finding 9A); lifecycle labels are now plain strings. §13.2 pyproject.toml refreshed (`version = "0.93.0"`, `argcomplete>=3.5`, `orjson>=3.10`, `pytest-xdist`, `pre-commit`, `jsonschema`, `hypothesis`, `integration` extra group for `ansible-core>=2.16`, mypy relaxed per-module for GUI). §5.1/§6.2 timestamp references mention canonical `core/timestamp.parse_iso_timestamp`. New §4.1 `fix-task-counting` subsection documents the v0.93 role-label / footer-count / parent-stub double-counting fixes and the TUI `TreeProjection`-based refresh. Cross-references to existing §4.1 State Filtering (hide-state) and §4.1 Two-Level Truncation Footers, both shipped between v1.8 and v1.9.
 
 ---

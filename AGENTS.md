@@ -7,7 +7,7 @@
 - **Default**: Compact ANSI streaming view (lightweight, no Textual)
 - **Optional**: Full multi-panel Textual TUI (`--tui` flag)
 - **Parsing**: JSONL only via `ansible.posix.jsonl` callback — never regex
-- **Stack**: Python 3.14, Textual ≥0.60, pexpect, Rich, Pydantic, blessed
+- **Stack**: Python 3.14, Textual ≥0.60, pexpect, Rich, Pydantic
 - **Build**: hatchling, managed by `uv`
 
 ## Setup (One Time)
