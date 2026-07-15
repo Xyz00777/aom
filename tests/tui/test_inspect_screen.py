@@ -189,6 +189,21 @@ async def test_detail_pane_hydrates_payload_from_disk(state_dir: Path):
 
 
 @pytest.mark.asyncio
+async def test_runs_rows_hydrate_via_background_backfill(state_dir: Path):
+    """On startup a background worker indexes sessions that lack one; each
+    Runs row's host roll-up appears as its index lands — without ever
+    selecting those sessions."""
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir)
+    async with app.run_test() as pilot:
+        await _settle(pilot)
+        assert all(s.host_counts for s in app._all_summaries), [
+            (s.short_id, dict(s.host_counts)) for s in app._all_summaries
+        ]
+
+
+@pytest.mark.asyncio
 async def test_loaded_sessions_are_cached(state_dir: Path):
     """Re-selecting an already-loaded session must not re-read the index."""
     from ansible_aom.tui.screens.inspect import InspectApp

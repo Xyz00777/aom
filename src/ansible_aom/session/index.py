@@ -20,9 +20,11 @@ import json
 import logging
 import os
 import sqlite3
+import threading
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Literal, Mapping
+from typing import Any, Iterator, Literal, Mapping
 
 from ansible_aom.core.inspect_model import (
     EventRef,
@@ -140,13 +142,24 @@ def build_index(session_path: Path) -> bool:
     if stat is None:
         return False
 
-    tmp_path = index_path(session_path).with_suffix(".db.tmp")
+    # PID+TID-unique temp name: a concurrent build of the same session
+    # (background backfill racing a selection-triggered load) must not
+    # share a half-written file. Both produce identical content; last
+    # os.replace wins.
+    tmp_path = index_path(session_path).with_suffix(
+        f".tmp-{os.getpid()}-{threading.get_ident()}.db"
+    )
     acc = SessionIndexAccumulator(collect_stderr=False)
     malformed = 0
     try:
         tmp_path.unlink(missing_ok=True)
         conn = sqlite3.connect(tmp_path)
         try:
+            # The temp db is disposable (atomically renamed on success,
+            # deleted on failure), so durability guarantees are wasted
+            # cost here — a crash mid-build just means "no index yet".
+            conn.execute("PRAGMA journal_mode = OFF")
+            conn.execute("PRAGMA synchronous = OFF")
             conn.executescript(_SCHEMA)
             stderr_batch: list[tuple[int, str, str | None, str | None, int]] = []
             stderr_seq = 0
@@ -284,6 +297,60 @@ def ensure_index(session_path: Path) -> bool:
     if index_is_fresh(session_path):
         return True
     return build_index(session_path)
+
+
+def sessions_needing_index(session_dir: Path) -> list[Path]:
+    """Session directories with an events.jsonl but no fresh index."""
+    if not session_dir.exists():
+        return []
+    stale: list[Path] = []
+    for path in sorted(session_dir.iterdir()):
+        if not path.is_dir() or not _events_path(path).exists():
+            continue
+        if not index_is_fresh(path):
+            stale.append(path)
+    return stale
+
+
+# Below this combined log volume a process pool costs more than it saves
+# (worker spawn + module import); build sequentially in-process instead.
+_PARALLEL_MIN_BYTES = 64 * 1024 * 1024
+
+
+def build_indexes(
+    session_paths: list[Path],
+    *,
+    max_workers: int | None = None,
+    parallel_min_bytes: int = _PARALLEL_MIN_BYTES,
+) -> Iterator[tuple[Path, bool]]:
+    """Build indexes for many sessions, yielding (path, ok) as each lands.
+
+    Index builds are CPU-bound (json parsing dominates) and fully
+    independent — one events.jsonl in, one index.db out — so large
+    backlogs fan out over a process pool and scale with cores instead
+    of being serialised behind the GIL. Small backlogs build inline.
+    """
+    total_bytes = 0
+    for path in session_paths:
+        stat = _events_stat(path)
+        if stat is not None:
+            total_bytes += stat[0]
+
+    if len(session_paths) <= 1 or total_bytes < parallel_min_bytes:
+        for path in session_paths:
+            yield (path, build_index(path))
+        return
+
+    with ProcessPoolExecutor(max_workers=max_workers) as pool:
+        futures = {pool.submit(build_index, path): path for path in session_paths}
+        for future in as_completed(futures):
+            path = futures[future]
+            try:
+                ok = bool(future.result())
+            except Exception as exc:  # worker died (OOM kill, interpreter error)
+                logger.debug("parallel index build failed for %s: %s", path, exc)
+                ok = False
+            yield (path, ok)
 
 
 def _counts(row: Any, base: int) -> StatusCounts:

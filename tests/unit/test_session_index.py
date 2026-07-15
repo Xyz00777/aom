@@ -232,3 +232,50 @@ def test_build_index_returns_false_without_events(tmp_path: Path) -> None:
     session_path.mkdir()
     assert build_index(session_path) is False
     assert not index_is_fresh(session_path)
+
+
+def _write_second_session(first: Path) -> Path:
+    other = first.parent / "0198cccc-0000-7000-8000-000000000002"
+    other.mkdir()
+    (other / "meta.json").write_text((first / "meta.json").read_text())
+    (other / "events.jsonl").write_text((first / "events.jsonl").read_text())
+    return other
+
+
+def test_sessions_needing_index_lists_only_stale(tmp_path: Path) -> None:
+    from ansible_aom.session.index import sessions_needing_index
+
+    first = _write_session(tmp_path)
+    second = _write_second_session(first)
+    (tmp_path / "not-a-session").mkdir()
+    (tmp_path / "stray-file").write_text("x")
+    build_index(first)
+
+    assert sessions_needing_index(tmp_path) == [second]
+
+
+def test_build_indexes_sequential_small_backlog(tmp_path: Path) -> None:
+    from ansible_aom.session.index import build_indexes
+
+    first = _write_session(tmp_path)
+    second = _write_second_session(first)
+
+    results = dict(build_indexes([first, second]))
+
+    assert results == {first: True, second: True}
+    assert index_is_fresh(first)
+    assert index_is_fresh(second)
+
+
+def test_build_indexes_process_pool(tmp_path: Path) -> None:
+    """Force the pool path (threshold 0) — results identical to sequential."""
+    from ansible_aom.session.index import build_indexes
+
+    first = _write_session(tmp_path)
+    second = _write_second_session(first)
+
+    results = dict(build_indexes([first, second], max_workers=2, parallel_min_bytes=0))
+
+    assert results == {first: True, second: True}
+    assert index_is_fresh(first)
+    assert index_is_fresh(second)

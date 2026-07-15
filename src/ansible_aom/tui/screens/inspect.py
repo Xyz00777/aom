@@ -66,12 +66,14 @@ from ansible_aom.core.inspect_model import (
     tree_from_index,
 )
 from ansible_aom.session.index import (
+    build_indexes,
     ensure_index,
     index_is_fresh,
     load_structure,
     load_summary,
     query_verbose,
     read_event,
+    sessions_needing_index,
 )
 from ansible_aom.session.store import list_sessions, load_session, load_session_meta
 
@@ -292,6 +294,21 @@ class _RunRow(ListItem):
         yield Label(line1, classes="run-line1", markup=True)
         yield Label(line2, classes="run-line2", markup=True)
         yield Label(line3, classes="run-line3", markup=True)
+
+    def update_summary(self, summary: RunSummary) -> None:
+        """Refresh the row's labels in place (e.g. after index backfill).
+
+        Rebuilding the whole ListView per hydrated row would reset scroll
+        and selection under the user's cursor.
+        """
+        self.summary = summary
+        line1, line2, line3 = _render_run_lines(summary)
+        try:
+            self.query_one(".run-line1", Label).update(line1)
+            self.query_one(".run-line2", Label).update(line2)
+            self.query_one(".run-line3", Label).update(line3)
+        except NoMatches:
+            pass
 
 
 class _ConfirmDelete(ModalScreen[bool]):
@@ -685,6 +702,7 @@ class InspectApp(App):
         if sid:
             self._select_session(sid)
             self._load_tasks_for(sid)
+        self._start_index_backfill()
         # Visual focus indicator
         self._refresh_pane_focus_classes()
         self._refresh_footer()
@@ -1037,6 +1055,7 @@ class InspectApp(App):
 
     def action_reload_runs(self) -> None:
         self._reload_runs()
+        self._start_index_backfill()
         self.notify(f"{len(self._all_summaries)} sessions on disk")
 
     def on_list_view_highlighted(self, event) -> None:  # noqa: ANN001
@@ -1170,20 +1189,59 @@ class InspectApp(App):
 
     def _refresh_run_summary(self, session_id: str, meta: dict) -> None:
         """Hydrate a meta-only Runs row once its session has been indexed."""
+        del meta  # re-read inside _hydrate_run_row; kept for signature clarity
         if not self._index_backed:
             return
+        self._hydrate_run_row(session_id)
+
+    def _hydrate_run_row(self, session_id: str) -> None:
+        """Swap a placeholder Runs row for real index-derived counts."""
         for i, summary in enumerate(self._all_summaries):
             if summary.session_id != session_id:
                 continue
             if summary.host_counts:
                 return  # already showing real counts
+            meta = load_session_meta(session_id, self.state_dir)
+            if meta is None:
+                return
             hydrated = load_summary(self.state_dir / session_id, meta)
             if hydrated is None:
                 return
             self._all_summaries[i] = hydrated
-            self._refresh_list()
-            self._select_session(session_id)
+            for row in self.query(_RunRow):
+                if row.session_id == session_id:
+                    row.update_summary(hydrated)
+                    break
             return
+
+    # ── Background index backfill ───────────────────────────────────────
+
+    def _start_index_backfill(self) -> None:
+        """Index sessions that lack a fresh index, in the background.
+
+        Runs once at mount (and again on ``r``). Large backlogs fan out
+        over a process pool inside the worker thread — json parsing is
+        CPU-bound, so this is the one place the GIL would otherwise
+        serialise hours of old logs.
+        """
+        self.run_worker(
+            self._backfill_indexes_blocking,
+            thread=True,
+            exclusive=True,
+            group="index-backfill",
+        )
+
+    def _backfill_indexes_blocking(self) -> None:
+        """Worker body — no widget access allowed here (thread)."""
+        paths = [
+            path
+            for path in sessions_needing_index(self.state_dir)
+            # The selected session is being indexed by its own load worker.
+            if path.name != self._loading_session_id
+        ]
+        for path, ok in build_indexes(paths):
+            if ok:
+                self.call_from_thread(self._hydrate_run_row, path.name)
 
     def _iter_failures(self, node: TaskTreeNode):
         if node.kind == "task":
