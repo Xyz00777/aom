@@ -72,10 +72,17 @@ knows about ANSI, glyph fallbacks, terminal width.
 
 ## Decision: tree leaf shape (PQ2 — host leaves under running tasks)
 
-A running task shows all hosts as leaves with status-specific icons
-(● OK, ◐ RUNNING, ○ SKIPPED, etc.). Completed tasks (no RUNNING hosts)
-disappear from the tree entirely. Tasks where no host is currently
-running are pruned.
+A running task shows its RUNNING hosts as leaves, plus any
+FAILED/UNREACHABLE hosts (the actionable signals; their elapsed is
+frozen at completion). OK/CHANGED/SKIPPED hosts drop off the leaf list
+— their result lines already streamed to the log above and the
+task-line summary counts them (2026-07-15 amendment: previously all
+hosts stayed as leaves, which under `throttle`/`async` pinned
+long-completed hosts to the panel for the task's whole lifetime).
+Hosts the play targets that have not started the task yet surface as
+an `N pending` count in the task-line summary. Completed tasks (no
+RUNNING hosts) disappear from the tree entirely. Tasks where no host
+is currently running are pruned.
 
 ```
 site.yml
@@ -147,7 +154,7 @@ fanned out.
 |---|---|---|---|
 | Preflight / before first task | no | no | — |
 | Any task RUNNING somewhere | **yes** | yes (if `host_count > 1`) | running tasks; only RUNNING hosts shown as leaves |
-| Between fast-completing tasks (no host RUNNING, but playbook in flight) | **yes (sticky)** | yes (if `host_count > 1`) | most recently active task per play, with all its host leaves showing terminal status |
+| Between fast-completing tasks (no host RUNNING, but playbook in flight) | **yes (sticky)** | yes (if `host_count > 1`) | most recently active play stays pinned with its pending tasks; completed tasks drop (FAILED/UNREACHABLE leaves stay visible with frozen elapsed) |
 | PLAY RECAP done (`v2_playbook_on_stats`) | no | yes, but `on:` suffix suppressed | — |
 
 **Sticky mode** (2026-05-20 amendment): under linear strategy especially,
@@ -296,7 +303,8 @@ def format_host_rows(
 ) -> list[str]: ...
 ```
 
-`format_host_summary` (the existing function at `renderer.py:218`) gets
+`format_host_summary` (the existing function at
+`src/ansible_aom/compact/format.py:399-399`) gets
 reused inside `format_host_rows` for the count-cells portion; the new
 function wraps it with the worst-status hostname colour and the
 `on: ...` suffix.
