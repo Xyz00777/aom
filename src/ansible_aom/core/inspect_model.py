@@ -69,6 +69,59 @@ class StatusCounts:
         return self.failed == 0 and self.unreachable == 0
 
 
+class _MutCounts:
+    """Mutable accumulator behind ``StatusCounts``.
+
+    The frozen ``StatusCounts.add_event`` goes through
+    ``dataclasses.replace`` — ~7 µs per call, which is seconds of pure
+    allocation churn when a session has hundreds of thousands of runner
+    events. Builders accumulate on this plain-slots class and ``freeze()``
+    to the public frozen type once per aggregate.
+    """
+
+    __slots__ = ("ok", "changed", "failed", "skipped", "unreachable")
+
+    def __init__(self) -> None:
+        self.ok = 0
+        self.changed = 0
+        self.failed = 0
+        self.skipped = 0
+        self.unreachable = 0
+
+    def add_event(self, event_type: str, *, changed: bool) -> None:
+        if event_type == "v2_runner_on_ok":
+            if changed:
+                self.changed += 1
+            else:
+                self.ok += 1
+        elif event_type == "v2_runner_on_failed":
+            self.failed += 1
+        elif event_type == "v2_runner_on_skipped":
+            self.skipped += 1
+        elif event_type == "v2_runner_on_unreachable":
+            self.unreachable += 1
+
+    def add_counts(self, other: "StatusCounts") -> None:
+        self.ok += other.ok
+        self.changed += other.changed
+        self.failed += other.failed
+        self.skipped += other.skipped
+        self.unreachable += other.unreachable
+
+    def freeze(self) -> StatusCounts:
+        return StatusCounts(
+            ok=self.ok,
+            changed=self.changed,
+            failed=self.failed,
+            skipped=self.skipped,
+            unreachable=self.unreachable,
+        )
+
+
+def _freeze_map(counts: dict[str, _MutCounts]) -> dict[str, StatusCounts]:
+    return {key: mut.freeze() for key, mut in counts.items()}
+
+
 @dataclass(frozen=True)
 class RunSummary:
     """Per-session view consumed by the Runs pane and the text-mode header."""
@@ -99,7 +152,7 @@ def build_run_summary(session: dict) -> RunSummary:
     duration_seconds = session.get("duration_seconds")
     duration = timedelta(seconds=duration_seconds) if duration_seconds is not None else None
 
-    host_counts: dict[str, StatusCounts] = {}
+    host_counts: dict[str, _MutCounts] = {}
     failed_task_ids: set[str] = set()
 
     for event in session.get("events", []):
@@ -116,8 +169,10 @@ def build_run_summary(session: dict) -> RunSummary:
         task_id = task_data.get("id", "") if isinstance(task_data, dict) else ""
         for host, result in hosts.items():
             changed = bool(result.get("changed", False)) if isinstance(result, dict) else False
-            current = host_counts.get(host, StatusCounts())
-            host_counts[host] = current.add_event(event_type, changed=changed)
+            current = host_counts.get(host)
+            if current is None:
+                current = host_counts[host] = _MutCounts()
+            current.add_event(event_type, changed=changed)
         if event_type == "v2_runner_on_failed" and task_id:
             failed_task_ids.add(task_id)
 
@@ -129,7 +184,7 @@ def build_run_summary(session: dict) -> RunSummary:
         end_time=end_time,
         duration=duration,
         status=status,
-        host_counts=host_counts,
+        host_counts=_freeze_map(host_counts),
         failed_task_count=len(failed_task_ids),
     )
 
@@ -406,13 +461,16 @@ def build_task_tree(session: dict) -> TaskTreeNode:
             pid = pid or "_orphans"
         grp = rec["group"]
         # Aggregate stats across hosts.
-        task_counts = StatusCounts()
-        per_host_counts: dict[str, StatusCounts] = {}
+        mut_task_counts = _MutCounts()
+        mut_per_host: dict[str, _MutCounts] = {}
         for et, host, changed, _ in rec["events"]:
-            task_counts = task_counts.add_event(et, changed=changed)
-            per_host_counts[host] = per_host_counts.get(host, StatusCounts()).add_event(
-                et, changed=changed
-            )
+            mut_task_counts.add_event(et, changed=changed)
+            current = mut_per_host.get(host)
+            if current is None:
+                current = mut_per_host[host] = _MutCounts()
+            current.add_event(et, changed=changed)
+        task_counts = mut_task_counts.freeze()
+        per_host_counts = _freeze_map(mut_per_host)
         host_nodes: list[TaskTreeNode] = []
         for host, counts in per_host_counts.items():
             last_event: dict | None = None
@@ -455,19 +513,27 @@ def build_task_tree(session: dict) -> TaskTreeNode:
         groups = play_groups.get(pid, {})
         order = play_group_order.get(pid, [])
         group_nodes: list[TaskTreeNode] = []
-        play_stats = StatusCounts()
-        play_per_host: dict[str, StatusCounts] = {}
+        mut_play_stats = _MutCounts()
+        mut_play_per_host: dict[str, _MutCounts] = {}
         for gkey in order:
             tasks = groups[gkey]
-            grp_stats = StatusCounts()
-            grp_per_host: dict[str, StatusCounts] = {}
+            mut_grp_stats = _MutCounts()
+            mut_grp_per_host: dict[str, _MutCounts] = {}
             for t in tasks:
-                grp_stats = grp_stats.merge(t.stats)
+                mut_grp_stats.add_counts(t.stats)
                 for host, counts in t.per_host.items():
-                    grp_per_host[host] = grp_per_host.get(host, StatusCounts()).merge(counts)
-            play_stats = play_stats.merge(grp_stats)
+                    current = mut_grp_per_host.get(host)
+                    if current is None:
+                        current = mut_grp_per_host[host] = _MutCounts()
+                    current.add_counts(counts)
+            mut_play_stats.add_counts(mut_grp_stats.freeze())
+            grp_stats = mut_grp_stats.freeze()
+            grp_per_host = _freeze_map(mut_grp_per_host)
             for host, counts in grp_per_host.items():
-                play_per_host[host] = play_per_host.get(host, StatusCounts()).merge(counts)
+                current = mut_play_per_host.get(host)
+                if current is None:
+                    current = mut_play_per_host[host] = _MutCounts()
+                current.add_counts(counts)
             if gkey == "_root":
                 # Top-level (non-role) tasks may include dynamic
                 # ``include_tasks``; reconstruct that nesting from paths.
@@ -486,24 +552,27 @@ def build_task_tree(session: dict) -> TaskTreeNode:
             TaskTreeNode(
                 kind="play",
                 label=pname,
-                stats=play_stats,
-                per_host=play_per_host,
+                stats=mut_play_stats.freeze(),
+                per_host=_freeze_map(mut_play_per_host),
                 children=tuple(group_nodes),
             )
         )
 
-    run_stats = StatusCounts()
-    run_per_host: dict[str, StatusCounts] = {}
+    mut_run_stats = _MutCounts()
+    mut_run_per_host: dict[str, _MutCounts] = {}
     for p in play_nodes:
-        run_stats = run_stats.merge(p.stats)
+        mut_run_stats.add_counts(p.stats)
         for host, counts in p.per_host.items():
-            run_per_host[host] = run_per_host.get(host, StatusCounts()).merge(counts)
+            current = mut_run_per_host.get(host)
+            if current is None:
+                current = mut_run_per_host[host] = _MutCounts()
+            current.add_counts(counts)
 
     return TaskTreeNode(
         kind="run",
         label=session.get("playbook", ""),
-        stats=run_stats,
-        per_host=run_per_host,
+        stats=mut_run_stats.freeze(),
+        per_host=_freeze_map(mut_run_per_host),
         children=tuple(play_nodes),
     )
 
