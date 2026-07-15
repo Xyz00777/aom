@@ -306,11 +306,16 @@ def ensure_index(session_path: Path) -> bool:
 
 
 def sessions_needing_index(session_dir: Path) -> list[Path]:
-    """Session directories with an events.jsonl but no fresh index."""
+    """Session directories with an events.jsonl but no fresh index.
+
+    Newest first: session ids are UUIDv7 (time-sortable by name), and
+    backfill consumers work the list in order — recent runs are the ones
+    the user actually opens, so they get their indexes first.
+    """
     if not session_dir.exists():
         return []
     stale: list[Path] = []
-    for path in sorted(session_dir.iterdir()):
+    for path in sorted(session_dir.iterdir(), reverse=True):
         if not path.is_dir() or not _events_path(path).exists():
             continue
         if not index_is_fresh(path):

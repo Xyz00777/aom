@@ -315,6 +315,19 @@ def test_sessions_needing_index_lists_only_stale(tmp_path: Path) -> None:
     assert sessions_needing_index(tmp_path) == [second]
 
 
+def test_sessions_needing_index_newest_first(tmp_path: Path) -> None:
+    """Backfill order follows interest: the most recent runs index first.
+
+    Session ids are UUIDv7 (time-sortable), so newest-first is a reverse
+    name sort."""
+    from ansible_aom.session.index import sessions_needing_index
+
+    first = _write_session(tmp_path)  # ...0001 (older)
+    second = _write_second_session(first)  # ...0002 (newer)
+
+    assert sessions_needing_index(tmp_path) == [second, first]
+
+
 def test_build_indexes_sequential_small_backlog(tmp_path: Path) -> None:
     from ansible_aom.session.index import build_indexes
 
