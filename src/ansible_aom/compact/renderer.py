@@ -1508,6 +1508,7 @@ class CompactRenderer:
             self._flush_pending_skips(force_individual=True)
             self._current_task_had_nonskipped_result = True
             suffix = self._inline_duration_suffix(event, event_time)
+            stale = self._stale_task_suffix(event)
             task_id = self._task_dict(event).get("id", "")
             lines: list[str] = []
             for host, result in self._hosts_dict(event).items():
@@ -1531,15 +1532,18 @@ class CompactRenderer:
                 if suffix:
                     self._current_task_inline_duration_hosts.add(host)
                 if result.get("changed"):
-                    lines.append(_wrap(f"changed: [{host}]{suffix}", _YELLOW, self._colorize))
+                    lines.append(
+                        _wrap(f"changed: [{host}]{suffix}", _YELLOW, self._colorize) + stale
+                    )
                 else:
-                    lines.append(_wrap(f"ok: [{host}]{suffix}", _GREEN, self._colorize))
+                    lines.append(_wrap(f"ok: [{host}]{suffix}", _GREEN, self._colorize) + stale)
             if lines:
                 self._display.print_log("\n".join(lines))
         elif name == "v2_runner_on_failed":
             if self._enter_terminal_event(name):
                 return
             suffix = self._inline_duration_suffix(event, event_time)
+            stale = self._stale_task_suffix(event)
             task_id = self._task_dict(event).get("id", "")
             lines = []
             for host, result in self._hosts_dict(event).items():
@@ -1568,6 +1572,7 @@ class CompactRenderer:
                         _RED,
                         self._colorize,
                     )
+                    + stale
                 )
             if lines:
                 self._display.print_log("\n".join(lines))
@@ -1575,6 +1580,7 @@ class CompactRenderer:
             if self._enter_terminal_event(name):
                 return
             suffix = self._inline_duration_suffix(event, event_time)
+            stale = self._stale_task_suffix(event)
             lines = []
             for host, result in self._hosts_dict(event).items():
                 if suffix:
@@ -1591,6 +1597,7 @@ class CompactRenderer:
                         _MAGENTA,
                         self._colorize,
                     )
+                    + stale
                 )
             if lines:
                 self._display.print_log("\n".join(lines))
@@ -1734,6 +1741,24 @@ class CompactRenderer:
         if raw.get("changed"):
             return _wrap(f"changed: [{host}] => (item={label})", _YELLOW, self._colorize)
         return _wrap(f"ok: [{host}] => (item={label})", _GREEN, self._colorize)
+
+    def _stale_task_suffix(self, event: JsonlEvent) -> str:
+        """Return `` [task: <name>]`` when a result belongs to a task other
+        than the most recently announced ``TASK [...]`` header.
+
+        Log lines print in arrival order under the latest header; with
+        throttle/free-strategy interleaving a straggler result for an
+        earlier task lands under the newer header and reads as the wrong
+        task's result. The suffix names the task the line really belongs
+        to. Empty when the result matches the current header (the common
+        case) or when no header has been announced yet.
+        """
+        task = self._task_dict(event)
+        task_uuid = task.get("id", "")
+        if not task_uuid or self._last_task_uuid is None or task_uuid == self._last_task_uuid:
+            return ""
+        name = task.get("name", "") or "different task"
+        return " " + _wrap(f"[task: {name}]", _DIM, self._colorize)
 
     def _inline_duration_suffix(self, event: JsonlEvent, event_time: float | None) -> str:
         """Return `` (2.3s)`` for the per-host result line, or empty.
