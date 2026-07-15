@@ -944,36 +944,57 @@ def task_ids_by_play(tree: TaskTreeNode) -> dict[str, set[str]]:
     return memberships
 
 
-def _connection_ids_by_task_host(events: list[dict]) -> dict[tuple[str, str], str]:
-    """Return the connection id for each (task_id, host) pair."""
-    connections: dict[tuple[str, str], str] = {}
-    for event in events:
-        if event.get("_event") != "aom_connection_acquired":
-            continue
-        conn_id = event.get("connection_id")
-        task_id = event.get("task_id") or event.get("task_uuid")
-        host = event.get("host")
-        if (
-            not isinstance(conn_id, str)
-            or not isinstance(task_id, str)
-            or not isinstance(host, str)
-        ):
-            continue
-        connections.setdefault((task_id, host), conn_id)
-    return connections
+def verbose_lines_from_rows(
+    stderr: tuple[StderrRow, ...],
+    connections: Mapping[str, tuple[str, str]],
+    *,
+    level: Literal["run", "play", "task"],
+    play_task_ids: Mapping[str, set[str]],
+    play_name: str | None = None,
+    task_id: str | None = None,
+    host: str | None = None,
+) -> tuple[str, ...]:
+    """Scope verbose rows to a focus level.
 
+    Shared by the in-memory path (:func:`build_verbose_lines`) and the
+    sqlite-index path so both filter identically.
 
-def _connection_task_ids(events: list[dict]) -> dict[str, str]:
-    """Return ``connection_id -> task_id`` mappings from connection events."""
-    task_ids: dict[str, str] = {}
-    for event in events:
-        if event.get("_event") != "aom_connection_acquired":
-            continue
-        conn_id = event.get("connection_id")
-        task_id = event.get("task_id") or event.get("task_uuid")
-        if isinstance(conn_id, str) and isinstance(task_id, str):
-            task_ids.setdefault(conn_id, task_id)
-    return task_ids
+    Scope rules are explicit and deterministic:
+
+    - ``run``: only rows whose source is ``run_level``.
+    - ``play``: run-level rows plus rows whose connection maps to a task
+      inside the selected play window.
+    - ``task``: run-level rows plus rows for the focused
+      ``(task_id, host)`` connection.
+
+    Ambiguous attribution is surfaced with a leading ``?``.
+    """
+    selected_connection_id: str | None = None
+    if level == "task" and task_id and host:
+        # First acquisition for the (task, host) pair wins — connections
+        # preserves acquisition order with first-wins per connection id.
+        for conn_id, (conn_task, conn_host) in connections.items():
+            if conn_task == task_id and conn_host == host:
+                selected_connection_id = conn_id
+                break
+
+    selected_play_task_ids = play_task_ids.get(play_name or "", set())
+
+    lines: list[str] = []
+    for row in stderr:
+        include = False
+        if row.source == "run_level":
+            include = True
+        elif level == "play" and row.connection_id is not None:
+            mapped = connections.get(row.connection_id)
+            include = bool(mapped and mapped[0] in selected_play_task_ids)
+        elif level == "task" and row.connection_id is not None:
+            include = row.connection_id == selected_connection_id
+
+        if include:
+            lines.append(f"? {row.line}" if row.ambiguous else row.line)
+
+    return tuple(lines)
 
 
 def build_verbose_lines(
@@ -985,18 +1006,10 @@ def build_verbose_lines(
     host: str | None = None,
     play_task_ids: Mapping[str, set[str]] | None = None,
 ) -> tuple[str, ...]:
-    """Build the verbose-panel body for one session and focus scope.
+    """Build the verbose-panel body for one session dict and focus scope.
 
-    Scope rules are explicit and deterministic:
-
-    - ``run``: only ``aom_stderr_line`` events whose source is
-      ``run_level``.
-    - ``play``: run-level lines plus task-level lines whose connection
-      maps to a task inside the selected play window.
-    - ``task``: run-level lines plus task-level lines for the focused
-      ``(task_id, host)`` connection.
-
-    Ambiguous attribution is surfaced with a leading ``?``.
+    In-memory wrapper over :func:`verbose_lines_from_rows` — see there
+    for the scope rules.
 
     ``play_task_ids`` is the ``play_name -> task_ids`` membership map from
     :func:`task_ids_by_play`. Pass it when a task tree already exists;
@@ -1006,40 +1019,16 @@ def build_verbose_lines(
     if not events:
         return ()
 
+    index = accumulate_session_events(events)
     if play_task_ids is None:
-        play_task_ids = task_ids_by_play(build_task_tree(session))
-    connection_task_ids = _connection_task_ids(events)
-    connection_ids = _connection_ids_by_task_host(events)
+        play_task_ids = task_ids_by_play(tree_from_index(index, playbook=""))
 
-    selected_connection_id: str | None = None
-    if level == "task" and task_id and host:
-        selected_connection_id = connection_ids.get((task_id, host))
-
-    selected_play_task_ids = play_task_ids.get(play_name or "", set())
-
-    lines: list[str] = []
-    for event in events:
-        if event.get("_event") != "aom_stderr_line":
-            continue
-
-        source = event.get("source")
-        connection_id = event.get("connection_id")
-
-        include = False
-        if source == "run_level":
-            include = True
-        elif level == "play" and isinstance(connection_id, str):
-            task_for_connection = connection_task_ids.get(connection_id)
-            include = bool(task_for_connection and task_for_connection in selected_play_task_ids)
-        elif level == "task" and isinstance(connection_id, str):
-            include = connection_id == selected_connection_id
-
-        if not include:
-            continue
-
-        line = str(event.get("line", ""))
-        if event.get("attribution_confidence") == "ambiguous":
-            line = f"? {line}"
-        lines.append(line)
-
-    return tuple(lines)
+    return verbose_lines_from_rows(
+        index.stderr,
+        index.connections,
+        level=level,
+        play_task_ids=play_task_ids,
+        play_name=play_name,
+        task_id=task_id,
+        host=host,
+    )
