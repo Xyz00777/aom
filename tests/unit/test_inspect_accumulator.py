@@ -173,6 +173,91 @@ def test_streaming_refs_replace_raw_events() -> None:
     assert task1.raw_ref == refs[5]
 
 
+def test_multiple_orphan_tasks_share_one_orphan_play() -> None:
+    """Tasks with no play attribution must all land under a single
+    '(orphan tasks)' play — not wipe each other and render duplicates."""
+    events = [
+        # Two runner events BEFORE any play_start: play_id stays "".
+        {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "2026-07-01T09:59:58Z",
+            "task": {"id": "orphan-a", "name": "Orphan A"},
+            "hosts": {"web1": {"changed": False}},
+        },
+        {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "2026-07-01T09:59:59Z",
+            "task": {"id": "orphan-b", "name": "Orphan B"},
+            "hosts": {"web1": {"changed": False}},
+        },
+        {
+            "_event": "v2_playbook_on_play_start",
+            "_timestamp": "2026-07-01T10:00:00Z",
+            "play": {"id": "play-1", "name": "Real Play"},
+        },
+        {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "2026-07-01T10:00:01Z",
+            "task": {"id": "task-1", "name": "In Play"},
+            "hosts": {"web1": {"changed": False}},
+        },
+    ]
+
+    tree = build_task_tree({"playbook": "site.yml", "events": events})
+
+    labels = [p.label for p in tree.children]
+    assert labels == ["Real Play", "(orphan tasks)"]
+    orphan_play = tree.children[1]
+    orphan_tasks = sorted(
+        node.label for node in _iter_task_nodes(orphan_play) if node.kind == "task"
+    )
+    assert orphan_tasks == ["Orphan A", "Orphan B"]
+    # Run totals count each task exactly once: 3 ok in total.
+    assert tree.stats.ok == 3
+
+
+def _iter_task_nodes(node):
+    yield node
+    for child in node.children:
+        yield from _iter_task_nodes(child)
+
+
+def test_empty_hosts_runner_event_does_not_extend_duration() -> None:
+    """A runner event with hosts:{} carries no per-host result; legacy
+    duration only counted per-host entries, so it must not stretch the
+    task's duration."""
+    events = [
+        {
+            "_event": "v2_playbook_on_play_start",
+            "_timestamp": "2026-07-01T10:00:00Z",
+            "play": {"id": "play-1", "name": "Play One"},
+        },
+        {
+            "_event": "v2_playbook_on_task_start",
+            "_timestamp": "2026-07-01T10:00:00Z",
+            "task": {"id": "task-1", "name": "Install"},
+        },
+        {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "2026-07-01T10:00:05Z",
+            "task": {"id": "task-1", "name": "Install"},
+            "hosts": {"web1": {"changed": False}},
+        },
+        {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "2026-07-01T10:00:55Z",
+            "task": {"id": "task-1", "name": "Install"},
+            "hosts": {},
+        },
+    ]
+
+    tree = build_task_tree({"playbook": "site.yml", "events": events})
+    task = tree.children[0].children[0]
+
+    assert task.duration is not None
+    assert task.duration.total_seconds() == 5.0
+
+
 def test_tree_from_index_matches_build_task_tree() -> None:
     session = _session()
     acc = SessionIndexAccumulator()

@@ -468,12 +468,10 @@ class SessionManager:
 
         # Build the derived sqlite index while the run's data is hot, so
         # the first `aom inspect` never pays the full-log streaming pass.
-        # Best-effort like diagnostics: an index failure must not turn a
-        # finished run into a crashed one — inspect rebuilds it lazily.
-        try:
-            session_index.build_index(session_info["session_path"])
-        except OSError as exc:
-            logger.debug("index build failed for %s: %s", session_id, exc)
+        # Best-effort: build_index swallows OSError/sqlite errors and
+        # returns False — an index failure must not turn a finished run
+        # into a crashed one; inspect rebuilds lazily.
+        session_index.build_index(session_info["session_path"])
 
         # Dump cProfile output when AOM_PROFILE=1 (phase 7). Lands in
         # ~/.local/state/aom/profile/ rather than the session dir so

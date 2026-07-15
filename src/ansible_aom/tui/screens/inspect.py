@@ -68,6 +68,7 @@ from ansible_aom.core.inspect_model import (
 from ansible_aom.session.index import (
     build_indexes,
     ensure_index,
+    events_stat,
     index_is_fresh,
     load_structure,
     load_summary,
@@ -663,8 +664,11 @@ class InspectApp(App):
         self._detail_text: str = "Select a task to see details."
         self._detail_focus_key: tuple[object, ...] | None = None
         self._detail_force_full = False
-        # Index-backed session loading state (see _load_tasks_for).
-        self._model_cache: OrderedDict[str, tuple[dict, TaskTreeNode, bool]] = OrderedDict()
+        # Index-backed session loading state (see _load_tasks_for). Cache
+        # entries: (meta_or_session, tree, index_backed, events_stat_at_load).
+        self._model_cache: OrderedDict[
+            str, tuple[dict, TaskTreeNode, bool, tuple[int, int] | None]
+        ] = OrderedDict()
         self._index_backed = False
         self._load_debounce: Timer | None = None
         self._loading_session_id: str | None = None
@@ -1115,12 +1119,27 @@ class InspectApp(App):
             self.LOAD_DEBOUNCE_SECONDS, partial(self._load_tasks_for, session_id)
         )
 
+    def _cache_entry_fresh(
+        self, session_id: str, entry: tuple[dict, TaskTreeNode, bool, tuple[int, int] | None]
+    ) -> bool:
+        """A cached model is reusable while the log it was built from is
+        unchanged. Index-backed entries defer to the index freshness
+        check; fallback entries (un-indexable sessions) compare the
+        events.jsonl stat captured at load time — otherwise every
+        re-selection would re-parse the full log."""
+        _, _, index_backed, stat_at_load = entry
+        session_path = self.state_dir / session_id
+        if index_backed:
+            return index_is_fresh(session_path)
+        return events_stat(session_path) == stat_at_load
+
     def _load_tasks_for(self, session_id: str) -> None:
         self._loading_session_id = session_id
         cached = self._model_cache.get(session_id)
-        if cached is not None and index_is_fresh(self.state_dir / session_id):
+        if cached is not None and self._cache_entry_fresh(session_id, cached):
             self._model_cache.move_to_end(session_id)
-            self._apply_session_model(session_id, *cached)
+            meta_or_session, tree, index_backed, _ = cached
+            self._apply_session_model(session_id, meta_or_session, tree, index_backed)
             return
         # Slow path: index build (first open of a legacy session can
         # stream hundreds of MB) or db read + tree assembly. Runs in a
@@ -1137,9 +1156,14 @@ class InspectApp(App):
             group="session-load",
         )
 
-    def _load_model_blocking(self, session_id: str) -> tuple[str, dict, TaskTreeNode, bool] | None:
+    def _load_model_blocking(
+        self, session_id: str
+    ) -> tuple[str, dict, TaskTreeNode, bool, tuple[int, int] | None] | None:
         """Worker body — no widget access allowed here (thread)."""
         session_path = self.state_dir / session_id
+        # Stat BEFORE parsing (same reasoning as build_index): a log that
+        # grows during the load makes the cache entry read as stale.
+        stat = events_stat(session_path)
         meta = load_session_meta(session_id, self.state_dir)
         if meta is None:
             return None
@@ -1147,26 +1171,34 @@ class InspectApp(App):
             index = load_structure(session_path)
             if index is not None:
                 tree = tree_from_index(index, playbook=str(meta.get("playbook", "")))
-                return (session_id, meta, tree, True)
+                return (session_id, meta, tree, True, stat)
         # No index possible (no events.jsonl, unreadable db): legacy
         # full-parse fallback.
         session = load_session(session_id, self.state_dir)
         if session is None:
             return None
-        return (session_id, session, build_task_tree(session), False)
+        return (session_id, session, build_task_tree(session), False, stat)
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
         if getattr(event.worker, "group", None) != "session-load":
+            return
+        if event.state in (WorkerState.ERROR, WorkerState.CANCELLED):
+            self._loading_note = None
+            self._refresh_footer()
             return
         if event.state is not WorkerState.SUCCESS:
             return
         result = event.worker.result
         if not result:
+            # Session vanished mid-load (deleted / pruned): nothing to
+            # show, but don't leave the footer stuck on "loading …".
+            self._loading_note = None
+            self._refresh_footer()
             return
-        session_id, session_meta, tree, index_backed = result
+        session_id, session_meta, tree, index_backed, stat = result
         if session_id != self._loading_session_id:
             return  # superseded by a newer selection while loading
-        self._model_cache[session_id] = (session_meta, tree, index_backed)
+        self._model_cache[session_id] = (session_meta, tree, index_backed, stat)
         self._model_cache.move_to_end(session_id)
         while len(self._model_cache) > self._MODEL_CACHE_SIZE:
             self._model_cache.popitem(last=False)
@@ -1523,6 +1555,11 @@ class InspectApp(App):
             sid = self.selected_session_id
             if not sid:
                 return
+            # A pending debounce timer would re-load the session we are
+            # about to delete.
+            if self._load_debounce is not None:
+                self._load_debounce.stop()
+                self._load_debounce = None
             target = self.state_dir / sid
             try:
                 if target.is_dir():

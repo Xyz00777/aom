@@ -82,7 +82,13 @@ def _events_path(session_path: Path) -> Path:
     return session_path / "events.jsonl"
 
 
-def _events_stat(session_path: Path) -> tuple[int, int] | None:
+def events_stat(session_path: Path) -> tuple[int, int] | None:
+    """(size, mtime_ns) of the session's events.jsonl, or None if absent.
+
+    The freshness token for anything derived from the log — the index
+    itself, and the TUI's cached fallback models for sessions that can't
+    be indexed.
+    """
     try:
         st = _events_path(session_path).stat()
     except OSError:
@@ -109,7 +115,7 @@ def index_is_fresh(session_path: Path) -> bool:
     Any mismatch — missing file, schema bump, size or mtime drift — means
     "rebuild"; there is deliberately no partial-validity notion.
     """
-    stat = _events_stat(session_path)
+    stat = events_stat(session_path)
     if stat is None or not index_path(session_path).exists():
         return False
     meta = _read_meta_table(index_path(session_path))
@@ -138,7 +144,7 @@ def build_index(session_path: Path) -> bool:
     # Stat BEFORE parsing: if the file grows while we read (running
     # session), the recorded size is smaller than reality and the index
     # correctly reads as stale on the next freshness check.
-    stat = _events_stat(session_path)
+    stat = events_stat(session_path)
     if stat is None:
         return False
 
@@ -332,7 +338,7 @@ def build_indexes(
     """
     total_bytes = 0
     for path in session_paths:
-        stat = _events_stat(path)
+        stat = events_stat(path)
         if stat is not None:
             total_bytes += stat[0]
 

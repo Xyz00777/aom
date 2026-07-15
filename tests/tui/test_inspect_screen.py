@@ -204,6 +204,72 @@ async def test_runs_rows_hydrate_via_background_backfill(state_dir: Path):
 
 
 @pytest.mark.asyncio
+async def test_loading_note_clears_on_dead_end_load(state_dir: Path):
+    """A load whose session vanished mid-flight (worker returns None) must
+    not leave the footer stuck on 'loading …'."""
+    from types import SimpleNamespace
+
+    from textual.worker import WorkerState
+
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir)
+    async with app.run_test() as pilot:
+        await _settle(pilot)
+        app._loading_note = "loading deadbeef…"
+        fake = SimpleNamespace(
+            worker=SimpleNamespace(group="session-load", result=None),
+            state=WorkerState.SUCCESS,
+        )
+        app.on_worker_state_changed(fake)  # type: ignore[arg-type]
+        assert app._loading_note is None
+
+        app._loading_note = "loading deadbeef…"
+        fake_err = SimpleNamespace(
+            worker=SimpleNamespace(group="session-load", result=None),
+            state=WorkerState.ERROR,
+        )
+        app.on_worker_state_changed(fake_err)  # type: ignore[arg-type]
+        assert app._loading_note is None
+
+
+@pytest.mark.asyncio
+async def test_fallback_loaded_session_stays_cached(
+    state_dir: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """When no index can be built (e.g. read-only session dir), the
+    fallback-parsed model must still be reusable from the cache — not
+    re-parse the full log on every re-selection."""
+    import ansible_aom.tui.screens.inspect as inspect_mod
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    monkeypatch.setattr(inspect_mod, "ensure_index", lambda _path: False)
+    load_calls: list[str] = []
+    real_load_session = inspect_mod.load_session
+
+    def _counting_load(session_id: str, session_dir: Path):
+        load_calls.append(session_id)
+        return real_load_session(session_id, session_dir)
+
+    monkeypatch.setattr(inspect_mod, "load_session", _counting_load)
+
+    app = InspectApp(state_dir=state_dir)
+    async with app.run_test() as pilot:
+        await _settle(pilot)
+        first = app.selected_session_id
+        assert load_calls.count(first) == 1
+
+        listview = app.query_one("#runs-list", inspect_mod._RunsListView)
+        listview.index = 1
+        await _settle(pilot)
+        listview.index = 0
+        await _settle(pilot)
+
+        assert app.selected_session_id == first
+        assert load_calls.count(first) == 1, "cached fallback model must be reused"
+
+
+@pytest.mark.asyncio
 async def test_loaded_sessions_are_cached(state_dir: Path):
     """Re-selecting an already-loaded session must not re-read the index."""
     from ansible_aom.tui.screens.inspect import InspectApp

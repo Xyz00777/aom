@@ -531,6 +531,10 @@ class SessionIndexAccumulator:
             task_id = event.get("task_id") or event.get("task_uuid")
             host = event.get("host")
             if isinstance(conn_id, str) and isinstance(task_id, str):
+                # First-wins per connection id. Verbose scoping relies on a
+                # connection id never being reused for a second (task, host)
+                # pair — guaranteed today because aom_connection derives the
+                # id deterministically from (task_uuid, host).
                 self._connections.setdefault(
                     conn_id, (task_id, host if isinstance(host, str) else "")
                 )
@@ -580,9 +584,14 @@ class SessionIndexAccumulator:
                 play_id=pid,
             )
 
-        event_ts = _parse_iso(event.get("_timestamp"))
-        if event_ts is not None and (rec.last_ts is None or event_ts > rec.last_ts):
-            rec.last_ts = event_ts
+        # Duration counts per-host results only: an event with hosts:{}
+        # carries no outcome and must not stretch the task's window
+        # (matches the per-host-entry semantics of the pre-streaming
+        # implementation).
+        if hosts:
+            event_ts = _parse_iso(event.get("_timestamp"))
+            if event_ts is not None and (rec.last_ts is None or event_ts > rec.last_ts):
+                rec.last_ts = event_ts
 
         raw = None if ref is not None else event
         for host, result in hosts.items():
@@ -676,11 +685,14 @@ def tree_from_index(index: SessionIndex, *, playbook: str) -> TaskTreeNode:
             # play so it still renders. Label intentionally indicates the
             # missing-header condition rather than "unknown" so users can
             # distinguish "ansible didn't emit play_start" from "we don't
-            # know which play this belongs to".
-            play_order.append((pid or "_orphans", "(orphan tasks)"))
-            play_groups[pid or "_orphans"] = {}
-            play_group_order[pid or "_orphans"] = []
+            # know which play this belongs to". Normalise the key BEFORE
+            # the membership re-check: with the raw ``""`` key, every
+            # subsequent orphan re-created (and wiped) the synthetic play.
             pid = pid or "_orphans"
+            if pid not in play_groups:
+                play_order.append((pid, "(orphan tasks)"))
+                play_groups[pid] = {}
+                play_group_order[pid] = []
         per_host_counts = {h.host: h.counts for h in row.hosts}
         host_nodes = [
             TaskTreeNode(
