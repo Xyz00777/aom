@@ -385,11 +385,41 @@ def load_tree(session_path: Path, *, playbook: str) -> TaskTreeNode | None:
 
 
 def load_summary(session_path: Path, meta: Mapping) -> RunSummary | None:
-    """Build a RunSummary from index.db aggregates plus meta.json fields."""
-    index = load_structure(session_path)
-    if index is None:
+    """Build a RunSummary from index.db aggregates plus meta.json fields.
+
+    Reads only the ``host_counts`` table and the meta keys — deliberately
+    NOT :func:`load_structure` — so the Runs pane can summarise every
+    session on disk without materialising tasks×hosts rows per session.
+    """
+    db_path = index_path(session_path)
+    if not db_path.exists():
         return None
-    return summary_from_index(index, meta)
+    try:
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    except sqlite3.Error:
+        return None
+    try:
+        db_meta = dict(conn.execute("SELECT key, value FROM meta"))
+        host_counts = {
+            row[0]: _counts(row, 1)
+            for row in conn.execute(
+                "SELECT host, ok, changed, failed, skipped, unreachable FROM host_counts"
+            )
+        }
+    except sqlite3.Error:
+        return None
+    finally:
+        conn.close()
+    summary_index = SessionIndex(
+        plays=(),
+        tasks=(),
+        host_counts=host_counts,
+        failed_task_count=int(db_meta.get("failed_task_count", "0")),
+        stderr=(),
+        connections={},
+        fallback_play_name="",
+    )
+    return summary_from_index(summary_index, meta)
 
 
 def query_verbose(

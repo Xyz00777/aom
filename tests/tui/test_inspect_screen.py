@@ -140,6 +140,74 @@ def state_dir(tmp_path: Path) -> Path:
     return state
 
 
+@pytest.fixture(autouse=True)
+def _no_load_debounce(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Disable the Runs-scroll load debounce so tests load deterministically."""
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    monkeypatch.setattr(InspectApp, "LOAD_DEBOUNCE_SECONDS", 0.0, raising=False)
+
+
+async def _settle(pilot) -> None:
+    """Wait until pending session-load workers finish and their results land."""
+    await pilot.pause()
+    await pilot.app.workers.wait_for_complete()
+    await pilot.pause()
+
+
+@pytest.mark.asyncio
+async def test_runs_pane_never_parses_full_log(state_dir: Path, monkeypatch: pytest.MonkeyPatch):
+    """Startup must not stream any events.jsonl into memory — the Runs pane
+    renders from meta.json and the task tree comes from the sqlite index."""
+    import ansible_aom.tui.screens.inspect as inspect_mod
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    def _boom(*args: object, **kwargs: object) -> None:
+        raise AssertionError("full-log load_session must not run in the TUI hot paths")
+
+    monkeypatch.setattr(inspect_mod, "load_session", _boom)
+
+    app = InspectApp(state_dir=state_dir)
+    async with app.run_test() as pilot:
+        await _settle(pilot)
+        assert len(app.query_one("#runs-list").children) == 4
+        tree = app.query_one("#tasks-tree")
+        assert tree.root.children, "selected session's tree should load via the index"
+
+
+@pytest.mark.asyncio
+async def test_detail_pane_hydrates_payload_from_disk(state_dir: Path):
+    """Index-built trees carry byte refs; focusing a failure must seek the
+    event out of events.jsonl and show its msg."""
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
+    async with app.run_test() as pilot:
+        await _settle(pilot)
+        # on_mount auto-focuses the first failure.
+        assert "One or more items failed" in app._detail_text
+
+
+@pytest.mark.asyncio
+async def test_loaded_sessions_are_cached(state_dir: Path):
+    """Re-selecting an already-loaded session must not re-read the index."""
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    app = InspectApp(state_dir=state_dir)
+    async with app.run_test() as pilot:
+        await _settle(pilot)
+        first = app.selected_session_id
+        assert first in app._model_cache
+
+        listview = app.query_one("#runs-list")
+        listview.index = 1
+        await _settle(pilot)
+        second = app.selected_session_id
+        assert second != first
+        assert second in app._model_cache
+        assert first in app._model_cache
+
+
 @pytest.mark.asyncio
 async def test_runs_pane_lists_newest_first(state_dir: Path):
     from ansible_aom.tui.screens.inspect import InspectApp

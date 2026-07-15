@@ -33,7 +33,10 @@ Other shortcuts:
 from __future__ import annotations
 
 import shutil
+from collections import OrderedDict
 from dataclasses import dataclass
+from dataclasses import replace as dc_replace
+from functools import partial
 from pathlib import Path
 from time import perf_counter
 from types import EllipsisType
@@ -48,6 +51,7 @@ from textual.screen import ModalScreen
 from textual.timer import Timer
 from textual.widgets import Footer, Header, Label, ListItem, ListView, RichLog, Static, Tree
 from textual.widgets._static import VisualType
+from textual.worker import Worker, WorkerState
 
 from ansible_aom.core.inspect_model import (
     DetailBlock,
@@ -59,8 +63,17 @@ from ansible_aom.core.inspect_model import (
     build_task_tree,
     build_verbose_lines,
     task_ids_by_play,
+    tree_from_index,
 )
-from ansible_aom.session.store import list_sessions, load_session
+from ansible_aom.session.index import (
+    ensure_index,
+    index_is_fresh,
+    load_structure,
+    load_summary,
+    query_verbose,
+    read_event,
+)
+from ansible_aom.session.store import list_sessions, load_session, load_session_meta
 
 
 def _fmt_duration_short(seconds: float | None) -> str:
@@ -597,6 +610,14 @@ class InspectApp(App):
         Binding("L", "load_full_detail", "Load full", show=False),
     ]
 
+    # Delay before loading a newly-highlighted session. Scrolling the Runs
+    # list fires a highlight per row; the debounce means only the row the
+    # cursor settles on actually loads. Tests set this to 0 for determinism.
+    LOAD_DEBOUNCE_SECONDS: float = 0.15
+    # Loaded (meta, tree, index_backed) models kept per session. Small on
+    # purpose: each entry is O(tasks × hosts).
+    _MODEL_CACHE_SIZE = 4
+
     _PANE_ORDER: tuple[str, ...] = ("runs-pane", "tasks-pane", "detail-pane")
     # Map pane container → focusable widget inside it. ``detail-pane`` is
     # the VerticalScroll itself (its inner Static is not focusable), so
@@ -625,6 +646,12 @@ class InspectApp(App):
         self._detail_text: str = "Select a task to see details."
         self._detail_focus_key: tuple[object, ...] | None = None
         self._detail_force_full = False
+        # Index-backed session loading state (see _load_tasks_for).
+        self._model_cache: OrderedDict[str, tuple[dict, TaskTreeNode, bool]] = OrderedDict()
+        self._index_backed = False
+        self._load_debounce: Timer | None = None
+        self._loading_session_id: str | None = None
+        self._loading_note: str | None = None
         # Cache key for the last detail body we rendered: (task_id,
         # host_label, session_id). Re-rendering only when the key changes
         # protects us from the burst of tree-highlight messages Textual
@@ -773,6 +800,8 @@ class InspectApp(App):
         parts = [
             "focus: —" if scope is None else f"focus: {scope.level} ({self._footer_context(scope)})"
         ]
+        if self._loading_note is not None:
+            parts.append(self._loading_note)
         if self._verbose_flash is not None:
             parts.append(self._verbose_flash)
         return " | ".join(parts)
@@ -912,16 +941,27 @@ class InspectApp(App):
             if scope.host:
                 lines.append(f"HOST   {scope.host}")
         lines.append("")
-        body = build_verbose_lines(
-            session,
-            level=scope.level,
-            play_name=scope.play_name,
-            task_id=scope.task_id,
-            host=scope.host,
-            play_task_ids=(
-                task_ids_by_play(self._current_tree) if self._current_tree is not None else None
-            ),
-        )
+        sid = session.get("session_id")
+        if self._index_backed and self._current_tree is not None and sid:
+            body = query_verbose(
+                self.state_dir / sid,
+                tree=self._current_tree,
+                level=scope.level,
+                play_name=scope.play_name,
+                task_id=scope.task_id,
+                host=scope.host,
+            )
+        else:
+            body = build_verbose_lines(
+                session,
+                level=scope.level,
+                play_name=scope.play_name,
+                task_id=scope.task_id,
+                host=scope.host,
+                play_task_ids=(
+                    task_ids_by_play(self._current_tree) if self._current_tree is not None else None
+                ),
+            )
         if body:
             lines.extend(body)
         else:
@@ -932,12 +972,31 @@ class InspectApp(App):
     # ── Runs pane ────────────────────────────────────────────────────────
 
     def _reload_runs(self) -> None:
+        """Populate the Runs pane WITHOUT touching any events.jsonl.
+
+        Rows come from meta.json; host roll-ups come from the sqlite
+        index when one is already fresh. Sessions never opened before
+        show a meta-only row and hydrate after their first load — the
+        alternative (indexing every session at startup) is exactly the
+        many-huge-runs stall this replaced.
+        """
         raws = list_sessions(self.state_dir)
         summaries: list[RunSummary] = []
         for raw in raws:
-            session = load_session(raw["session_id"], self.state_dir)
-            if session is not None:
-                summaries.append(build_run_summary(session))
+            sid = raw["session_id"]
+            meta = load_session_meta(sid, self.state_dir)
+            if meta is None:
+                continue
+            summary: RunSummary | None = None
+            session_path = self.state_dir / sid
+            if index_is_fresh(session_path):
+                summary = load_summary(session_path, meta)
+            if summary is None:
+                # build_run_summary on a meta-only dict (no "events" key)
+                # yields the placeholder: correct times/status, empty
+                # host roll-up.
+                summary = build_run_summary(meta)
+            summaries.append(summary)
         self._all_summaries = summaries
         self._refresh_list()
 
@@ -994,7 +1053,7 @@ class InspectApp(App):
             return
         if sid != self.selected_session_id:
             self.selected_session_id = sid
-            self._load_tasks_for(sid)
+            self._schedule_load(sid)
 
     def on_list_view_selected(self, _event) -> None:  # noqa: ANN001
         """Enter on a Runs row → drill into the Tasks pane."""
@@ -1025,18 +1084,106 @@ class InspectApp(App):
         if self._should_auto_expand(node, depth):
             sub.expand()
 
-    def _load_tasks_for(self, session_id: str) -> None:
-        session = load_session(session_id, self.state_dir)
-        if session is None:
+    def _schedule_load(self, session_id: str) -> None:
+        """Debounced entry point for Runs-list scrolling."""
+        if self._load_debounce is not None:
+            self._load_debounce.stop()
+            self._load_debounce = None
+        if self.LOAD_DEBOUNCE_SECONDS <= 0 or session_id in self._model_cache:
+            self._load_tasks_for(session_id)
             return
-        self._current_session = session
+        self._load_debounce = self.set_timer(
+            self.LOAD_DEBOUNCE_SECONDS, partial(self._load_tasks_for, session_id)
+        )
+
+    def _load_tasks_for(self, session_id: str) -> None:
+        self._loading_session_id = session_id
+        cached = self._model_cache.get(session_id)
+        if cached is not None and index_is_fresh(self.state_dir / session_id):
+            self._model_cache.move_to_end(session_id)
+            self._apply_session_model(session_id, *cached)
+            return
+        # Slow path: index build (first open of a legacy session can
+        # stream hundreds of MB) or db read + tree assembly. Runs in a
+        # thread worker so the UI keeps painting; exclusive group means
+        # a newer selection cancels a stale in-flight load.
         tree_widget = self.query_one("#tasks-tree", _NavTree)
         tree_widget.clear()
-        model = build_task_tree(session)
-        self._current_tree = model
-        for play in model.children:
+        self._loading_note = f"loading {session_id[:8]}…"
+        self._refresh_footer()
+        self.run_worker(
+            partial(self._load_model_blocking, session_id),
+            thread=True,
+            exclusive=True,
+            group="session-load",
+        )
+
+    def _load_model_blocking(self, session_id: str) -> tuple[str, dict, TaskTreeNode, bool] | None:
+        """Worker body — no widget access allowed here (thread)."""
+        session_path = self.state_dir / session_id
+        meta = load_session_meta(session_id, self.state_dir)
+        if meta is None:
+            return None
+        if ensure_index(session_path):
+            index = load_structure(session_path)
+            if index is not None:
+                tree = tree_from_index(index, playbook=str(meta.get("playbook", "")))
+                return (session_id, meta, tree, True)
+        # No index possible (no events.jsonl, unreadable db): legacy
+        # full-parse fallback.
+        session = load_session(session_id, self.state_dir)
+        if session is None:
+            return None
+        return (session_id, session, build_task_tree(session), False)
+
+    def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        if getattr(event.worker, "group", None) != "session-load":
+            return
+        if event.state is not WorkerState.SUCCESS:
+            return
+        result = event.worker.result
+        if not result:
+            return
+        session_id, session_meta, tree, index_backed = result
+        if session_id != self._loading_session_id:
+            return  # superseded by a newer selection while loading
+        self._model_cache[session_id] = (session_meta, tree, index_backed)
+        self._model_cache.move_to_end(session_id)
+        while len(self._model_cache) > self._MODEL_CACHE_SIZE:
+            self._model_cache.popitem(last=False)
+        self._apply_session_model(session_id, session_meta, tree, index_backed)
+
+    def _apply_session_model(
+        self, session_id: str, session_meta: dict, tree: TaskTreeNode, index_backed: bool
+    ) -> None:
+        self._current_session = session_meta
+        self._index_backed = index_backed
+        self._current_tree = tree
+        self._loading_note = None
+        tree_widget = self.query_one("#tasks-tree", _NavTree)
+        tree_widget.clear()
+        for play in tree.children:
             self._add_node(tree_widget.root, play, depth=0)
+        self._refresh_run_summary(session_id, session_meta)
         self.action_show_first_failure()
+        self._refresh_footer()
+
+    def _refresh_run_summary(self, session_id: str, meta: dict) -> None:
+        """Hydrate a meta-only Runs row once its session has been indexed."""
+        if not self._index_backed:
+            return
+        for i, summary in enumerate(self._all_summaries):
+            if summary.session_id != session_id:
+                continue
+            if summary.host_counts:
+                return  # already showing real counts
+            hydrated = load_summary(self.state_dir / session_id, meta)
+            if hydrated is None:
+                return
+            self._all_summaries[i] = hydrated
+            self._refresh_list()
+            self._select_session(session_id)
+            return
 
     def _iter_failures(self, node: TaskTreeNode):
         if node.kind == "task":
@@ -1078,6 +1225,24 @@ class InspectApp(App):
         self.focus_detail()
 
     # ── Detail pane ──────────────────────────────────────────────────────
+
+    def _hydrate_node(self, node: TaskTreeNode) -> TaskTreeNode:
+        """Resolve an index-built node's byte ref into the event dict.
+
+        Trees loaded from the sqlite index carry EventRefs instead of
+        event payloads; the detail pane needs the dict, so seek the one
+        line out of events.jsonl on focus. A failed read (log pruned or
+        rewritten) degrades to a payload-less detail block.
+        """
+        if node.raw_event is not None or node.raw_ref is None:
+            return node
+        sid = (self._current_session or {}).get("session_id")
+        if not sid:
+            return node
+        event = read_event(self.state_dir / sid, node.raw_ref)
+        if event is None:
+            return node
+        return dc_replace(node, raw_event=event)
 
     def _render_detail_block(self, block: DetailBlock, *, full_stdout: bool = False) -> str:
         """Render the per-task detail body.
@@ -1202,7 +1367,11 @@ class InspectApp(App):
             self._detail_text = "Select a task to see details."
             detail.write(self._detail_text)
             return
-        block = build_detail_block(self._current_session, self._focused_task, self._focused_host)
+        block = build_detail_block(
+            self._current_session,
+            self._hydrate_node(self._focused_task),
+            None if self._focused_host is None else self._hydrate_node(self._focused_host),
+        )
         self._detail_text = self._render_detail_block(block, full_stdout=self._detail_force_full)
         # One write, not one per line: each write does its own measure +
         # console.render + virtual-size update, so per-line writes add a
@@ -1304,6 +1473,7 @@ class InspectApp(App):
                 self.notify(f"Delete failed: {exc}", severity="error")
                 return
             self.notify(f"Deleted {short}")
+            self._model_cache.pop(sid, None)
             self._reload_runs()
             visible = self._visible_summaries()
             if visible:
