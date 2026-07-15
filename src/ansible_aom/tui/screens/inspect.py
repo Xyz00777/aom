@@ -58,6 +58,7 @@ from ansible_aom.core.inspect_model import (
     build_run_summary,
     build_task_tree,
     build_verbose_lines,
+    task_ids_by_play,
 )
 from ansible_aom.session.store import list_sessions, load_session
 
@@ -917,6 +918,9 @@ class InspectApp(App):
             play_name=scope.play_name,
             task_id=scope.task_id,
             host=scope.host,
+            play_task_ids=(
+                task_ids_by_play(self._current_tree) if self._current_tree is not None else None
+            ),
         )
         if body:
             lines.extend(body)

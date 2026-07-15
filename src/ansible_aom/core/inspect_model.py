@@ -707,9 +707,14 @@ def build_detail_block(
     )
 
 
-def _task_ids_by_play(session: dict) -> dict[str, set[str]]:
-    """Return ``play_name -> task_id`` membership from the task tree."""
-    tree = build_task_tree(session)
+def task_ids_by_play(tree: TaskTreeNode) -> dict[str, set[str]]:
+    """Return ``play_name -> task_id`` membership from an already-built tree.
+
+    Callers that hold a tree (the TUI keeps one per selected session, the
+    text renderer builds one for the failures section) pass this map to
+    :func:`build_verbose_lines` so it doesn't rebuild the tree — a full
+    O(events) pass on every verbose render.
+    """
     memberships: dict[str, set[str]] = {}
 
     for play in tree.children:
@@ -764,6 +769,7 @@ def build_verbose_lines(
     play_name: str | None = None,
     task_id: str | None = None,
     host: str | None = None,
+    play_task_ids: Mapping[str, set[str]] | None = None,
 ) -> tuple[str, ...]:
     """Build the verbose-panel body for one session and focus scope.
 
@@ -777,12 +783,17 @@ def build_verbose_lines(
       ``(task_id, host)`` connection.
 
     Ambiguous attribution is surfaced with a leading ``?``.
+
+    ``play_task_ids`` is the ``play_name -> task_ids`` membership map from
+    :func:`task_ids_by_play`. Pass it when a task tree already exists;
+    when omitted it is derived here (rebuilding the tree, O(events)).
     """
     events = list(session.get("events", []))
     if not events:
         return ()
 
-    play_task_ids = _task_ids_by_play(session)
+    if play_task_ids is None:
+        play_task_ids = task_ids_by_play(build_task_tree(session))
     connection_task_ids = _connection_task_ids(events)
     connection_ids = _connection_ids_by_task_host(events)
 

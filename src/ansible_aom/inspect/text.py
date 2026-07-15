@@ -20,6 +20,7 @@ from ansible_aom.core.inspect_model import (
     build_run_summary,
     build_task_tree,
     build_verbose_lines,
+    task_ids_by_play,
 )
 
 
@@ -151,7 +152,11 @@ def _render_failures(session: dict, tree: TaskTreeNode) -> list[str]:
 
 
 def _render_verbose(
-    session: dict, *, play_name: str | None = None, task_name: str | None = None
+    session: dict,
+    tree: TaskTreeNode,
+    *,
+    play_name: str | None = None,
+    task_name: str | None = None,
 ) -> list[str]:
     """Render the verbose/stderr section from ``aom_stderr_line`` events.
 
@@ -172,7 +177,6 @@ def _render_verbose(
 
     if task_name:
         level = "task"
-        tree = build_task_tree(session)
         for node in _iter_tree(tree):
             if node.kind == "task" and node.label == task_name and node.task_id:
                 task_id = node.task_id
@@ -186,7 +190,14 @@ def _render_verbose(
     elif play_name:
         level = "play"
 
-    lines = build_verbose_lines(session, level=level, play_name=play, task_id=task_id, host=host)
+    lines = build_verbose_lines(
+        session,
+        level=level,
+        play_name=play,
+        task_id=task_id,
+        host=host,
+        play_task_ids=task_ids_by_play(tree),
+    )
     if not lines:
         return []
 
@@ -236,7 +247,7 @@ def render_session(
     parts: list[str] = []
     parts.extend(_render_header(summary))
     parts.extend(_render_failures(session, tree))
-    parts.extend(_render_verbose(session, play_name=play_name, task_name=task_name))
+    parts.extend(_render_verbose(session, tree, play_name=play_name, task_name=task_name))
     return "\n".join(parts) + "\n"
 
 
