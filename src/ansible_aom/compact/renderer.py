@@ -81,11 +81,23 @@ from ansible_aom.core.log_filter import (
 )
 from ansible_aom.core.models import RunState, Status
 from ansible_aom.core.tree import TreeProjection, run_state_status_counts
+from ansible_aom.core.tree_projection import task_complete_on_all_targets
 
 if TYPE_CHECKING:
     from ansible_aom.session.history import PriorRun
 
 logger = logging.getLogger(__name__)
+
+# Terminal per-host runner events: each may be the last target host to
+# finish a task, triggering that task's completion check.
+_TERMINAL_RUNNER_EVENTS = frozenset(
+    {
+        "v2_runner_on_ok",
+        "v2_runner_on_failed",
+        "v2_runner_on_unreachable",
+        "v2_runner_on_skipped",
+    }
+)
 
 
 class _BoundedSet(set):  # noqa: FURB189 — subclassing set is intentional
@@ -245,14 +257,29 @@ class CompactRenderer:
         self._ascii_mode: bool = not is_unicode_terminal()
         self._colorize: bool = _color_enabled(is_tty)
         self._heartbeat = HeartbeatTracker()
-        # Per-task timing: start timestamp (seconds since epoch) keyed by
-        # task UUID, plus a tiny single-entry cache of "the task we just
-        # printed a TASK header for" so the inline result lines and the
-        # post-task summary can quote the right duration.
+        # Per-task timing: start timestamp (seconds since epoch) and name
+        # keyed by task UUID, so a task's post-task summary can be emitted
+        # whenever it *completes on all target hosts* — which under a free
+        # strategy may be long after later tasks have started.
         self._task_start_times: dict[str, float] = {}
+        self._task_names: dict[str, str] = {}
+        # Latest ``_timestamp`` seen (Unix seconds). Used as "now" for the
+        # run-end forced summary flush so durations stay consistent with
+        # the event-derived task start times (wall-clock time.time() would
+        # be on a different scale under replay / synthetic fixtures).
+        self._last_event_time: float | None = None
+        # UUIDs of announced-but-not-yet-summarised tasks, in announce
+        # order. The summary sweep walks this list, emits any task now
+        # complete (see ``task_complete_on_all_targets``), and removes it
+        # from the list — so a summarised task is never revisited and the
+        # list stays bounded by the in-flight task set, not run length.
+        self._announced_order: list[str] = []
+        # "The task whose header is currently on screen" — the most
+        # recently announced UUID. Drives the ``[task: …]`` straggler
+        # suffix (a result whose task differs from this reads as
+        # mis-attributed) and the "don't pre-empt the current task's
+        # own next-announce summary" guard in the terminal-event sweep.
         self._last_task_uuid: str | None = None
-        self._last_task_name: str | None = None
-        self._last_task_start_time: float | None = None
         # Pre-rendered chips like ``DRY RUN`` / ``DIFF`` shown in the
         # status bar's leftmost slot. Computed once in ``start()``
         # from the ansible_args; never changes during a run.
@@ -265,12 +292,13 @@ class CompactRenderer:
         self._pending_skipped_hosts: list[str] = []
         self._current_task_had_nonskipped_result: bool = False
         # Hosts that produced a per-host result line carrying an inline
-        # duration suffix for the *currently running* task. Used by the
-        # post-task summary to suppress its own duration when exactly
-        # one host already displayed it on its result line — avoiding
-        # duplication on single-host runs (and on run_once / delegated
-        # tasks in multi-host runs).
-        self._current_task_inline_duration_hosts: set[str] = set()
+        # duration suffix, keyed by task UUID. Used by the post-task
+        # summary to suppress its own duration when exactly one host
+        # already displayed it on its result line — avoiding duplication
+        # on single-host runs (and on run_once / delegated tasks in
+        # multi-host runs). Keyed per task because a task's summary may
+        # now be emitted well after a later task has started.
+        self._task_inline_duration_hosts: dict[str, set[str]] = {}
         # ``(host, task_id)`` pairs for which we have already streamed
         # per-item loop lines from ``v2_runner_item_on_*`` events. The
         # aggregate ``v2_runner_on_ok``/``on_failed`` then suppresses its
@@ -463,6 +491,10 @@ class CompactRenderer:
         if self._state is None:
             return
 
+        et = self._event_time(event)
+        if et is not None:
+            self._last_event_time = et
+
         # Stream the event as a log line above the status panel BEFORE
         # mutating state — keeps the visual story "what happened, then
         # the panel reflects it". Throttling on the panel update means
@@ -471,6 +503,17 @@ class CompactRenderer:
 
         # Update RunState with the event
         self._state.handle_event(event)
+
+        # A terminal event may have been the last target host to finish an
+        # earlier task (a free-strategy straggler completing a task whose
+        # header scrolled off long ago). Detect completion AFTER
+        # handle_event so the just-finished host is counted. ``behind_only``
+        # leaves the currently-on-screen task to be summarised at the next
+        # task announcement, preserving the linear inter-task placement.
+        if event.get("_event") in _TERMINAL_RUNNER_EVENTS:
+            event_time = self._event_time(event)
+            if event_time is not None:
+                self._flush_ready_summaries(event_time, behind_only=True)
 
         # HS-2: bump the incremental counters using the freshly-mutated
         # state. Done after ``handle_event`` so the task's hosts dict
@@ -959,6 +1002,16 @@ class CompactRenderer:
         # Calculate final elapsed time
         elapsed = time.time() - self._start_time
 
+        # Force-flush any task summaries not yet emitted. On a clean run
+        # v2_playbook_on_stats already drained them (this is a no-op); on a
+        # cancel/crash with no stats event, this is where the in-flight and
+        # never-completed tasks finally get their summary line, before the
+        # final recap and the panel teardown below. Use the last event
+        # timestamp (not wall-clock) so the duration matches the
+        # event-derived task start times.
+        flush_now = self._last_event_time if self._last_event_time is not None else time.time()
+        self._flush_ready_summaries(flush_now, force=True)
+
         # Calculate final statistics
         hosts_completed = 0
         hosts_total = 0
@@ -1235,26 +1288,119 @@ class CompactRenderer:
         """
         return format_duration_decimal(seconds)
 
-    def _emit_previous_task_summary(self, now: float) -> None:
-        """Print a one-line summary of the task that just finished.
+    def _flush_ready_summaries(
+        self, now: float, *, force: bool = False, behind_only: bool = False
+    ) -> None:
+        """Emit summaries for announced tasks that are now complete.
 
-        Triggered right before the next task_start prints its TASK
-        header so the user sees the duration of *the previous task*
-        directly under that task's output. Format:
+        Walks the pending (announced, not-yet-summarised) tasks in order
+        and prints a summary for any that has finished on every target
+        host (see ``task_complete_on_all_targets``). Completion is checked
+        independently per task rather than stopping at the first incomplete
+        one, so a task that never completes (all-host silent skip, or a
+        cancelled run) does not block later, genuinely-complete tasks.
+
+        A summarised task is dropped from ``_announced_order`` and its
+        per-task bookkeeping discarded, so all of it stays bounded by the
+        set of *in-flight* tasks rather than growing with the whole run
+        (the R14 bounding guarantee — see ``_announced_task_uuids``).
+
+        ``force`` emits every remaining task that produced a result,
+        regardless of completion — used at stats / cancellation to drain
+        the tail.
+
+        ``behind_only`` skips the task whose header is currently on screen
+        (the most recently announced UUID). The terminal-event sweep uses
+        it so it never pre-empts a still-current task's summary: under the
+        linear strategy that summary must land at the *next* task's
+        announcement (with the announce timestamp), matching how ansible's
+        profile_tasks callback attributes the inter-task gap.
+        """
+        if self._state is None:
+            return
+        remaining: list[str] = []
+        for task_uuid in self._announced_order:
+            if behind_only and task_uuid == self._last_task_uuid:
+                remaining.append(task_uuid)
+                continue
+            if force:
+                # Drain the tail at run end — but only tasks that actually
+                # produced a result. A task still purely in-flight (or never
+                # reached) at cancel has nothing to summarise; a bare
+                # ``— 0.0s`` line would be noise.
+                emit = self._task_has_terminal_result(task_uuid)
+                # Time the summary to the task's last host result, not the
+                # run-end moment — otherwise a partially-done task at cancel
+                # reads as spanning to cancel-time (misleadingly long) when
+                # its hosts actually finished much earlier.
+                summary_now = self._task_last_result_time(task_uuid) or now
+            else:
+                emit = task_complete_on_all_targets(self._state, task_uuid)
+                summary_now = now
+            if emit:
+                self._emit_task_summary(task_uuid, summary_now)
+                self._discard_task_state(task_uuid)
+            else:
+                remaining.append(task_uuid)
+        self._announced_order = remaining
+
+    def _discard_task_state(self, task_uuid: str) -> None:
+        """Drop a summarised task's per-task bookkeeping (keeps memory
+        bounded by in-flight tasks, not total run length)."""
+        self._task_start_times.pop(task_uuid, None)
+        self._task_names.pop(task_uuid, None)
+        self._task_inline_duration_hosts.pop(task_uuid, None)
+
+    def _task_has_terminal_result(self, task_uuid: str) -> bool:
+        """True when ``task_uuid`` has at least one non-RUNNING host result."""
+        if self._state is None:
+            return False
+        for play in self._state.plays.values():
+            task = play.tasks.get(task_uuid)
+            if task is None:
+                continue
+            return any(hs.status != Status.RUNNING for hs in task.hosts.values())
+        return False
+
+    def _task_last_result_time(self, task_uuid: str) -> float | None:
+        """Latest host ``end_time`` (Unix seconds) across the task's hosts.
+
+        Used to time a force-flushed summary to when the task's hosts
+        actually finished, rather than the run-end moment. Returns None
+        when no host has a recorded end_time (caller falls back to now).
+        """
+        if self._state is None:
+            return None
+        for play in self._state.plays.values():
+            task = play.tasks.get(task_uuid)
+            if task is None:
+                continue
+            latest: float | None = None
+            for hs in task.hosts.values():
+                if hs.end_time is not None:
+                    ts = hs.end_time.timestamp()
+                    if latest is None or ts > latest:
+                        latest = ts
+            return latest
+        return None
+
+    def _emit_task_summary(self, task_uuid: str, now: float) -> None:
+        """Print a one-line summary of ``task_uuid``. Format:
 
             [HH:MM:SS] <task name> — N.Ns (H:MM:SS)  (1 failed, 2 ok)
 
-        Where the timestamp is the wall-clock at the moment the new
-        task started (which is also when the old task ended in
-        linear strategy), ``N.Ns`` is the previous task's duration,
-        the parenthesized value is the cumulative playbook elapsed
-        time, and the trailing status counts summarise how many
-        hosts ended in each terminal state.  ``--hide-state`` is
-        honoured: hidden states are omitted from the counts.
+        The wall-clock prefix and ``N.Ns`` duration are measured to
+        ``now`` — the moment the task actually completed (its last target
+        host finished), or its last host-result time when force-flushed at
+        run end. The parenthesized value is cumulative playbook elapsed
+        time; the trailing status counts summarise how many hosts ended in each
+        terminal state. ``--hide-state`` is honoured.
         """
-        if self._last_task_start_time is None or self._last_task_name is None:
+        start = self._task_start_times.get(task_uuid)
+        name = self._task_names.get(task_uuid)
+        if start is None or name is None:
             return
-        duration = now - self._last_task_start_time
+        duration = now - start
         cum = now - self._start_time
 
         # Local-time timestamp keeps the format consistent with what
@@ -1265,32 +1411,32 @@ class CompactRenderer:
         prefix = _wrap(f"[{wall}]", _DIM, self._colorize)
         cum_str = _wrap(f"({self._format_duration(cum)})", _DIM, self._colorize)
 
-        summary_suffix = self._build_status_suffix()
+        summary_suffix = self._build_status_suffix(task_uuid)
 
         # Drop the per-task duration when exactly one host already
         # displayed it on its inline result line — keeping the cleaner
         # ``— (cum)`` shape for single-host runs and run_once tasks.
-        if len(self._current_task_inline_duration_hosts) == 1:
-            line = f"{prefix} {self._last_task_name} — {cum_str}{summary_suffix}"
+        if len(self._task_inline_duration_hosts.get(task_uuid, ())) == 1:
+            line = f"{prefix} {name} — {cum_str}{summary_suffix}"
         else:
             duration_str = _wrap(self._format_duration(duration), _CYAN, self._colorize)
-            line = f"{prefix} {self._last_task_name} — {duration_str} {cum_str}{summary_suffix}"
+            line = f"{prefix} {name} — {duration_str} {cum_str}{summary_suffix}"
         self._display.print_log(line)
 
-    def _build_status_suffix(self) -> str:
+    def _build_status_suffix(self, task_uuid: str) -> str:
         """Build the trailing ``(N failed, M ok)`` status summary.
 
-        Walks the most recent task's host states, tallies per-status
-        counts, respects ``--hide-state``, and returns a coloured
-        string like ``"  (1 failed, 2 ok)"`` or an empty string when
-        no counts are available or all are hidden.
+        Walks ``task_uuid``'s host states, tallies per-status counts,
+        respects ``--hide-state``, and returns a coloured string like
+        ``"  (1 failed, 2 ok)"`` or an empty string when no counts are
+        available or all are hidden.
         """
-        if self._last_task_uuid is None or self._state is None:
+        if self._state is None:
             return ""
         task = None
         for play in self._state.plays.values():
-            if self._last_task_uuid in play.tasks:
-                task = play.tasks[self._last_task_uuid]
+            if task_uuid in play.tasks:
+                task = play.tasks[task_uuid]
                 break
         if task is None:
             return ""
@@ -1411,23 +1557,24 @@ class CompactRenderer:
         self._flush_pending_skips(force_individual=self._current_task_had_nonskipped_result)
         # Reset per-task state for the task we're about to print.
         self._current_task_had_nonskipped_result = False
-        # Summary for the previous task lands BEFORE the new TASK
-        # header — keeps it visually attached to its own output.
+        # Any previously-announced task that is now complete lands BEFORE
+        # this new TASK header. Under linear strategy that's the task that
+        # just finished (attached to its own output, as before); under
+        # free strategy it's any earlier task whose last host finally
+        # reported. Stragglers still-incomplete stay pending.
         if event_time is not None:
-            self._emit_previous_task_summary(event_time)
-        # Now safe to discard the previous task's host set.
-        self._current_task_inline_duration_hosts = set()
+            self._flush_ready_summaries(event_time)
         self._display.print_log(f"\nTASK [{task_name}] " + "*" * 50)
         self._maybe_emit_pause_seconds_hint(task_meta)
-        # Stash timing for the inline-duration logic below and for the
-        # *next* summary line.
+        # Stash timing/name and register the task in announce order so its
+        # summary can be emitted whenever it completes.
         if event_time is not None:
             self._task_start_times[task_uuid] = event_time
+            self._task_names[task_uuid] = task_name
             self._last_task_uuid = task_uuid
-            self._last_task_name = task_name
-            self._last_task_start_time = event_time
         if task_uuid:
             self._announced_task_uuids.add(task_uuid)
+            self._announced_order.append(task_uuid)
 
     def _task_dict(self, event: JsonlEvent) -> JsonlTask:
         """Extract the ``task`` field as a dict.
@@ -1530,7 +1677,7 @@ class CompactRenderer:
                     lines.extend(item_lines)
                     continue
                 if suffix:
-                    self._current_task_inline_duration_hosts.add(host)
+                    self._task_inline_duration_hosts.setdefault(task_id, set()).add(host)
                 if result.get("changed"):
                     lines.append(
                         _wrap(f"changed: [{host}]{suffix}", _YELLOW, self._colorize) + stale
@@ -1559,7 +1706,7 @@ class CompactRenderer:
                     lines.extend(item_lines)
                     continue
                 if suffix:
-                    self._current_task_inline_duration_hosts.add(host)
+                    self._task_inline_duration_hosts.setdefault(task_id, set()).add(host)
                 prefix = f"fatal: [{host}]{suffix}: FAILED!"
                 if self._show_failed_hint:
                     msg = _first_line(_extract_error_msg(result))
@@ -1581,10 +1728,11 @@ class CompactRenderer:
                 return
             suffix = self._inline_duration_suffix(event, event_time)
             stale = self._stale_task_suffix(event)
+            task_id = self._task_dict(event).get("id", "")
             lines = []
             for host, result in self._hosts_dict(event).items():
                 if suffix:
-                    self._current_task_inline_duration_hosts.add(host)
+                    self._task_inline_duration_hosts.setdefault(task_id, set()).add(host)
                 prefix = f"fatal: [{host}]{suffix}: UNREACHABLE!"
                 if self._show_failed_hint:
                     msg = _first_line(_extract_error_msg(result))
@@ -1662,14 +1810,14 @@ class CompactRenderer:
             # mixed-vs-all-skipped rule we use at task transitions.
             self._flush_pending_skips(force_individual=self._current_task_had_nonskipped_result)
             self._current_task_had_nonskipped_result = False
-            # Final task's summary line — same logic as the inter-task
-            # case, just triggered by stats instead of the next task_start.
+            # Run is over: force-flush every still-un-summarised task,
+            # complete or not (the final task, plus any task left
+            # incomplete because a host never reached it). Counts reflect
+            # whatever each task actually recorded.
             if event_time is not None:
-                self._emit_previous_task_summary(event_time)
+                self._flush_ready_summaries(event_time, force=True)
                 # Clear so a subsequent run doesn't see a stale last task.
                 self._last_task_uuid = None
-                self._last_task_name = None
-                self._last_task_start_time = None
 
     def _loop_item_lines(self, host: str, result: dict) -> list[str]:
         """Expand a looped task's per-host ``results`` array into log lines.

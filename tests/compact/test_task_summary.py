@@ -1,10 +1,10 @@
 """Tests for task summary status counts in CompactRenderer.
 
-When a task completes, ``_emit_previous_task_summary`` appends a
-per-status count suffix like ``(2 ok)`` or ``(1 failed, 1 ok)`` to the
-summary line.  The suffix honours ``--hide-state`` and uses severity
-colouring (failed=red, unreachable=magenta, changed=yellow, ok=green,
-skipped=cyan; non-error states dim when alongside errors).
+When a task completes, ``_emit_task_summary`` appends a per-status count
+suffix like ``(2 ok)`` or ``(1 failed, 1 ok)`` to the summary line.  The
+suffix honours ``--hide-state`` and uses severity colouring (failed=red,
+unreachable=magenta, changed=yellow, ok=green, skipped=cyan; non-error
+states dim when alongside errors).
 """
 
 from __future__ import annotations

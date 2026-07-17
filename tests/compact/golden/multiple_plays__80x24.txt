@@ -9,7 +9,7 @@ PLAY [Configure db tier] **************************************************
 
 TASK [Install postgres] **************************************************
 ok: [db1] (5.0s)
-[10:00:15] Install postgres — (15.0s)  (1 ok)
+[10:00:12] Install postgres — (12.0s)  (1 ok)
 host  ok  changed  failed  on
 web1   0        1       0  (idle)
 db1    1        0       0  (idle)

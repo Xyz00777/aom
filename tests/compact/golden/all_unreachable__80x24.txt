@@ -4,7 +4,7 @@ PLAY [Drain cluster] **************************************************
 TASK [Ping nodes] **************************************************
 fatal: [node1] (1.0s): UNREACHABLE! => ssh: connect timed out
 fatal: [node2] (2.0s): UNREACHABLE! => ssh: no route to host
-[10:00:05] Ping nodes — 3.0s (5.0s)  (2 unreachable)
+[10:00:04] Ping nodes — 2.0s (4.0s)  (2 unreachable)
 host   ok  changed  failed  unreachable  on
 node1   0        0       0            1  O Ping nodes
 node2   0        0       0            1  O Ping nodes

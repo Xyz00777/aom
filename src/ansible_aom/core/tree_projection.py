@@ -323,6 +323,74 @@ def _pending_host_count(
     return len(targets - set(runtime.hosts) - dead)
 
 
+def _play_def_for_state(run_state: "RunState", play: "PlayRunState") -> "PlayDefinition | None":
+    """Resolve a runtime play to its preflight PlayDefinition.
+
+    Mirrors ``TreeProjection._play_def_for`` minus the tree-construction
+    mapping (which isn't available outside a projection): id first, then
+    name. Returns None when no definitions were supplied.
+    """
+    by_id = run_state._play_def_by_id
+    if by_id is not None and play.play_id:
+        match = by_id.get(play.play_id)
+        if match is not None:
+            return match
+    by_name = run_state._play_def_by_name
+    if by_name is not None:
+        return by_name.get(play.name)
+    return None
+
+
+def task_complete_on_all_targets(run_state: "RunState", task_uuid: str) -> bool:
+    """True when every live target host has finished ``task_uuid``.
+
+    "Live targets" = the task's play target host set (preflight
+    ``resolved_hosts`` when available, else the runtime union) minus
+    hosts that went FAILED/UNREACHABLE anywhere in the play (ansible
+    drops them, so they never reach later tasks). The task is complete
+    only when every live target has a terminal (non-RUNNING) entry in it.
+
+    This is deliberately stricter than "all *started* hosts terminal":
+    under a free/host-pinned strategy the started set fills gradually
+    (fork limit) and a host can start a task minutes after its peers
+    finished it, so the started set undercounts. Anchoring on the target
+    set is what makes the per-task summary reflect the whole play instead
+    of whichever cohort happened to have reported first.
+
+    Returns False when the task is unknown or no target information is
+    available yet — callers treat "can't tell" as "not complete" and
+    fall back to the run-end forced flush.
+    """
+    for play in run_state.plays.values():
+        task = play.tasks.get(task_uuid)
+        if task is None:
+            continue
+        play_def = _play_def_for_state(run_state, play)
+        targets = _play_target_hostnames(play, play_def)
+        if not targets:
+            return False
+        # Hosts that went FAILED/UNREACHABLE somewhere in the play. Ansible
+        # drops them, so one that died *before* reaching this task will
+        # never run it and must not block completion. A host that died *in*
+        # this task, however, has a terminal entry here — it finished (by
+        # failing) and is counted normally by the loop below.
+        dead = {
+            hostname
+            for t in play.tasks.values()
+            for hostname, hs in t.hosts.items()
+            if hs.status in (Status.FAILED, Status.UNREACHABLE)
+        }
+        for hostname in targets:
+            hs = task.hosts.get(hostname)
+            if hs is not None:
+                if hs.status == Status.RUNNING:
+                    return False  # still running this task
+            elif hostname not in dead:
+                return False  # hasn't reached this task yet, and still alive
+        return True
+    return False
+
+
 def _is_meta_task(task_name: str) -> bool:
     """Return True for explicit ``meta: ...`` tasks.
 

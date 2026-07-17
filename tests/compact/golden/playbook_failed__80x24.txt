@@ -7,6 +7,6 @@ ok: [server1] (8.0s)
 
 TASK [Configure application] **************************************************
 fatal: [server1] (5.0s): FAILED! => Configuration file syntax error at line 42
-[10:01:00] Configure application — (1m00s)  (1 failed)
+[10:00:20] Configure application — (20.0s)  (1 failed)
 site.yml | 0/1 hosts | 2/2 tasks | *1 +0 X1 | 0:00:00 X failed
   FAILED: server1 — Configure application
