@@ -352,7 +352,21 @@ def build_indexes(
             yield (path, build_index(path))
         return
 
-    with ProcessPoolExecutor(max_workers=max_workers) as pool:
+    try:
+        pool = ProcessPoolExecutor(max_workers=max_workers)
+    except (OSError, ValueError) as exc:
+        # The pool couldn't be constructed — e.g. multiprocessing's
+        # resource_tracker launch passing a stderr fileno of -1 under a
+        # Textual stderr redirect (``bad value(s) in fds_to_keep``), or a
+        # sandbox with no /dev/shm. Degrade to a sequential build rather
+        # than crash the caller. (The TUI also pre-warms the tracker up
+        # front — see ``prewarm_parallel_pool`` — so this is a backstop.)
+        logger.debug("process pool unavailable (%s); building sequentially", exc)
+        for path in session_paths:
+            yield (path, build_index(path))
+        return
+
+    with pool:
         futures = {pool.submit(build_index, path): path for path in session_paths}
         for future in as_completed(futures):
             path = futures[future]
@@ -362,6 +376,29 @@ def build_indexes(
                 logger.debug("parallel index build failed for %s: %s", path, exc)
                 ok = False
             yield (path, ok)
+
+
+def prewarm_parallel_pool() -> None:
+    """Eagerly launch multiprocessing's resource_tracker.
+
+    ``build_indexes`` fans out over a ``ProcessPoolExecutor`` for large
+    backlogs. The pool's first internal semaphore lazily launches the
+    multiprocessing resource_tracker, whose launch passes
+    ``sys.stderr.fileno()`` to ``fork_exec``. Inside a Textual app stderr
+    is redirected and its ``fileno()`` returns -1, so the launch raises
+    ``ValueError: bad value(s) in fds_to_keep`` and kills the backfill
+    worker.
+
+    Calling this once *before* the TUI redirects stderr launches the
+    tracker while stderr is still a real fd; it then persists for the
+    process lifetime and is reused when the pool starts. Cheap (a
+    throwaway lock) and safe to call redundantly.
+    """
+    import multiprocessing as mp
+
+    # Creating (and discarding) a lock forces the resource_tracker to
+    # launch; the tracker process outlives the lock.
+    mp.Lock()
 
 
 def _counts(row: Any, base: int) -> StatusCounts:

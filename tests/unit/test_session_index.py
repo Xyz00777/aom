@@ -353,3 +353,24 @@ def test_build_indexes_process_pool(tmp_path: Path) -> None:
     assert results == {first: True, second: True}
     assert index_is_fresh(first)
     assert index_is_fresh(second)
+
+
+def test_build_indexes_falls_back_when_pool_unavailable(tmp_path: Path, monkeypatch) -> None:
+    """When the process pool can't be constructed (e.g. the Textual
+    stderr-redirect ``bad value(s) in fds_to_keep`` crash), build_indexes
+    must degrade to a sequential build, not propagate the error."""
+    import ansible_aom.session.index as index_mod
+
+    first = _write_session(tmp_path)
+    second = _write_second_session(first)
+
+    def _boom(*args, **kwargs):
+        raise ValueError("bad value(s) in fds_to_keep")
+
+    monkeypatch.setattr(index_mod, "ProcessPoolExecutor", _boom)
+
+    results = dict(index_mod.build_indexes([first, second], max_workers=2, parallel_min_bytes=0))
+
+    assert results == {first: True, second: True}
+    assert index_is_fresh(first)
+    assert index_is_fresh(second)

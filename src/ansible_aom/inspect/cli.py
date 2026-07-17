@@ -25,7 +25,7 @@ from pathlib import Path
 
 from ansible_aom.inspect.formatters import format_diagnostics_section
 from ansible_aom.inspect.text import render_session, render_session_from_index
-from ansible_aom.session.index import ensure_index
+from ansible_aom.session.index import ensure_index, prewarm_parallel_pool
 from ansible_aom.session.store import (
     cleanup_old_sessions,
     find_latest_session,
@@ -88,6 +88,12 @@ def inspect_tui(state_dir: Path) -> int:
     """Launch the TUI inspector. Returns the TUI's exit code."""
     # Lazy import: keeps `--text` invocation free of Textual cost.
     from ansible_aom.tui.screens.inspect import InspectApp
+
+    # Launch multiprocessing's resource_tracker now, while stderr still has
+    # a real fileno. Textual redirects stderr during app.run(), which makes
+    # the tracker's lazy launch (triggered by the parallel index backfill's
+    # process pool) crash with "bad value(s) in fds_to_keep".
+    prewarm_parallel_pool()
 
     latest = find_latest_session(state_dir)
     app = InspectApp(state_dir=state_dir, initial_session_id=latest)
