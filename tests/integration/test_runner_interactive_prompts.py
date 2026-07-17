@@ -400,6 +400,96 @@ class TestKeyboardInterruptDuringPromptAborts:
         return sys.executable, ["-c", code]
 
 
+class TestStalePlaintextDoesNotArmPrompt:
+    """A plaintext line ending in ``?`` early in a run must NOT arm the
+    block-forever interactive-input trap for every later quiet window.
+
+    Reproduces the reported freeze: an early debug/banner line ending in
+    ``?`` was stored as ``plaintext_lines[-1]`` and — because JSONL events
+    never touch that list — stayed the 'most recent plaintext' forever. On
+    any later silent window (e.g. a 3-minute AIDE task with zero output)
+    the TIMEOUT heuristic fired ``input()`` and froze the whole live loop
+    while the playbook kept running. A JSONL event consumed after the
+    plaintext line must invalidate it as a prompt candidate.
+    """
+
+    def test_stale_question_line_then_jsonl_then_silence_does_not_fire(
+        self, tmp_path: Path
+    ) -> None:
+        from ansible_aom.ansible.runner import run_playbook
+
+        renderer = MagicMock()
+        # Return "" so that IF the bug fires, sendline("") succeeds and the
+        # child exits cleanly — the assertion below is what catches the
+        # misfire, not a crash.
+        renderer.handle_interactive_prompt.return_value = ""
+
+        # Fake: start event, an early plaintext line ending in '?', a later
+        # JSONL task event, then a quiet window (never reads stdin).
+        code = textwrap.dedent(
+            """
+            import sys, json, time
+            w = sys.stdout.write
+            w(json.dumps({"_event": "v2_playbook_on_start", "_timestamp": "2026-07-18T12:00:00+00:00"}) + "\\n")
+            w("Deploy which environment?\\n")
+            w(json.dumps({"_event": "v2_playbook_on_task_start", "_timestamp": "2026-07-18T12:00:00+00:00",
+                          "task": {"name": "aide", "id": "1"}}) + "\\n")
+            sys.stdout.flush()
+            time.sleep(0.8)
+            sys.exit(0)
+            """
+        )
+        cmd = (sys.executable, ["-c", code])
+
+        with patch("ansible_aom.ansible.runner._build_command", return_value=cmd):
+            exit_code = run_playbook(
+                "playbook.yml", [], renderer, timeout=0.15, session_dir=tmp_path
+            )
+
+        assert exit_code == 0
+        renderer.handle_interactive_prompt.assert_not_called()
+
+    def test_jsonl_then_latest_plaintext_prompt_still_fires(self, tmp_path: Path) -> None:
+        """Mirror of the fix's directionality: when the plaintext prompt IS
+        the most recent output (JSONL task_start, THEN the pause prompt),
+        it must still fire. The gate rejects *stale* plaintext, not a
+        genuine prompt that follows a JSONL event.
+        """
+        from ansible_aom.ansible.runner import run_playbook
+
+        renderer = MagicMock()
+        renderer.handle_interactive_prompt.return_value = ""
+        captured = tmp_path / "captured.txt"
+        path_repr = repr(str(captured))
+        code = textwrap.dedent(
+            f"""
+            import sys, json
+            w = sys.stdout.write
+            w(json.dumps({{"_event": "v2_playbook_on_start", "_timestamp": "2026-07-18T12:00:00+00:00"}}) + "\\n")
+            w(json.dumps({{"_event": "v2_playbook_on_task_start", "_timestamp": "2026-07-18T12:00:00+00:00",
+                          "task": {{"name": "pause", "id": "1"}}}}) + "\\n")
+            w("[Confirm deployment]\\r\\n")
+            w("Deploy to web1? Press Enter to continue or Ctrl+C to abort:\\r\\n")
+            sys.stdout.flush()
+            line = sys.stdin.readline().rstrip("\\r\\n")
+            with open({path_repr}, "w") as f:
+                f.write(line)
+            sys.exit(0)
+            """
+        )
+        cmd = (sys.executable, ["-c", code])
+
+        with patch("ansible_aom.ansible.runner._build_command", return_value=cmd):
+            exit_code = run_playbook(
+                "playbook.yml", [], renderer, timeout=0.15, session_dir=tmp_path
+            )
+
+        assert exit_code == 0
+        renderer.handle_interactive_prompt.assert_called_once()
+        assert captured.exists()
+        assert captured.read_text() == ""
+
+
 class TestNoPromptNoSpuriousInteractiveCall:
     """A normal run with no prompts must NOT call handle_interactive_prompt."""
 
