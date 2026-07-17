@@ -1467,3 +1467,88 @@ class TestPasswordPromptPatterns:
 
         pattern = password_patterns[6]
         assert re.search(pattern, "Confirm New Vault password: ") is not None
+
+
+class TestVerboseAlwaysMsgDisplay:
+    """A verbose-always ok result (``debug``/``assert``) shows its ``msg``.
+
+    Ansible's default callback dumps an ok result's body only when
+    ``_ansible_verbose_always`` is set and ``_ansible_verbose_override`` is
+    not — that flag is exactly how the ``debug`` module signals "this task
+    exists to inform". aom mirrors that: the ``msg`` is appended inline to
+    the ``ok:``/``changed:`` host line, newlines preserved.
+    """
+
+    def _run(self, host_result: dict) -> list[str]:
+        from unittest.mock import MagicMock
+
+        from ansible_aom.compact.renderer import CompactRenderer
+
+        renderer = CompactRenderer(is_tty=True)
+        renderer._display = MagicMock(is_tty=True)
+        renderer.start("playbook.yml", [])
+        events = [
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-10T13:00:00Z",
+                "play": {"name": "P", "id": "p1"},
+                "tasks": [],
+            },
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-10T13:00:00Z",
+                "task": {"name": "Show next steps", "id": "t1", "path": "f.yml:1"},
+                "hosts": {},
+            },
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-10T13:00:00Z",
+                "task": {"name": "Show next steps", "id": "t1", "path": "f.yml:1"},
+                "hosts": {"prod": host_result},
+            },
+        ]
+        for event in events:
+            renderer.update_state(event)
+        from ansible_aom.compact.format import _strip_sgr
+
+        return [_strip_sgr(c.args[0]) for c in renderer._display.print_log.call_args_list]
+
+    def test_verbose_always_ok_shows_msg_inline(self):
+        lines = self._run(
+            {
+                "changed": False,
+                "msg": "Deployment complete.\nNext steps:\n  - restart nginx",
+                "_ansible_verbose_always": True,
+            }
+        )
+        joined = "\n".join(lines)
+        assert any("ok: [prod]" in line and "=> Deployment complete." in line for line in lines), (
+            lines
+        )
+        # Multi-line body preserved verbatim.
+        assert "Next steps:\n  - restart nginx" in joined, lines
+
+    def test_verbose_always_changed_shows_msg(self):
+        lines = self._run({"changed": True, "msg": "did a thing", "_ansible_verbose_always": True})
+        assert any("changed: [prod]" in line and "=> did a thing" in line for line in lines), lines
+
+    def test_incidental_msg_without_flag_is_not_shown(self):
+        # A plain command ok-result carries an incidental msg; without the
+        # verbose-always flag it must stay hidden (only ``ok: [prod]``).
+        lines = self._run(
+            {"changed": False, "msg": "The command exited with a non-zero return code."}
+        )
+        assert any("ok: [prod]" in line and " => " not in line for line in lines), lines
+        assert "non-zero return code" not in "\n".join(lines), lines
+
+    def test_verbose_override_suppresses_msg(self):
+        lines = self._run(
+            {
+                "changed": False,
+                "msg": "hidden",
+                "_ansible_verbose_always": True,
+                "_ansible_verbose_override": True,
+            }
+        )
+        assert any("ok: [prod]" in line and " => " not in line for line in lines), lines
+        assert "hidden" not in "\n".join(lines), lines

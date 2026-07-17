@@ -48,6 +48,7 @@ from ansible_aom.compact.format import (
     _strip_sgr,  # noqa: F401 — re-export
     _truncate_msg,
     _truncate_visible,  # noqa: F401 — re-export
+    _verbose_ok_body,
     _wrap,
     collect_tags,  # noqa: F401 — re-export
     count_completed_tasks,
@@ -1678,12 +1679,16 @@ class CompactRenderer:
                     continue
                 if suffix:
                     self._task_inline_duration_hosts.setdefault(task_id, set()).add(host)
-                if result.get("changed"):
-                    lines.append(
-                        _wrap(f"changed: [{host}]{suffix}", _YELLOW, self._colorize) + stale
-                    )
-                else:
-                    lines.append(_wrap(f"ok: [{host}]{suffix}", _GREEN, self._colorize) + stale)
+                changed = result.get("changed")
+                label, color = ("changed", _YELLOW) if changed else ("ok", _GREEN)
+                text = f"{label}: [{host}]{suffix}"
+                # debug/assert results (``_ansible_verbose_always``) exist to
+                # inform — surface their msg inline like ansible's default
+                # callback, instead of dropping the body.
+                body = _verbose_ok_body(result)
+                if body is not None:
+                    text += f" => {body}"
+                lines.append(_wrap(text, color, self._colorize) + stale)
             if lines:
                 self._display.print_log("\n".join(lines))
         elif name == "v2_runner_on_failed":
@@ -1886,9 +1891,13 @@ class CompactRenderer:
             return _wrap(text, _RED, self._colorize)
         if event_type == "v2_runner_item_on_skipped" or raw.get("skipped"):
             return _wrap(f"skipping: [{host}] => (item={label})", _CYAN, self._colorize)
-        if raw.get("changed"):
-            return _wrap(f"changed: [{host}] => (item={label})", _YELLOW, self._colorize)
-        return _wrap(f"ok: [{host}] => (item={label})", _GREEN, self._colorize)
+        changed = raw.get("changed")
+        label_word, color = ("changed", _YELLOW) if changed else ("ok", _GREEN)
+        text = f"{label_word}: [{host}] => (item={label})"
+        body = _verbose_ok_body(raw)
+        if body is not None:
+            text += f" => {body}"
+        return _wrap(text, color, self._colorize)
 
     def _stale_task_suffix(self, event: JsonlEvent) -> str:
         """Return `` [task: <name>]`` when a result belongs to a task other

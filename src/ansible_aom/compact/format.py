@@ -136,6 +136,37 @@ def _truncate_msg(msg: str) -> str:
     return f"{msg[:_MSG_DISPLAY_CAP]}…(truncated, {len(msg)} bytes)"
 
 
+def _verbose_ok_body(result: dict) -> str | None:
+    """Return the inline body for a verbose-always ok result, or ``None``.
+
+    Mirrors ansible's default callback (``_run_is_verbose``): an ok result's
+    content is surfaced only when it carries ``_ansible_verbose_always: True``
+    and no ``_ansible_verbose_override``. The ``debug`` and ``assert`` action
+    plugins set that flag — it is exactly how ansible distinguishes "a task
+    whose purpose is to inform" from a task that merely happens to carry a
+    ``msg`` (a plain ``command`` result, say). Keying off it avoids spamming
+    every ok line with incidental ``msg`` fields.
+
+    A string ``msg`` is returned verbatim (multi-line preserved, capped via
+    :func:`_truncate_msg`); a non-string ``msg`` (list, from a YAML list
+    ``msg:``) is JSON-encoded. Returns ``None`` when there is nothing to show,
+    so callers fall back to the plain ``ok:``/``changed:`` host line.
+    ``var``-style debug (no ``msg``) is intentionally not reconstructed.
+    """
+    if result.get("_ansible_verbose_always") is not True:
+        return None
+    if result.get("_ansible_verbose_override") is True:
+        return None
+    msg = result.get("msg")
+    if isinstance(msg, str):
+        return _truncate_msg(msg) if msg else None
+    if msg is not None:
+        import json
+
+        return _truncate_msg(json.dumps(msg, ensure_ascii=False))
+    return None
+
+
 def _replace_surrogates(s: str) -> str:
     """Replace any lone-surrogate codepoints in ``s`` with U+FFFD.
 
