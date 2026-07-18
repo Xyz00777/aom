@@ -341,6 +341,14 @@ class CompactRenderer:
         # caches when the underlying RunState revision changes, so the
         # same instance can survive across renders and quiet gaps.
         self._projection: TreeProjection | None = None
+        # Cache for ``count_total_tasks(self._definitions)`` — a pure function
+        # of the preflight definitions (plus any dynamically grafted
+        # ``include_tasks`` children, which bump ``RunState._tree_revision``).
+        # Stored as ``(revision, value)`` and recomputed only when the
+        # revision advances, so the O(all-preflight-tasks) walk stops running
+        # on every render. ``-1`` never matches a real revision, forcing the
+        # first read to compute.
+        self._count_total_tasks_cache: tuple[int, int] = (-1, 0)
         # HS-2: incremental task counters. The format-layer functions
         # ``count_completed_tasks`` / ``count_total_tasks_seen`` walked
         # the full state on every render — fine for handle_completion
@@ -745,6 +753,24 @@ class CompactRenderer:
         estimated = prior is not None and not prior.exact_match and prior_total > base_total
         return total, estimated
 
+    def _cached_count_total_tasks(self) -> int:
+        """``count_total_tasks(self._definitions)`` memoised on the tree revision.
+
+        The preflight total only changes when definitions are (re)assigned or
+        a dynamic ``include_tasks`` grafts children — both bump
+        ``RunState._tree_revision``. Keying the cache on that revision keeps
+        the O(all-preflight-tasks) walk off the per-render hot path while
+        staying correct across grafts. Falls back to a plain compute when no
+        state is attached yet.
+        """
+        state = self._state
+        revision = getattr(state, "_tree_revision", -1) if state is not None else -1
+        cached_revision, cached_value = self._count_total_tasks_cache
+        if cached_revision != revision:
+            cached_value = count_total_tasks(self._definitions)
+            self._count_total_tasks_cache = (revision, cached_value)
+        return cached_value
+
     def _render_status_panel(self) -> None:
         """Compute and push the current panel (status bar + tree + hosts).
 
@@ -841,7 +867,7 @@ class CompactRenderer:
             for path, start in self._running_task_starts.values():
                 add_in_flight(self._estimate, progress, path, now_wall - start)
             remaining_seconds = project_remaining(self._estimate, progress)
-        base_total = max(count_total_tasks(self._definitions), self._tasks_seen)
+        base_total = max(self._cached_count_total_tasks(), self._tasks_seen)
         tasks_total, estimated_total = self._task_total_with_prior(base_total)
         status_bar = format_status_bar(
             playbook=self._playbook,
