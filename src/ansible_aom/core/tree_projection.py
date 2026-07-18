@@ -566,6 +566,38 @@ class TreeProjection:
     _known_roles: set[str] | None = field(default=None, init=False, repr=False)
     _runtime_role_counts: dict[str, int] | None = field(default=None, init=False, repr=False)
     _known_tree_revision: int | None = field(default=None, init=False, repr=False)
+    # Preflight-derived caches. Everything here is a pure function of the
+    # (immutable-after-set_definitions) definitions, so it is computed once
+    # and reused across renders. All are invalidated wholesale in
+    # ``_refresh_tree_cache`` when the tree revision advances (definitions
+    # reassigned or a dynamic task grafted). Keyed by ``id(play_def)`` — play
+    # definition objects are stable for the life of a revision.
+    #
+    # ``_pending_play_lines``: the full TreeLine list a fully-pending play
+    # projects (``_emit_pending_play``). ``_runtime_play_preflight_roles``:
+    # the ``(innermost-role → preflight task count, preflight name set)`` pair
+    # ``_emit_runtime_play`` derives from a play's definition. Keyed by the
+    # visible-play-name filter, ``_role_total_preflight``: the preflight
+    # portion of ``_build_role_total_tasks``. ``_total_unique_tasks``: the
+    # whole-run leaf-task count the outer footer uses.
+    _pending_play_lines: dict[int, list["TreeLine"]] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    _runtime_play_preflight_roles: dict[int, tuple[dict[str | None, int], set[str]]] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    _role_total_preflight: dict[frozenset[str] | None, tuple[dict[str, int], set[str]]] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    _total_unique_tasks: int | None = field(default=None, init=False, repr=False)
+    # Per-render memo for ``_play_running_and_pending`` — reset at the top of
+    # each ``_tree_lines_unbounded`` call. The active play's items are needed
+    # by both the "find the latest running play" pre-pass and the emission
+    # loop; without this memo the O(preflight × runtime-match) walk runs twice
+    # per render. Keyed by ``id(play)``.
+    _prp_render_memo: dict[int, list[tuple[str, str, tuple[str, ...], "TaskRunState | None"]]] = (
+        field(default_factory=dict, init=False, repr=False)
+    )
     _row_leases: dict[tuple[str, str], _RowLease] = field(
         default_factory=dict, init=False, repr=False
     )
@@ -645,6 +677,10 @@ class TreeProjection:
         self._role_index = None
         self._known_roles = None
         self._runtime_role_counts = None
+        self._pending_play_lines.clear()
+        self._runtime_play_preflight_roles.clear()
+        self._role_total_preflight.clear()
+        self._total_unique_tasks = None
 
     @staticmethod
     def _task_definition_identity(task_def: "TaskDefinition") -> str:
@@ -955,6 +991,38 @@ class TreeProjection:
                 return True
         return False
 
+    def _role_total_preflight_for(
+        self, play_names: set[str] | None
+    ) -> tuple[dict[str, int], set[str]]:
+        """Preflight portion of ``_build_role_total_tasks``: ``(role → subtree
+        task count, preflight name set)`` for the plays matching ``play_names``.
+
+        Pure function of the definitions and the visibility filter, memoised
+        per filter and invalidated on revision. See ``_build_role_total_tasks``
+        for the counting rules (subtree crediting; parent stubs skipped).
+        """
+        key = frozenset(play_names) if play_names is not None else None
+        cached = self._role_total_preflight.get(key)
+        if cached is not None:
+            return cached
+        role_total_tasks: dict[str, int] = {}
+        emitted_preflight_names: set[str] = set()
+        for play_def in self._state.definitions:
+            if not self._play_def_matches_visible(play_def.name, play_names or set()):
+                continue
+            for entry, role_path in iter_preflight_task_defs(play_def.tasks):
+                emitted_preflight_names.add(entry.name)
+                if entry.children:
+                    continue
+                collapsed_path = _collapse_role_path_aggressive(role_path)
+                if not collapsed_path:
+                    continue
+                for role in collapsed_path:
+                    role_total_tasks[role] = role_total_tasks.get(role, 0) + 1
+        result = (role_total_tasks, emitted_preflight_names)
+        self._role_total_preflight[key] = result
+        return result
+
     def _build_role_total_tasks(self, play_names: set[str] | None = None) -> dict[str, int]:
         """Build role → total task count from preflight + runtime state.
 
@@ -1023,37 +1091,15 @@ class TreeProjection:
            fallback here so the relabel produces the same counts the
            emission would.
         """
-        role_total_tasks: dict[str, int] = {}
-
-        # Preflight pass: credit each task to every role in its
-        # (aggressively collapsed) role path. Tasks with empty role
-        # paths are skipped (no role ancestor — they live directly
-        # under a play). Parent stubs (TaskDefinition with non-empty
-        # ``children``) are also skipped: they are ``include_tasks``
-        # containers, not leaves, so counting them would double-count
-        # the leaves in their subtree (the same fix already applied
-        # to ``_count_tasks`` in ``format.py``). When ``play_names`` is
-        # provided, plays outside the visible subset are excluded so
-        # the totals reflect only what the user can see.
-        for play_def in self._state.definitions:
-            if not self._play_def_matches_visible(play_def.name, play_names or set()):
-                continue
-            for entry, role_path in iter_preflight_task_defs(play_def.tasks):
-                if entry.children:
-                    continue
-                collapsed_path = _collapse_role_path_aggressive(role_path)
-                if not collapsed_path:
-                    continue
-                for role in collapsed_path:
-                    role_total_tasks[role] = role_total_tasks.get(role, 0) + 1
-
-        # Build preflight name set for the runtime filter.
-        emitted_preflight_names: set[str] = set()
-        for play_def in self._state.definitions:
-            if not self._play_def_matches_visible(play_def.name, play_names or set()):
-                continue
-            for entry, _role_path in iter_preflight_task_defs(play_def.tasks):
-                emitted_preflight_names.add(entry.name)
+        # Preflight passes: credit each task to every role in its
+        # (aggressively collapsed) role path, and build the preflight name set
+        # for the runtime filter. Both are pure functions of the definitions
+        # and the ``play_names`` visibility filter, so they are memoised (per
+        # filter, invalidated on revision) rather than re-walked on every
+        # render. ``role_total_tasks`` is copied because the runtime/fallback
+        # passes below mutate it; ``emitted_preflight_names`` is only read.
+        preflight_totals, emitted_preflight_names = self._role_total_preflight_for(play_names)
+        role_total_tasks: dict[str, int] = dict(preflight_totals)
 
         # Runtime pass: tasks not in preflight. Credit the chain
         # extracted from " : " in the runtime name so the runtime
@@ -1369,11 +1415,19 @@ class TreeProjection:
             # their subtree. Skip them so the outer footer's drop count
             # matches the visible/inner math (same rule as
             # ``_count_tasks`` in ``format.py``).
-            total_unique_tasks = sum(
-                sum(1 for tdef, _ in iter_preflight_task_defs(play_def.tasks) if not tdef.children)
-                for play_def in self._state.definitions
-            )
-            outer_remaining = max(0, total_unique_tasks - visible_task_count)
+            # Whole-run leaf-task count is a pure function of the definitions;
+            # memoise it (invalidated on revision) instead of re-walking every
+            # play's preflight tree on each render.
+            if self._total_unique_tasks is None:
+                self._total_unique_tasks = sum(
+                    sum(
+                        1
+                        for tdef, _ in iter_preflight_task_defs(play_def.tasks)
+                        if not tdef.children
+                    )
+                    for play_def in self._state.definitions
+                )
+            outer_remaining = max(0, self._total_unique_tasks - visible_task_count)
             result[outer_idx] = _more_footer(depth=0, count=outer_remaining)
 
         return result
@@ -1445,6 +1499,11 @@ class TreeProjection:
         """
         if not self.is_tree_visible():
             return []
+
+        # Fresh per-render memo so the active play's running/pending items are
+        # computed once, not once for the "latest running play" pre-pass and
+        # again for emission.
+        self._prp_render_memo = {}
 
         lines: list[TreeLine] = [
             TreeLine(
@@ -1588,8 +1647,25 @@ class TreeProjection:
         role header at role-index ``i`` lives at depth ``2 + i``; a task
         at the bottom of a ``len(n)`` role path sits at depth ``2 + n``
         (or depth 2 when the path is empty).
+
+        A fully-pending play's projection is a pure function of its
+        (immutable-per-revision) ``PlayDefinition``: every line is PENDING
+        with ``elapsed_s=None``, so nothing here depends on ``now`` or runtime
+        state. The emitted line list is therefore memoised per ``id(play_def)``
+        (invalidated on revision change) and reused across renders — the walk
+        over a large upcoming play used to run on every frame. The row-lease
+        side effects are intentionally dropped on the cached path: pending
+        play / task / role leases are never read to make an output decision
+        (only ``("play", <runtime-identity>)`` leases are, and those are
+        refreshed each render by ``_emit_runtime_play``), so skipping them
+        cannot change what is rendered.
         """
-        lines.append(
+        cached = self._pending_play_lines.get(id(play_def))
+        if cached is not None:
+            lines.extend(cached)
+            return
+
+        emitted: list[TreeLine] = [
             TreeLine(
                 depth=1,
                 kind="play",
@@ -1598,8 +1674,7 @@ class TreeProjection:
                 status=Status.PENDING,
                 elapsed_s=None,
             )
-        )
-        self._touch_row_lease("play", play_def.id or play_def.name, now)
+        ]
         # Pre-pass: count tasks per *innermost* role so the role header
         # summary reflects the total under that role regardless of
         # nesting depth. ``_collapse_role_path_aggressive`` collapses
@@ -1634,7 +1709,7 @@ class TreeProjection:
                     n = role_counts.get(role, 0)
                     task_count = f" ({n} task{'s' if n != 1 else ''})" if n > 0 else ""
                     role_depth = 2 + depth_idx
-                    lines.append(
+                    emitted.append(
                         TreeLine(
                             depth=role_depth,
                             kind="role",
@@ -1645,10 +1720,9 @@ class TreeProjection:
                             identity=role,
                         )
                     )
-                    self._touch_role_lease(role, now)
                 current_role_path = role_path_list
             task_depth = 2 + len(current_role_path) if current_role_path else 2
-            lines.append(
+            emitted.append(
                 TreeLine(
                     depth=task_depth,
                     kind="task",
@@ -1658,7 +1732,35 @@ class TreeProjection:
                     elapsed_s=None,
                 )
             )
-            self._touch_task_lease(None, None, tdef, now)
+
+        self._pending_play_lines[id(play_def)] = emitted
+        lines.extend(emitted)
+
+    def _runtime_play_preflight_roles_for(
+        self, play_def: "PlayDefinition | None"
+    ) -> tuple[dict[str | None, int], set[str]]:
+        """``(innermost-role → preflight task count, preflight name set)`` for
+        a play, memoised per ``id(play_def)`` and invalidated on revision.
+
+        Both are pure functions of the play definition. The caller copies the
+        count dict before mutating it with runtime roles; the name set is only
+        read, so it is returned by reference.
+        """
+        if play_def is None:
+            return {}, set()
+        cached = self._runtime_play_preflight_roles.get(id(play_def))
+        if cached is not None:
+            return cached
+        role_total_tasks: dict[str | None, int] = {}
+        emitted_preflight_names: set[str] = set()
+        for entry, role_path in iter_preflight_task_defs(play_def.tasks):
+            collapsed_path = _collapse_role_path_aggressive(role_path)
+            innermost = collapsed_path[-1] if collapsed_path else None
+            role_total_tasks[innermost] = role_total_tasks.get(innermost, 0) + 1
+            emitted_preflight_names.add(entry.name)
+        result = (role_total_tasks, emitted_preflight_names)
+        self._runtime_play_preflight_roles[id(play_def)] = result
+        return result
 
     def _emit_runtime_play(self, lines: list[TreeLine], play: PlayRunState, now: datetime) -> None:
         """Render a play that's already in flight (or was)."""
@@ -1701,21 +1803,20 @@ class TreeProjection:
         # ``(X, X)`` path produced when ``TaskDefinition.role`` matches
         # the enclosing ``RoleGroupDefinition.role`` so the count and
         # the path the main loop iterates stay consistent.
-        role_total_tasks: dict[str | None, int] = {}
         play_def = self._play_def_for(play)
         self._touch_play_leases(play, play_def, now)
-        if play_def is not None:
-            for _entry, role_path in iter_preflight_task_defs(play_def.tasks):
-                collapsed_path = _collapse_role_path_aggressive(role_path)
-                innermost = collapsed_path[-1] if collapsed_path else None
-                role_total_tasks[innermost] = role_total_tasks.get(innermost, 0) + 1
+        # The innermost-role task counts and the preflight name set are pure
+        # functions of ``play_def`` (invalidated on revision), so they are
+        # memoised per ``id(play_def)`` rather than re-walked every render.
+        # ``role_total_tasks`` is copied because the runtime pass below mutates
+        # it; ``emitted_preflight_names`` is only read, so it is shared.
+        preflight_role_totals, emitted_preflight_names = self._runtime_play_preflight_roles_for(
+            play_def
+        )
+        role_total_tasks: dict[str | None, int] = dict(preflight_role_totals)
         # Also count runtime tasks per role that weren't in preflight.
         # include_role tasks appear at runtime but --list-tasks doesn't
         # expand them, so they're missing from play_def.
-        emitted_preflight_names: set[str] = set()
-        if play_def is not None:
-            for entry, _role_path in iter_preflight_task_defs(play_def.tasks):
-                emitted_preflight_names.add(entry.name)
 
         for task in play.tasks.values():
             stripped = strip_role_prefix(task.name)
@@ -1879,7 +1980,16 @@ class TreeProjection:
         Order: preflight order first (when ``definitions`` is available),
         with any runtime-only tasks (dynamic ``include_tasks``) appended
         in runtime-arrival order.
+
+        ``include_cross_play`` is accepted for call-site compatibility but has
+        no effect (cross-play borrowing is intentionally disabled), so the
+        per-render memo below can serve both the ``False`` pre-pass call and
+        the ``True`` emission call from one computation.
         """
+        memo = self._prp_render_memo.get(id(play))
+        if memo is not None:
+            return memo
+
         runtime_by_name: dict[str, list[TaskRunState]] = defaultdict(list)
         runtime_by_path: dict[str, list[TaskRunState]] = defaultdict(list)
         for task in play.tasks.values():
@@ -2184,6 +2294,7 @@ class TreeProjection:
             if stripped != task.name:
                 emitted_names.add(stripped)
 
+        self._prp_render_memo[id(play)] = items
         return items
 
     def _play_def_for(self, play: "PlayRunState") -> "PlayDefinition | None":

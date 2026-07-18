@@ -115,14 +115,32 @@ def _bump(counts: StatusCounts, status: Status) -> StatusCounts:
 
 
 def run_state_status_counts(state: RunState) -> StatusCounts:
-    counts = StatusCounts()
+    # Single-pass integer tally rather than folding through ``_bump`` (which
+    # allocates a fresh immutable ``StatusCounts`` per host). On a large
+    # free-strategy run this walks tens of thousands of (task × host) pairs
+    # every render, so the per-host allocation dominated the status-bar
+    # compute. One ``StatusCounts`` is built at the end; the result is
+    # identical.
+    ok = changed = failed = skipped = unreachable = 0
     for play in state.plays.values():
         for task in play.tasks.values():
             for host_state in task.hosts.values():
                 if host_state.status == Status.RUNNING:
                     continue
-                counts = _bump(counts, _effective_status(host_state))
-    return counts
+                effective = _effective_status(host_state)
+                if effective == Status.OK:
+                    ok += 1
+                elif effective == Status.CHANGED:
+                    changed += 1
+                elif effective == Status.FAILED:
+                    failed += 1
+                elif effective == Status.SKIPPED:
+                    skipped += 1
+                elif effective == Status.UNREACHABLE:
+                    unreachable += 1
+    return StatusCounts(
+        ok=ok, changed=changed, failed=failed, skipped=skipped, unreachable=unreachable
+    )
 
 
 def run_state_host_counts(state: RunState) -> dict[str, StatusCounts]:
