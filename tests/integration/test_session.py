@@ -192,6 +192,7 @@ class TestRecordEvent:
 
         manager.record_event(session_id, event1)
         manager.record_event(session_id, event2)
+        manager.flush(session_id)  # writes are async; wait for the drain
 
         events_file = session_dir / session_id / "events.jsonl"
         with open(events_file) as f:
@@ -214,6 +215,7 @@ class TestRecordEvent:
             "hosts": {"web1": {"ok": True, "changed": False}},
         }
         manager.record_event(session_id, event)
+        manager.flush(session_id)  # writes are async; wait for the drain
 
         events_file = session_dir / session_id / "events.jsonl"
         with open(events_file) as f:
@@ -233,6 +235,7 @@ class TestRecordEvent:
             manager.record_event(
                 session_id, {"_event": f"event_{i}", "_timestamp": f"2026-04-20T10:00:0{i}Z"}
             )
+        manager.flush(session_id)  # writes are async; wait for the drain
 
         events_file = session_dir / session_id / "events.jsonl"
         with open(events_file) as f:
@@ -256,6 +259,7 @@ class TestRecordStderr:
 
         manager.record_stderr(session_id, "[WARNING]: ansible.posix not found")
         manager.record_stderr(session_id, "[DEPRECATION WARNING]: This feature is deprecated")
+        manager.flush(session_id)  # writes are async; wait for the drain
 
         events_file = session_dir / session_id / "events.jsonl"
         with open(events_file) as f:
@@ -278,6 +282,7 @@ class TestRecordStderr:
 
         line = "Error: 中文字符 émojis 🎉"
         manager.record_stderr(session_id, line)
+        manager.flush(session_id)  # writes are async; wait for the drain
 
         events_file = session_dir / session_id / "events.jsonl"
         with open(events_file, encoding="utf-8") as f:

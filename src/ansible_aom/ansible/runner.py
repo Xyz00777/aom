@@ -264,6 +264,12 @@ class _SessionSink:
             )
         except OSError as exc:
             logger.debug("session end failed: %s", exc)
+        # The async writer can only report a disk failure after the fact
+        # (record_event never blocks on the write). Surface it now so the
+        # user still gets the one-time "recording disabled" warning.
+        reason = self._manager.recording_failed(self._session_id)
+        if reason is not None:
+            self._disable(reason)
 
     @property
     def session_id(self) -> str | None:

@@ -231,6 +231,7 @@ def test_session_roundtrip_preserves_state_shape(
     sid = mgr.start_session(playbook="rt.yml")
     for ev in events:
         mgr.record_event(sid, ev)
+    mgr.flush(sid)  # writes are async; wait for the drain before reading back
     loaded = load_session(sid, session_dir)
     assert loaded is not None, "Persisted session must round-trip via load_session"
 
@@ -266,6 +267,7 @@ def test_tree_builder_matches_live_runstate_totals(
     sid = mgr.start_session(playbook="rt.yml")
     for ev in events:
         mgr.record_event(sid, ev)
+    mgr.flush(sid)  # writes are async; wait for the drain before reading back
     loaded = load_session(sid, session_dir)
     assert loaded is not None
 

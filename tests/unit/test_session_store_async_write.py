@@ -114,3 +114,116 @@ def test_queue_full_drops_event_and_counts(tmp_path: Path) -> None:
     # Dropped attribute exists and is an int (could be 0 if the writer
     # keeps up; the test only verifies the plumbing).
     assert isinstance(getattr(mgr, "dropped_events", 0), int)
+
+
+def test_no_event_loss_and_order_on_end_session(tmp_path: Path) -> None:
+    """R16: ``end_session`` drains the writer, so every recorded event lands
+    on disk in the order it was recorded — no event is lost to a still-queued
+    write."""
+    from ansible_aom.session.store import SessionManager
+
+    mgr = SessionManager(session_dir=tmp_path / "sessions")
+    sid = mgr.start_session("play.yml", ansible_args=[])
+
+    for i in range(200):
+        mgr.record_event(sid, {"_event": "v2_runner_on_ok", "seq": i})
+
+    mgr.end_session(sid, "completed")
+
+    events_file = tmp_path / "sessions" / sid / "events.jsonl"
+    lines = events_file.read_text().splitlines()
+    assert len(lines) == 200, f"expected 200 events on disk, got {len(lines)}"
+    seqs = [json.loads(line)["seq"] for line in lines]
+    assert seqs == list(range(200)), "events must persist in recorded order"
+
+
+def test_interleaved_event_and_stderr_order_preserved(tmp_path: Path) -> None:
+    """R16: events and stderr lines share one writer, so their relative
+    order on disk matches the order they were recorded."""
+    from ansible_aom.session.store import SessionManager
+
+    mgr = SessionManager(session_dir=tmp_path / "sessions")
+    sid = mgr.start_session("play.yml", ansible_args=[])
+
+    for i in range(50):
+        mgr.record_event(sid, {"_event": "v2_runner_on_ok", "seq": i})
+        mgr.record_stderr(sid, f"stderr line {i}")
+
+    mgr.flush(sid)
+
+    events_file = tmp_path / "sessions" / sid / "events.jsonl"
+    parsed = [json.loads(line) for line in events_file.read_text().splitlines()]
+    assert len(parsed) == 100
+    for i in range(50):
+        assert parsed[2 * i]["_event"] == "v2_runner_on_ok"
+        assert parsed[2 * i]["seq"] == i
+        assert parsed[2 * i + 1]["_event"] == "aom_stderr_line"
+        assert parsed[2 * i + 1]["line"] == f"stderr line {i}"
+
+
+def test_index_built_from_complete_events_after_end_session(tmp_path: Path) -> None:
+    """Requirement: ``end_session`` flushes the writer BEFORE building the
+    sqlite index, so the index is fresh against the complete events.jsonl.
+
+    If the index were built before the writer drained, the recorded
+    ``events_size`` would be smaller than the final file and
+    ``index_is_fresh`` would report stale immediately after ``end_session``.
+    """
+    from ansible_aom.session import index as session_index
+    from ansible_aom.session.store import SessionManager
+
+    mgr = SessionManager(session_dir=tmp_path / "sessions")
+    sid = mgr.start_session("play.yml", ansible_args=[])
+
+    for i in range(200):
+        mgr.record_event(sid, {"_event": "v2_runner_on_ok", "seq": i})
+
+    mgr.end_session(sid, "completed")
+
+    session_path = tmp_path / "sessions" / sid
+    assert session_index.index_is_fresh(session_path), (
+        "index must be built from the fully-drained events.jsonl"
+    )
+
+
+def _break_events_file(session_path: Path) -> None:
+    """Replace events.jsonl with a directory so the writer's ``open('ab')``
+    fails with an OSError (``IsADirectoryError``)."""
+    events_file = session_path / "events.jsonl"
+    events_file.unlink()
+    events_file.mkdir()
+
+
+def test_write_failure_does_not_propagate(tmp_path: Path) -> None:
+    """R16: a disk write failure in the background writer must never raise
+    out of ``record_event`` / ``record_stderr`` / ``end_session``."""
+    from ansible_aom.session.store import SessionManager
+
+    mgr = SessionManager(session_dir=tmp_path / "sessions")
+    sid = mgr.start_session("play.yml", ansible_args=[])
+    _break_events_file(tmp_path / "sessions" / sid)
+
+    # None of these may raise even though the writer can't open the file.
+    for i in range(20):
+        mgr.record_event(sid, {"_event": "v2_runner_on_ok", "seq": i})
+        mgr.record_stderr(sid, f"line {i}")
+    mgr.flush(sid)
+    mgr.end_session(sid, "completed")
+
+
+def test_write_failure_surfaces_via_recording_failed(tmp_path: Path) -> None:
+    """R16: the writer's disk failure is observable through
+    ``recording_failed`` so the sink can disable recording and warn — the
+    error surfaces asynchronously rather than blocking the hot path."""
+    from ansible_aom.session.store import SessionManager
+
+    mgr = SessionManager(session_dir=tmp_path / "sessions")
+    sid = mgr.start_session("play.yml", ansible_args=[])
+    _break_events_file(tmp_path / "sessions" / sid)
+
+    assert mgr.recording_failed(sid) is None  # not attempted yet
+
+    mgr.record_event(sid, {"_event": "v2_runner_on_ok", "seq": 0})
+    mgr.flush(sid)  # let the writer attempt (and fail) the open
+
+    assert mgr.recording_failed(sid) is not None
