@@ -1976,6 +1976,108 @@ class TestWarningDetectionThroughAnsiPrefix:
         assert parser.warnings == []
 
 
+class TestMultiLineWarningContinuation:
+    """Ansible hard-wraps ``[WARNING]``/``[DEPRECATION WARNING]`` messages to
+    the terminal width. Only the first physical line carries the
+    ``[WARNING]: `` prefix; every wrapped continuation line arrives as
+    magenta-coloured body text with no prefix (e.g.
+    ``\\x1b[1;35m...in use. Set loop_var...\\x1b[0m``).
+
+    Before the fix these continuation lines matched no classifier rule and
+    were recorded as ``source='unknown'`` ``aom_stderr_line`` events — one
+    warning wrapped across N lines produced N-1 unknowns, which at scale is
+    the thousands of unknowns in ``events.jsonl``. They must instead fold
+    into the parent warning: no standalone event, and the warning's message
+    reassembled (ANSI-stripped) from all its physical lines.
+    """
+
+    def _feed_wrapped_warning(self, parser):
+        """Feed a real 3-line wrapped [WARNING] as ansible emits it on the PTY."""
+        first = "\x1b[1;35m[WARNING]: The loop variable 'item' is already in use. You should\x1b[0m"
+        cont1 = (
+            "\x1b[1;35mset the `loop_var` value in the `loop_control` option for the task\x1b[0m"
+        )
+        cont2 = "\x1b[1;35mto something else to avoid variable collisions.\x1b[0m"
+        return (
+            parser.feed_line(first + "\n"),
+            parser.feed_line(cont1 + "\n"),
+            parser.feed_line(cont2 + "\n"),
+        )
+
+    def test_continuation_lines_emit_no_stderr_event(self):
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        e0, e1, e2 = self._feed_wrapped_warning(parser)
+        # First line -> warning via drain path; continuations fold in silently.
+        assert e0 == []
+        assert e1 == []
+        assert e2 == []
+
+    def test_warning_message_reassembled_from_all_lines(self):
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        self._feed_wrapped_warning(parser)
+        assert len(parser.warnings) == 1
+        msg = parser.warnings[0].message
+        assert "\x1b[" not in msg  # ANSI stripped from the stored message
+        # Full sentence reassembled across all three physical lines.
+        assert "The loop variable 'item' is already in use." in msg
+        assert "set the `loop_var` value" in msg
+        assert "to something else to avoid variable collisions." in msg
+
+    def test_deprecation_continuation_keeps_deprecation_type(self):
+        from ansible_aom.core.models import WarningType
+
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        parser.feed_line("\x1b[0;35m[DEPRECATION WARNING]: The foo option is\x1b[0m\n")
+        parser.feed_line("\x1b[0;35mdeprecated and will be removed in 2.99.\x1b[0m\n")
+        assert len(parser.warnings) == 1
+        assert parser.warnings[0].type == WarningType.DEPRECATION
+        assert "deprecated and will be removed in 2.99." in parser.warnings[0].message
+
+    def test_json_event_closes_warning_block(self):
+        """A magenta line after an intervening JSON event starts a fresh
+        warning — it must not append to the earlier, now-closed block."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        parser.feed_line("\x1b[1;35m[WARNING]: first warning body\x1b[0m\n")
+        parser.feed_line('{"_event":"v2_runner_on_ok","hosts":{}}\n')
+        parser.feed_line("\x1b[1;35mlater magenta line\x1b[0m\n")
+        assert len(parser.warnings) == 2
+        assert "later magenta line" not in parser.warnings[0].message
+
+    def test_orphan_magenta_line_classified_as_warning_not_unknown(self):
+        """Color-based classification: a magenta stderr line with no open
+        warning block is still warning-family, never emitted as 'unknown'."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        events = parser.feed_line("\x1b[1;35mstandalone magenta notice\x1b[0m\n")
+        assert events == []
+        assert len(parser.warnings) == 1
+        assert "standalone magenta notice" in parser.warnings[0].message
+
+    def test_non_magenta_unknown_line_still_unknown(self):
+        """Regression guard: non-coloured unrecognised lines are unaffected
+        and still classify as ``unknown``."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        events = parser.feed_line("some completely unrecognised line\n")
+        assert len(events) == 1
+        assert events[0]["source"] == "unknown"
+
+    def test_red_colored_line_does_not_fold_into_warning(self):
+        """Only magenta (warn/deprecate) folds. A red line after a warning
+        closes the block and emits its own event."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        parser.feed_line("\x1b[1;35m[WARNING]: a warning\x1b[0m\n")
+        events = parser.feed_line("\x1b[31mred non-warning text\x1b[0m\n")
+        assert len(events) == 1
+        assert events[0]["_event"] == "aom_stderr_line"
+        assert "red non-warning text" not in parser.warnings[0].message
+
+
 # =============================================================================
 # Section 5.6: aom_stderr_line synthetic event emission
 # =============================================================================

@@ -38,6 +38,14 @@ logger = logging.getLogger(__name__)
 # still anchor against the WARNING_PATTERNS regexes.
 _ANSI_SGR_RE = re.compile(r"\x1b\[[0-9;]*m")
 
+# A leading foreground-magenta SGR (``\x1b[1;35m`` bright / ``\x1b[0;35m`` or
+# ``\x1b[35m`` plain). ansible-core colours ``[WARNING]`` bright purple and
+# ``[DEPRECATION WARNING]`` purple, and hard-wraps them to the terminal width
+# so continuation lines arrive as magenta body text with no ``[WARNING]: ``
+# prefix. The colour is the only signal that ties such a line back to its
+# warning — see ``_handle_plaintext``.
+_MAGENTA_SGR_RE = re.compile(r"^\x1b\[(?:\d+;)*35m")
+
 
 def _has_surrogate_codepoint(s: str) -> bool:
     """True if ``s`` contains any surrogate codepoint (U+D800..U+DFFF).
@@ -192,6 +200,12 @@ class PtyStreamParser:
         self._in_recap: bool = False
         self._recap_lines: list[str] = []
         self._warnings: list[WarningEntry] = []
+        # The warning currently being assembled from wrapped continuation
+        # lines. None between warning blocks. Set when a ``[WARNING]``/
+        # ``[DEPRECATION WARNING]`` first line (or an orphan magenta line)
+        # arrives; cleared by any non-magenta plaintext line, a blank line,
+        # or a consumed JSON event (see ``_parse_and_return``).
+        self._current_warning: WarningEntry | None = None
         self._plaintext_lines: list[str] = []
         # True when the most recent classified output line was plaintext;
         # flipped False as soon as a JSONL event is consumed. Lets the
@@ -273,8 +287,11 @@ class PtyStreamParser:
             data = _safe_loads(line)
             if isinstance(data, dict) and "_event" in data:
                 # A JSONL event is the child's latest output — invalidate
-                # any prior plaintext line as a prompt candidate.
+                # any prior plaintext line as a prompt candidate and close
+                # any open multi-line warning block so a later magenta line
+                # can't fold into a warning from before this event.
                 self._plaintext_is_latest_output = False
+                self._current_warning = None
                 return [cast(JsonlEvent, data)]
         except ValueError:
             pass
@@ -295,8 +312,10 @@ class PtyStreamParser:
             (which are handled via the existing ``drain_warnings`` path).
         """
         clean = _ANSI_SGR_RE.sub("", line)
-        # Empty or whitespace-only lines are not stderr — return empty.
+        # Empty or whitespace-only lines are not stderr — they also close any
+        # open multi-line warning block.
         if not clean or not clean.strip():
+            self._current_warning = None
             return []
 
         for pattern in self.WARNING_PATTERNS:
@@ -307,14 +326,38 @@ class PtyStreamParser:
                 elif "DEPRECATED" in pattern:
                     warning_type = WarningType.DEPRECATION
 
-                self._warnings.append(
-                    WarningEntry(
-                        type=warning_type,
-                        message=clean,
-                        timestamp=datetime.now(),
-                    )
+                entry = WarningEntry(
+                    type=warning_type,
+                    message=clean,
+                    timestamp=datetime.now(),
                 )
+                self._warnings.append(entry)
+                self._current_warning = entry
                 return []
+
+        # ansible hard-wraps warnings to the terminal width and colours the
+        # whole block magenta; continuation lines carry no ``[WARNING]: ``
+        # prefix, only the colour. Fold a magenta, prefix-less line into the
+        # open warning block — or, if none is open, record it as its own
+        # warning (colour-based classification) — so it never becomes a
+        # spurious ``source='unknown'`` aom_stderr_line event.
+        if _MAGENTA_SGR_RE.match(line):
+            if self._current_warning is not None:
+                self._current_warning.message = (
+                    self._current_warning.message.rstrip() + " " + clean.strip()
+                )
+            else:
+                entry = WarningEntry(
+                    type=WarningType.WARNING,
+                    message=clean,
+                    timestamp=datetime.now(),
+                )
+                self._warnings.append(entry)
+                self._current_warning = entry
+            return []
+
+        # Not warning-family: any open warning block ends here.
+        self._current_warning = None
 
         # Classify the line via stderr_classifier and emit a synthetic
         # aom_stderr_line event so the session recording captures it.
