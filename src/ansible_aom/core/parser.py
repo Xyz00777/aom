@@ -193,6 +193,12 @@ class PtyStreamParser:
         self._recap_lines: list[str] = []
         self._warnings: list[WarningEntry] = []
         self._plaintext_lines: list[str] = []
+        # True when the most recent classified output line was plaintext;
+        # flipped False as soon as a JSONL event is consumed. Lets the
+        # runner's TIMEOUT prompt heuristic reject a stale plaintext line
+        # (an early ``?`` banner) that is no longer the child's latest
+        # output. See ``latest_output_is_plaintext``.
+        self._plaintext_is_latest_output: bool = False
         self._current_timestamp: datetime | None = None
         # Connection tracking: host -> ordered list of active connection_ids.
         # Populated by aom_connection_acquired / aom_connection_released events
@@ -266,6 +272,9 @@ class PtyStreamParser:
         try:
             data = _safe_loads(line)
             if isinstance(data, dict) and "_event" in data:
+                # A JSONL event is the child's latest output — invalidate
+                # any prior plaintext line as a prompt candidate.
+                self._plaintext_is_latest_output = False
                 return [cast(JsonlEvent, data)]
         except ValueError:
             pass
@@ -324,6 +333,9 @@ class PtyStreamParser:
         }
 
         self._plaintext_lines.append(line)
+        # This plaintext line is now the child's latest output — it may be
+        # a live prompt candidate until a JSONL event supersedes it.
+        self._plaintext_is_latest_output = True
         # R2: cap plaintext_lines at MAX_LOG_LINES so a long noisy run
         # can't grow this list without bound. Drop oldest first — the
         # tail is what's useful for "what did pexpect just see?" stall
@@ -456,6 +468,20 @@ class PtyStreamParser:
     @property
     def plaintext_lines(self) -> list[str]:
         return self._plaintext_lines
+
+    @property
+    def latest_output_is_plaintext(self) -> bool:
+        """True if the most recent classified output line was plaintext.
+
+        A JSONL event consumed after a plaintext line flips this False.
+        The runner's TIMEOUT prompt heuristic uses ``plaintext_lines[-1]``
+        as a prompt candidate, but JSONL events never touch that list —
+        so a stale line ending in ``?`` early in a run would otherwise
+        stay the 'last plaintext' forever and arm a block-forever
+        ``input()`` trap on every later quiet window. Gate the candidate
+        on this flag so only genuinely-latest plaintext counts.
+        """
+        return self._plaintext_is_latest_output
 
     @property
     def pending_password_prompt(self) -> str | None:

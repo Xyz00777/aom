@@ -357,6 +357,55 @@ class TestPtyStreamParserPlaintextCap:
         assert parser.plaintext_lines[-1] == "line 59999"
 
 
+class TestPtyStreamParserLatestOutputIsPlaintext:
+    """``latest_output_is_plaintext`` tracks whether the most recent
+    classified output line was plaintext (vs a JSONL event).
+
+    The runner's TIMEOUT prompt heuristic uses ``plaintext_lines[-1]`` as
+    a prompt candidate, but JSONL events never touch that list — so an
+    early line ending in ``?`` stays the 'last plaintext' forever and
+    arms a block-forever ``input()`` trap on every later quiet window.
+    This flag lets the runner reject a plaintext candidate once any JSONL
+    event has been consumed after it.
+    """
+
+    def test_initially_false(self):
+        parser = PtyStreamParser()
+        assert parser.latest_output_is_plaintext is False
+
+    def test_plaintext_line_sets_true(self):
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        parser.feed_line("Deploy which environment?")
+        assert parser.latest_output_is_plaintext is True
+
+    def test_jsonl_event_after_plaintext_clears_it(self):
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        parser.feed_line("Deploy which environment?")
+        assert parser.latest_output_is_plaintext is True
+
+        parser.feed_line(json.dumps({"_event": "v2_runner_on_ok", "_timestamp": "x"}))
+        assert parser.latest_output_is_plaintext is False
+        # The stale plaintext line is still retained for stall diagnostics;
+        # only its *prompt-candidate* status is invalidated.
+        assert parser.plaintext_lines[-1] == "Deploy which environment?"
+
+    def test_plaintext_after_jsonl_sets_true_again(self):
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        parser.feed_line(json.dumps({"_event": "v2_playbook_on_task_start", "_timestamp": "x"}))
+        assert parser.latest_output_is_plaintext is False
+
+        parser.feed_line("Proceed?")
+        assert parser.latest_output_is_plaintext is True
+
+    def test_start_event_leaves_it_false(self):
+        parser = PtyStreamParser()  # PRE_RUN_PROMPTS
+        parser.feed_line(json.dumps({"_event": "v2_playbook_on_start", "_timestamp": "x"}))
+        assert parser.latest_output_is_plaintext is False
+
+
 class TestPtyStreamParserPhases:
     """TC-128 to TC-142: PTY stream phase transitions."""
 

@@ -675,11 +675,23 @@ def _drive(
                 break
             # Pre-stats timeout: same liveness / prompt heuristics as
             # before — the watchdog doesn't apply yet.
-            prior = parser.plaintext_lines[-1] if parser.plaintext_lines else None
-            # Rebuild a multi-line ``|`` pause block whose terminating
-            # ``:`` landed on its own line (the bare-colon ``prior`` alone
-            # carries no signal — the identifying header is lines back).
-            prompt_block = _reconstruct_pause_prompt(parser.plaintext_lines)
+            #
+            # Only consider plaintext as a prompt candidate when it is
+            # genuinely the child's LATEST output. JSONL events never touch
+            # ``plaintext_lines``, so a stale line ending in ``?`` early in a
+            # run would otherwise stay ``plaintext_lines[-1]`` forever and
+            # arm a block-forever ``input()`` trap on every later quiet
+            # window (e.g. a long silent task). ``latest_output_is_plaintext``
+            # is False once any JSONL event has been consumed after the line.
+            if parser.plaintext_lines and parser.latest_output_is_plaintext:
+                prior = parser.plaintext_lines[-1]
+                # Rebuild a multi-line ``|`` pause block whose terminating
+                # ``:`` landed on its own line (the bare-colon ``prior`` alone
+                # carries no signal — the identifying header is lines back).
+                prompt_block = _reconstruct_pause_prompt(parser.plaintext_lines)
+            else:
+                prior = None
+                prompt_block = None
             _trace(
                 "timeout",
                 stall_count=stall_count,
