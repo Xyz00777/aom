@@ -341,7 +341,27 @@ def _play_def_for_state(run_state: "RunState", play: "PlayRunState") -> "PlayDef
     return None
 
 
-def task_complete_on_all_targets(run_state: "RunState", task_uuid: str) -> bool:
+def play_dead_hosts(play: "PlayRunState") -> set[str]:
+    """Hosts that went FAILED/UNREACHABLE anywhere in ``play``.
+
+    Ansible drops these hosts from the play, so they never reach later
+    tasks. O(tasks × hosts) — callers on hot paths should memoise (see
+    the ``dead_by_play`` parameter of ``task_complete_on_all_targets``).
+    """
+    return {
+        hostname
+        for t in play.tasks.values()
+        for hostname, hs in t.hosts.items()
+        if hs.status in (Status.FAILED, Status.UNREACHABLE)
+    }
+
+
+def task_complete_on_all_targets(
+    run_state: "RunState",
+    task_uuid: str,
+    *,
+    dead_by_play: dict[str, set[str]] | None = None,
+) -> bool:
     """True when every live target host has finished ``task_uuid``.
 
     "Live targets" = the task's play target host set (preflight
@@ -357,6 +377,14 @@ def task_complete_on_all_targets(run_state: "RunState", task_uuid: str) -> bool:
     set is what makes the per-task summary reflect the whole play instead
     of whichever cohort happened to have reported first.
 
+    ``dead_by_play`` is an optional memo dict (play_id → dead-host set)
+    filled lazily. The dead-host scan is O(play tasks × hosts); without a
+    memo, a caller checking many tasks per event re-pays it per call —
+    the quadratic sweep behind the free-strategy display freeze. The
+    CALLER owns invalidation: entries must be dropped whenever a host
+    dies (failed/unreachable), a play (re)starts, or a formerly-dead
+    host's result is overwritten (retry recovery).
+
     Returns False when the task is unknown or no target information is
     available yet — callers treat "can't tell" as "not complete" and
     fall back to the run-end forced flush.
@@ -369,17 +397,17 @@ def task_complete_on_all_targets(run_state: "RunState", task_uuid: str) -> bool:
         targets = _play_target_hostnames(play, play_def)
         if not targets:
             return False
-        # Hosts that went FAILED/UNREACHABLE somewhere in the play. Ansible
-        # drops them, so one that died *before* reaching this task will
-        # never run it and must not block completion. A host that died *in*
-        # this task, however, has a terminal entry here — it finished (by
-        # failing) and is counted normally by the loop below.
-        dead = {
-            hostname
-            for t in play.tasks.values()
-            for hostname, hs in t.hosts.items()
-            if hs.status in (Status.FAILED, Status.UNREACHABLE)
-        }
+        # A host that died *before* reaching this task never runs it and
+        # must not block completion. One that died *in* this task has a
+        # terminal entry here — it finished (by failing) and is counted
+        # normally by the loop below.
+        if dead_by_play is not None:
+            dead = dead_by_play.get(play.play_id)
+            if dead is None:
+                dead = play_dead_hosts(play)
+                dead_by_play[play.play_id] = dead
+        else:
+            dead = play_dead_hosts(play)
         for hostname in targets:
             hs = task.hosts.get(hostname)
             if hs is not None:

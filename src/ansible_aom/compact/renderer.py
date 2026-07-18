@@ -100,6 +100,12 @@ _TERMINAL_RUNNER_EVENTS = frozenset(
     }
 )
 
+# Host-death events. A death shrinks the play's live-target set, which
+# can complete OTHER pending tasks the dead host was blocking — the one
+# case that still needs a sweep over the whole pending list (rare, so
+# the sweep cost is off the per-event hot path).
+_DEATH_RUNNER_EVENTS = frozenset({"v2_runner_on_failed", "v2_runner_on_unreachable"})
+
 
 class _BoundedSet(set):  # noqa: FURB189 — subclassing set is intentional
     """A ``set`` that drops itself when it exceeds a cap on insert.
@@ -270,11 +276,21 @@ class CompactRenderer:
         # be on a different scale under replay / synthetic fixtures).
         self._last_event_time: float | None = None
         # UUIDs of announced-but-not-yet-summarised tasks, in announce
-        # order. The summary sweep walks this list, emits any task now
-        # complete (see ``task_complete_on_all_targets``), and removes it
-        # from the list — so a summarised task is never revisited and the
-        # list stays bounded by the in-flight task set, not run length.
-        self._announced_order: list[str] = []
+        # order (dict for O(1) membership/removal; insertion-ordered).
+        # A task is emitted the moment it completes (see
+        # ``task_complete_on_all_targets``) and removed — so a summarised
+        # task is never revisited and this stays bounded by the in-flight
+        # task set, not run length.
+        self._announced_order: dict[str, None] = {}
+        # Memo of each play's dead-host set (play_id → hostnames), fed to
+        # ``task_complete_on_all_targets`` so completion checks don't
+        # rescan the whole play per call (the quadratic sweep behind the
+        # free-strategy display freeze). Invalidated wholesale on any
+        # event that can change a dead set: a death, a play (re)start, or
+        # an ok/skipped result overwriting a formerly-dead host's entry
+        # (retry recovery). All are rare; the memo is hot the rest of the
+        # time.
+        self._play_dead_cache: dict[str, set[str]] = {}
         # "The task whose header is currently on screen" — the most
         # recently announced UUID. Drives the ``[task: …]`` straggler
         # suffix (a result whose task differs from this reads as
@@ -402,6 +418,7 @@ class CompactRenderer:
         self._tasks_completed = 0
         self._completed_task_ids = _BoundedSet(_COMPLETED_TASK_IDS_CAP)
         self._announced_task_uuids = _BoundedSet(_ANNOUNCED_TASK_UUIDS_CAP)
+        self._play_dead_cache = {}
         # ``_estimate`` is set by ``set_prior_run`` and not reset here, the
         # same way ``_prior_run`` isn't — only the per-run accumulators are.
         self._progress = RunProgress()
@@ -505,16 +522,39 @@ class CompactRenderer:
         # Update RunState with the event
         self._state.handle_event(event)
 
+        # Keep the dead-host memo honest BEFORE any completion check. A
+        # death or play (re)start changes dead sets outright; an ok/
+        # skipped result for a host the memo believes dead means a FAILED
+        # entry was overwritten (retry recovery) — the host is alive
+        # again and must block completion of tasks it hasn't reached.
+        event_name = event.get("_event")
+        if event_name == "v2_playbook_on_play_start" or event_name in _DEATH_RUNNER_EVENTS:
+            self._play_dead_cache.clear()
+        elif event_name in _TERMINAL_RUNNER_EVENTS and self._play_dead_cache:
+            event_hosts = self._hosts_dict(event)
+            if any(h in dead for dead in self._play_dead_cache.values() for h in event_hosts):
+                self._play_dead_cache.clear()
+
         # A terminal event may have been the last target host to finish an
         # earlier task (a free-strategy straggler completing a task whose
         # header scrolled off long ago). Detect completion AFTER
-        # handle_event so the just-finished host is counted. ``behind_only``
-        # leaves the currently-on-screen task to be summarised at the next
+        # handle_event so the just-finished host is counted. A task can
+        # only newly complete via one of its OWN terminal events, so the
+        # check is scoped to the event's task — sweeping the whole pending
+        # list per event is quadratic under a free strategy with straggler
+        # hosts (the mid-run display freeze). The exceptions that DO need
+        # the sweep: host deaths (shrink the live-target set for every
+        # pending task) and events with no task id (can't be scoped). The
+        # currently-on-screen task is left to be summarised at the next
         # task announcement, preserving the linear inter-task placement.
-        if event.get("_event") in _TERMINAL_RUNNER_EVENTS:
+        if event_name in _TERMINAL_RUNNER_EVENTS:
             event_time = self._event_time(event)
             if event_time is not None:
-                self._flush_ready_summaries(event_time, behind_only=True)
+                task_uuid = self._task_dict(event).get("id", "")
+                if event_name in _DEATH_RUNNER_EVENTS or not task_uuid:
+                    self._flush_ready_summaries(event_time, behind_only=True)
+                elif task_uuid != self._last_task_uuid:
+                    self._maybe_flush_completed(task_uuid, event_time)
 
         # HS-2: bump the incremental counters using the freshly-mutated
         # state. Done after ``handle_event`` so the task's hosts dict
@@ -1319,10 +1359,9 @@ class CompactRenderer:
         """
         if self._state is None:
             return
-        remaining: list[str] = []
+        emitted: list[str] = []
         for task_uuid in self._announced_order:
             if behind_only and task_uuid == self._last_task_uuid:
-                remaining.append(task_uuid)
                 continue
             if force:
                 # Drain the tail at run end — but only tasks that actually
@@ -1336,14 +1375,31 @@ class CompactRenderer:
                 # its hosts actually finished much earlier.
                 summary_now = self._task_last_result_time(task_uuid) or now
             else:
-                emit = task_complete_on_all_targets(self._state, task_uuid)
+                emit = task_complete_on_all_targets(
+                    self._state, task_uuid, dead_by_play=self._play_dead_cache
+                )
                 summary_now = now
             if emit:
                 self._emit_task_summary(task_uuid, summary_now)
                 self._discard_task_state(task_uuid)
-            else:
-                remaining.append(task_uuid)
-        self._announced_order = remaining
+                emitted.append(task_uuid)
+        for task_uuid in emitted:
+            del self._announced_order[task_uuid]
+
+    def _maybe_flush_completed(self, task_uuid: str, now: float) -> None:
+        """Emit ``task_uuid``'s summary if it just completed on all targets.
+
+        The event-scoped fast path of ``_flush_ready_summaries``: called
+        with the task a terminal event belongs to (or, at announce time,
+        the task being displaced as "current"), so ordinary events pay one
+        completion check instead of a sweep over every pending task.
+        """
+        if self._state is None or task_uuid not in self._announced_order:
+            return
+        if task_complete_on_all_targets(self._state, task_uuid, dead_by_play=self._play_dead_cache):
+            self._emit_task_summary(task_uuid, now)
+            self._discard_task_state(task_uuid)
+            del self._announced_order[task_uuid]
 
     def _discard_task_state(self, task_uuid: str) -> None:
         """Drop a summarised task's per-task bookkeeping (keeps memory
@@ -1558,13 +1614,15 @@ class CompactRenderer:
         self._flush_pending_skips(force_individual=self._current_task_had_nonskipped_result)
         # Reset per-task state for the task we're about to print.
         self._current_task_had_nonskipped_result = False
-        # Any previously-announced task that is now complete lands BEFORE
-        # this new TASK header. Under linear strategy that's the task that
-        # just finished (attached to its own output, as before); under
-        # free strategy it's any earlier task whose last host finally
-        # reported. Stragglers still-incomplete stay pending.
-        if event_time is not None:
-            self._flush_ready_summaries(event_time)
+        # If the task being displaced as "current" is complete, its
+        # summary lands BEFORE this new TASK header (under linear
+        # strategy that's the task that just finished, attached to its
+        # own output). It is the only task the terminal-event checks can
+        # have deferred: every other pending task was checked the moment
+        # its own last host reported (``behind_only`` skips only the
+        # current one), so no sweep is needed here.
+        if event_time is not None and self._last_task_uuid is not None:
+            self._maybe_flush_completed(self._last_task_uuid, event_time)
         self._display.print_log(f"\nTASK [{task_name}] " + "*" * 50)
         self._maybe_emit_pause_seconds_hint(task_meta)
         # Stash timing/name and register the task in announce order so its
@@ -1575,7 +1633,7 @@ class CompactRenderer:
             self._last_task_uuid = task_uuid
         if task_uuid:
             self._announced_task_uuids.add(task_uuid)
-            self._announced_order.append(task_uuid)
+            self._announced_order[task_uuid] = None
 
     def _task_dict(self, event: JsonlEvent) -> JsonlTask:
         """Extract the ``task`` field as a dict.
