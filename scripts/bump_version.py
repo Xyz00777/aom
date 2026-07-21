@@ -114,6 +114,30 @@ def _read_head_message(repo_root: Path) -> str:
     return result.stdout
 
 
+def _resolve_repo_root() -> Path:
+    """Return the worktree whose Git invocation triggered this hook."""
+    result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return Path(result.stdout.strip())
+
+
+def _resolve_git_path(repo_root: Path, name: str) -> Path:
+    """Resolve a Git administrative path for the active worktree."""
+    result = subprocess.run(
+        ["git", "rev-parse", "--git-path", name],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    path = Path(result.stdout.strip())
+    return path if path.is_absolute() else repo_root / path
+
+
 _HELP = """\
 Usage: bump_version.py
 
@@ -142,7 +166,10 @@ def main(argv: list[str]) -> int:
     if os.environ.get("AOM_BUMP_HOOK_RUNNING"):
         return 0
 
-    repo_root = Path(__file__).resolve().parent.parent
+    try:
+        repo_root = _resolve_repo_root()
+    except subprocess.SubprocessError, FileNotFoundError:
+        return 0
     pyproject = repo_root / "pyproject.toml"
     if not pyproject.exists():
         return 0
@@ -159,9 +186,13 @@ def main(argv: list[str]) -> int:
     # Bail out if we're mid-rebase / mid-merge / mid-cherry-pick — an
     # amend during those would scramble the in-flight sequencing.
     for marker in ("REBASE_HEAD", "MERGE_HEAD", "CHERRY_PICK_HEAD", "BISECT_LOG"):
-        if (repo_root / ".git" / marker).exists():
+        try:
+            marker_path = _resolve_git_path(repo_root, marker)
+        except subprocess.SubprocessError, FileNotFoundError:
+            return 0
+        if marker_path.exists():
             sys.stderr.write(
-                f"[bump-version] skipped: .git/{marker} present — bumping "
+                f"[bump-version] skipped: {marker} present — bumping "
                 "during rebase/merge/cherry-pick/bisect is unsafe\n"
             )
             return 0
