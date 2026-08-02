@@ -833,10 +833,10 @@ class LoopItem:
 class DetailBlock:
     """Right-pane data for a focused (task, host) pair.
 
-    Everything here is *per task × host*. Session-wide info
-    (``stderr.log``, overall stats) belongs elsewhere — including the
-    session stderr in this block was confusing because it didn't change
-    when navigating between tasks.
+    Everything here is *per task × host*. Session-wide stderr from
+    ``aom_stderr_line`` events in ``events.jsonl`` and overall stats belong
+    elsewhere; including session stderr in this block was confusing because
+    it didn't change when navigating between tasks.
     """
 
     task_name: str

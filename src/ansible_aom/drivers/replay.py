@@ -24,10 +24,10 @@ inspection:
   renderer rebuilds its tree from ``v2_playbook_on_play_start`` /
   ``v2_playbook_on_task_start`` events).
 * Password-prompt log lines emitted by the runner.
-* ``aom_stderr_line`` synthetic events (Phase 4 — the stderr stream
-  that used to live in ``stderr.log``). They are recorded for
-  ``aom inspect`` but are not part of the live renderer view, so
-  replay skips them too. This keeps record→replay round-trips stable:
+* ``aom_stderr_line`` synthetic events. They are recorded in
+  ``events.jsonl`` for ``aom inspect`` but are not part of the live
+  renderer view, so replay skips them too. This keeps record-to-replay
+  round-trips stable:
   a preflight ``aom_stderr_line`` written by ``record_stderr`` (which
   the runner does not forward to ``update_state``) would otherwise
   appear in the replayed sequence but not the recorded one.
@@ -182,7 +182,7 @@ What replay does NOT reproduce:
   * The preflight summary — definitions are rebuilt from
     v2_playbook_on_play_start / v2_playbook_on_task_start events.
   * Password-prompt log lines.
-  * stderr lines from stderr.log.
+  * aom_stderr_line synthetic events stored in events.jsonl for inspect.
 
 Anything else that appeared in events.jsonl is replayed verbatim.
 """

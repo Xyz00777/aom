@@ -256,9 +256,10 @@ Verbosity:
 
 Session recording:
   Every run writes ~/.local/state/aom/sessions/<uuidv7>/ containing
-  events.jsonl, stderr.log, and meta.json. Recording is best-effort —
-  disk errors are logged but never abort the run. Use `aom inspect`
-  to replay past runs; `aom inspect prune` to clean up.
+  events.jsonl (including aom_stderr_line events), meta.json,
+  diagnostics.json, and an optional derived index.db. Recording is
+  best-effort — disk errors are logged but never abort the run. Use
+  `aom inspect` to view past runs; `aom inspect prune` to clean up.
   Pass --no-record to disable session writing for a single invocation
   (debug logs from --verbose are unaffected).
 
@@ -304,7 +305,10 @@ Debugging:
 
 File locations:
   Sessions:    ~/.local/state/aom/sessions/<uuidv7>/
-  Config:      ~/.config/aom/config.yaml (optional)
+  User config: ~/.config/aom/aom_config.yaml (optional)
+  Config layers: built-in, /etc/aom/aom_config.yaml, user config,
+                 ./.aom_config.yaml, then AOM_CONFIG or --config.
+                 ~/.config/aom/config.yaml is legacy migration input only.
   Inventory:   auto-detects ./inventory.ini, ./inventory.yml,
                ./inventory.yaml, ./inventory, ./hosts.ini, ./hosts.yml,
                ./hosts.yaml, ./hosts (first match wins).

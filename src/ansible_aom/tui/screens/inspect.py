@@ -1338,9 +1338,9 @@ class InspectApp(App):
         """Render the per-task detail body.
 
         Everything here is specific to the focused (task, host) pair —
-        session-wide content (the session ``stderr.log``) belongs in a
-        separate view, not under each task, because re-rendering the same
-        text on every cursor move was confusing.
+        session-wide stderr from ``aom_stderr_line`` events in ``events.jsonl``
+        belongs in a separate view, not under each task, because re-rendering
+        the same text on every cursor move was confusing.
         """
         status_color = _STATUS_COLOR.get(block.status, "")
         status_markup = f"[{status_color}]{block.status}[/]" if status_color else block.status
