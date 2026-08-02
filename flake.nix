@@ -11,10 +11,11 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         python = pkgs.python314;
+        pyproject = fromTOML (builtins.readFile ./pyproject.toml);
       in {
         packages.default = python.pkgs.buildPythonApplication {
           pname = "ansible-aom";
-          version = "0.1.0";
+          version = pyproject.project.version;
           src = ./.;
           format = "pyproject";
 
