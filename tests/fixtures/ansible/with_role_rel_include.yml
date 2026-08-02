@@ -1,0 +1,6 @@
+---
+- name: Role-relative include_tasks smoke test (TC-094b)
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - podman_role_rel

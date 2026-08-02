@@ -1,0 +1,9 @@
+---
+- name: Throttle probe
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Throttled task (2 at a time, 6 hosts => 3 waves)
+      ansible.builtin.wait_for:
+        timeout: 1
+      throttle: 2

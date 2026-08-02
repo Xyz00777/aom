@@ -1,0 +1,14 @@
+---
+- name: Playbook with include_role
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Task before role
+      debug:
+        msg: "Before"
+    - name: Apply test role dynamically
+      include_role:
+        name: test_role
+    - name: Task after role
+      debug:
+        msg: "After"

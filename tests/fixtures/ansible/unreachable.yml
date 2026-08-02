@@ -1,0 +1,15 @@
+---
+- name: Playbook with unreachable task
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: First task
+      debug:
+        msg: "First"
+    - name: Unreachable task
+      debug:
+        msg: "This is unreachable"
+      when: false
+    - name: Task after unreachable
+      debug:
+        msg: "After"

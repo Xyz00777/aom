@@ -1,0 +1,21 @@
+---
+- name: First play
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Task in play 1
+      debug:
+        msg: "Play 1"
+
+- name: Second play
+  hosts: localhost
+  gather_facts: false
+  tags: [deploy]
+  tasks:
+    - name: Task in play 2
+      debug:
+        msg: "Play 2"
+    - name: Another task in play 2
+      debug:
+        msg: "Play 2b"
+      tags: [tag1]

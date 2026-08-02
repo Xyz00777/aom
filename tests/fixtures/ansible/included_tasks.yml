@@ -1,0 +1,7 @@
+---
+- name: Included task 1
+  debug:
+    msg: "Included"
+- name: Included task 2
+  debug:
+    msg: "Included 2"

@@ -1,0 +1,10 @@
+---
+- name: Playbook with nested includes
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Direct task
+      debug:
+        msg: "Direct"
+    - name: Level 1 include
+      include_tasks: nested_level1.yml

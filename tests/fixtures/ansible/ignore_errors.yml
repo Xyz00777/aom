@@ -1,0 +1,13 @@
+---
+- name: Ignore-errors test playbook
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Task that fails but is ignored
+      ansible.builtin.fail:
+        msg: "acceptable failure"
+      ignore_errors: true
+
+    - name: Continue after ignored failure
+      ansible.builtin.debug:
+        msg: "still running"

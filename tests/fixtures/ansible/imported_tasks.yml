@@ -1,0 +1,7 @@
+---
+- name: Imported task 1
+  debug:
+    msg: "Imported"
+- name: Imported task 2
+  debug:
+    msg: "Imported 2"

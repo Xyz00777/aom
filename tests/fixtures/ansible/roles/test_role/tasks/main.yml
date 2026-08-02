@@ -1,0 +1,11 @@
+---
+- name: Role task 1
+  debug:
+    msg: "Role task 1"
+- name: Role task 2
+  debug:
+    msg: "Role task 2"
+  tags: [role_tag]
+- name: Role task 3
+  debug:
+    msg: "Role task 3"
