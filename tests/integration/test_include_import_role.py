@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-FIXTURES_DIR = Path(__file__).resolve().parents[2] / ".sisyphus" / "test-fixtures"
+FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "ansible"
 
 
 def _ansible_collection_paths() -> list[str]:

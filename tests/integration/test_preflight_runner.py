@@ -194,7 +194,7 @@ def test_run_preflight_populates_include_cache(tmp_path: Path) -> None:
 
     from ansible_aom.ansible.preflight import run_preflight
 
-    fixtures = Path(__file__).resolve().parent.parent.parent / ".sisyphus" / "test-fixtures"
+    fixtures = Path(__file__).resolve().parents[1] / "fixtures" / "ansible"
     playbook = fixtures / "with_include.yml"
 
     result = run_preflight(
@@ -225,7 +225,7 @@ def test_run_preflight_grafts_include_children_into_definitions(tmp_path: Path) 
     from ansible_aom.ansible.preflight import run_preflight
     from ansible_aom.core.models import TaskDefinition
 
-    fixtures = Path(__file__).resolve().parent.parent.parent / ".sisyphus" / "test-fixtures"
+    fixtures = Path(__file__).resolve().parents[1] / "fixtures" / "ansible"
     playbook = fixtures / "with_include.yml"
 
     result = run_preflight(
@@ -259,7 +259,7 @@ def test_run_preflight_role_relative_include_resolves_under_role(tmp_path: Path)
 
     from ansible_aom.ansible.preflight import run_preflight
 
-    fixtures = Path(__file__).resolve().parent.parent.parent / ".sisyphus" / "test-fixtures"
+    fixtures = Path(__file__).resolve().parents[1] / "fixtures" / "ansible"
     playbook = fixtures / "with_role_rel_include.yml"
 
     result = run_preflight(

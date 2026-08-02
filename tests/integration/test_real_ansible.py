@@ -7,7 +7,7 @@ emitting a new event type) because the shim happily speaks whatever
 yesterday's version spoke.
 
 These tests actually spawn ``ansible-playbook`` against the fixtures in
-``.sisyphus/test-fixtures/`` and assert end-to-end:
+``tests/fixtures/ansible/`` and assert end-to-end:
 
 * aom exits with the expected status,
 * the session directory was created and contains a non-empty
@@ -33,7 +33,7 @@ import pytest
 
 from ansible_aom.core.parser import JsonLineStream
 
-FIXTURES_DIR = Path(__file__).resolve().parents[2] / ".sisyphus" / "test-fixtures"
+FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "ansible"
 
 
 def _ansible_collection_paths() -> list[str]:
@@ -162,7 +162,7 @@ class TestRealAnsibleSmoke:
     """Live ansible-playbook integration — fixtures that work with ``-c local``.
 
     Only ``simple.yml`` and ``syntax_error.yml`` are exercised here.
-    The other ``.sisyphus/test-fixtures/`` playbooks either target
+    The other ``tests/fixtures/ansible/`` playbooks either target
     inventory groups that don't resolve against a bare
     ``localhost,`` host-list (``multi_hosts.yml``) or only ever skip
     tasks (``unreachable.yml`` uses ``when: false``), so neither

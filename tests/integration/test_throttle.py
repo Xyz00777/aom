@@ -36,7 +36,7 @@ For a 6-host, single-throttled-task playbook (``throttle: 2``):
    - ``{h5, h6} -> wave 3``
 
 The test runs real ``ansible-playbook`` (not a fake shim) against the
-fixture in ``.sisyphus/test-fixtures/with_throttle.yml`` and asserts
+    fixture in ``tests/fixtures/ansible/with_throttle.yml`` and asserts
 against the recorded session.
 
 Skips automatically when ``ansible-playbook`` or the
@@ -57,7 +57,7 @@ import pytest
 
 from ansible_aom.core.parser import JsonLineStream
 
-FIXTURES_DIR = Path(__file__).resolve().parents[2] / ".sisyphus" / "test-fixtures"
+FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "ansible"
 
 
 def _ansible_collection_paths() -> list[str]:

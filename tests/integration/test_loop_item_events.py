@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-FIXTURES_DIR = Path(__file__).resolve().parents[2] / ".sisyphus" / "test-fixtures"
+FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "ansible"
 CALLBACK_DIR = Path(__file__).resolve().parents[2] / "src" / "ansible_aom" / "ansible" / "callback"
 
 
