@@ -97,34 +97,20 @@ class TestSingleTaskSuccess:
     """Integration tests for 01-single-task-success playbook."""
 
     @requires_ansible
-    def test_parser_phases_correct(self):
-        """Parser transitions through PRE_RUN_PROMPTS -> EXECUTION -> POST_RUN_RECAP."""
+    def test_single_task_success_round_trip(self):
         returncode, lines, _ = run_ansible_playbook("01-single-task-success")
         assert returncode == 0, "Playbook should succeed"
-        parser, _ = parse_jsonl_output(lines)
-        assert parser.phase == StreamPhase.POST_RUN_RECAP
-        assert len(parser.recap_lines) >= 0
 
-    @requires_ansible
-    def test_parser_produces_correct_events(self):
-        """Parser produces expected event types for single OK task."""
-        returncode, lines, _ = run_ansible_playbook("01-single-task-success")
-        assert returncode == 0
         parser, run_state = parse_jsonl_output(lines)
-        assert len(run_state.plays) == 1
+        assert parser.phase == StreamPhase.POST_RUN_RECAP
         assert run_state.status == Status.COMPLETED
+        assert len(run_state.plays) == 1
         assert run_state.start_time is not None
         assert run_state.end_time is not None
-
-    @requires_ansible
-    def test_host_status_ok(self):
-        """Host result is OK (not changed)."""
-        returncode, lines, _ = run_ansible_playbook("01-single-task-success")
-        assert returncode == 0
-        parser, run_state = parse_jsonl_output(lines)
         play = list(run_state.plays.values())[0]
+        assert len(play.tasks) == 1
         task = list(play.tasks.values())[0]
-        assert len(task.hosts) >= 1
+        assert set(task.hosts) == {"web1", "web2", "web3"}
         for hostname, host_state in task.hosts.items():
             assert host_state.status == Status.OK
             assert host_state.changed is False
@@ -330,25 +316,13 @@ class TestMultiplePlays:
     """Integration tests for 08-multiple-plays playbook."""
 
     @requires_ansible
-    def test_parser_tracks_multiple_plays(self):
-        """Parser correctly tracks multiple plays."""
+    def test_multiple_plays_round_trip(self):
         returncode, lines, _ = run_ansible_playbook("08-multiple-plays")
         assert returncode == 0
 
         parser, run_state = parse_jsonl_output(lines)
         assert len(run_state.plays) == 2
         assert run_state.status == Status.COMPLETED
-
-        # Both should be completed
-        assert run_state.status == Status.COMPLETED
-
-    @requires_ansible
-    def test_play_names_extracted(self):
-        """Play names are correctly extracted."""
-        returncode, lines, _ = run_ansible_playbook("08-multiple-plays")
-        assert returncode == 0
-
-        parser, run_state = parse_jsonl_output(lines)
         play_names = [play.name for play in run_state.plays.values()]
         assert any("web" in name.lower() for name in play_names)
         assert any("db" in name.lower() or "database" in name.lower() for name in play_names)
@@ -646,70 +620,49 @@ class TestHostPatternFiltering:
     """Integration tests for 28-host-pattern-filtering playbook."""
 
     @requires_ansible
-    def test_host_pattern_exclusion(self):
-        """Host pattern webservers:!ghost excludes ghost host."""
+    def test_host_pattern_limits_hosts(self):
         returncode, lines, _ = run_ansible_playbook("28-host-pattern-filtering")
         assert returncode == 0
+
         parser, run_state = parse_jsonl_output(lines)
         assert run_state.status == Status.COMPLETED
         assert len(run_state.plays) >= 1
 
-    @requires_ansible
-    def test_host_pattern_limits_hosts(self):
-        """Only webservers group hosts are targeted (not ghost)."""
-        returncode, lines, _ = run_ansible_playbook("28-host-pattern-filtering")
-        assert returncode == 0
-        parser, run_state = parse_jsonl_output(lines)
         play = list(run_state.plays.values())[0]
         task = list(play.tasks.values())[0]
-        # Should have 3 webservers (web1, web2, web3), not ghost
-        assert len(task.hosts) >= 1
+        assert set(task.hosts) == {"web1", "web2", "web3"}
 
 
 class TestFreeStrategy:
     """Integration tests for 10-free-strategy playbook."""
 
     @requires_ansible
-    def test_free_strategy_completes(self):
-        """Free strategy playbook completes successfully."""
+    def test_free_strategy_tracks_all_tasks(self):
         returncode, lines, _ = run_ansible_playbook("10-free-strategy")
         assert returncode == 0
+
         parser, run_state = parse_jsonl_output(lines)
         assert run_state.status == Status.COMPLETED
-        assert len(run_state.plays) >= 1
-
-    @requires_ansible
-    def test_free_strategy_multiple_tasks(self):
-        """Free strategy playbook runs multiple tasks per host."""
-        returncode, lines, _ = run_ansible_playbook("10-free-strategy")
-        assert returncode == 0
-        parser, run_state = parse_jsonl_output(lines)
         play = list(run_state.plays.values())[0]
-        # Should have 2 tasks (Task A, Task B)
-        assert len(play.tasks) >= 1
+        assert len(play.tasks) == 2
+        assert {task.name for task in play.tasks.values()} == {"Task A", "Task B"}
 
 
 class TestSingleHostLocalhost:
     """Integration tests for 27-single-host-localhost playbook."""
 
     @requires_ansible
-    def test_localhost_connection(self):
-        """Single host localhost playbook completes."""
+    def test_localhost_connection_and_host_count(self):
         returncode, lines, _ = run_ansible_playbook("27-single-host-localhost")
         assert returncode == 0
+
         parser, run_state = parse_jsonl_output(lines)
         assert run_state.status == Status.COMPLETED
         assert len(run_state.plays) >= 1
 
-    @requires_ansible
-    def test_localhost_host_count(self):
-        """Only localhost appears in task hosts."""
-        returncode, lines, _ = run_ansible_playbook("27-single-host-localhost")
-        assert returncode == 0
-        parser, run_state = parse_jsonl_output(lines)
         play = list(run_state.plays.values())[0]
         task = list(play.tasks.values())[0]
-        assert len(task.hosts) >= 1
+        assert set(task.hosts) == {"localhost"}
 
 
 class TestIncludeVsImport:
@@ -739,23 +692,23 @@ class TestBlockTasks:
     """Integration tests for 31-block-tasks playbook."""
 
     @requires_ansible
-    def test_block_tasks_complete(self):
-        """Block tasks playbook completes successfully."""
+    def test_block_tasks_complete_and_expand(self):
         returncode, lines, _ = run_ansible_playbook("31-block-tasks")
         assert returncode == 0
+
         parser, run_state = parse_jsonl_output(lines)
         assert run_state.status == Status.COMPLETED
         assert len(run_state.plays) >= 1
 
-    @requires_ansible
-    def test_block_contains_multiple_tasks(self):
-        """Block contains multiple sub-tasks plus always/rescue."""
-        returncode, lines, _ = run_ansible_playbook("31-block-tasks")
-        assert returncode == 0
-        parser, run_state = parse_jsonl_output(lines)
         play = list(run_state.plays.values())[0]
-        # Should have at least 3 tasks (regular, block tasks, after block)
-        assert len(play.tasks) >= 1
+        task_names = {task.name for task in play.tasks.values()}
+        assert task_names == {
+            "Regular task",
+            "Block task 1",
+            "Block task 2",
+            "Always task",
+            "After block",
+        }
 
 
 class TestMixedWarningsExecution:
@@ -785,23 +738,18 @@ class TestRoleGrouping:
     """Integration tests for 11-role-grouping playbook."""
 
     @requires_ansible
-    def test_role_grouping_completes(self):
-        """Role grouping playbook completes successfully."""
+    def test_role_grouping_completes_and_collects_role_tasks(self):
         returncode, lines, _ = run_ansible_playbook("11-role-grouping")
         assert returncode == 0
+
         parser, run_state = parse_jsonl_output(lines)
         assert run_state.status == Status.COMPLETED
         assert len(run_state.plays) >= 1
 
-    @requires_ansible
-    def test_role_tasks_appear_in_play(self):
-        """Role tasks are included in the play's task list."""
-        returncode, lines, _ = run_ansible_playbook("11-role-grouping")
-        assert returncode == 0
-        parser, run_state = parse_jsonl_output(lines)
         play = list(run_state.plays.values())[0]
-        # Role should contribute at least 1 task
-        assert len(play.tasks) >= 1
+        task_names = {task.name for task in play.tasks.values()}
+        assert len(task_names) == 7
+        assert all("nginx" in task_name.lower() for task_name in task_names)
 
 
 # ============================================================================

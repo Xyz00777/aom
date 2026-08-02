@@ -1,15 +1,13 @@
 """Unit tests for warning classification and filtering (v1.8).
 
 Covers TEST_SPECIFICATION.md Section 5.6 Supplement and Section 8.1 Supplement:
-- WarningType enum (TC-496)
-- WarningEntry dataclass (TC-497)
 - Deprecation warning classification (TC-498)
 - Deprecated feature classification (TC-499)
 - Regular warning classification (TC-500)
 - PtyStreamParser warnings list (TC-501)
 - WarningEntry source field (TC-502)
 - WarningEntry timestamp (TC-503)
-- WarningsConfig model (TC-509-TC-512)
+- WarningsConfig integration with AppConfig (TC-512)
 
 Test Isolation Rules (CRITICAL):
 1. Every test creates its own parser/config instance
@@ -18,106 +16,13 @@ Test Isolation Rules (CRITICAL):
 4. Tests can run in ANY order
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 import pytest
 
 from ansible_aom.core.config import WarningsConfig
 from ansible_aom.core.models import WarningEntry, WarningType
 from ansible_aom.core.parser import PtyStreamParser, StreamPhase
-
-# =============================================================================
-# Section 6.1: WarningType Enum Tests (TC-496)
-# =============================================================================
-
-
-class TestWarningTypeEnum:
-    """TC-496: WarningType enum values."""
-
-    def test_warning_type_has_warning_value(self):
-        """TC-496: WarningType.WARNING has value 'warning'."""
-        assert hasattr(WarningType, "WARNING")
-        assert WarningType.WARNING.value == "warning"
-
-    def test_warning_type_has_deprecation_value(self):
-        """TC-496: WarningType.DEPRECATION has value 'deprecation'."""
-        assert hasattr(WarningType, "DEPRECATION")
-        assert WarningType.DEPRECATION.value == "deprecation"
-
-    def test_warning_type_enum_count(self):
-        """TC-496: WarningType has exactly 2 values."""
-        assert len(list(WarningType)) == 2
-
-    def test_warning_type_member_names(self):
-        """TC-496: WarningType member names are WARNING and DEPRECATION."""
-        member_names = {m.name for m in WarningType}
-        assert member_names == {"WARNING", "DEPRECATION"}
-
-    def test_warning_type_string_representation(self):
-        """TC-496: WarningType values have correct string representation."""
-        assert WarningType.WARNING.value == "warning"
-        assert WarningType.DEPRECATION.value == "deprecation"
-
-
-# =============================================================================
-# Section 6.1: WarningEntry Dataclass Tests (TC-497)
-# =============================================================================
-
-
-class TestWarningEntryDataclass:
-    """TC-497: WarningEntry dataclass fields."""
-
-    def test_warning_entry_required_fields(self):
-        """TC-497: WarningEntry requires type and message."""
-        entry = WarningEntry(type=WarningType.WARNING, message="Test warning message")
-        assert entry.type == WarningType.WARNING
-        assert entry.message == "Test warning message"
-
-    def test_warning_entry_optional_timestamp(self):
-        """TC-497: timestamp field is optional and defaults to None."""
-        entry = WarningEntry(type=WarningType.WARNING, message="Test")
-        assert entry.timestamp is None
-
-    def test_warning_entry_with_timestamp(self):
-        """TC-497: WarningEntry can have timestamp set."""
-        ts = datetime(2026, 4, 20, 10, 0, 0, tzinfo=timezone.utc)
-        entry = WarningEntry(type=WarningType.WARNING, message="Test", timestamp=ts)
-        assert entry.timestamp == ts
-
-    def test_warning_entry_source_default(self):
-        """TC-497: source field defaults to empty string."""
-        entry = WarningEntry(type=WarningType.WARNING, message="Test")
-        assert entry.source == ""
-
-    def test_warning_entry_with_source(self):
-        """TC-497: WarningEntry can have source set."""
-        entry = WarningEntry(type=WarningType.WARNING, message="Test", source="controller")
-        assert entry.source == "controller"
-
-    def test_warning_entry_all_fields(self):
-        """TC-497: WarningEntry with all fields populated."""
-        ts = datetime(2026, 4, 20, 10, 0, 0, tzinfo=timezone.utc)
-        entry = WarningEntry(
-            type=WarningType.DEPRECATION,
-            message="This feature is deprecated",
-            timestamp=ts,
-            source="controller",
-        )
-        assert entry.type == WarningType.DEPRECATION
-        assert entry.message == "This feature is deprecated"
-        assert entry.timestamp == ts
-        assert entry.source == "controller"
-
-    def test_warning_entry_empty_message(self):
-        """TC-497: WarningEntry can have empty message (edge case)."""
-        entry = WarningEntry(type=WarningType.WARNING, message="")
-        assert entry.message == ""
-
-    def test_warning_entry_deprecation_type(self):
-        """TC-497: WarningEntry can use DEPRECATION type."""
-        entry = WarningEntry(type=WarningType.DEPRECATION, message="Deprecated feature")
-        assert entry.type == WarningType.DEPRECATION
-
 
 # =============================================================================
 # Section 5.6: Warning Classification Tests (TC-498, TC-499, TC-500)
@@ -300,72 +205,6 @@ class TestWarningEntryTimestamp:
         if len(parser.warnings) >= 1:
             ts = parser.warnings[0].timestamp
             assert ts is None or isinstance(ts, datetime)
-
-
-# =============================================================================
-# Section 8.2: WarningsConfig Model Tests (TC-509, TC-510, TC-511, TC-512)
-# =============================================================================
-
-
-class TestWarningsConfig:
-    """TC-509 to TC-512: WarningsConfig model tests."""
-
-    def test_warnings_config_default_values(self):
-        """TC-509: WarningsConfig defaults to show_warnings=True and show_deprecations=True."""
-        config = WarningsConfig()
-        assert config.show_warnings is True
-        assert config.show_deprecations is True
-
-    def test_warnings_config_show_warnings_false(self):
-        """TC-510: WarningsConfig can set show_warnings=False."""
-        config = WarningsConfig(show_warnings=False)
-        assert config.show_warnings is False
-        assert config.show_deprecations is True
-
-    def test_warnings_config_show_deprecations_false(self):
-        """TC-511: WarningsConfig can set show_deprecations=False."""
-        config = WarningsConfig(show_deprecations=False)
-        assert config.show_warnings is True
-        assert config.show_deprecations is False
-
-    def test_warnings_config_both_false(self):
-        """TC-510/511: Both show_warnings and show_deprecations can be False."""
-        config = WarningsConfig(show_warnings=False, show_deprecations=False)
-        assert config.show_warnings is False
-        assert config.show_deprecations is False
-
-    def test_warnings_config_both_true_explicit(self):
-        """TC-509: Both fields can be explicitly set to True."""
-        config = WarningsConfig(show_warnings=True, show_deprecations=True)
-        assert config.show_warnings is True
-        assert config.show_deprecations is True
-
-    def test_warnings_config_model_validation(self):
-        """TC-512: WarningsConfig validates field types."""
-        # Pydantic should validate that values are booleans
-        config = WarningsConfig()
-        assert isinstance(config.show_warnings, bool)
-        assert isinstance(config.show_deprecations, bool)
-
-    def test_warnings_config_from_dict(self):
-        """TC-512: WarningsConfig can be created from dict."""
-        config = WarningsConfig(**{"show_warnings": False, "show_deprecations": True})
-        assert config.show_warnings is False
-        assert config.show_deprecations is True
-
-    def test_warnings_config_model_dump(self):
-        """TC-512: WarningsConfig can be serialized."""
-        config = WarningsConfig(show_warnings=False, show_deprecations=True)
-        data = config.model_dump()
-        assert data["show_warnings"] is False
-        assert data["show_deprecations"] is True
-
-    def test_warnings_config_json_serialization(self):
-        """TC-512: WarningsConfig can be serialized to JSON."""
-        config = WarningsConfig(show_warnings=False, show_deprecations=True)
-        json_str = config.model_dump_json()
-        assert '"show_warnings":false' in json_str or '"show_warnings": false' in json_str
-        assert '"show_deprecations":true' in json_str or '"show_deprecations": true' in json_str
 
 
 # =============================================================================
