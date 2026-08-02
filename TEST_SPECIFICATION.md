@@ -3219,7 +3219,7 @@ the count parens.
 - depth=2, kind="role", label="role: outer (N tasks)"
 - depth=3, kind="role", label="role: inner (M tasks)"
 - depth=4, kind="task", label="inner : task-name"
-**Fixture/Setup:** Synthetic ``RunState`` constructed in unit test, no real ansible-playbook run required. Equivalent integration fixture: ``.sisyphus/test-fixtures/with_nested_role.yml`` plus ``roles/podman`` (6 tasks, one ``include_role: angie_ssl_terminator``) and ``roles/angie_ssl_terminator`` (6 tasks).
+**Fixture/Setup:** Synthetic ``RunState`` constructed in unit test, no real ansible-playbook run required. Equivalent integration fixture: ``tests/fixtures/ansible/with_nested_role.yml`` plus ``roles/podman`` (6 tasks, one ``include_role: angie_ssl_terminator``) and ``roles/angie_ssl_terminator`` (6 tasks).
 **Edge Cases:** Outer role with 4 tasks (no grouping, tasks flat at depth=2). Inner role with 4 tasks (no grouping, tasks flat at depth=3). Three-level nesting (A → B → C, with C grouping at depth 4).
 
 ### TC-325: Session Diff Command

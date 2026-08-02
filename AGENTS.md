@@ -101,7 +101,7 @@ The `.sisyphus/` directory contains project state, research, and implementation 
 | `implementation/learnings.md` | Session-by-session implementation notes: stub status, test contracts, AOMApp wiring, widget patterns, mock paths for password tests |
 | `impl-gaps/learnings.md` | Gaps between spec and current code: redaction API design, CLI exit code behavior, missing POSIX callback tests, host resolution tests |
 
-### Test Fixtures (`.sisyphus/test-fixtures/`)
+### Test Fixtures (`tests/fixtures/ansible/`)
 
 Integration test playbooks for running against real `ansible-playbook`: `simple.yml`, `multi_play.yml`, `multi_hosts.yml`, `unreachable.yml`, `with_role.yml`, `with_include.yml`, `with_import.yml`, `with_block.yml`, `with_pre_post.yml`, `syntax_error.yml`, `missing_role.yml`, `no_name.yml`, plus `roles/test_role/`. These are separate from `tests/playbooks/` (unit test fixtures used by pytest).
 
@@ -117,7 +117,7 @@ Integration test playbooks for running against real `ansible-playbook`: `simple.
 | `flake.nix` | Nix dev shell + package build |
 | `.pre-commit-config.yaml` | Pre-commit hook pipeline |
 | `.sisyphus/notepads/` | Project notes — decisions, research, implementation state, open questions |
-| `.sisyphus/test-fixtures/` | Integration test playbooks for real ansible-playbook runs |
+| `tests/fixtures/ansible/` | Integration test playbooks for real ansible-playbook runs |
 
 ## graphify
 
