@@ -1,5 +1,17 @@
 # aom — Ansible Output Monitor
 
+## Status and Disclosure
+
+> **Active development:** AOM is under active development. APIs, CLI behavior,
+> configuration formats, session formats, and documentation may change without
+> notice. Test it in a non-production environment before relying on it for
+> critical automation.
+>
+> **AI-assisted development:** Parts of the code, tests, documentation, and
+> research were developed with assistance from generative AI tools. Maintainers
+> review and accept changes, but users should independently verify behavior,
+> security, and licensing.
+
 A `nom`-style live view for `ansible-playbook`. Replaces ansible's stock
 log-spew with a compact, persistent status panel that tells you *what's
 running right now*, *what's failed*, and *what's still ahead* — without
@@ -33,17 +45,6 @@ Two render modes:
 
 Every run is recorded to `~/.local/state/aom/sessions/<id>/` so
 `aom inspect` can replay it later.
-
-## Project Status
-
-AOM is in active development. APIs, CLI behavior, configuration formats,
-session formats, and documentation may change without notice. Test it in a
-non-production environment before relying on it for critical automation.
-
-This project uses AI-assisted development: parts of the code, tests,
-documentation, and research were developed with assistance from generative AI
-tools. Maintainers review and accept changes, but users should independently
-verify behavior, security, and licensing.
 
 ## Install
 
