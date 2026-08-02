@@ -1575,7 +1575,7 @@ if 'invocation' in result and 'module_args' in result['invocation']:
 **Redaction Configuration:**
 
 ```yaml
-# ~/.config/aom/config.yaml
+# ~/.config/aom/aom_config.yaml
 redaction:
   whitelist:                      # Field names to NOT redact (false positive prevention)
     - passenger_version
@@ -1839,10 +1839,16 @@ class RunState:
 **Directory Structure (during run):**
 ```
 ~/.local/state/aom/sessions/{uuidv7}/
-├── events.jsonl      # All JSONL events
-├── stderr.log        # Captured stderr
-└── meta.json         # Session metadata
+├── events.jsonl      # Immutable events, including aom_stderr_line records
+├── meta.json         # Session metadata
+├── diagnostics.json  # Derived post-run diagnostics
+└── index.db          # Optional, disposable inspect index
 ```
+
+`events.jsonl` is the source of truth. Stderr is persisted as synthetic
+`aom_stderr_line` events in that file rather than as a separate log. The
+post-run `diagnostics.json` and optional `index.db` are derived artifacts;
+inspection rebuilds a stale or missing index from `events.jsonl`.
 
 **Artifact Format (after completion):**
 ```
@@ -2128,103 +2134,56 @@ Where ⚠ is the warning count and ✱ is the deprecation count.
 
 ## 8. Configuration
 
-### 8.1 Config File
+### 8.1 Config Files and Precedence
 
-**Path:** `~/.config/aom/config.yaml` (XDG-compliant)
+The current XDG user configuration path is
+`~/.config/aom/aom_config.yaml`. Configuration files are optional and
+deep-merged from lowest to highest precedence:
 
-**First Run Behavior:**
-- Create config with all settings commented out
-- User can uncomment to override defaults
+1. Bundled defaults from `core/default_config.yaml`
+2. `/etc/aom/aom_config.yaml`
+3. `~/.config/aom/aom_config.yaml`
+4. `./.aom_config.yaml`
+5. The explicit `AOM_CONFIG` file, or `--config` when `AOM_CONFIG` is unset
+6. Supported CLI value flags
+
+The prior user file, `~/.config/aom/config.yaml`, is a legacy migration input
+only. AOM copies it into the current filename and preserves the old file as
+`config.yaml.migrated`; it is not a current configuration layer.
 
 **Schema:**
 
 ```yaml
-# Status bar configuration
-status_bar:
-  elements:
-    - playbook_name
-    - elapsed_time
-    - task_progress
-    # - current_task
-    # - memory_usage
-    # - subprocess_pid
-
-# Panel defaults
-panels:
-  tree_width: 40        # percentage
-  summary_height: 30    # percentage
-  
-# Keybindings (override defaults)
-keybindings:
-  quit: "q"
-  search: "ctrl+f"
-  expand: "right"
-  collapse: "left"
-
-# Log settings
-log:
-  max_lines: 50000
-  auto_scroll: true
-
-# Session storage
-session:
-  storage_dir: "~/.local/state/aom"
-  keep_sessions: 100
-  keep_days: 30
-
-# Secret redaction
+capture:
+  verbose: false
+  include_setup: false
+  exclude_modules: []
 redaction:
   enabled: true
-  whitelist:
-    - passenger_version
-    - bypass
+  whitelist: []
   custom_fields: []
+  custom_key_patterns: []
   custom_patterns: []
-
-# Warning display
-warnings:
+live:
+  show_failed_hint: true
   show_warnings: true
   show_deprecations: true
-
-# Default ansible args
-ansible:
-  default_args: []
+inspect:
+  default_tab: summary
+tui:
+  theme: default
+log:
+  max_lines: 50000
+session:
+  keep_sessions: 100
+  keep_days: 30
 ```
 
 ### 8.2 Validation
 
-**Framework:** Pydantic + Pydantic Settings
-
-```python
-from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings
-
-class StatusBarConfig(BaseModel):
-    elements: list[str] = Field(default_factory=lambda: [
-        "playbook_name", "elapsed_time", "task_progress"
-    ])
-
-class RedactionConfig(BaseModel):
-    whitelist: list[str] = Field(default_factory=list)
-    custom_fields: list[str] = Field(default_factory=list)
-    custom_patterns: list[dict[str, str]] = Field(default_factory=list)
-
-class WarningsConfig(BaseModel):
-    show_warnings: bool = Field(default=True)
-    show_deprecations: bool = Field(default=True)
-
-class AppConfig(BaseSettings):
-    status_bar: StatusBarConfig = Field(default_factory=StatusBarConfig)
-    redaction: RedactionConfig = Field(default_factory=RedactionConfig)
-    warnings: WarningsConfig = Field(default_factory=WarningsConfig)
-    log_max_lines: int = Field(default=50000, ge=1000, le=100000)
-    session_keep_count: int = Field(default=100, ge=1)
-    session_keep_days: int = Field(default=30, ge=1)
-    
-    model_config = SettingsConfigDict(
-        yaml_file="~/.config/aom/config.yaml"
-    )
-```
+`core.config_layer.AomSettings` validates the merged YAML through Pydantic
+Settings. The bundled `default_config.yaml` is the canonical schema and
+default-value reference.
 
 ---
 
@@ -3103,7 +3062,7 @@ Install with:
 
 **Stderr Capture:**
 - Capture all stderr output from subprocess
-- Store in session directory as `stderr.log`
+- Store each line in `events.jsonl` as a synthetic `aom_stderr_line` event
 - Display stderr lines in log panel (TUI) or console (compact)
 - If stderr contains JSON: attempt to parse as JSONL event (some errors leak to stderr)
 

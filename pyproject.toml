@@ -27,6 +27,13 @@ dependencies = [
     "orjson>=3.10",            # Fast JSON parser on the PTY event hot path
 ]
 
+[project.urls]
+Homepage = "https://github.com/Xyz00777/aom"
+Repository = "https://github.com/Xyz00777/aom"
+Issues = "https://github.com/Xyz00777/aom/issues"
+Documentation = "https://github.com/Xyz00777/aom/wiki"
+Releases = "https://github.com/Xyz00777/aom/releases"
+
 [project.scripts]
 aom = "ansible_aom.cli:main"
 

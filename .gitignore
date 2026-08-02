@@ -57,6 +57,9 @@ result
 # OS
 Thumbs.db
 
+# AI
+.omo/
+
 # graphify-out: ignore everything, whitelist only the files needed for
 # `graphify query/path/explain` to work in a fresh clone.
 graphify-out/*

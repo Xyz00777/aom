@@ -34,6 +34,17 @@ Two render modes:
 Every run is recorded to `~/.local/state/aom/sessions/<id>/` so
 `aom inspect` can replay it later.
 
+## Project Status
+
+AOM is in active development. APIs, CLI behavior, configuration formats,
+session formats, and documentation may change without notice. Test it in a
+non-production environment before relying on it for critical automation.
+
+This project uses AI-assisted development: parts of the code, tests,
+documentation, and research were developed with assistance from generative AI
+tools. Maintainers review and accept changes, but users should independently
+verify behavior, security, and licensing.
+
 ## Install
 
 ```bash
@@ -181,10 +192,15 @@ ansible-playbook ─────►│ PTY (pexpect)        │
                   │
                   ▼
           ~/.local/state/aom/sessions/<uuidv7>/
-            ├── events.jsonl     ← every JSONL event the run saw
-            ├── stderr.log       ← warnings + preflight errors
-            └── meta.json        ← playbook, start/end, status
+            ├── events.jsonl     ← immutable events, including aom_stderr_line
+            ├── meta.json        ← playbook, start/end, status
+            ├── diagnostics.json ← derived lifecycle and renderer diagnostics
+            └── index.db         ← optional, disposable inspect index
 ```
+
+`events.jsonl` is the session source of truth. Stderr is stored there as
+synthetic `aom_stderr_line` events; `diagnostics.json` and `index.db` are
+derived artifacts.
 
 Before the run starts, AOM also fires `--list-tasks` and `--list-hosts`
 **in parallel** so the panel shows host count, task count, and the
@@ -209,12 +225,18 @@ ASCII fallback kicks in automatically when `LANG` / `LC_*` aren't UTF-8.
 | What | Where |
 |------|-------|
 | Session recordings | `~/.local/state/aom/sessions/<uuidv7>/` |
-| User config | `~/.config/aom/config.yaml` (optional) |
+| User config | `~/.config/aom/aom_config.yaml` (optional) |
 | Inventory auto-detect | `./inventory.ini`, `./inventory.yml`, `./hosts`, … |
 
 If a conventional inventory file sits in your current directory and
 you didn't pass `-i`, AOM prepends `-i <file>` for you. Pass any
 inventory flag explicitly and AOM keeps its hands off.
+
+Configuration layers are merged in this order: built-in defaults,
+`/etc/aom/aom_config.yaml`, `~/.config/aom/aom_config.yaml`,
+`./.aom_config.yaml`, an explicit `AOM_CONFIG` or `--config` file, then
+supported CLI values. The older `~/.config/aom/config.yaml` is accepted only
+as legacy migration input and is preserved as `config.yaml.migrated`.
 
 ### Disk usage
 
@@ -241,6 +263,13 @@ threshold.
 - `TEST_SPECIFICATION.md` — every test case, indexed by spec section.
 - `AGENTS.md` — contributor guide: setup, commands, style, TDD rules.
 
+## Community
+
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Support](SUPPORT.md)
+
 ## Development
 
 ```bash
@@ -257,4 +286,6 @@ TDD-first; tests for `core/` must pass without `ansible-core`. See
 
 ## License
 
-GPL-3.0-or-later. See [`LICENSE`](LICENSE).
+GPL-3.0-or-later. See [`LICENSE`](LICENSE). AOM is provided as-is, with no warranty.
+The repository's reasoning for the GPL treatment of the bundled
+callback is documented in [ARCHITECTURE.md section 10.1](ARCHITECTURE.md#101-gpl-subclass-concern-ansiblecallbackaom_jsonlpy).
