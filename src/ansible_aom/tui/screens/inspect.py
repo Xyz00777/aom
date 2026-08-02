@@ -41,6 +41,7 @@ from time import perf_counter
 from types import EllipsisType
 from typing import Literal
 
+from rich.markup import escape
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -1361,6 +1362,19 @@ class InspectApp(App):
             lines.append(f"msg: {block.msg}")
             lines.append("")
 
+        if block.verbose_vars:
+            # ``debug: var=thing`` — the value lives under its own key, so
+            # without this section the pane had nothing to show at all.
+            # Escaped because the pane is rendered with markup=True and a
+            # var's value is arbitrary user data ("[bold]" is a plausible
+            # string to debug).
+            lines.append("[bold]vars[/]")
+            for key, value in block.verbose_vars:
+                value_lines = value.splitlines() or [""]
+                lines.append(f"  {escape(key)}: {escape(value_lines[0])}")
+                lines.extend(f"  {escape(cont)}" for cont in value_lines[1:])
+            lines.append("")
+
         if block.failed_items:
             total = len(block.failed_items) + len(block.ok_items)
             failed_color = _STATUS_COLOR["failed"]
@@ -1402,6 +1416,7 @@ class InspectApp(App):
         # the user a hint rather than a blank pane.
         non_header = (
             block.msg
+            or block.verbose_vars
             or block.failed_items
             or block.module_stderr
             or block.module_stdout

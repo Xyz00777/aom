@@ -504,3 +504,147 @@ class TestAsyncPollDoesNotLeakDictIntoLoopItem:
         assert item.label == "apple"
         assert item.changed is True
         assert item.failed is False
+
+
+# ── verbose-always payloads (debug / assert) ─────────────────────────────────
+#
+# ``debug: var=thing`` puts its value under the var's OWN key, not under
+# ``msg`` — and ``msg:`` accepting a YAML list means ``msg`` is not always
+# a string. Both used to fall through ``build_detail_block`` untouched, so
+# the detail pane rendered "(module returned no message, stdout, or
+# stderr)" for a task whose entire purpose is to inform. These pin that the
+# payload reaches the block.
+
+
+def _verbose_session(result: dict) -> dict:
+    """A one-task session whose single ok result is ``result``."""
+    task = {"id": "t1", "name": "show it", "path": "site.yml:3"}
+    return {
+        "playbook": "site.yml",
+        "session_id": "019e4700-0000-7000-8000-000000000007",
+        "malformed_lines": 0,
+        "stderr": [],
+        "events": [
+            {"_event": "v2_playbook_on_start", "playbook": {"file": "site.yml"}},
+            {"_event": "v2_playbook_on_play_start", "play": {"id": "p1", "name": "all"}},
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-19T18:02:01.000000Z",
+                "task": task,
+                "play": {"id": "p1", "name": "all"},
+            },
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-19T18:02:02.000000Z",
+                "task": task,
+                "play": {"id": "p1", "name": "all"},
+                "hosts": {"web1": result},
+            },
+        ],
+    }
+
+
+def _only_block(result: dict) -> DetailBlock:
+    session = _verbose_session(result)
+    root = build_task_tree(session)
+    # No "roles/" in the path → the task sits flat under the play.
+    task = root.children[0].children[0]
+    return build_detail_block(session, task, task.children[0])
+
+
+def test_detail_block_surfaces_debug_var_payload():
+    """``debug: var=thing`` — the value lands under its own key."""
+    block = _only_block(
+        {
+            "_ansible_no_log": False,
+            "_ansible_verbose_always": True,
+            "action": "debug",
+            "changed": False,
+            "thing": {"a": 1, "b": [2, 3]},
+        }
+    )
+    assert block.verbose_vars == (("thing", '{\n  "a": 1,\n  "b": [\n    2,\n    3\n  ]\n}'),)
+
+
+def test_detail_block_surfaces_multiple_vars_in_source_order():
+    """Order is the payload's order, not sorted — discriminating fixture."""
+    block = _only_block(
+        {
+            "_ansible_verbose_always": True,
+            "action": "debug",
+            "changed": False,
+            "zebra": 1,
+            "alpha": 2,
+        }
+    )
+    assert block.verbose_vars == (("zebra", "1"), ("alpha", "2"))
+
+
+def test_detail_block_json_encodes_non_string_msg():
+    """A YAML-list ``msg:`` is shown, not dropped for not being a str."""
+    block = _only_block(
+        {
+            "_ansible_verbose_always": True,
+            "action": "debug",
+            "changed": False,
+            "msg": ["alpha", "beta", "gamma"],
+        }
+    )
+    assert block.msg == '[\n  "alpha",\n  "beta",\n  "gamma"\n]'
+    assert block.verbose_vars == ()
+
+
+def test_detail_block_string_msg_stays_verbatim():
+    """Boundary: strings must NOT gain JSON quoting."""
+    block = _only_block(
+        {
+            "_ansible_verbose_always": True,
+            "action": "debug",
+            "changed": False,
+            "msg": "line one\nline two\n",
+        }
+    )
+    assert block.msg == "line one\nline two\n"
+
+
+def test_detail_block_ignores_result_keys_without_verbose_flag():
+    """A plain ``command`` result must not spray cmd/rc/stdout into vars."""
+    block = _only_block(
+        {
+            "action": "command",
+            "changed": True,
+            "cmd": ["echo", "hi"],
+            "rc": 0,
+            "stdout": "hi",
+            "some_module_field": "should not surface",
+        }
+    )
+    assert block.verbose_vars == ()
+
+
+def test_detail_block_verbose_override_suppresses_vars():
+    """``_ansible_verbose_override`` is ansible's opt-out; honour it."""
+    block = _only_block(
+        {
+            "_ansible_verbose_always": True,
+            "_ansible_verbose_override": True,
+            "action": "debug",
+            "changed": False,
+            "thing": {"a": 1},
+        }
+    )
+    assert block.verbose_vars == ()
+
+
+def test_detail_block_verbose_msg_only_has_no_vars():
+    """``assert``/``debug: msg=`` carry no extra keys — vars stays empty."""
+    block = _only_block(
+        {
+            "_ansible_verbose_always": True,
+            "action": "assert",
+            "changed": False,
+            "msg": "All assertions passed",
+        }
+    )
+    assert block.msg == "All assertions passed"
+    assert block.verbose_vars == ()

@@ -13,6 +13,7 @@ render the same information for the same session.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -845,12 +846,84 @@ class DetailBlock:
     status: str  # "ok" | "changed" | "failed" | "skipped" | "unreachable"
     action: str | None  # the ansible module that ran (e.g. "command", "homebrew_cask")
     msg: str | None
+    verbose_vars: tuple[tuple[str, str], ...]  # (key, rendered value), source order
     failed_items: tuple[LoopItem, ...]
     ok_items: tuple[LoopItem, ...]
     module_stdout: str | None
     module_stderr: str | None
     warnings: tuple[str, ...]
     raw_event: dict | None
+
+
+# Keys of the standard ansible result envelope. Everything here is either
+# rendered by its own section of the detail pane (``msg``, ``stdout``,
+# ``warnings``, ``results``) or is bookkeeping the user did not ask to see
+# (``rc``, ``delta``, ``invocation``). What remains on a verbose-always
+# result is the payload ``debug: var=`` produced under the variable's own
+# name — the only place that value exists in the JSONL.
+_RESULT_ENVELOPE_KEYS = frozenset(
+    {
+        "action",
+        "changed",
+        "cmd",
+        "delta",
+        "deprecations",
+        "end",
+        "exception",
+        "failed",
+        "invocation",
+        "item",
+        "module_stderr",
+        "module_stdout",
+        "msg",
+        "rc",
+        "results",
+        "skipped",
+        "start",
+        "stderr",
+        "stderr_lines",
+        "stdout",
+        "stdout_lines",
+        "warnings",
+    }
+)
+
+
+def _render_value(value: object) -> str:
+    """Render a result value for display: strings raw, everything else JSON.
+
+    Strings pass through untouched so a multi-line ``msg`` reads as the
+    lines the playbook author wrote rather than one escaped ``\\n`` blob —
+    the exact thing that makes ansible's own default callback painful. Every
+    other shape is pretty-printed JSON, which keeps a var's type visible
+    (``"1"`` vs ``1``) — the reason someone reached for ``debug: var=`` in
+    the first place.
+    """
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, indent=2, ensure_ascii=False)
+
+
+def _verbose_vars(host_data: dict) -> tuple[tuple[str, str], ...]:
+    """Extract the ``debug: var=`` payload from a verbose-always result.
+
+    Gated on the same flags as the compact view's inline body
+    (``compact/format.py:_verbose_ok_body``): ``_ansible_verbose_always``
+    marks a task whose purpose is to inform, and
+    ``_ansible_verbose_override`` is ansible's opt-out. Without that gate
+    every ``command`` result would spray its module fields into the pane.
+
+    Order is the payload's own key order, so it matches the playbook.
+    """
+    if host_data.get("_ansible_verbose_always") is not True:
+        return ()
+    if host_data.get("_ansible_verbose_override") is True:
+        return ()
+    return tuple(
+        (key, _render_value(value))
+        for key, value in host_data.items()
+        if not key.startswith("_") and key not in _RESULT_ENVELOPE_KEYS
+    )
 
 
 def _status_from_event_type(event_type: str, changed: bool) -> str:
@@ -937,7 +1010,10 @@ def build_detail_block(
         duration=task_node.duration,
         status=status,
         action=str(action) if action else None,
-        msg=msg if isinstance(msg, str) else None,
+        # A YAML-list ``msg:`` is a list, not a str — rendering it rather
+        # than dropping it is why this goes through _render_value.
+        msg=None if msg is None else _render_value(msg),
+        verbose_vars=_verbose_vars(host_data),
         failed_items=tuple(failed_items),
         ok_items=tuple(ok_items),
         module_stdout=host_data.get("stdout"),

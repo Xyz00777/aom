@@ -1266,3 +1266,82 @@ async def test_detail_pane_handles_huge_stdout_quickly(state_dir: Path):
         app._update_detail()
         assert app._detail_force_full is False
         assert "press L to load full" not in app._detail_text
+
+
+def _write_debug_var_session(state_dir: Path) -> str:
+    """A session whose only task is ``debug: var=thing``.
+
+    The payload has no ``msg`` at all — its value sits under the var's own
+    key. Before vars rendering the pane showed the "(module returned no
+    message...)" placeholder for exactly this case.
+    """
+    sid = "019e5100-0000-7000-8000-000000000006"
+    session_dir = state_dir / sid
+    session_dir.mkdir(parents=True)
+    (session_dir / "meta.json").write_text(
+        json.dumps(
+            {
+                "playbook": "vars.yml",
+                "status": "completed",
+                "start_time": "2026-07-01T10:00:00Z",
+                "end_time": "2026-07-01T10:00:02Z",
+                "duration_seconds": 2,
+            }
+        )
+        + "\n"
+    )
+    task = {"id": "task-1", "name": "show thing", "path": "vars.yml:4"}
+    events = [
+        {"_event": "v2_playbook_on_start", "playbook": {"file": "vars.yml"}},
+        {"_event": "v2_playbook_on_play_start", "play": {"id": "p1", "name": "all"}},
+        {
+            "_event": "v2_playbook_on_task_start",
+            "_timestamp": "2026-07-01T10:00:00.000000Z",
+            "task": task,
+            "play": {"id": "p1", "name": "all"},
+        },
+        {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "2026-07-01T10:00:01.000000Z",
+            "task": task,
+            "play": {"id": "p1", "name": "all"},
+            "hosts": {
+                "web1": {
+                    "_ansible_no_log": False,
+                    "_ansible_verbose_always": True,
+                    "action": "debug",
+                    "changed": False,
+                    "thing": {"a": 1, "b": ["[bold]not markup[/]"]},
+                }
+            },
+        },
+    ]
+    (session_dir / "events.jsonl").write_text("".join(json.dumps(e) + "\n" for e in events))
+    return sid
+
+
+@pytest.mark.asyncio
+async def test_detail_pane_shows_debug_var_payload(state_dir: Path):
+    """``debug: var=`` output must reach the Detail pane, not the
+    "no message" placeholder."""
+    from ansible_aom.core.inspect_model import build_task_tree
+    from ansible_aom.session.store import load_session
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    sid = _write_debug_var_session(state_dir)
+    app = InspectApp(state_dir=state_dir, initial_session_id=sid)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        session = load_session(sid, state_dir)
+        assert session is not None
+        task = build_task_tree(session).children[0].children[0]
+        app._focused_task = task
+        app._focused_host = task.children[0]
+        app._update_detail()
+        body = app._detail_text
+
+        assert "thing:" in body
+        assert '"a": 1' in body
+        assert "module returned no message" not in body
+        # Payload text must not be interpreted as Rich markup.
+        assert "[bold]not markup[/]" in body.replace("\\[", "[")
