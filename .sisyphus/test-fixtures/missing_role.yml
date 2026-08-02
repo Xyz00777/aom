@@ -1,5 +1,0 @@
----
-- name: Playbook with missing role
-  hosts: localhost
-  roles:
-    - nonexistent_role_12345

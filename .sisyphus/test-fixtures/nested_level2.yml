@@ -1,7 +1,0 @@
----
-- name: Level 2 task A
-  debug:
-    msg: "Deep A"
-- name: Level 2 task B
-  debug:
-    msg: "Deep B"

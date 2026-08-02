@@ -1,6 +1,0 @@
----
-- name: Level 1 task
-  debug:
-    msg: "Level 1"
-- name: Level 2 include
-  include_tasks: nested_level2.yml

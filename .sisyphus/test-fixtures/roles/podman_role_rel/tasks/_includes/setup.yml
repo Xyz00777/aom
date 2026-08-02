@@ -1,8 +1,0 @@
----
-- name: Set up angie config from role-relative include
-  debug:
-    msg: "angie config"
-
-- name: Enable and start angie-sidecar service
-  debug:
-    msg: "start angie-sidecar"
