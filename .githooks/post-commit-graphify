@@ -29,6 +29,14 @@ if ! command -v graphify >/dev/null 2>&1; then
   exit 0
 fi
 
+# Bail out mid-rebase / mid-merge / mid-cherry-pick — an amend during
+# those would scramble the in-flight sequencing.
+for marker in REBASE_HEAD MERGE_HEAD CHERRY_PICK_HEAD BISECT_LOG; do
+  if [ -f "$REPO_ROOT/.git/$marker" ]; then
+    exit 0
+  fi
+done
+
 # git sets GIT_DIR / GIT_INDEX_FILE when it runs hooks, which makes
 # `git -C graphify-out ...` resolve the superproject's gitdir instead of
 # the submodule's. Unset them so submodule commands address the right
