@@ -61,9 +61,12 @@ graphify tree 2>/dev/null || true
 if git -C graphify-out rev-parse --git-dir >/dev/null 2>&1 \
   && git -C graphify-out remote >/dev/null 2>&1; then
   if ! git -C graphify-out diff --quiet; then
+    # -u stages modified tracked artifacts; -A also picks up newly
+    # generated wiki pages so the submodule stays clean.
     git -C graphify-out add -u graph.json .graphify_labels.json \
       .graphify_analysis.json .graphify_semantic_marker GRAPH_TREE.html \
       GRAPH_REPORT.md graph.html wiki/ 2>/dev/null || true
+    git -C graphify-out add -A wiki/ 2>/dev/null || true
     git -C graphify-out commit -m "chore: regenerate graph artifacts" >/dev/null 2>&1 || true
     # Submodules sit on a detached HEAD, so a bare `git push` pushes
     # nothing. Push the detached HEAD explicitly to the main branch.
