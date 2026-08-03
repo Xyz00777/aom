@@ -1,58 +1,40 @@
 # Runtime Event Handlers
 
-> 35 nodes · cohesion 0.06
+> 16 nodes · cohesion 0.33
 
 ## Key Concepts
 
-- **learnings.md** (26 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **v1 Verbosity — Learnings (R17: EOF flush drains child.buffer)** (5 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **v1 Verbosity — Learnings (Task 7.5: CLI text mode)** (4 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **v1 Verbosity — Learnings (Task F7: docs finalization)** (4 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **v1 Verbosity — Learnings (Task 6.1: compact REC+VC status chip)** (3 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **v1 Verbosity — Learnings (Task 6.2: compact failed-hint toggle)** (3 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **v1 Verbosity — Learnings (Task 6.2 follow-up: config wiring)** (3 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **v1 Verbosity — Learnings (Task 7.4: lazy-render budget)** (3 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **v1 Verbosity — Learnings (Task 8.6: README disk-usage section)** (3 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **v1 Verbosity — Learnings (Phase 4 / Task 4.2: stderr classifier)** (2 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **v1 Verbosity — Learnings (Task 6.3: warnings + deprecations live view)** (2 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **v1 Verbosity — Learnings (Task 7.1: inspect TUI V keybind plumbing)** (2 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **Fix** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **Followups (out of scope for Phase 3)** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **Gotcha** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **Gotchas** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **Note** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **Note** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **Notes** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **Notes** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **Root cause** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **Verification** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **Verification** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **Verification** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- **Verification** (1 connections) — `.sisyphus/notepads/v1-verbosity/learnings.md`
-- *... and 10 more nodes in this community*
+- **test_full_completion_summary.py** (14 connections) — `tests/compact/test_full_completion_summary.py`
+- **_logged()** (8 connections) — `tests/compact/test_full_completion_summary.py`
+- **_renderer()** (8 connections) — `tests/compact/test_full_completion_summary.py`
+- **_summary_lines()** (7 connections) — `tests/compact/test_full_completion_summary.py`
+- **test_cancel_flushes_incomplete_task_with_partial_count()** (7 connections) — `tests/compact/test_full_completion_summary.py`
+- **test_completed_task_summary_emitted_once()** (7 connections) — `tests/compact/test_full_completion_summary.py`
+- **_start()** (6 connections) — `tests/compact/test_full_completion_summary.py`
+- **test_free_strategy_summary_counts_all_targets_not_fast_cohort()** (6 connections) — `tests/compact/test_full_completion_summary.py`
+- **test_purely_inflight_task_gets_no_summary_at_cancel()** (6 connections) — `tests/compact/test_full_completion_summary.py`
+- **_ok()** (5 connections) — `tests/compact/test_full_completion_summary.py`
+- **test_free_strategy_summary_lands_after_later_task_header()** (5 connections) — `tests/compact/test_full_completion_summary.py`
+- **_play_def()** (3 connections) — `tests/compact/test_full_completion_summary.py`
+- **Per-task summary fires on FULL play completion, not on the next task.  Under a f** (1 connections) — `tests/compact/test_full_completion_summary.py`
+- **A task with zero terminal results at cancel produces no summary —     a bare ``—** (1 connections) — `tests/compact/test_full_completion_summary.py`
+- **A task summarised mid-run is not re-emitted at cancel/stats.** (1 connections) — `tests/compact/test_full_completion_summary.py`
+- **A task that never completes on all hosts (run cancelled) still gets     a summar** (1 connections) — `tests/compact/test_full_completion_summary.py`
 
 ## Relationships
 
-- [Community 641](Community_641.md) (1 shared connections)
-- [Build Rerun Command](Build_Rerun_Command.md) (1 shared connections)
-- [Heartbeat Liveness Machine](Heartbeat_Liveness_Machine.md) (1 shared connections)
-- [Community 474](Community_474.md) (1 shared connections)
-- [Diagnostics Record Building](Diagnostics_Record_Building.md) (1 shared connections)
-- [Small Terminal Handling](Small_Terminal_Handling.md) (1 shared connections)
-- [Role Grouping Playbooks](Role_Grouping_Playbooks.md) (1 shared connections)
-- [ORJSON Parser Swap](ORJSON_Parser_Swap.md) (1 shared connections)
-- [Tree Projection Lifecycle](Tree_Projection_Lifecycle.md) (1 shared connections)
-- [Quit Keybinding](Quit_Keybinding.md) (1 shared connections)
-- [ANSI Rewind Correctness](ANSI_Rewind_Correctness.md) (1 shared connections)
-- [Community 640](Community_640.md) (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (3 shared connections)
+- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/v1-verbosity/learnings.md`
+- `tests/compact/test_full_completion_summary.py`
 
 ## Audit Trail
 
-- EXTRACTED: 83 (100%)
+- EXTRACTED: 86 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

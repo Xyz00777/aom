@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **tests/playbooks/23-command-not-found/README.md** (0 connections) — `tests/playbooks/23-command-not-found/README.md`
+- **23-command-not-found/README.md** (0 connections) — `tests/playbooks/23-command-not-found/README.md`
 
 ## Relationships
 

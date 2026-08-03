@@ -1,46 +1,35 @@
 # Mitogen Event Tolerance
 
-> 21 nodes · cohesion 0.10
+> 10 nodes · cohesion 0.20
 
 ## Key Concepts
 
-- **LogPanel** (11 connections) — `src/ansible_aom/tui/widgets/log_panel.py`
-- **.update_log_line()** (3 connections) — `src/ansible_aom/tui/screens/main.py`
-- **log_panel.py** (3 connections) — `src/ansible_aom/tui/widgets/log_panel.py`
-- **is_vertical_scroll_end()** (3 connections) — `src/ansible_aom/tui/widgets/log_panel.py`
-- **.test_is_vertical_scroll_end_detection()** (3 connections) — `tests/tui/test_panels.py`
-- **.__init__()** (2 connections) — `src/ansible_aom/tui/widgets/log_panel.py`
-- **._on_mount()** (2 connections) — `src/ansible_aom/tui/widgets/log_panel.py`
-- **.on_scroll()** (2 connections) — `src/ansible_aom/tui/widgets/log_panel.py`
-- **.scroll_to_end()** (2 connections) — `src/ansible_aom/tui/widgets/log_panel.py`
-- **.write_line()** (2 connections) — `src/ansible_aom/tui/widgets/log_panel.py`
-- **Write a line to the LogPanel.** (1 connections) — `src/ansible_aom/tui/screens/main.py`
-- **RichLog** (1 connections)
-- **Log panel widget for AOM TUI.  RichLog with search functionality. See SPECIFICAT** (1 connections) — `src/ansible_aom/tui/widgets/log_panel.py`
-- **Determine if scrolled to the end (bottom).      Args:         scroll_offset: Ind** (1 connections) — `src/ansible_aom/tui/widgets/log_panel.py`
-- **Log panel with search support.** (1 connections) — `src/ansible_aom/tui/widgets/log_panel.py`
-- **Initialize the log panel widget.          Args:             name: Widget name** (1 connections) — `src/ansible_aom/tui/widgets/log_panel.py`
-- **Handle widget mount event.** (1 connections) — `src/ansible_aom/tui/widgets/log_panel.py`
-- **Write a line to the log, auto-scrolling if enabled.          Args:             l** (1 connections) — `src/ansible_aom/tui/widgets/log_panel.py`
-- **Scroll to bottom and re-enable auto-scroll.** (1 connections) — `src/ansible_aom/tui/widgets/log_panel.py`
-- **Handle scroll events to manage auto-scroll state.** (1 connections) — `src/ansible_aom/tui/widgets/log_panel.py`
-- **TC-284: is_vertical_scroll_end() correctly detects bottom.** (1 connections) — `tests/tui/test_panels.py`
+- **TestRedactionCustomPatterns** (10 connections) — `tests/unit/test_config.py`
+- **.test_custom_patterns_dict_keys()** (2 connections) — `tests/unit/test_config.py`
+- **.test_custom_patterns_dict_structure()** (2 connections) — `tests/unit/test_config.py`
+- **.test_custom_patterns_multiple_patterns()** (2 connections) — `tests/unit/test_config.py`
+- **.test_custom_patterns_with_complex_regex()** (2 connections) — `tests/unit/test_config.py`
+- **Tests for redaction custom patterns - TC-314.** (1 connections) — `tests/unit/test_config.py`
+- **Custom patterns use dict with regex and replacement.** (1 connections) — `tests/unit/test_config.py`
+- **Multiple custom patterns can be defined.** (1 connections) — `tests/unit/test_config.py`
+- **Custom patterns support complex regex patterns.** (1 connections) — `tests/unit/test_config.py`
+- **Custom pattern dicts have regex and replacement keys.** (1 connections) — `tests/unit/test_config.py`
 
 ## Relationships
 
-- [Session Recording Tests](Session_Recording_Tests.md) (3 shared connections)
-- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (2 shared connections)
+- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (1 shared connections)
+- [Run State Summary Panel](Run_State_Summary_Panel.md) (1 shared connections)
+- [Renderer Set Definitions](Renderer_Set_Definitions.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/tui/screens/main.py`
-- `src/ansible_aom/tui/widgets/log_panel.py`
-- `tests/tui/test_panels.py`
+- `tests/unit/test_config.py`
 
 ## Audit Trail
 
-- EXTRACTED: 38 (86%)
-- INFERRED: 6 (14%)
+- EXTRACTED: 19 (83%)
+- INFERRED: 4 (17%)
 - AMBIGUOUS: 0 (0%)
 
 ---

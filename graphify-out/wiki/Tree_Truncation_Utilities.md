@@ -1,42 +1,37 @@
 # Tree Truncation Utilities
 
-> 14 nodes · cohesion 0.15
+> 11 nodes · cohesion 0.29
 
 ## Key Concepts
 
-- **SPECIFICATION.md** (12 connections) — `SPECIFICATION.md`
-- **ARCHITECTURE.md** (4 connections) — `ARCHITECTURE.md`
-- **AGENTS.md** (3 connections) — `AGENTS.md`
-- **README.md** (3 connections) — `README.md`
-- **Default ansible args** (1 connections) — `SPECIFICATION.md`
-- **Keybindings (override defaults)** (1 connections) — `SPECIFICATION.md`
-- **Log settings** (1 connections) — `SPECIFICATION.md`
-- **Panel defaults** (1 connections) — `SPECIFICATION.md`
-- **patterns don't type cleanly); vendored ansible code has no stubs.** (1 connections) — `SPECIFICATION.md`
-- **Per-module overrides: GUI modules relax strict typing (Textual/Rich metaclass** (1 connections) — `SPECIFICATION.md`
-- **Secret redaction** (1 connections) — `SPECIFICATION.md`
-- **Session storage** (1 connections) — `SPECIFICATION.md`
-- **Status bar configuration** (1 connections) — `SPECIFICATION.md`
-- **Warning display** (1 connections) — `SPECIFICATION.md`
+- **test_loop_item_count.py** (8 connections) — `tests/unit/test_loop_item_count.py`
+- **_running_loop_state()** (7 connections) — `tests/unit/test_loop_item_count.py`
+- **TestRunStateCounter** (6 connections) — `tests/unit/test_loop_item_count.py`
+- **TestTreeRendersCount** (6 connections) — `tests/unit/test_loop_item_count.py`
+- **.test_running_host_leaf_shows_n_over_total_when_known()** (4 connections) — `tests/unit/test_loop_item_count.py`
+- **_item_event()** (3 connections) — `tests/unit/test_loop_item_count.py`
+- **.test_running_host_leaf_shows_item_count()** (3 connections) — `tests/unit/test_loop_item_count.py`
+- **.test_item_events_do_not_inflate_status_counts()** (2 connections) — `tests/unit/test_loop_item_count.py`
+- **.test_item_events_increment_per_host_counter()** (2 connections) — `tests/unit/test_loop_item_count.py`
+- **.test_item_events_keep_host_running()** (2 connections) — `tests/unit/test_loop_item_count.py`
+- **Per-host loop item counting for the TUI task tree.  The bundled ``aom_jsonl`` ca** (1 connections) — `tests/unit/test_loop_item_count.py`
 
 ## Relationships
 
-- [Commit Hygiene Policy](Commit_Hygiene_Policy.md) (1 shared connections)
-- [Library-First Principle](Library-First_Principle.md) (1 shared connections)
-- [SSH Password Prompt](SSH_Password_Prompt.md) (1 shared connections)
-- [Ansible Core Version Check](Ansible_Core_Version_Check.md) (1 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (7 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (2 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
+- [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (1 shared connections)
+- [tree.py](tree.py.md) (1 shared connections)
 
 ## Source Files
 
-- `AGENTS.md`
-- `ARCHITECTURE.md`
-- `README.md`
-- `SPECIFICATION.md`
+- `tests/unit/test_loop_item_count.py`
 
 ## Audit Trail
 
-- EXTRACTED: 32 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 40 (91%)
+- INFERRED: 4 (9%)
 - AMBIGUOUS: 0 (0%)
 
 ---

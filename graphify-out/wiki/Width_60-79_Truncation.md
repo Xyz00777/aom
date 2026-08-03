@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_diagnostics_wiring.py** (8 connections) — `tests/unit/test_diagnostics_wiring.py`
+- **test_diagnostics_wiring.py** (9 connections) — `tests/unit/test_diagnostics_wiring.py`
 - **_assert_installed()** (5 connections) — `tests/unit/test_diagnostics_wiring.py`
 - **test_cli_main_installs_diagnostics()** (4 connections) — `tests/unit/test_diagnostics_wiring.py`
 - **test_inspect_main_installs_diagnostics()** (4 connections) — `tests/unit/test_diagnostics_wiring.py`
@@ -23,7 +23,7 @@
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [core/__init__.py](core-__init__.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -31,7 +31,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 40 (100%)
+- EXTRACTED: 41 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

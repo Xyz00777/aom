@@ -1,15 +1,10 @@
 # Completion Scope Playbooks
 
-> 6 nodes · cohesion 0.33
+> 1 nodes · cohesion 1.00
 
 ## Key Concepts
 
-- **Integration Playbook 6: Handlers & Conditionals** (3 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
-- **tests/playbooks/05-skipped-tasks/site.yml** (2 connections) — `tests/playbooks/05-skipped-tasks/site.yml`
-- **tests/playbooks/09-handler-tasks/site.yml** (2 connections) — `tests/playbooks/09-handler-tasks/site.yml`
-- **v2_playbook_on_handler_task_start** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
-- **v2_runner_on_skipped** (1 connections) — `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
-- **tests/playbooks/29-tags/site.yml** (1 connections) — `tests/playbooks/29-tags/site.yml`
+- **05-skipped-tasks/site.yml** (0 connections) — `tests/playbooks/05-skipped-tasks/site.yml`
 
 ## Relationships
 
@@ -17,16 +12,13 @@
 
 ## Source Files
 
-- `.sisyphus/notepads/implementation/INTEGRATION_TEST_PLAN.md`
 - `tests/playbooks/05-skipped-tasks/site.yml`
-- `tests/playbooks/09-handler-tasks/site.yml`
-- `tests/playbooks/29-tags/site.yml`
 
 ## Audit Trail
 
-- EXTRACTED: 2 (20%)
-- INFERRED: 6 (60%)
-- AMBIGUOUS: 2 (20%)
+- EXTRACTED: 0 (0%)
+- INFERRED: 0 (0%)
+- AMBIGUOUS: 0 (0%)
 
 ---
 

@@ -1,55 +1,58 @@
 # ASCII Status Icon Fallback
 
-> 32 nodes · cohesion 0.12
+> 58 nodes · cohesion 0.06
 
 ## Key Concepts
 
-- **render_session()** (17 connections) — `src/ansible_aom/inspect/text.py`
-- **text.py** (12 connections) — `src/ansible_aom/inspect/text.py`
-- **test_inspect_text_golden.py** (12 connections) — `tests/compact/test_inspect_text_golden.py`
-- **_load()** (11 connections) — `tests/compact/test_inspect_text_golden.py`
-- **_render_verbose()** (7 connections) — `src/ansible_aom/inspect/text.py`
+- **TaskTreeNode** (43 connections) — `src/ansible_aom/core/inspect_model.py`
+- **text.py** (36 connections) — `src/ansible_aom/inspect/text.py`
+- **DetailBlock** (18 connections) — `src/ansible_aom/core/inspect_model.py`
+- **build_detail_block()** (17 connections) — `src/ansible_aom/core/inspect_model.py`
+- **render_session_from_index()** (14 connections) — `src/ansible_aom/inspect/text.py`
+- **_only_block()** (12 connections) — `tests/unit/test_inspect_model.py`
+- **_render_verbose()** (11 connections) — `src/ansible_aom/inspect/text.py`
+- **TestAsyncPollDoesNotLeakDictIntoLoopItem** (10 connections) — `tests/unit/test_inspect_model.py`
+- **_render_failures_from_index()** (8 connections) — `src/ansible_aom/inspect/text.py`
+- **_make_loop_item()** (7 connections) — `src/ansible_aom/core/inspect_model.py`
+- **_resolve_verbose_scope()** (7 connections) — `src/ansible_aom/inspect/text.py`
+- **_hydrate_node()** (6 connections) — `src/ansible_aom/inspect/text.py`
+- **_iter_tree()** (6 connections) — `src/ansible_aom/inspect/text.py`
+- **_play_name_for_task()** (6 connections) — `src/ansible_aom/inspect/text.py`
 - **_render_failures()** (6 connections) — `src/ansible_aom/inspect/text.py`
-- **_iter_tree()** (5 connections) — `src/ansible_aom/inspect/text.py`
-- **_play_name_for_task()** (5 connections) — `src/ansible_aom/inspect/text.py`
-- **_render_header()** (5 connections) — `src/ansible_aom/inspect/text.py`
+- **_render_header()** (6 connections) — `src/ansible_aom/inspect/text.py`
+- **_iter_failed_tasks()** (5 connections) — `src/ansible_aom/inspect/text.py`
+- **_render_detail()** (5 connections) — `src/ansible_aom/inspect/text.py`
+- **LoopItem** (4 connections) — `src/ansible_aom/core/inspect_model.py`
 - **_fmt_duration()** (4 connections) — `src/ansible_aom/inspect/text.py`
-- **_iter_failed_tasks()** (4 connections) — `src/ansible_aom/inspect/text.py`
-- **_render_detail()** (4 connections) — `src/ansible_aom/inspect/text.py`
 - **render_session_list()** (4 connections) — `src/ansible_aom/inspect/text.py`
 - **_host_counts_line()** (3 connections) — `src/ansible_aom/inspect/text.py`
-- **test_render_clean_run_has_header_and_no_failure_block()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
-- **test_render_failed_loop_shows_msg_and_failed_items()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
-- **test_render_includes_verbose_section_when_stderr_lines_exist()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
-- **test_render_no_verbose_section_when_no_stderr_events()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
-- **test_render_running_shows_running_status()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
-- **test_render_unreachable_shows_connection_msg()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
-- **test_render_verbose_not_gated_on_failed_status()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
-- **test_render_verbose_play_scoping()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
-- **test_render_verbose_task_scoping()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
-- **RunSummary** (2 connections)
-- **Plain-text rendering of an inspect session.  Used by ``aom inspect --text`` (and** (1 connections) — `src/ansible_aom/inspect/text.py`
-- *... and 7 more nodes in this community*
+- **Path** (3 connections)
+- **_verbose_section()** (3 connections) — `src/ansible_aom/inspect/text.py`
+- **test_detail_block_ignores_result_keys_without_verbose_flag()** (3 connections) — `tests/unit/test_inspect_model.py`
+- *... and 33 more nodes in this community*
 
 ## Relationships
 
-- [Playbook Parser Integration Tests](Playbook_Parser_Integration_Tests.md) (5 shared connections)
-- [PTY Buffer Stall Handling](PTY_Buffer_Stall_Handling.md) (4 shared connections)
-- [Data Model Unit Tests](Data_Model_Unit_Tests.md) (1 shared connections)
-- [Status Bar Widget](Status_Bar_Widget.md) (1 shared connections)
-- [Log Filter Helpers](Log_Filter_Helpers.md) (1 shared connections)
-- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
-- [RunSummary Schema Contract](RunSummary_Schema_Contract.md) (1 shared connections)
+- [Playbook Parser Integration Tests](Playbook_Parser_Integration_Tests.md) (21 shared connections)
+- [Log Filter Helpers](Log_Filter_Helpers.md) (18 shared connections)
+- [Data Model Unit Tests](Data_Model_Unit_Tests.md) (18 shared connections)
+- [Include Role Discovery](Include_Role_Discovery.md) (16 shared connections)
+- [Task Summary Count Tests](Task_Summary_Count_Tests.md) (9 shared connections)
+- [PTY Buffer Stall Handling](PTY_Buffer_Stall_Handling.md) (9 shared connections)
+- [Two-Cut Tree Truncation](Two-Cut_Tree_Truncation.md) (5 shared connections)
+- [Status Bar Widget](Status_Bar_Widget.md) (3 shared connections)
+- [Heartbeat Liveness Tracker](Heartbeat_Liveness_Tracker.md) (1 shared connections)
 
 ## Source Files
 
+- `src/ansible_aom/core/inspect_model.py`
 - `src/ansible_aom/inspect/text.py`
-- `tests/compact/test_inspect_text_golden.py`
+- `tests/unit/test_inspect_model.py`
 
 ## Audit Trail
 
-- EXTRACTED: 111 (82%)
-- INFERRED: 25 (18%)
+- EXTRACTED: 253 (85%)
+- INFERRED: 45 (15%)
 - AMBIGUOUS: 0 (0%)
 
 ---

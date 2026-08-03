@@ -1,57 +1,37 @@
 # Status Bar Elements
 
-> 27 nodes · cohesion 0.09
+> 12 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **sanitize_string()** (17 connections) — `src/ansible_aom/core/redaction.py`
-- **TestSanitizeStringLayer3Unchanged** (6 connections) — `tests/unit/test_redaction_layer4.py`
-- **TestURLCredentialSanitization** (6 connections) — `tests/unit/test_redaction.py`
-- **TestCLICredentialSanitization** (5 connections) — `tests/unit/test_redaction.py`
-- **TestConfigCustomPatterns** (5 connections) — `tests/unit/test_redaction.py`
-- **.test_cli_credentials_redacted()** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_variant_formats()** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_custom_pattern_redacts_matching_strings()** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_multiple_custom_patterns()** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_url_credentials_redacted()** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_url_encoded_password()** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_url_without_credentials_unchanged()** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_cli_password_sanitized()** (3 connections) — `tests/unit/test_redaction_layer4.py`
-- **.test_custom_patterns_applied_to_strings()** (3 connections) — `tests/unit/test_redaction_layer4.py`
-- **.test_url_credentials_sanitized()** (3 connections) — `tests/unit/test_redaction_layer4.py`
-- **Sanitize credentials in a single string (Layer 3).      Applies in order:     1.** (1 connections) — `src/ansible_aom/core/redaction.py`
-- **URL/CLI string sanitization is independent of the key-match rewrite.** (1 connections) — `tests/unit/test_redaction_layer4.py`
-- **Tests for TC-160: URL credential sanitization.** (1 connections) — `tests/unit/test_redaction.py`
-- **TC-160: URL credentials are sanitized.** (1 connections) — `tests/unit/test_redaction.py`
-- **TC-160 edge case: URL-encoded passwords.** (1 connections) — `tests/unit/test_redaction.py`
-- **TC-160 edge: URLs without credentials remain unchanged.** (1 connections) — `tests/unit/test_redaction.py`
-- **Tests for TC-161: CLI argument credential sanitization.** (1 connections) — `tests/unit/test_redaction.py`
-- **TC-161: CLI credentials are sanitized.** (1 connections) — `tests/unit/test_redaction.py`
-- **TC-161 edge case: Variant CLI formats.** (1 connections) — `tests/unit/test_redaction.py`
-- **Tests for TC-173: Config custom_patterns for string sanitization.** (1 connections) — `tests/unit/test_redaction.py`
-- *... and 2 more nodes in this community*
+- **TestConfigFieldValidation** (11 connections) — `tests/unit/test_config.py`
+- **.test_log_max_lines_boundary_values()** (3 connections) — `tests/unit/test_config.py`
+- **.test_multiple_instances_independent()** (3 connections) — `tests/unit/test_config.py`
+- **.test_session_keep_count_large_values()** (3 connections) — `tests/unit/test_config.py`
+- **.test_session_keep_days_large_values()** (3 connections) — `tests/unit/test_config.py`
+- **.test_status_bar_config_elements_preserves_order()** (3 connections) — `tests/unit/test_config.py`
+- **Tests for edge cases in field validation.** (1 connections) — `tests/unit/test_config.py`
+- **Boundary values for log_max_lines are valid.** (1 connections) — `tests/unit/test_config.py`
+- **session_keep_count accepts large values.** (1 connections) — `tests/unit/test_config.py`
+- **session_keep_days accepts large values.** (1 connections) — `tests/unit/test_config.py`
+- **StatusBarConfig elements list preserves order.** (1 connections) — `tests/unit/test_config.py`
+- **Multiple config instances are independent.** (1 connections) — `tests/unit/test_config.py`
 
 ## Relationships
 
-- [Warnings Display Config](Warnings_Display_Config.md) (7 shared connections)
-- [Inspect TUI Widget Data](Inspect_TUI_Widget_Data.md) (5 shared connections)
-- [Run State Summary Panel](Run_State_Summary_Panel.md) (4 shared connections)
-- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (3 shared connections)
-- [Summary Panel Widget](Summary_Panel_Widget.md) (2 shared connections)
-- [Rerun Round Trip Tests](Rerun_Round_Trip_Tests.md) (1 shared connections)
-- [TUI Tree View Tests](TUI_Tree_View_Tests.md) (1 shared connections)
-- [Community 463](Community_463.md) (1 shared connections)
+- [Run State Summary Panel](Run_State_Summary_Panel.md) (5 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (3 shared connections)
+- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (1 shared connections)
+- [Renderer Set Definitions](Renderer_Set_Definitions.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/redaction.py`
-- `tests/unit/test_redaction.py`
-- `tests/unit/test_redaction_layer4.py`
+- `tests/unit/test_config.py`
 
 ## Audit Trail
 
-- EXTRACTED: 61 (69%)
-- INFERRED: 27 (31%)
+- EXTRACTED: 23 (72%)
+- INFERRED: 9 (28%)
 - AMBIGUOUS: 0 (0%)
 
 ---

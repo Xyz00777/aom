@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_throttle.py** (8 connections) — `tests/integration/test_throttle.py`
+- **test_throttle.py** (9 connections) — `tests/integration/test_throttle.py`
 - **_run_aom()** (8 connections) — `tests/integration/test_throttle.py`
 - **TestThrottleAwareness** (7 connections) — `tests/integration/test_throttle.py`
 - **_find_session()** (6 connections) — `tests/integration/test_throttle.py`
@@ -30,7 +30,8 @@
 ## Relationships
 
 - [Three-Pane Inspect App](Three-Pane_Inspect_App.md) (2 shared connections)
-- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (2 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (2 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
 - [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
 
 ## Source Files
@@ -39,7 +40,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 69 (95%)
+- EXTRACTED: 70 (95%)
 - INFERRED: 4 (5%)
 - AMBIGUOUS: 0 (0%)
 

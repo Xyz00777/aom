@@ -1,10 +1,11 @@
 # JSONL Environment Variable
 
-> 19 nodes · cohesion 0.18
+> 31 nodes · cohesion 0.09
 
 ## Key Concepts
 
-- **TestWarningVisibilityCompactPlumbing** (14 connections) — `tests/unit/test_cli.py`
+- **TestHideStateCompactPlumbing** (17 connections) — `tests/unit/test_cli.py`
+- **TestWarningVisibilityCompactPlumbing** (13 connections) — `tests/unit/test_cli.py`
 - **Path** (10 connections)
 - **._write_live_config()** (7 connections) — `tests/unit/test_cli.py`
 - **MonkeyPatch** (5 connections)
@@ -16,23 +17,28 @@
 - **.test_core_module_file_exists()** (3 connections) — `tests/unit/test_cli.py`
 - **.test_cli_entry_point_is_aom()** (3 connections) — `tests/unit/test_cli.py`
 - **.test_package_name_is_ansible_aom()** (3 connections) — `tests/unit/test_cli.py`
+- **.test_capture_verbose_propagates_to_renderer()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_hide_state_default_propagates_empty_list()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_hide_state_propagates_multiple_values()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_hide_state_propagates_to_renderer()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_no_failed_hint_propagates_to_renderer()** (2 connections) — `tests/unit/test_cli.py`
 - **._write_live_config()** (2 connections) — `tests/unit/test_cli.py`
-- **[live] show_failed_hint: false should disable compact hints.** (1 connections) — `tests/unit/test_cli.py`
-- **--no-failed-hint still wins when config enables hints.** (1 connections) — `tests/unit/test_cli.py`
-- **--hide-warnings / --hide-deprecations propagate into compact mode.** (1 connections) — `tests/unit/test_cli.py`
-- **TC-003: Core module file exists at expected path.** (1 connections) — `tests/unit/test_cli.py`
-- **TC-001: Package name is 'ansible-aom'.** (1 connections) — `tests/unit/test_cli.py`
-- **TC-001: CLI entry point is 'aom'.** (1 connections) — `tests/unit/test_cli.py`
+- **--hide-state propagates from CLI to create_renderer/run_playbook.** (1 connections) — `tests/unit/test_cli.py`
+- **aom --hide-state ok playbook.yml → create_renderer gets hide_states=["ok"].** (1 connections) — `tests/unit/test_cli.py`
+- **--hide-state ok --hide-state skipped → hide_states=["ok", "skipped"].** (1 connections) — `tests/unit/test_cli.py`
+- **No --hide-state flag → create_renderer gets hide_states=[].** (1 connections) — `tests/unit/test_cli.py`
+- **--capture-verbose should reach compact renderer creation.** (1 connections) — `tests/unit/test_cli.py`
+- **--no-failed-hint should disable failed hints in compact mode only.** (1 connections) — `tests/unit/test_cli.py`
+- *... and 6 more nodes in this community*
 
 ## Relationships
 
-- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (6 shared connections)
-- [Terminal Display Manager](Terminal_Display_Manager.md) (4 shared connections)
-- [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
-- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
-- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (1 shared connections)
-- [Inspect Data Model Builders](Inspect_Data_Model_Builders.md) (1 shared connections)
-- [Session Recording Tests](Session_Recording_Tests.md) (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (10 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (2 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (2 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (2 shared connections)
+- [Inspect Data Model Builders](Inspect_Data_Model_Builders.md) (2 shared connections)
+- [PTY Encoding Robustness](PTY_Encoding_Robustness.md) (1 shared connections)
 
 ## Source Files
 
@@ -40,8 +46,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 67 (89%)
-- INFERRED: 8 (11%)
+- EXTRACTED: 93 (87%)
+- INFERRED: 14 (13%)
 - AMBIGUOUS: 0 (0%)
 
 ---

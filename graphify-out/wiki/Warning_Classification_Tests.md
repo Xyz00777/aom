@@ -1,17 +1,20 @@
 # Warning Classification Tests
 
-> 37 nodes · cohesion 0.14
+> 43 nodes · cohesion 0.12
 
 ## Key Concepts
 
-- **RunProgress** (26 connections) — `src/ansible_aom/core/estimate.py`
-- **test_estimate.py** (19 connections) — `tests/unit/test_estimate.py`
+- **renderer.py** (106 connections) — `src/ansible_aom/compact/renderer.py`
+- **RunProgress** (27 connections) — `src/ansible_aom/core/estimate.py`
+- **test_estimate.py** (20 connections) — `tests/unit/test_estimate.py`
 - **_est()** (19 connections) — `tests/unit/test_estimate.py`
-- **project_remaining()** (15 connections) — `src/ansible_aom/core/estimate.py`
-- **RunEstimate** (11 connections) — `src/ansible_aom/core/estimate.py`
-- **add_completed()** (9 connections) — `src/ansible_aom/core/estimate.py`
-- **add_in_flight()** (9 connections) — `src/ansible_aom/core/estimate.py`
-- **estimate.py** (6 connections) — `src/ansible_aom/core/estimate.py`
+- **_BoundedSet** (16 connections) — `src/ansible_aom/compact/renderer.py`
+- **project_remaining()** (16 connections) — `src/ansible_aom/core/estimate.py`
+- **RunEstimate** (12 connections) — `src/ansible_aom/core/estimate.py`
+- **.__init__()** (10 connections) — `src/ansible_aom/compact/renderer.py`
+- **add_completed()** (10 connections) — `src/ansible_aom/core/estimate.py`
+- **add_in_flight()** (10 connections) — `src/ansible_aom/core/estimate.py`
+- **estimate.py** (8 connections) — `src/ansible_aom/core/estimate.py`
 - **test_add_completed_buckets_by_prior_result()** (4 connections) — `tests/unit/test_estimate.py`
 - **test_add_completed_fixed_task_does_not_touch_var_actual()** (4 connections) — `tests/unit/test_estimate.py`
 - **test_add_completed_ignores_unmatched_path()** (4 connections) — `tests/unit/test_estimate.py`
@@ -26,17 +29,22 @@
 - **test_warmup_fraction_gate()** (4 connections) — `tests/unit/test_estimate.py`
 - **test_warmup_min_tasks_gate()** (4 connections) — `tests/unit/test_estimate.py`
 - **test_work_pace_clamped_high()** (4 connections) — `tests/unit/test_estimate.py`
-- **test_work_pace_clamped_low()** (4 connections) — `tests/unit/test_estimate.py`
-- **test_work_pace_defaults_to_one_before_any_variable_completes()** (4 connections) — `tests/unit/test_estimate.py`
-- **.set_prior_run()** (3 connections) — `src/ansible_aom/compact/renderer.py`
-- *... and 12 more nodes in this community*
+- *... and 18 more nodes in this community*
 
 ## Relationships
 
-- [Inspect Debug Diagnostics](Inspect_Debug_Diagnostics.md) (4 shared connections)
-- [App Configuration Settings](App_Configuration_Settings.md) (3 shared connections)
-- [Community 560](Community_560.md) (2 shared connections)
-- [Crash Recovery Panels](Crash_Recovery_Panels.md) (1 shared connections)
+- [Heartbeat Liveness Tracker](Heartbeat_Liveness_Tracker.md) (14 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (10 shared connections)
+- [TUI Keybindings Config](TUI_Keybindings_Config.md) (8 shared connections)
+- [._render_status_panel](_render_status_panel.md) (7 shared connections)
+- [Renderer Event Protocol](Renderer_Event_Protocol.md) (6 shared connections)
+- [Session List View](Session_List_View.md) (6 shared connections)
+- [Replay Frame Signatures](Replay_Frame_Signatures.md) (4 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (3 shared connections)
+- [UUIDv7 Session Generation](UUIDv7_Session_Generation.md) (3 shared connections)
+- [test_password.py](test_password.py.md) (3 shared connections)
+- [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (3 shared connections)
+- [Status Icon Unicode Mapping](Status_Icon_Unicode_Mapping.md) (3 shared connections)
 
 ## Source Files
 
@@ -46,8 +54,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 121 (62%)
-- INFERRED: 75 (38%)
+- EXTRACTED: 249 (74%)
+- INFERRED: 89 (26%)
 - AMBIGUOUS: 0 (0%)
 
 ---

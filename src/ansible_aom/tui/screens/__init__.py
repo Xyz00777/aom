@@ -1,1 +1,1 @@
-"""TUI screens module for AOM."""
+"""Textual inspect screen for AOM sessions."""

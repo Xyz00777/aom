@@ -1,44 +1,35 @@
 # Failed Host Collection
 
-> 20 nodes · cohesion 0.16
+> 8 nodes · cohesion 0.46
 
 ## Key Concepts
 
-- **test_concurrent_inspect.py** (8 connections) — `tests/integration/test_concurrent_inspect.py`
-- **.test_aom_inspect_during_active_writer()** (8 connections) — `tests/integration/test_concurrent_inspect.py`
-- **.test_load_session_during_active_writer_does_not_raise()** (8 connections) — `tests/integration/test_concurrent_inspect.py`
-- **Path** (6 connections)
-- **_read_snapshot()** (6 connections) — `tests/integration/test_concurrent_inspect.py`
-- **_writer_thread()** (6 connections) — `tests/integration/test_concurrent_inspect.py`
-- **_build_session()** (5 connections) — `tests/integration/test_concurrent_inspect.py`
-- **_run_aom_inspect()** (4 connections) — `tests/integration/test_concurrent_inspect.py`
-- **TestInspectDuringWrite** (3 connections) — `tests/integration/test_concurrent_inspect.py`
-- **TestLoadSessionDuringWrite** (3 connections) — `tests/integration/test_concurrent_inspect.py`
-- **Any** (1 connections)
-- **Concurrency test: writer + concurrent inspect (Phase 8 / Task 8.4).  What this t** (1 connections) — `tests/integration/test_concurrent_inspect.py`
-- **Create ``<state_dir>/<session_id>/`` with a minimal meta.json.      Mirrors the** (1 connections) — `tests/integration/test_concurrent_inspect.py`
-- **Append events to *events_file* at ~1000/sec until *stop* is set.      The writer** (1 connections) — `tests/integration/test_concurrent_inspect.py`
-- **Invoke ``aom inspect --text --state-dir <state>`` and return the exit code.** (1 connections) — `tests/integration/test_concurrent_inspect.py`
-- **Open the events file and return ``(well_formed_count, malformed_count, events)``** (1 connections) — `tests/integration/test_concurrent_inspect.py`
-- **Concurrent writer + reader on the same events.jsonl.      The writer pushes ~100** (1 connections) — `tests/integration/test_concurrent_inspect.py`
-- **The headline concurrency test.          Steps:           1. Create a session dir** (1 connections) — `tests/integration/test_concurrent_inspect.py`
-- **``load_session`` is the lowest layer the inspect reader relies on.      This cla** (1 connections) — `tests/integration/test_concurrent_inspect.py`
-- **``load_session`` returns a dict (not None, not raising) on every read.** (1 connections) — `tests/integration/test_concurrent_inspect.py`
+- **test_prior_denominator.py** (10 connections) — `tests/compact/test_prior_denominator.py`
+- **_run()** (7 connections) — `tests/compact/test_prior_denominator.py`
+- **_drive_one_task()** (4 connections) — `tests/compact/test_prior_denominator.py`
+- **_prior()** (4 connections) — `tests/compact/test_prior_denominator.py`
+- **test_no_prior_falls_back_to_seen()** (4 connections) — `tests/compact/test_prior_denominator.py`
+- **test_loose_prior_seeds_estimated_total()** (3 connections) — `tests/compact/test_prior_denominator.py`
+- **test_strict_prior_seeds_plain_total()** (3 connections) — `tests/compact/test_prior_denominator.py`
+- **Renderer seeds the task denominator from a matching prior run.  Preflight ``--li** (1 connections) — `tests/compact/test_prior_denominator.py`
 
 ## Relationships
 
-- [Session Recording Tests](Session_Recording_Tests.md) (3 shared connections)
-- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
-- [Total Task Counting](Total_Task_Counting.md) (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (3 shared connections)
+- [TUI Keybindings Config](TUI_Keybindings_Config.md) (2 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (2 shared connections)
+- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
+- [Property Based Tests](Property_Based_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_concurrent_inspect.py`
+- `tests/compact/test_prior_denominator.py`
 
 ## Audit Trail
 
-- EXTRACTED: 62 (93%)
-- INFERRED: 5 (7%)
+- EXTRACTED: 36 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -1,14 +1,15 @@
 # Session Diagnostics Writing
 
-> 19 nodes · cohesion 0.14
+> 20 nodes · cohesion 0.13
 
 ## Key Concepts
 
 - **_FakeSpawn** (9 connections) — `tests/unit/test_runner_searchwindowsize.py`
-- **_patch_runner_with_fake_spawn()** (6 connections) — `tests/unit/test_runner_searchwindowsize.py`
+- **_patch_runner_with_fake_spawn()** (7 connections) — `tests/unit/test_runner_searchwindowsize.py`
 - **test_runner_searchwindowsize.py** (5 connections) — `tests/unit/test_runner_searchwindowsize.py`
 - **test_runner_searchwindow_covers_longest_pattern()** (5 connections) — `tests/unit/test_runner_searchwindowsize.py`
 - **test_runner_sets_explicit_searchwindowsize()** (5 connections) — `tests/unit/test_runner_searchwindowsize.py`
+- **.playbook()** (4 connections) — `src/ansible_aom/drivers/live.py`
 - **Any** (3 connections)
 - **MonkeyPatch** (3 connections)
 - **.expect()** (2 connections) — `tests/unit/test_runner_searchwindowsize.py`
@@ -26,16 +27,20 @@
 
 ## Relationships
 
-- [Tree Block Animation](Tree_Block_Animation.md) (2 shared connections)
+- [Replay Determinism Tests](Replay_Determinism_Tests.md) (2 shared connections)
+- [Debug Diagnostics Summary](Debug_Diagnostics_Summary.md) (1 shared connections)
+- [Diagnostics Layer Tests](Diagnostics_Layer_Tests.md) (1 shared connections)
+- [Host Collection Helpers](Host_Collection_Helpers.md) (1 shared connections)
 
 ## Source Files
 
+- `src/ansible_aom/drivers/live.py`
 - `tests/unit/test_runner_searchwindowsize.py`
 
 ## Audit Trail
 
-- EXTRACTED: 48 (96%)
-- INFERRED: 2 (4%)
+- EXTRACTED: 49 (89%)
+- INFERRED: 6 (11%)
 - AMBIGUOUS: 0 (0%)
 
 ---

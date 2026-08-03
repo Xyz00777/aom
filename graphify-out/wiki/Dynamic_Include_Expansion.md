@@ -1,6 +1,6 @@
 # Dynamic Include Expansion
 
-> 38 nodes · cohesion 0.10
+> 38 nodes · cohesion 0.11
 
 ## Key Concepts
 
@@ -9,10 +9,10 @@
 - **collect_changed_hosts()** (10 connections) — `src/ansible_aom/session/summary.py`
 - **collect_unreachable_hosts()** (10 connections) — `src/ansible_aom/session/summary.py`
 - **TestCollectFailedHosts** (9 connections) — `tests/unit/test_session_collectors.py`
+- **summary.py** (8 connections) — `src/ansible_aom/session/summary.py`
+- **test_session_collectors.py** (6 connections) — `tests/unit/test_session_collectors.py`
 - **TestCollectChangedHosts** (6 connections) — `tests/unit/test_session_collectors.py`
 - **TestCollectUnreachableHosts** (6 connections) — `tests/unit/test_session_collectors.py`
-- **summary.py** (5 connections) — `src/ansible_aom/session/summary.py`
-- **test_session_collectors.py** (5 connections) — `tests/unit/test_session_collectors.py`
 - **create_session_summary()** (4 connections) — `src/ansible_aom/session/summary.py`
 - **Any** (4 connections)
 - **.test_multi_host_failure_event()** (4 connections) — `tests/unit/test_session_collectors.py`
@@ -33,9 +33,9 @@
 
 ## Relationships
 
+- [Rerun Subcommand Module](Rerun_Subcommand_Module.md) (4 shared connections)
 - [KeyAction TypedDict](KeyAction_TypedDict.md) (3 shared connections)
-- [Crash Recovery Auto-Save](Crash_Recovery_Auto-Save.md) (3 shared connections)
-- [Total Task Counting](Total_Task_Counting.md) (1 shared connections)
+- [Run Config Key Normalization](Run_Config_Key_Normalization.md) (2 shared connections)
 
 ## Source Files
 
@@ -44,8 +44,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 110 (72%)
-- INFERRED: 43 (28%)
+- EXTRACTED: 117 (75%)
+- INFERRED: 40 (25%)
 - AMBIGUOUS: 0 (0%)
 
 ---

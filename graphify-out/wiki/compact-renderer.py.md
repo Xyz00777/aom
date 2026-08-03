@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **compact/renderer.py** (0 connections) — `.sisyphus/notepads/implementation/decisions.md`
+- **compact/renderer.py** (0 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
 
 ## Relationships
 
@@ -12,7 +12,7 @@
 
 ## Source Files
 
-- `.sisyphus/notepads/implementation/decisions.md`
+- `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
 
 ## Audit Trail
 

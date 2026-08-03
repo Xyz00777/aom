@@ -4,16 +4,16 @@
 
 ## Key Concepts
 
-- **TestTreeNavigationKeybindings** (13 connections) — `tests/tui/test_keybindings.py`
-- **.test_arrow_down_navigates_tree()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_arrow_up_navigates_tree()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_capital_g_jumps_to_tree_bottom()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_enter_toggles_node()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_g_jumps_to_tree_top()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_j_navigates_tree_down()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_k_navigates_tree_up()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_left_arrow_collapses_node()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_right_arrow_expands_node()** (3 connections) — `tests/tui/test_keybindings.py`
+- **TestTreeNavigationKeybindings** (11 connections) — `tests/tui/test_keybindings.py`
+- **.test_arrow_down_navigates_tree()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_arrow_up_navigates_tree()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_capital_g_jumps_to_tree_bottom()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_enter_toggles_node()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_g_jumps_to_tree_top()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_j_navigates_tree_down()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_k_navigates_tree_up()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_left_arrow_collapses_node()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_right_arrow_expands_node()** (2 connections) — `tests/tui/test_keybindings.py`
 - **Tests for tree navigation keybindings - TC-343, TC-344.** (1 connections) — `tests/tui/test_keybindings.py`
 - **TC-343: Up arrow navigates tree up when tree focused.** (1 connections) — `tests/tui/test_keybindings.py`
 - **TC-343: Down arrow navigates tree down when tree focused.** (1 connections) — `tests/tui/test_keybindings.py`
@@ -27,9 +27,7 @@
 
 ## Relationships
 
-- [Runner Event Batching](Runner_Event_Batching.md) (9 shared connections)
-- [State Machine Invariants](State_Machine_Invariants.md) (2 shared connections)
-- [Warning Color Formatting](Warning_Color_Formatting.md) (1 shared connections)
+- [test_keybindings.py](test_keybindings.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -37,8 +35,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 39 (78%)
-- INFERRED: 11 (22%)
+- EXTRACTED: 39 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

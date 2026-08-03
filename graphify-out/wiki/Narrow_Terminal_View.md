@@ -1,41 +1,32 @@
 # Narrow Terminal View
 
-> 16 nodes · cohesion 0.13
+> 5 nodes · cohesion 0.40
 
 ## Key Concepts
 
-- **FakeRenderer** (22 connections) — `tests/unit/test_event_source.py`
-- **Any** (3 connections)
-- **.set_definitions()** (2 connections) — `tests/unit/test_event_source.py`
-- **.update_state()** (2 connections) — `tests/unit/test_event_source.py`
-- **.add_warning()** (1 connections) — `tests/unit/test_event_source.py`
-- **.handle_completion()** (1 connections) — `tests/unit/test_event_source.py`
-- **.handle_interactive_prompt()** (1 connections) — `tests/unit/test_event_source.py`
-- **.__init__()** (1 connections) — `tests/unit/test_event_source.py`
-- **.note_pty_bytes()** (1 connections) — `tests/unit/test_event_source.py`
-- **.note_subprocess_active()** (1 connections) — `tests/unit/test_event_source.py`
-- **.print_log()** (1 connections) — `tests/unit/test_event_source.py`
-- **.set_prior_run()** (1 connections) — `tests/unit/test_event_source.py`
-- **.start()** (1 connections) — `tests/unit/test_event_source.py`
-- **.stop()** (1 connections) — `tests/unit/test_event_source.py`
-- **.tick()** (1 connections) — `tests/unit/test_event_source.py`
-- **Minimal Renderer-shaped sink used by the driver smoke tests.** (1 connections) — `tests/unit/test_event_source.py`
+- **TestNoFailedHintFlag** (12 connections) — `tests/unit/test_cli.py`
+- **.test_no_failed_hint_defaults_false()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_no_failed_hint_does_not_leak_to_ansible_args()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_no_failed_hint_long_form()** (2 connections) — `tests/unit/test_cli.py`
+- **Task 5.2: --no-failed-hint suppresses the failed-hint in compact log.** (1 connections) — `tests/unit/test_cli.py`
 
 ## Relationships
 
-- [Diagnostics Layer Tests](Diagnostics_Layer_Tests.md) (6 shared connections)
-- [Debug Diagnostics Summary](Debug_Diagnostics_Summary.md) (1 shared connections)
-- [Rerun Main Function](Rerun_Main_Function.md) (1 shared connections)
-- [Status Bar Liveness Tests](Status_Bar_Liveness_Tests.md) (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (4 shared connections)
+- [PTY Stream Parser](PTY_Stream_Parser.md) (3 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (1 shared connections)
+- [Inspect Data Model Builders](Inspect_Data_Model_Builders.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/unit/test_event_source.py`
+- `tests/unit/test_cli.py`
 
 ## Audit Trail
 
-- EXTRACTED: 38 (93%)
-- INFERRED: 3 (7%)
+- EXTRACTED: 9 (47%)
+- INFERRED: 10 (53%)
 - AMBIGUOUS: 0 (0%)
 
 ---

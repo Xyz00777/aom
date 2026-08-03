@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_loop_item_lines.py** (13 connections) — `tests/compact/test_loop_item_lines.py`
+- **test_loop_item_lines.py** (14 connections) — `tests/compact/test_loop_item_lines.py`
 - **_renderer()** (11 connections) — `tests/compact/test_loop_item_lines.py`
 - **_task_start()** (10 connections) — `tests/compact/test_loop_item_lines.py`
 - **_item()** (9 connections) — `tests/compact/test_loop_item_lines.py`
@@ -31,6 +31,7 @@
 ## Relationships
 
 - [App Configuration Settings](App_Configuration_Settings.md) (7 shared connections)
+- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
 
 ## Source Files
 
@@ -38,7 +39,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 137 (97%)
+- EXTRACTED: 138 (97%)
 - INFERRED: 4 (3%)
 - AMBIGUOUS: 0 (0%)
 

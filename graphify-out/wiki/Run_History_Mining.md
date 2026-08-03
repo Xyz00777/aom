@@ -4,14 +4,14 @@
 
 ## Key Concepts
 
+- **test_runner_eof_watchdog.py** (14 connections) — `tests/unit/test_runner_eof_watchdog.py`
 - **_SequenceChild** (14 connections) — `tests/unit/test_runner_eof_watchdog.py`
 - **_NullSink** (12 connections) — `tests/unit/test_runner_eof_watchdog.py`
-- **test_runner_eof_watchdog.py** (11 connections) — `tests/unit/test_runner_eof_watchdog.py`
-- **.test_watchdog_emits_warning_and_returns_when_no_eof()** (9 connections) — `tests/unit/test_runner_eof_watchdog.py`
-- **.test_watchdog_emits_warning_via_logger()** (9 connections) — `tests/unit/test_runner_eof_watchdog.py`
-- **.test_watchdog_path_calls_expect()** (9 connections) — `tests/unit/test_runner_eof_watchdog.py`
-- **.test_clean_eof_after_stats_no_warning()** (8 connections) — `tests/unit/test_runner_eof_watchdog.py`
-- **.test_pre_stats_timeout_does_not_trigger_watchdog()** (7 connections) — `tests/unit/test_runner_eof_watchdog.py`
+- **.test_watchdog_emits_warning_and_returns_when_no_eof()** (10 connections) — `tests/unit/test_runner_eof_watchdog.py`
+- **.test_watchdog_emits_warning_via_logger()** (10 connections) — `tests/unit/test_runner_eof_watchdog.py`
+- **.test_watchdog_path_calls_expect()** (10 connections) — `tests/unit/test_runner_eof_watchdog.py`
+- **.test_clean_eof_after_stats_no_warning()** (9 connections) — `tests/unit/test_runner_eof_watchdog.py`
+- **.test_pre_stats_timeout_does_not_trigger_watchdog()** (8 connections) — `tests/unit/test_runner_eof_watchdog.py`
 - **_start_line()** (6 connections) — `tests/unit/test_runner_eof_watchdog.py`
 - **TestWatchdogFiresAfterStats** (6 connections) — `tests/unit/test_runner_eof_watchdog.py`
 - **_stats_line()** (5 connections) — `tests/unit/test_runner_eof_watchdog.py`
@@ -34,10 +34,13 @@
 ## Relationships
 
 - [Run State Completion Recap](Run_State_Completion_Recap.md) (11 shared connections)
-- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (11 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (11 shared connections)
+- [Tree Block Animation](Tree_Block_Animation.md) (6 shared connections)
 - [Architecture Layering Tests](Architecture_Layering_Tests.md) (5 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (1 shared connections)
 - [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
-- [Community 611](Community_611.md) (1 shared connections)
+- [TestEofWatchdogConfig](TestEofWatchdogConfig.md) (1 shared connections)
 
 ## Source Files
 
@@ -45,8 +48,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 102 (79%)
-- INFERRED: 27 (21%)
+- EXTRACTED: 110 (80%)
+- INFERRED: 27 (20%)
 - AMBIGUOUS: 0 (0%)
 
 ---

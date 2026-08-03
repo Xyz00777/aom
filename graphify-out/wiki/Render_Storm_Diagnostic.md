@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_diagnostics.py** (14 connections) — `tests/unit/test_diagnostics.py`
+- **test_diagnostics.py** (15 connections) — `tests/unit/test_diagnostics.py`
 - **Unit tests for core.diagnostics — opt-in observability layer.  Spec: docs/superp** (1 connections) — `tests/unit/test_diagnostics.py`
 - **_reset_diagnostics()** (1 connections) — `tests/unit/test_diagnostics.py`
 - **test_aom_debug_is_the_only_trace_knob()** (1 connections) — `tests/unit/test_diagnostics.py`
@@ -21,6 +21,7 @@
 
 ## Relationships
 
+- [core/__init__.py](core-__init__.py.md) (1 shared connections)
 - [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
 
 ## Source Files
@@ -29,7 +30,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 27 (100%)
+- EXTRACTED: 28 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

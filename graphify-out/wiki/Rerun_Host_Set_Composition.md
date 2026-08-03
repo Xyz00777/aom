@@ -4,8 +4,8 @@
 
 ## Key Concepts
 
+- **test_tree_pipe_continuation.py** (13 connections) — `tests/compact/test_tree_pipe_continuation.py`
 - **_spur_projection()** (12 connections) — `tests/compact/test_tree_pipe_continuation.py`
-- **test_tree_pipe_continuation.py** (10 connections) — `tests/compact/test_tree_pipe_continuation.py`
 - **_two_plays_with_running_tasks()** (9 connections) — `tests/compact/test_tree_pipe_continuation.py`
 - **test_ascii_mode_uses_pipe_substitute()** (5 connections) — `tests/compact/test_tree_pipe_continuation.py`
 - **test_last_play_children_have_plain_indent()** (5 connections) — `tests/compact/test_tree_pipe_continuation.py`
@@ -29,9 +29,12 @@
 
 - [Pause Prompt Heuristic](Pause_Prompt_Heuristic.md) (7 shared connections)
 - [Play Definition Tree Population](Play_Definition_Tree_Population.md) (6 shared connections)
-- [Hide State Gating Tests](Hide_State_Gating_Tests.md) (5 shared connections)
-- [CLI Interface Tests](CLI_Interface_Tests.md) (4 shared connections)
-- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (2 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (6 shared connections)
+- [.test_field_exists_with_default_false](test_field_exists_with_default_false.md) (4 shared connections)
+- [TUI Keybindings Config](TUI_Keybindings_Config.md) (1 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
+- [tree.py](tree.py.md) (1 shared connections)
+- [Hide State Gating Tests](Hide_State_Gating_Tests.md) (1 shared connections)
 
 ## Source Files
 
@@ -39,7 +42,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 59 (78%)
+- EXTRACTED: 62 (78%)
 - INFERRED: 17 (22%)
 - AMBIGUOUS: 0 (0%)
 

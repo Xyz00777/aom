@@ -5,7 +5,7 @@
 ## Key Concepts
 
 - **_build_compact_renderer()** (9 connections) — `tests/unit/test_renderer_unbounded_caps.py`
-- **test_renderer_unbounded_caps.py** (7 connections) — `tests/unit/test_renderer_unbounded_caps.py`
+- **test_renderer_unbounded_caps.py** (8 connections) — `tests/unit/test_renderer_unbounded_caps.py`
 - **test_announced_task_uuids_capped()** (3 connections) — `tests/unit/test_renderer_unbounded_caps.py`
 - **test_completed_task_ids_capped()** (3 connections) — `tests/unit/test_renderer_unbounded_caps.py`
 - **test_renderer_constructor_uses_sane_initial_caps()** (3 connections) — `tests/unit/test_renderer_unbounded_caps.py`
@@ -22,6 +22,7 @@
 
 ## Relationships
 
+- [TUI Screens Module](TUI_Screens_Module.md) (1 shared connections)
 - [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
 
 ## Source Files
@@ -30,8 +31,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 38 (97%)
-- INFERRED: 1 (3%)
+- EXTRACTED: 39 (98%)
+- INFERRED: 1 (2%)
 - AMBIGUOUS: 0 (0%)
 
 ---

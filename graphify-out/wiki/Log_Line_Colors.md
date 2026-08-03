@@ -1,36 +1,26 @@
 # Log Line Colors
 
-> 15 nodes · cohesion 0.13
+> 4 nodes · cohesion 0.50
 
 ## Key Concepts
 
-- **Tree view for the compact renderer** (14 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
-- **2026-05-19-free-strategy-tree-view-design.md** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
-- **Architecture** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
-- **Data model: `core/tree.py`** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
-- **Decision: per-host summary row (PQ3 — counts + current task, worst-status colour)** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
-- **Decision: tree leaf shape (PQ2 — host leaves under running tasks)** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
-- **Goal** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
-- **Height budget & pruning** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
-- **Open notes (deferred but signposted)** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
-- **Ordering & include/import handling** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
-- **Problem** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
-- **Renderer integration: `compact/renderer.py`** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
-- **Status-icon colour mapping** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
-- **Testing** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
-- **Tree lifecycle** (1 connections) — `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
+- **.test_sigpipe_is_ignored()** (3 connections) — `tests/integration/test_compact_renderer.py`
+- **Pattern matches 'SSH password: '.** (2 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_ssh_password_pattern()** (2 connections) — `tests/integration/test_compact_renderer.py`
+- **TC-052: SIGPIPE is ignored — process continues without crash.** (1 connections) — `tests/integration/test_compact_renderer.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [Password Pattern Detection](Password_Pattern_Detection.md) (1 shared connections)
+- [Action Keybindings Lookup](Action_Keybindings_Lookup.md) (1 shared connections)
 
 ## Source Files
 
-- `docs/superpowers/specs/2026-05-19-free-strategy-tree-view-design.md`
+- `tests/integration/test_compact_renderer.py`
 
 ## Audit Trail
 
-- EXTRACTED: 28 (100%)
+- EXTRACTED: 8 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

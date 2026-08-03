@@ -1,44 +1,37 @@
 # Action Keybindings Lookup
 
-> 20 nodes · cohesion 0.13
+> 8 nodes · cohesion 0.25
 
 ## Key Concepts
 
-- **_fake_ansible_command()** (8 connections) — `tests/integration/test_runner.py`
-- **test_runner.py** (7 connections) — `tests/integration/test_runner.py`
-- **TestRunnerPreflight** (6 connections) — `tests/integration/test_runner.py`
-- **TestRunnerHappyPath** (5 connections) — `tests/integration/test_runner.py`
-- **TestRunnerCommandNotFound** (4 connections) — `tests/integration/test_runner.py`
-- **TestRunnerFailureExit** (4 connections) — `tests/integration/test_runner.py`
-- **.test_run_playbook_calls_preflight_and_forwards_definitions()** (4 connections) — `tests/integration/test_runner.py`
-- **.test_run_playbook_forwards_every_preflight_error_to_add_warning()** (4 connections) — `tests/integration/test_runner.py`
-- **.test_run_playbook_marks_failed_on_nonzero_exit()** (3 connections) — `tests/integration/test_runner.py`
-- **.test_run_playbook_calls_renderer_start_and_completion()** (3 connections) — `tests/integration/test_runner.py`
-- **.test_run_playbook_forwards_jsonl_events_to_update_state()** (3 connections) — `tests/integration/test_runner.py`
-- **.test_run_playbook_forwards_preflight_errors_as_warnings()** (3 connections) — `tests/integration/test_runner.py`
-- **.test_run_playbook_returns_127_when_command_missing()** (2 connections) — `tests/integration/test_runner.py`
-- **Integration tests for the ansible-playbook runner.  The runner spawns `ansible-p** (1 connections) — `tests/integration/test_runner.py`
-- **Missing ansible-playbook surfaces as exit 127 without crashing.** (1 connections) — `tests/integration/test_runner.py`
-- **Runner calls run_preflight before spawning and forwards its result.** (1 connections) — `tests/integration/test_runner.py`
-- **Build a (command, args) pair that emits `events` as JSONL then exits.      Retur** (1 connections) — `tests/integration/test_runner.py`
-- **Each error → an add_warning call, even when they share a body.          The coun** (1 connections) — `tests/integration/test_runner.py`
-- **Runner spawns the subprocess and pumps events to the renderer.** (1 connections) — `tests/integration/test_runner.py`
-- **Non-zero subprocess exit becomes 'failed' state.** (1 connections) — `tests/integration/test_runner.py`
+- **TestSignalHandling** (19 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_exit_code_130_for_sigint()** (2 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_sigint_second_press_kills_within_2s()** (2 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_sigquit_logs_stack_trace()** (2 connections) — `tests/integration/test_compact_renderer.py`
+- **Tests for TC-046 to TC-053: Signal handling.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **TC-047: Exit code 130 for SIGINT (second Ctrl+C).** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **TC-047: Second Ctrl+C within 2s kills everything, exits 130.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **TC-048: SIGQUIT logs stack trace to file, continues execution.** (1 connections) — `tests/integration/test_compact_renderer.py`
 
 ## Relationships
 
-- [Tree Block Animation](Tree_Block_Animation.md) (7 shared connections)
-- [CLI Argument Parser](CLI_Argument_Parser.md) (5 shared connections)
-- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (4 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (3 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (2 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (2 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [Log Line Colors](Log_Line_Colors.md) (1 shared connections)
+- [Completion State Labels](Completion_State_Labels.md) (1 shared connections)
+- [Renderer Event Protocol](Renderer_Event_Protocol.md) (1 shared connections)
 
 ## Source Files
 
-- `tests/integration/test_runner.py`
+- `tests/integration/test_compact_renderer.py`
 
 ## Audit Trail
 
-- EXTRACTED: 51 (81%)
-- INFERRED: 12 (19%)
+- EXTRACTED: 21 (72%)
+- INFERRED: 8 (28%)
 - AMBIGUOUS: 0 (0%)
 
 ---

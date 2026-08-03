@@ -22,7 +22,7 @@
 
 ## Relationships
 
-- [Tree Block Animation](Tree_Block_Animation.md) (4 shared connections)
+- [Replay Determinism Tests](Replay_Determinism_Tests.md) (4 shared connections)
 - [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
 
 ## Source Files

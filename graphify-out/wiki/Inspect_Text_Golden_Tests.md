@@ -1,49 +1,39 @@
 # Inspect Text Golden Tests
 
-> 30 nodes · cohesion 0.07
+> 14 nodes · cohesion 0.14
 
 ## Key Concepts
 
-- **Research: `aom inspect diff <session1> <session2>` Implementation (2026-04-20)** (11 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **7. OPEN QUESTIONS for User Decision** (6 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **1. Existing Tools Research** (4 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **2. Task Matching Strategies** (4 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **3. Comparison Dimensions** (4 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **4. Output Format: Table View** (4 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **6. Recommended Implementation** (4 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **1.1 ARA (Ansible Run Analysis)** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **1.2 Ansible-Specific Diff Tools** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **1.3 General Diff Tools (Applicable Patterns)** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **2.1 Available Identifiers** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **2.2 Matching Strategy Comparison** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **2.3 Recommended Matching Strategy: Hybrid UUID + Path** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **3.1 Task-Level Comparison (Per Task)** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **3.2 Host-Level Comparison (Per Host)** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **3.3 Playbook-Level Comparison** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **4.1 Task-Centric View (`--task` flag)** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **4.2 Host-Centric View (`--host` flag)** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **4.3 Rich Table Implementation Pattern** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **6.1 Data Models for Diff** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **6.2 Core Diff Function** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **6.3 CLI Command** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **8. Implementation Checklist** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **9. References** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- **Executive Summary** (1 connections) — `.sisyphus/notepads/new-spec/open-questions.md`
-- *... and 5 more nodes in this community*
+- **TestAppConfigFieldTypes** (12 connections) — `tests/unit/test_config.py`
+- **.test_status_bar_is_status_bar_config()** (4 connections) — `tests/unit/test_config.py`
+- **.test_warnings_is_warnings_config()** (4 connections) — `tests/unit/test_config.py`
+- **.test_log_max_lines_is_int()** (3 connections) — `tests/unit/test_config.py`
+- **.test_redaction_is_redaction_config()** (3 connections) — `tests/unit/test_config.py`
+- **.test_session_keep_count_is_int()** (3 connections) — `tests/unit/test_config.py`
+- **.test_session_keep_days_is_int()** (3 connections) — `tests/unit/test_config.py`
+- **Tests for AppConfig field types and defaults.** (1 connections) — `tests/unit/test_config.py`
+- **log_max_lines is an integer.** (1 connections) — `tests/unit/test_config.py`
+- **session_keep_count is an integer.** (1 connections) — `tests/unit/test_config.py`
+- **session_keep_days is an integer.** (1 connections) — `tests/unit/test_config.py`
+- **status_bar field is StatusBarConfig type.** (1 connections) — `tests/unit/test_config.py`
+- **redaction field is RedactionConfig type.** (1 connections) — `tests/unit/test_config.py`
+- **warnings field is WarningsConfig type.** (1 connections) — `tests/unit/test_config.py`
 
 ## Relationships
 
-- [Real Ansible Integration](Real_Ansible_Integration.md) (1 shared connections)
-- [Community 555](Community_555.md) (1 shared connections)
+- [Run State Summary Panel](Run_State_Summary_Panel.md) (7 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (4 shared connections)
+- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (1 shared connections)
+- [Renderer Set Definitions](Renderer_Set_Definitions.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/new-spec/open-questions.md`
+- `tests/unit/test_config.py`
 
 ## Audit Trail
 
-- EXTRACTED: 60 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 27 (69%)
+- INFERRED: 12 (31%)
 - AMBIGUOUS: 0 (0%)
 
 ---

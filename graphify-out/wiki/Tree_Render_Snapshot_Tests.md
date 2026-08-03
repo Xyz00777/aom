@@ -1,49 +1,46 @@
 # Tree Render Snapshot Tests
 
-> 42 nodes · cohesion 0.05
+> 20 nodes · cohesion 0.10
 
 ## Key Concepts
 
-- **AOM Diagnostics Layer — Design Plan** (10 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
-- **1. Verified hot spots** (10 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
-- **2. Proposed fixes** (8 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
-- **Performance-Improvement Plan: AOM Compact Renderer** (8 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
-- **4. Tests to write first** (7 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
-- **2026-05-21-diagnostics-layer-design.md** (2 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
-- **2026-05-21-render-state-perf-design.md** (2 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
-- **1. What we want answered, by failure class** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
-- **2. Diagnostic surface** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
-- **3. Module layout** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
-- **4. Lifecycle** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
-- **5. Session-recorded diagnostics** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
-- **6. Sequence and dependencies** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
-- **7. Tests to write first (TDD-first order)** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
-- **8. Out of scope / explicit non-goals** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
-- **9. Open questions** (1 connections) — `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
-- **3. Sequence and dependencies** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
-- **5. Layer assignment for new logic** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
-- **6. Out of scope / explicit non-goals** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
-- **7. Open questions** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
-- **A0 tests — `tests/unit/test_parser_orjson_swap.py`** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
-- **A1 tests — `tests/compact/test_emit_event_log_batching.py`** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
-- **A2 tests — `tests/unit/test_run_state_index.py`** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
-- **B1 tests — `tests/compact/test_tree_projection_lifecycle.py`** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
-- **C1 tests — `tests/compact/test_incremental_counters.py`** (1 connections) — `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
-- *... and 17 more nodes in this community*
+- **TestRunState** (21 connections) — `tests/unit/test_models.py`
+- **.test_run_state_plays_dict_key_is_play_id()** (4 connections) — `tests/unit/test_models.py`
+- **.test_run_state_plays_dict_value_is_play_run_state()** (4 connections) — `tests/unit/test_models.py`
+- **.test_run_state_all_fields()** (3 connections) — `tests/unit/test_models.py`
+- **.test_run_state_definitions_defaults_empty_list()** (3 connections) — `tests/unit/test_models.py`
+- **.test_run_state_plays_defaults_empty_dict()** (3 connections) — `tests/unit/test_models.py`
+- **.test_run_state_required_field_playbook()** (3 connections) — `tests/unit/test_models.py`
+- **.test_run_state_single_instance_per_playbook()** (3 connections) — `tests/unit/test_models.py`
+- **.test_run_state_status_defaults_pending()** (3 connections) — `tests/unit/test_models.py`
+- **.test_run_state_timestamps_default_none()** (3 connections) — `tests/unit/test_models.py`
+- **Tests for RunState dataclass - TC-194, TC-195, TC-196.** (1 connections) — `tests/unit/test_models.py`
+- **TC-194: RunState requires playbook field.** (1 connections) — `tests/unit/test_models.py`
+- **TC-194: RunState with all fields.** (1 connections) — `tests/unit/test_models.py`
+- **TC-194: plays defaults to empty dict.** (1 connections) — `tests/unit/test_models.py`
+- **TC-195: definitions defaults to empty list.** (1 connections) — `tests/unit/test_models.py`
+- **TC-194: status defaults to PENDING.** (1 connections) — `tests/unit/test_models.py`
+- **TC-194: timestamps default to None.** (1 connections) — `tests/unit/test_models.py`
+- **TC-196: plays dict uses play UUID/id string as key.** (1 connections) — `tests/unit/test_models.py`
+- **TC-196: plays dict value is PlayRunState.** (1 connections) — `tests/unit/test_models.py`
+- **TC-194 edge case: One RunState instance per playbook run.** (1 connections) — `tests/unit/test_models.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [CLI Interface Tests](CLI_Interface_Tests.md) (13 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (5 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (2 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [Check Mode Chip](Check_Mode_Chip.md) (1 shared connections)
 
 ## Source Files
 
-- `docs/superpowers/specs/2026-05-21-diagnostics-layer-design.md`
-- `docs/superpowers/specs/2026-05-21-render-state-perf-design.md`
+- `tests/unit/test_models.py`
 
 ## Audit Trail
 
-- EXTRACTED: 82 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 40 (67%)
+- INFERRED: 20 (33%)
 - AMBIGUOUS: 0 (0%)
 
 ---

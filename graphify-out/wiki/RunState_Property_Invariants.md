@@ -4,9 +4,9 @@
 
 ## Key Concepts
 
-- **format_host_rows()** (26 connections) — `src/ansible_aom/compact/format.py`
-- **_strip_sgr()** (16 connections) — `src/ansible_aom/compact/format.py`
-- **test_host_table.py** (15 connections) — `tests/compact/test_host_table.py`
+- **format_host_rows()** (27 connections) — `src/ansible_aom/compact/format.py`
+- **_strip_sgr()** (18 connections) — `src/ansible_aom/compact/format.py`
+- **test_host_table.py** (18 connections) — `tests/compact/test_host_table.py`
 - **_state()** (14 connections) — `tests/compact/test_host_table.py`
 - **_add_results()** (13 connections) — `tests/compact/test_host_table.py`
 - **test_failed_host_shows_failed_task_in_suffix()** (8 connections) — `tests/compact/test_host_table.py`
@@ -30,16 +30,17 @@
 ## Relationships
 
 - [Play Definition Tree Population](Play_Definition_Tree_Population.md) (15 shared connections)
-- [CLI Interface Tests](CLI_Interface_Tests.md) (11 shared connections)
-- [Four-Layer Redaction System](Four-Layer_Redaction_System.md) (6 shared connections)
-- [Renderer Set Definitions](Renderer_Set_Definitions.md) (4 shared connections)
-- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (2 shared connections)
-- [Community 642](Community_642.md) (1 shared connections)
-- [Crash Recovery Notification](Crash_Recovery_Notification.md) (1 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (14 shared connections)
+- [Four-Layer Redaction System](Four-Layer_Redaction_System.md) (5 shared connections)
+- [TUI Keybindings Config](TUI_Keybindings_Config.md) (4 shared connections)
+- [Heartbeat Liveness Tracker](Heartbeat_Liveness_Tracker.md) (2 shared connections)
+- [Warning Classification Tests](Warning_Classification_Tests.md) (2 shared connections)
+- [._render_status_panel](_render_status_panel.md) (2 shared connections)
+- [Session List View](Session_List_View.md) (1 shared connections)
 - [Hide State Gating Tests](Hide_State_Gating_Tests.md) (1 shared connections)
-- [Community 560](Community_560.md) (1 shared connections)
 - [Pause Prompt Heuristic](Pause_Prompt_Heuristic.md) (1 shared connections)
-- [CLI Argument Parser](CLI_Argument_Parser.md) (1 shared connections)
+- [Free Strategy Task Header](Free_Strategy_Task_Header.md) (1 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
 
 ## Source Files
 
@@ -48,8 +49,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 96 (58%)
-- INFERRED: 70 (42%)
+- EXTRACTED: 101 (59%)
+- INFERRED: 71 (41%)
 - AMBIGUOUS: 0 (0%)
 
 ---

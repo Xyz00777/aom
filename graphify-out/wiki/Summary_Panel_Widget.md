@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_properties_redaction.py** (13 connections) — `tests/unit/test_properties_redaction.py`
+- **test_properties_redaction.py** (15 connections) — `tests/unit/test_properties_redaction.py`
 - **SearchStrategy** (4 connections)
 - **_distinctive_secret()** (3 connections) — `tests/unit/test_properties_redaction.py`
 - **_innocuous_key()** (3 connections) — `tests/unit/test_properties_redaction.py`
@@ -32,7 +32,8 @@
 ## Relationships
 
 - [TUI Tree View Tests](TUI_Tree_View_Tests.md) (5 shared connections)
-- [Status Bar Elements](Status_Bar_Elements.md) (2 shared connections)
+- [Inspect TUI Widget Data](Inspect_TUI_Widget_Data.md) (3 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
 - [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
 
 ## Source Files
@@ -41,8 +42,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 53 (88%)
-- INFERRED: 7 (12%)
+- EXTRACTED: 55 (89%)
+- INFERRED: 7 (11%)
 - AMBIGUOUS: 0 (0%)
 
 ---

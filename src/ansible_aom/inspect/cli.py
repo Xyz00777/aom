@@ -2,7 +2,7 @@
 
 The CLI exposes three invocations:
 
-* ``aom inspect``         — launch the TUI on the most recent session.
+ * ``aom inspect``         — launch the Textual session viewer on the most recent session.
 * ``aom inspect --text``  — dump the most recent session as plain text.
   ``--play`` and ``--task`` scope the verbose output to that play or task.
 * ``aom inspect prune``   — clean up old sessions on disk.
@@ -85,7 +85,6 @@ def inspect_text(
 
 
 def inspect_tui(state_dir: Path) -> int:
-    """Launch the TUI inspector. Returns the TUI's exit code."""
     # Lazy import: keeps `--text` invocation free of Textual cost.
     from ansible_aom.tui.screens.inspect import InspectApp
 
@@ -157,7 +156,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--text",
         action="store_true",
-        help="Render output as plain text instead of launching the TUI "
+        help="Render output as plain text instead of launching the Textual viewer "
         "(also implied when stdout is not a TTY).",
     )
     parser.add_argument(

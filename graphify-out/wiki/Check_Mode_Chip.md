@@ -1,41 +1,44 @@
 # Check Mode Chip
 
-> 22 nodes · cohesion 0.09
+> 68 nodes · cohesion 0.03
 
 ## Key Concepts
 
 - **TestStatusEnum** (21 connections) — `tests/unit/test_models.py`
+- **TestPlayDefinition** (20 connections) — `tests/unit/test_models.py`
+- **test_models.py** (18 connections) — `tests/unit/test_models.py`
+- **TestDefinitionVsStateSeparation** (15 connections) — `tests/unit/test_models.py`
+- **TestTaskMatching** (15 connections) — `tests/unit/test_models.py`
+- **TestWarningTypeEnum** (15 connections) — `tests/unit/test_models.py`
+- **.test_definition_classes_are_immutable_intent()** (3 connections) — `tests/unit/test_models.py`
+- **.test_definition_path_can_be_populated_later()** (3 connections) — `tests/unit/test_models.py`
+- **.test_definition_uuid_can_be_populated_later()** (3 connections) — `tests/unit/test_models.py`
+- **.test_play_definition_hosts_pattern_localhost()** (3 connections) — `tests/unit/test_models.py`
+- **.test_play_definition_hosts_pattern_wildcard()** (3 connections) — `tests/unit/test_models.py`
+- **.test_play_definition_hosts_vs_resolved_hosts()** (3 connections) — `tests/unit/test_models.py`
+- **.test_play_definition_id_sequential_number_format()** (3 connections) — `tests/unit/test_models.py`
+- **.test_play_definition_required_fields()** (3 connections) — `tests/unit/test_models.py`
+- **.test_play_definition_resolved_hosts_defaults_empty()** (3 connections) — `tests/unit/test_models.py`
+- **.test_play_definition_tasks_defaults_empty()** (3 connections) — `tests/unit/test_models.py`
+- **.test_status_enum_has_eight_values()** (3 connections) — `tests/unit/test_models.py`
+- **.test_task_matching_uses_uuid_first_if_present()** (3 connections) — `tests/unit/test_models.py`
+- **.test_task_path_secondary_matching()** (3 connections) — `tests/unit/test_models.py`
+- **.test_task_sequential_name_fallback_matching()** (3 connections) — `tests/unit/test_models.py`
+- **.test_task_uuid_primary_matching()** (3 connections) — `tests/unit/test_models.py`
+- **.test_warning_type_enum_has_two_values()** (3 connections) — `tests/unit/test_models.py`
 - **.test_status_enum_all_values_unique()** (2 connections) — `tests/unit/test_models.py`
 - **.test_status_enum_changed()** (2 connections) — `tests/unit/test_models.py`
 - **.test_status_enum_failed()** (2 connections) — `tests/unit/test_models.py`
-- **.test_status_enum_has_eight_values()** (2 connections) — `tests/unit/test_models.py`
-- **.test_status_enum_ok()** (2 connections) — `tests/unit/test_models.py`
-- **.test_status_enum_pending()** (2 connections) — `tests/unit/test_models.py`
-- **.test_status_enum_running()** (2 connections) — `tests/unit/test_models.py`
-- **.test_status_enum_skipped()** (2 connections) — `tests/unit/test_models.py`
-- **.test_status_enum_string_values_lowercased()** (2 connections) — `tests/unit/test_models.py`
-- **.test_status_enum_unreachable()** (2 connections) — `tests/unit/test_models.py`
-- **Tests for Status enum - TC-186.** (1 connections) — `tests/unit/test_models.py`
-- **TC-186: Status enum contains exactly 8 values (7 task/host + COMPLETED for run-l** (1 connections) — `tests/unit/test_models.py`
-- **TC-186: Status.PENDING exists with correct value.** (1 connections) — `tests/unit/test_models.py`
-- **TC-186: Status.RUNNING exists with correct value.** (1 connections) — `tests/unit/test_models.py`
-- **TC-186: Status.OK exists with correct value.** (1 connections) — `tests/unit/test_models.py`
-- **TC-186: Status.CHANGED exists with correct value.** (1 connections) — `tests/unit/test_models.py`
-- **TC-186: Status.FAILED exists with correct value.** (1 connections) — `tests/unit/test_models.py`
-- **TC-186: Status.SKIPPED exists with correct value.** (1 connections) — `tests/unit/test_models.py`
-- **TC-186: Status.UNREACHABLE exists with correct value.** (1 connections) — `tests/unit/test_models.py`
-- **TC-186: All Status values are unique strings.** (1 connections) — `tests/unit/test_models.py`
-- **TC-186: All Status string values are lowercase.** (1 connections) — `tests/unit/test_models.py`
+- *... and 43 more nodes in this community*
 
 ## Relationships
 
-- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (3 shared connections)
-- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (2 shared connections)
-- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
-- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
-- [AOM TUI Application](AOM_TUI_Application.md) (1 shared connections)
-- [Per-Task Overhead Analysis](Per-Task_Overhead_Analysis.md) (1 shared connections)
-- [CLI Argument Parser](CLI_Argument_Parser.md) (1 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (35 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (20 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (13 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (6 shared connections)
+- [Tree Render Snapshot Tests](Tree_Render_Snapshot_Tests.md) (1 shared connections)
+- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (1 shared connections)
 
 ## Source Files
 
@@ -43,8 +46,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 43 (83%)
-- INFERRED: 9 (17%)
+- EXTRACTED: 149 (71%)
+- INFERRED: 61 (29%)
 - AMBIGUOUS: 0 (0%)
 
 ---

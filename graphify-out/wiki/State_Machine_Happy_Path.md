@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **cli_main()** (12 connections) — `src/ansible_aom/drivers/replay.py`
+- **cli_main()** (15 connections) — `src/ansible_aom/drivers/replay.py`
 - **TestReplayCLIMain** (8 connections) — `tests/unit/test_cli_replay.py`
 - **Path** (7 connections)
 - **_make_session()** (6 connections) — `tests/unit/test_cli_replay.py`
@@ -23,11 +23,14 @@
 
 ## Relationships
 
-- [Community 504](Community_504.md) (2 shared connections)
+- [First Ctrl-C Cancellation](First_Ctrl-C_Cancellation.md) (2 shared connections)
 - [Diagnostics Layer Tests](Diagnostics_Layer_Tests.md) (2 shared connections)
+- [Loop Item Stream Tests](Loop_Item_Stream_Tests.md) (1 shared connections)
+- [StatusBarConfig Model](StatusBarConfig_Model.md) (1 shared connections)
+- [Ansible Posix Availability](Ansible_Posix_Availability.md) (1 shared connections)
 - [Preflight Summary Rendering](Preflight_Summary_Rendering.md) (1 shared connections)
 - [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
-- [Community 571](Community_571.md) (1 shared connections)
+- [TestReplayDispatch](TestReplayDispatch.md) (1 shared connections)
 
 ## Source Files
 
@@ -36,7 +39,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 54 (81%)
+- EXTRACTED: 57 (81%)
 - INFERRED: 13 (19%)
 - AMBIGUOUS: 0 (0%)
 

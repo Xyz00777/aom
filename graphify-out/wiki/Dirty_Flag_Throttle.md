@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **get_status_color()** (12 connections) — `src/ansible_aom/core/icons.py`
+- **get_status_color()** (13 connections) — `src/ansible_aom/core/icons.py`
 - **TestGetStatusColor** (10 connections) — `tests/unit/test_icons.py`
 - **.test_get_status_color_changed()** (3 connections) — `tests/unit/test_icons.py`
 - **.test_get_status_color_completed()** (3 connections) — `tests/unit/test_icons.py`
@@ -27,10 +27,11 @@
 
 ## Relationships
 
+- [TUI Keybindings Config](TUI_Keybindings_Config.md) (1 shared connections)
 - [Pause Prompt Heuristic](Pause_Prompt_Heuristic.md) (1 shared connections)
-- [Crash Recovery Notification](Crash_Recovery_Notification.md) (1 shared connections)
-- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
-- [Community 461](Community_461.md) (1 shared connections)
+- [Session List View](Session_List_View.md) (1 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [test_icons.py](test_icons.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -39,7 +40,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 39 (70%)
+- EXTRACTED: 40 (70%)
 - INFERRED: 17 (30%)
 - AMBIGUOUS: 0 (0%)
 

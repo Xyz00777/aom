@@ -1,63 +1,62 @@
 # Compact Renderer Integration Tests
 
-> 163 nodes · cohesion 0.02
+> 58 nodes · cohesion 0.04
 
 ## Key Concepts
 
-- **Status** (287 connections) — `src/ansible_aom/core/models.py`
-- **Display** (45 connections) — `src/ansible_aom/compact/display.py`
-- **test_compact_renderer.py** (24 connections) — `tests/integration/test_compact_renderer.py`
-- **TestStatusBarFormat** (21 connections) — `tests/integration/test_compact_renderer.py`
-- **models.py** (20 connections) — `src/ansible_aom/core/models.py`
-- **TestSignalHandling** (19 connections) — `tests/integration/test_compact_renderer.py`
-- **TestPasswordPromptPatterns** (18 connections) — `tests/integration/test_compact_renderer.py`
-- **TestStatusIcons** (18 connections) — `tests/integration/test_compact_renderer.py`
-- **TestStatusIconFallback** (17 connections) — `tests/integration/test_compact_renderer.py`
-- **TestDisplayClass** (16 connections) — `tests/integration/test_compact_renderer.py`
-- **TestHostStatusIndicators** (16 connections) — `tests/integration/test_compact_renderer.py`
-- **TestNonTTYBehavior** (16 connections) — `tests/integration/test_compact_renderer.py`
-- **TestRefreshStrategy** (16 connections) — `tests/integration/test_compact_renderer.py`
-- **TestCompactRendererHandleCompletion** (15 connections) — `tests/integration/test_compact_renderer.py`
-- **TestCompactRendererProtocol** (15 connections) — `tests/integration/test_compact_renderer.py`
-- **TestPasswordPassThrough** (13 connections) — `tests/integration/test_compact_renderer.py`
-- **TestViewModeSelection** (13 connections) — `tests/integration/test_compact_renderer.py`
-- **TestCompactDependencies** (12 connections) — `tests/integration/test_compact_renderer.py`
-- **TestCompactRendererStart** (12 connections) — `tests/integration/test_compact_renderer.py`
-- **TestNonTTYRefreshFallback** (12 connections) — `tests/integration/test_compact_renderer.py`
-- **TestRichLiveConfiguration** (12 connections) — `tests/integration/test_compact_renderer.py`
-- **TestCompactRendererHandlePasswordPrompt** (11 connections) — `tests/integration/test_compact_renderer.py`
-- **TestCompactRendererStop** (11 connections) — `tests/integration/test_compact_renderer.py`
-- **TestCompactRendererUpdateState** (11 connections) — `tests/integration/test_compact_renderer.py`
-- **_shape()** (5 connections) — `tests/integration/test_invariants_session_roundtrip.py`
-- *... and 138 more nodes in this community*
+- **Display** (92 connections) — `src/ansible_aom/compact/display.py`
+- **TestDegradedModeEntry** (9 connections) — `tests/compact/test_small_terminal.py`
+- **TestDegradedModeFallthrough** (7 connections) — `tests/compact/test_small_terminal.py`
+- **TestReEnableOnResize** (7 connections) — `tests/compact/test_small_terminal.py`
+- **TestNonTtyUnaffected** (4 connections) — `tests/compact/test_log_flush_batching.py`
+- **.test_sighup_saves_session()** (4 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_terminal_cleanup_on_exit()** (4 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_force_size_at_threshold_does_not_degrade()** (3 connections) — `tests/compact/test_small_terminal.py`
+- **.test_non_tty_is_never_degraded()** (3 connections) — `tests/compact/test_small_terminal.py`
+- **.test_stop_in_degraded_mode_is_a_noop()** (3 connections) — `tests/compact/test_small_terminal.py`
+- **.test_update_without_force_size_falls_back_to_real_terminal()** (3 connections) — `tests/compact/test_small_terminal.py`
+- **.test_display_has_print_log_method()** (3 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_display_has_start_method()** (3 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_display_has_stop_method()** (3 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_display_has_update_method()** (3 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_non_tty_display_print_log_uses_stdout()** (3 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_non_tty_display_start_is_noop()** (3 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_non_tty_display_update_is_noop()** (3 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_non_tty_line_per_status()** (3 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_non_tty_no_continuous_elapsed_time()** (3 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_throttled_refresh_rate_max_four_per_second()** (3 connections) — `tests/integration/test_compact_renderer.py`
+- **.__init__()** (2 connections) — `src/ansible_aom/compact/display.py`
+- **.start()** (2 connections) — `src/ansible_aom/compact/display.py`
+- **.test_non_tty_print_log_stays_immediate_and_plain()** (2 connections) — `tests/compact/test_log_flush_batching.py`
+- **.test_force_size_below_threshold_enters_degraded_mode()** (2 connections) — `tests/compact/test_small_terminal.py`
+- *... and 33 more nodes in this community*
 
 ## Relationships
 
-- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (100 shared connections)
-- [App Configuration Settings](App_Configuration_Settings.md) (49 shared connections)
-- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (37 shared connections)
-- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (30 shared connections)
-- [Role Group Task Models](Role_Group_Task_Models.md) (26 shared connections)
-- [CLI Argument Parser](CLI_Argument_Parser.md) (24 shared connections)
-- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (21 shared connections)
-- [Per-Task Overhead Analysis](Per-Task_Overhead_Analysis.md) (17 shared connections)
-- [CLI Interface Tests](CLI_Interface_Tests.md) (14 shared connections)
-- [Secret Redaction Configuration](Secret_Redaction_Configuration.md) (13 shared connections)
-- [Session Recording Tests](Session_Recording_Tests.md) (10 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (26 shared connections)
 - [Ctrl-C Race Handling](Ctrl-C_Race_Handling.md) (7 shared connections)
+- [Config Loading Screen](Config_Loading_Screen.md) (7 shared connections)
+- [Frame Parameter Handling](Frame_Parameter_Handling.md) (7 shared connections)
+- [Per-Task Timing Tests](Per-Task_Timing_Tests.md) (6 shared connections)
+- [Ansible Runner Subprocess](Ansible_Runner_Subprocess.md) (5 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (4 shared connections)
+- [Warning Classification Tests](Warning_Classification_Tests.md) (3 shared connections)
+- [Action Keybindings Lookup](Action_Keybindings_Lookup.md) (3 shared connections)
+- [Monochrome Terminal Fallback](Monochrome_Terminal_Fallback.md) (2 shared connections)
+- [Completion State Labels](Completion_State_Labels.md) (2 shared connections)
+- [Password Pattern Detection](Password_Pattern_Detection.md) (1 shared connections)
 
 ## Source Files
 
 - `src/ansible_aom/compact/display.py`
-- `src/ansible_aom/core/models.py`
-- `src/ansible_aom/tui/app.py`
+- `tests/compact/test_log_flush_batching.py`
+- `tests/compact/test_small_terminal.py`
 - `tests/integration/test_compact_renderer.py`
-- `tests/integration/test_invariants_session_roundtrip.py`
 
 ## Audit Trail
 
-- EXTRACTED: 402 (46%)
-- INFERRED: 470 (54%)
+- EXTRACTED: 150 (68%)
+- INFERRED: 69 (32%)
 - AMBIGUOUS: 0 (0%)
 
 ---

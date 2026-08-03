@@ -1,48 +1,43 @@
 # Password Pattern Detection
 
-> 33 nodes · cohesion 0.06
+> 16 nodes · cohesion 0.12
 
 ## Key Concepts
 
-- **Connection ID Feasibility Report** (9 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **3. Are SSH debug lines (`<hostname> SSH: ...`) emitted from the same process as `CONNECTION:` lock messages?** (6 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **1. Are `CONNECTION: pid X acquired lock on Y` messages always paired with `pid X released lock on Y`?** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **2. Is the lock counter Y unique within a run?** (4 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **4. Is the `pid` consistent within a connection's lifetime?** (4 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **6. For persistent connections (ControlPersist), does the SSH debug line come from the ansible process or the SSH client process?** (4 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **7. Overall Feasibility Assessment** (4 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **5. For the local connection plugin, what does the connection lifecycle look like?** (3 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **connection-id-feasibility.md** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **Alternative approaches for `connection_id`** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **Can `pid` + lock counter serve as a `connection_id`?** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **ControlPersist implications** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **Display proxy mechanism** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **Evidence** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **Evidence** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **Evidence** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **Evidence** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **Evidence** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **Evidence** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **Key implications** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **Process boundary** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **Recommendation** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **Scenarios where lock would be lost** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **Source Code References** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- **The `pid` in CONNECTION messages** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
-- *... and 8 more nodes in this community*
+- **TestPasswordPromptPatterns** (18 connections) — `tests/integration/test_compact_renderer.py`
+- **.password_patterns()** (2 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_become_default_password_pattern()** (2 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_become_password_pattern()** (2 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_confirm_new_vault_password_pattern()** (2 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_new_vault_password_pattern()** (2 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_vault_id_password_pattern()** (2 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_vault_password_pattern()** (2 connections) — `tests/integration/test_compact_renderer.py`
+- **Tests for all password prompt patterns.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **All password prompt patterns from SPECIFICATION.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **Pattern matches 'Vault password: '.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **Pattern matches vault ID variant.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **Pattern matches 'BECOME password: '.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **Pattern matches BECOME password default variant.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **Pattern matches 'New Vault password: '.** (1 connections) — `tests/integration/test_compact_renderer.py`
+- **Pattern matches 'Confirm New Vault password: '.** (1 connections) — `tests/integration/test_compact_renderer.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (4 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (2 shared connections)
+- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [Log Line Colors](Log_Line_Colors.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/connection-id-feasibility.md`
+- `tests/integration/test_compact_renderer.py`
 
 ## Audit Trail
 
-- EXTRACTED: 64 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 32 (80%)
+- INFERRED: 8 (20%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -1,65 +1,54 @@
 # Session Recording Tests
 
-> 146 nodes · cohesion 0.02
+> 54 nodes · cohesion 0.06
 
 ## Key Concepts
 
-- **AOMApp** (181 connections) — `src/ansible_aom/tui/app.py`
-- **TaskTree** (47 connections) — `src/ansible_aom/tui/widgets/task_tree.py`
-- **MainScreen** (31 connections) — `src/ansible_aom/tui/screens/main.py`
-- **TestRendererProtocol** (19 connections) — `tests/unit/test_cli.py`
-- **TestDirtyCounter** (16 connections) — `tests/tui/test_live_refresh.py`
-- **TestMainScreenTreeIntegration** (15 connections) — `tests/tui/test_live_refresh.py`
-- **TestCompletionTitleUpdate** (13 connections) — `tests/tui/test_live_refresh.py`
-- **TestPeriodicRefresh** (13 connections) — `tests/tui/test_live_refresh.py`
-- **TestTreePopulationFromDefinitions** (13 connections) — `tests/tui/test_live_refresh.py`
-- **TestCallFromThreadRouting** (12 connections) — `tests/tui/test_live_refresh.py`
-- **TestEndToEndThreeTasks** (12 connections) — `tests/tui/test_live_refresh.py`
 - **Event** (11 connections)
-- **.test_update_from_state_drops_completed_tasks()** (10 connections) — `tests/tui/test_live_refresh.py`
-- **.test_update_from_state_keeps_running_task_visible()** (10 connections) — `tests/tui/test_live_refresh.py`
-- **.test_update_from_state_shows_ok_icon_after_completion()** (10 connections) — `tests/tui/test_live_refresh.py`
-- **TestRunStateOwnership** (9 connections) — `tests/tui/test_app_end_to_end.py`
-- **test_live_refresh.py** (9 connections) — `tests/tui/test_live_refresh.py`
-- **TestAOMAppInteractivePrompt** (9 connections) — `tests/unit/test_interactive_prompt.py`
-- **.update_from_state()** (8 connections) — `src/ansible_aom/tui/screens/main.py`
-- **TestAOMAppConstruction** (7 connections) — `tests/tui/test_app_end_to_end.py`
-- **TestWarningsAndLogsRoutedToState** (7 connections) — `tests/tui/test_app_end_to_end.py`
-- **.test_three_task_starts_appear_in_tree()** (7 connections) — `tests/tui/test_live_refresh.py`
-- **.test_tick_refreshes_widgets_after_event()** (7 connections) — `tests/tui/test_live_refresh.py`
-- **.compose()** (6 connections) — `src/ansible_aom/tui/screens/main.py`
-- **._update_elapsed_from_start()** (6 connections) — `src/ansible_aom/tui/screens/main.py`
-- *... and 121 more nodes in this community*
+- **test_concurrent_inspect.py** (8 connections) — `tests/integration/test_concurrent_inspect.py`
+- **.test_aom_inspect_during_active_writer()** (8 connections) — `tests/integration/test_concurrent_inspect.py`
+- **.test_load_session_during_active_writer_does_not_raise()** (8 connections) — `tests/integration/test_concurrent_inspect.py`
+- **TestRunStateOwnership** (8 connections) — `tests/tui/test_app_end_to_end.py`
+- **test_app_end_to_end.py** (7 connections) — `tests/tui/test_app_end_to_end.py`
+- **Path** (6 connections)
+- **_read_snapshot()** (6 connections) — `tests/integration/test_concurrent_inspect.py`
+- **_writer_thread()** (6 connections) — `tests/integration/test_concurrent_inspect.py`
+- **TestAOMAppConstruction** (6 connections) — `tests/tui/test_app_end_to_end.py`
+- **TestWarningsAndLogsRoutedToState** (6 connections) — `tests/tui/test_app_end_to_end.py`
+- **MonkeyPatch** (6 connections)
+- **Path** (6 connections)
+- **_build_session()** (5 connections) — `tests/integration/test_concurrent_inspect.py`
+- **TestAOMAppInteractivePromptDuringRun** (5 connections) — `tests/tui/test_app_end_to_end.py`
+- **TestWorkerKickoff** (5 connections) — `tests/tui/test_app_end_to_end.py`
+- **_run_aom_inspect()** (4 connections) — `tests/integration/test_concurrent_inspect.py`
+- **.test_handle_interactive_prompt_returns_answer_from_worker()** (4 connections) — `tests/tui/test_app_end_to_end.py`
+- **.test_worker_invokes_run_playbook()** (4 connections) — `tests/tui/test_app_end_to_end.py`
+- **.test_add_warning_from_worker_lands_on_status_bar()** (4 connections) — `tests/tui/test_live_refresh.py`
+- **.test_completion_nonzero_marks_title_with_cross()** (4 connections) — `tests/tui/test_live_refresh.py`
+- **.test_completion_zero_marks_title_with_check()** (4 connections) — `tests/tui/test_live_refresh.py`
+- **.test_three_task_starts_appear_in_tree()** (4 connections) — `tests/tui/test_live_refresh.py`
+- **.test_tick_drains_pending_log_lines()** (4 connections) — `tests/tui/test_live_refresh.py`
+- **.test_tick_refreshes_widgets_after_event()** (4 connections) — `tests/tui/test_live_refresh.py`
+- *... and 29 more nodes in this community*
 
 ## Relationships
 
-- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (57 shared connections)
-- [CLI Argument Parser](CLI_Argument_Parser.md) (20 shared connections)
-- [Session Replay Round Trip](Session_Replay_Round_Trip.md) (15 shared connections)
-- [Inventory Auto Detection](Inventory_Auto_Detection.md) (14 shared connections)
-- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (14 shared connections)
-- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (12 shared connections)
-- [Per-Task Overhead Analysis](Per-Task_Overhead_Analysis.md) (11 shared connections)
-- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (10 shared connections)
-- [Interactive Prompt Tests](Interactive_Prompt_Tests.md) (10 shared connections)
-- [View Mode Selection](View_Mode_Selection.md) (7 shared connections)
-- [Terminal Display Manager](Terminal_Display_Manager.md) (5 shared connections)
-- [KeyContext Enum](KeyContext_Enum.md) (5 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (12 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (6 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [Include Role Discovery](Include_Role_Discovery.md) (1 shared connections)
+- [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/tui/app.py`
-- `src/ansible_aom/tui/screens/main.py`
-- `src/ansible_aom/tui/widgets/task_tree.py`
+- `tests/integration/test_concurrent_inspect.py`
 - `tests/tui/test_app_end_to_end.py`
 - `tests/tui/test_live_refresh.py`
-- `tests/unit/test_cli.py`
-- `tests/unit/test_interactive_prompt.py`
 
 ## Audit Trail
 
-- EXTRACTED: 345 (47%)
-- INFERRED: 390 (53%)
+- EXTRACTED: 148 (82%)
+- INFERRED: 33 (18%)
 - AMBIGUOUS: 0 (0%)
 
 ---

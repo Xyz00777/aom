@@ -1,63 +1,51 @@
 # AOM TUI Application
 
-> 93 nodes · cohesion 0.03
+> 32 nodes · cohesion 0.11
 
 ## Key Concepts
 
-- **WarningEntry** (84 connections) — `src/ansible_aom/core/models.py`
-- **TestWarningEntry** (19 connections) — `tests/unit/test_models.py`
-- **TestWarningEntryDataclass** (16 connections) — `tests/unit/test_warnings.py`
-- **TestFilterPanelWarningCheckboxes** (15 connections) — `tests/tui/test_panels.py`
-- **TestWarningClassification** (13 connections) — `tests/unit/test_warnings.py`
-- **TestPtyStreamParserWarningsList** (12 connections) — `tests/unit/test_warnings.py`
-- **TestWarningEntrySourceField** (11 connections) — `tests/unit/test_warnings.py`
-- **test_warnings.py** (10 connections) — `tests/unit/test_warnings.py`
-- **TestWarningEntryTimestamp** (10 connections) — `tests/unit/test_warnings.py`
-- **.test_warnings_list_contains_warning_entry_objects()** (4 connections) — `tests/unit/test_warnings.py`
-- **.drain_warnings()** (3 connections) — `src/ansible_aom/core/parser.py`
-- **.test_warning_only_entries_shown()** (3 connections) — `tests/tui/test_panels.py`
-- **.warnings_list()** (3 connections) — `tests/tui/test_panels.py`
-- **.test_warning_entry_all_fields()** (3 connections) — `tests/unit/test_models.py`
-- **.test_warning_entry_default_source_is_empty()** (3 connections) — `tests/unit/test_models.py`
-- **.test_warning_entry_deprecation_type()** (3 connections) — `tests/unit/test_models.py`
-- **.test_warning_entry_empty_message()** (3 connections) — `tests/unit/test_models.py`
-- **.test_warning_entry_is_dataclass()** (3 connections) — `tests/unit/test_models.py`
-- **.test_warning_entry_none_timestamp()** (3 connections) — `tests/unit/test_models.py`
-- **.test_warning_entry_required_fields()** (3 connections) — `tests/unit/test_models.py`
-- **.test_warning_entry_warning_type()** (3 connections) — `tests/unit/test_models.py`
-- **.test_multiple_warnings_preserve_order()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_warnings_list_empty_initially()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_warnings_property_returns_list()** (3 connections) — `tests/unit/test_warnings.py`
-- **.test_deprecated_feature_classification()** (3 connections) — `tests/unit/test_warnings.py`
-- *... and 68 more nodes in this community*
+- **_play_start()** (15 connections) — `tests/unit/test_runner_event_fallback.py`
+- **_task_start()** (15 connections) — `tests/unit/test_runner_event_fallback.py`
+- **TestTaskStartHostSynthesisFallback** (10 connections) — `tests/unit/test_runner_event_fallback.py`
+- **TestTerminalEventFallbackAttribution** (10 connections) — `tests/unit/test_runner_event_fallback.py`
+- **test_runner_event_fallback.py** (9 connections) — `tests/unit/test_runner_event_fallback.py`
+- **TestTreeReflectsPartialCompletion** (7 connections) — `tests/unit/test_runner_event_fallback.py`
+- **.test_tree_shows_per_host_status_when_subset_completed()** (7 connections) — `tests/unit/test_runner_event_fallback.py`
+- **TestUnmatchedEventCounter** (7 connections) — `tests/unit/test_runner_event_fallback.py`
+- **.test_preflight_resolved_hosts_still_win()** (6 connections) — `tests/unit/test_runner_event_fallback.py`
+- **.test_no_synthesis_under_free_strategy()** (5 connections) — `tests/unit/test_runner_event_fallback.py`
+- **.test_removed_hosts_excluded_from_synthesis()** (5 connections) — `tests/unit/test_runner_event_fallback.py`
+- **.test_second_task_synthesises_hosts_from_prior_task()** (5 connections) — `tests/unit/test_runner_event_fallback.py`
+- **.test_synthesised_hosts_purged_when_strategy_flips_to_free()** (5 connections) — `tests/unit/test_runner_event_fallback.py`
+- **.test_failed_with_unknown_task_id_matches_by_name()** (5 connections) — `tests/unit/test_runner_event_fallback.py`
+- **.test_name_fallback_prefers_running_task()** (5 connections) — `tests/unit/test_runner_event_fallback.py`
+- **.test_ok_with_stale_play_id_lands_via_task_ownership()** (5 connections) — `tests/unit/test_runner_event_fallback.py`
+- **.test_ok_with_unknown_task_id_matches_by_name()** (5 connections) — `tests/unit/test_runner_event_fallback.py`
+- **.test_ok_with_unknown_task_id_matches_by_path()** (5 connections) — `tests/unit/test_runner_event_fallback.py`
+- **.test_fully_unmatched_terminal_event_is_counted()** (4 connections) — `tests/unit/test_runner_event_fallback.py`
+- **.test_matched_events_do_not_count_as_unmatched()** (4 connections) — `tests/unit/test_runner_event_fallback.py`
+- **Terminal runner events must update host state even when ids mismatch.  Real-worl** (1 connections) — `tests/unit/test_runner_event_fallback.py`
+- **The fallback must cover every terminal handler, not just ok.** (1 connections) — `tests/unit/test_runner_event_fallback.py`
+- **An ok carrying a play.id we never saw must still land on the         task that o** (1 connections) — `tests/unit/test_runner_event_fallback.py`
+- **Two same-named tasks in one play: the fallback must pick the         one still r** (1 connections) — `tests/unit/test_runner_event_fallback.py`
+- **No preflight definitions (or no name match): the second         task_start under** (1 connections) — `tests/unit/test_runner_event_fallback.py`
+- *... and 7 more nodes in this community*
 
 ## Relationships
 
-- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (29 shared connections)
-- [Run State Completion Recap](Run_State_Completion_Recap.md) (20 shared connections)
-- [Run State Summary Panel](Run_State_Summary_Panel.md) (16 shared connections)
-- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (12 shared connections)
-- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (8 shared connections)
-- [Role Group Task Models](Role_Group_Task_Models.md) (6 shared connections)
-- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (3 shared connections)
-- [CLI Argument Parser](CLI_Argument_Parser.md) (2 shared connections)
-- [Per-Task Overhead Analysis](Per-Task_Overhead_Analysis.md) (2 shared connections)
-- [Password Timeout](Password_Timeout.md) (2 shared connections)
-- [Three-Pane Inspect App](Three-Pane_Inspect_App.md) (1 shared connections)
-- [Secret Redaction Configuration](Secret_Redaction_Configuration.md) (1 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (27 shared connections)
+- [Hide State Gating Tests](Hide_State_Gating_Tests.md) (5 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (4 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/models.py`
-- `src/ansible_aom/core/parser.py`
-- `tests/tui/test_panels.py`
-- `tests/unit/test_models.py`
-- `tests/unit/test_warnings.py`
+- `tests/unit/test_runner_event_fallback.py`
 
 ## Audit Trail
 
-- EXTRACTED: 188 (54%)
-- INFERRED: 158 (46%)
+- EXTRACTED: 135 (89%)
+- INFERRED: 16 (11%)
 - AMBIGUOUS: 0 (0%)
 
 ---

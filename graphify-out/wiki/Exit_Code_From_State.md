@@ -19,11 +19,10 @@
 
 ## Relationships
 
-- [Ungrouped Role Tree Tests](Ungrouped_Role_Tree_Tests.md) (5 shared connections)
+- [Ungrouped Role Tree Tests](Ungrouped_Role_Tree_Tests.md) (6 shared connections)
 - [Log Panel Search](Log_Panel_Search.md) (5 shared connections)
-- [Rerun Confirmation Prompt](Rerun_Confirmation_Prompt.md) (2 shared connections)
-- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (1 shared connections)
-- [CLI Argument Parser](CLI_Argument_Parser.md) (1 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (2 shared connections)
+- [Rerun Confirmation Prompt](Rerun_Confirmation_Prompt.md) (1 shared connections)
 - [WarningEntry Dataclass](WarningEntry_Dataclass.md) (1 shared connections)
 
 ## Source Files

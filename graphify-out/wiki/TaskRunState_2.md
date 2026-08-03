@@ -1,6 +1,6 @@
 # TaskRunState
 
-> God node · 266 connections · `src/ansible_aom/core/models.py`
+> God node · 260 connections · `src/ansible_aom/core/models.py`
 
 **Community:** [Play Definition Tree Population](Play_Definition_Tree_Population.md)
 
@@ -19,17 +19,21 @@
 - _visible_projection() `INFERRED`
 - _make_state_with_stale_running() `INFERRED`
 - _renderer_with_running_task() `INFERRED`
+- _build_state() `EXTRACTED`
 - _state_first_play_running() `INFERRED`
-- .test_update_from_state_drops_completed_tasks() `INFERRED`
-- .test_update_from_state_keeps_running_task_visible() `INFERRED`
-- .test_update_from_state_shows_ok_icon_after_completion() `INFERRED`
 - _state_with_failure() `INFERRED`
 - _running_state() `INFERRED`
 - ._state_with() `INFERRED`
 - _two_plays_with_running_tasks() `INFERRED`
+- _seed_sticky_gap_state() `INFERRED`
+- test_completed_tasks_counts_dynamic_children() `INFERRED`
 
 ### contains
 - models.py `EXTRACTED`
+
+### imports
+- run_state.py `EXTRACTED`
+- tree_projection.py `EXTRACTED`
 
 ### indirect_call
 - test_runstate_never_holds_orphan_hostrunstate() `INFERRED`
@@ -41,14 +45,17 @@
 
 ### references
 - _reserve_host_run_state() `EXTRACTED`
+- ._resolve_runner_task() `EXTRACTED`
 - ._touch_task_lease() `EXTRACTED`
+- ._prior_host_start_time() `EXTRACTED`
 - ._play_running_and_pending() `EXTRACTED`
 - ._task_line() `EXTRACTED`
 - ._task_runtime_identity() `EXTRACTED`
+- _pending_host_count() `EXTRACTED`
 
 ### uses
 - [RunState](RunState.md) `INFERRED`
-- [TreeProjection](TreeProjection.md) `INFERRED`
+- TreeProjection `INFERRED`
 - TestPtyStreamParserStderrLineEmission `INFERRED`
 - TreeLine `INFERRED`
 - TestJsonLineStreamBasics `INFERRED`
@@ -57,16 +64,16 @@
 - TestListTasksParser `INFERRED`
 - TestPtyStreamParserPhases `INFERRED`
 - TestTaskDefinition `INFERRED`
-- TestTaskMatching `INFERRED`
 - TestListHostsEdgeCases `INFERRED`
 - TestHostRunState `INFERRED`
 - TestPlayRunState `INFERRED`
-- TestStatusBarFormat `INFERRED`
 - TestRunState `INFERRED`
 - TestStatusEnum `INFERRED`
 - TestRoleGrouping `INFERRED`
 - TestPlayDefinition `INFERRED`
 - TestTaskRunState `INFERRED`
+- TestJsonLineStreamCarryBuffer `INFERRED`
+- TestListHostsParser `INFERRED`
 
 ---
 

@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **tests/playbooks/15-vault-password-change/README.md** (0 connections) — `tests/playbooks/15-vault-password-change/README.md`
+- **15-vault-password-change/README.md** (0 connections) — `tests/playbooks/15-vault-password-change/README.md`
 
 ## Relationships
 

@@ -1,48 +1,33 @@
 # Template Name Regression
 
-> 39 nodes · cohesion 0.05
+> 10 nodes · cohesion 0.20
 
 ## Key Concepts
 
-- **Section 4: View Modes** (39 connections) — `TEST_SPECIFICATION.md`
-- **TC-029: Compact View Default Layout** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-030: Compact View Status Icons** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-031: Compact View Elapsed Time** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-032: Compact View Progress Bar** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-033: Rich Live Rendering for Compact Mode** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-034: Compact Password Pass-Through** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-035: Compact Mode Dependencies** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-036: TUI Multi-Panel Layout** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-037: TUI Tree Navigation** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-038: TUI Search in Log Panel** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-039: TUI Status Bar Configuration** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-040: TUI Footer Shortcuts** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-041: Non-TTY Output Format** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-042: Non-TTY No Interactive Features** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-043: Minimum Terminal Size Check** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-044: Terminal Size Error Message** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-045: Terminal Graceful Degradation** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-046: Signal Handling - SIGINT First Press** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-047: Signal Handling - SIGINT Second Press** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-048: Signal Handling - SIGQUIT** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-049: Signal Handling - SIGTERM** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-050: Signal Handling - SIGHUP** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-051: Signal Handling - SIGWINCH** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-052: Signal Handling - SIGPIPE** (1 connections) — `TEST_SPECIFICATION.md`
-- *... and 14 more nodes in this community*
+- **TestAOMAppInteractivePrompt** (8 connections) — `tests/unit/test_interactive_prompt.py`
+- **test_interactive_prompt.py** (4 connections) — `tests/unit/test_interactive_prompt.py`
+- **.test_writes_prompt_to_stdout_not_input_arg()** (2 connections) — `tests/unit/test_interactive_prompt.py`
+- **Tests for handle_interactive_prompt (IP1, IP4).  ansible.builtin.pause and vars_** (1 connections) — `tests/unit/test_interactive_prompt.py`
+- **AOMApp must implement handle_interactive_prompt via suspend + input.** (1 connections) — `tests/unit/test_interactive_prompt.py`
+- **Same readline-routes-prompt-to-stderr bug applies to the TUI path.** (1 connections) — `tests/unit/test_interactive_prompt.py`
+- **.test_keyboard_interrupt_propagates_so_run_can_abort()** (1 connections) — `tests/unit/test_interactive_prompt.py`
+- **.test_method_exists()** (1 connections) — `tests/unit/test_interactive_prompt.py`
+- **.test_returns_empty_on_eof()** (1 connections) — `tests/unit/test_interactive_prompt.py`
+- **.test_suspends_then_reads_input()** (1 connections) — `tests/unit/test_interactive_prompt.py`
 
 ## Relationships
 
-- [Failure Recap Formatting](Failure_Recap_Formatting.md) (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (2 shared connections)
+- [Interactive Prompt Tests](Interactive_Prompt_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `TEST_SPECIFICATION.md`
+- `tests/unit/test_interactive_prompt.py`
 
 ## Audit Trail
 
-- EXTRACTED: 77 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 20 (95%)
+- INFERRED: 1 (5%)
 - AMBIGUOUS: 0 (0%)
 
 ---

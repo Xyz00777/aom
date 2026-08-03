@@ -1,44 +1,37 @@
 # PTY Encoding Robustness
 
-> 22 nodes · cohesion 0.09
+> 10 nodes · cohesion 0.20
 
 ## Key Concepts
 
-- **Tree Flicker and Task Row Stability Remediation Plan** (12 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Implementation Plan** (7 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Minimal Repro and Validation Matrix** (4 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **tree-flicker-remediation.md** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Acceptance Criteria** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Confirmed Findings** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Estimated Effort** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Execution Order** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Open Questions** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Out of Scope** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Phase 0: Replay Harness and Repro-First Test Bed (Priority: Critical)** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Phase 1: Core Execution Identity Model (Priority: Critical)** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Phase 2: Durable Projection and Row Leases (Priority: Critical)** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Phase 3: Play-Boundary and Active-Play Borrowing Fixes (Priority: High)** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Phase 4: Meta, Handler, Include, Async, and Delegation Normalization (Priority: High)** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Phase 5: Regression Shielding and Real-Workload Validation (Priority: High)** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Problem Statement** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Related Files** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Root Causes** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Targeted fixture additions for repo-local testing** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Top real repro playbooks** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
-- **Validation matrix** (1 connections) — `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- **TestCoreModuleStructure** (14 connections) — `tests/unit/test_cli.py`
+- **.test_cli_module_exists()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_core_module_exists()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_main_module_exists()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_renderer_module_exists()** (2 connections) — `tests/unit/test_cli.py`
+- **Tests for TC-003: Core Module Structure.** (1 connections) — `tests/unit/test_cli.py`
+- **TC-003: cli.py module exists.** (1 connections) — `tests/unit/test_cli.py`
+- **TC-003: __main__.py module exists.** (1 connections) — `tests/unit/test_cli.py`
+- **TC-003: renderer/ module exists.** (1 connections) — `tests/unit/test_cli.py`
+- **TC-003: core/ module exists.** (1 connections) — `tests/unit/test_cli.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (4 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (1 shared connections)
+- [Inspect Data Model Builders](Inspect_Data_Model_Builders.md) (1 shared connections)
+- [JSONL Environment Variable](JSONL_Environment_Variable.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/plans/tree-flicker-remediation.md`
+- `tests/unit/test_cli.py`
 
 ## Audit Trail
 
-- EXTRACTED: 42 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 20 (74%)
+- INFERRED: 7 (26%)
 - AMBIGUOUS: 0 (0%)
 
 ---

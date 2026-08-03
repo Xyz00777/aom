@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **getpass stdlib** (0 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **19-password-field-redaction/site.yml** (0 connections) — `tests/playbooks/19-password-field-redaction/site.yml`
 
 ## Relationships
 
@@ -12,7 +12,7 @@
 
 ## Source Files
 
-- `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- `tests/playbooks/19-password-field-redaction/site.yml`
 
 ## Audit Trail
 

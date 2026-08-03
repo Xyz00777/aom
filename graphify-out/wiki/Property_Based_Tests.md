@@ -1,50 +1,52 @@
 # Property Based Tests
 
-> 42 nodes · cohesion 0.05
+> 19 nodes · cohesion 0.19
 
 ## Key Concepts
 
-- **DebugPanel** (21 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.action_toggle_debug()** (3 connections) — `src/ansible_aom/tui/app.py`
-- **.update_debug_from_summary()** (3 connections) — `src/ansible_aom/tui/screens/main.py`
-- **.render()** (3 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **debug_panel.py** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.get_debug_summary()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.__init__()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_callback_status()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_command()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_env_overrides()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_event_count()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_event_latency()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_memory_usage()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_parsing_errors()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_pending_events()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_renderer_fps()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_state_tree()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_subprocess_pid()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.set_timing_stats()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **.toggle_visibility()** (2 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- **Toggle debug panel visibility.          Per SPECIFICATION.md Section 7.5, toggle** (1 connections) — `src/ansible_aom/tui/app.py`
-- **Update DebugPanel from debug summary dict.** (1 connections) — `src/ansible_aom/tui/screens/main.py`
-- **Text** (1 connections)
-- **Widget** (1 connections)
-- **Debug panel widget for AOM TUI.  Shows internal state for debugging. See SPECIFI** (1 connections) — `src/ansible_aom/tui/widgets/debug_panel.py`
-- *... and 17 more nodes in this community*
+- **history.py** (31 connections) — `src/ansible_aom/session/history.py`
+- **_iter_completed_sessions()** (7 connections) — `src/ansible_aom/session/history.py`
+- **_mine_and_replace()** (7 connections) — `src/ansible_aom/session/history.py`
+- **Path** (7 connections)
+- **_build_prior()** (6 connections) — `src/ansible_aom/session/history.py`
+- **_match_loose()** (6 connections) — `src/ansible_aom/session/history.py`
+- **_match_strict()** (6 connections) — `src/ansible_aom/session/history.py`
+- **_mine_task_wall()** (5 connections) — `src/ansible_aom/session/history.py`
+- **_parse_iso()** (5 connections) — `src/ansible_aom/session/history.py`
+- **_mine_loop_totals()** (4 connections) — `src/ansible_aom/session/history.py`
+- **Any** (4 connections)
+- **datetime** (4 connections)
+- **Pure history lookup: find the most recent prior run matching a config + host cou** (1 connections) — `src/ansible_aom/session/history.py`
+- **Mine the per-task wall profile + result segmentation from a session.      Return** (1 connections) — `src/ansible_aom/session/history.py`
+- **Yield ``(end_time, meta, session_path)`` for every valid completed session.** (1 connections) — `src/ansible_aom/session/history.py`
+- **True when the stored session matches the current invocation exactly.** (1 connections) — `src/ansible_aom/session/history.py`
+- **True when the stored session matches the current invocation loosely.      Loose** (1 connections) — `src/ansible_aom/session/history.py`
+- **Mine per-task wall and loop totals for *prior*, returning a new PriorRun.** (1 connections) — `src/ansible_aom/session/history.py`
+- **Mine ``{task.path: {host: item_count}}`` from a session's events.      Scans ``e** (1 connections) — `src/ansible_aom/session/history.py`
 
 ## Relationships
 
-- [Session Recording Tests](Session_Recording_Tests.md) (2 shared connections)
+- [JSON Renderer](JSON_Renderer.md) (14 shared connections)
+- [TUI Keybindings Config](TUI_Keybindings_Config.md) (6 shared connections)
+- [StatusBarConfig Model](StatusBarConfig_Model.md) (3 shared connections)
+- [Tree Block Animation](Tree_Block_Animation.md) (1 shared connections)
+- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [Interactive Prompt Tests](Interactive_Prompt_Tests.md) (1 shared connections)
+- [Failed Host Collection](Failed_Host_Collection.md) (1 shared connections)
+- [Run Config Key Normalization](Run_Config_Key_Normalization.md) (1 shared connections)
+- [Shift Modifier Keybindings](Shift_Modifier_Keybindings.md) (1 shared connections)
+- [test_history_loop_totals.py](test_history_loop_totals.py.md) (1 shared connections)
+- [Run Diagnostics Accumulator](Run_Diagnostics_Accumulator.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/tui/app.py`
-- `src/ansible_aom/tui/screens/main.py`
-- `src/ansible_aom/tui/widgets/debug_panel.py`
+- `src/ansible_aom/session/history.py`
 
 ## Audit Trail
 
-- EXTRACTED: 80 (95%)
-- INFERRED: 4 (5%)
+- EXTRACTED: 97 (98%)
+- INFERRED: 2 (2%)
 - AMBIGUOUS: 0 (0%)
 
 ---

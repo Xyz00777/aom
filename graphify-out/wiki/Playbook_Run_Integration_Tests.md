@@ -6,7 +6,7 @@
 
 - **_renderer()** (20 connections) — `tests/compact/test_loop_item_streaming.py`
 - **_task_start()** (19 connections) — `tests/compact/test_loop_item_streaming.py`
-- **test_loop_item_streaming.py** (15 connections) — `tests/compact/test_loop_item_streaming.py`
+- **test_loop_item_streaming.py** (16 connections) — `tests/compact/test_loop_item_streaming.py`
 - **_all_text()** (15 connections) — `tests/compact/test_loop_item_streaming.py`
 - **TestItemEventTypeIsAuthoritative** (9 connections) — `tests/compact/test_loop_item_streaming.py`
 - **_aom_jsonl_item_event()** (8 connections) — `tests/compact/test_loop_item_streaming.py`
@@ -34,6 +34,7 @@
 ## Relationships
 
 - [App Configuration Settings](App_Configuration_Settings.md) (8 shared connections)
+- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
 
 ## Source Files
 
@@ -41,7 +42,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 229 (98%)
+- EXTRACTED: 230 (98%)
 - INFERRED: 5 (2%)
 - AMBIGUOUS: 0 (0%)
 

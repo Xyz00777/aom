@@ -1,13 +1,13 @@
 # TUI Tree View Tests
 
-> 86 nodes · cohesion 0.04
+> 84 nodes · cohesion 0.05
 
 ## Key Concepts
 
 - **redact_event()** (69 connections) — `src/ansible_aom/core/redaction.py`
 - **RedactionConfig** (28 connections)
 - **_ansible_event_with_res()** (26 connections) — `tests/integration/test_redaction.py`
-- **test_redaction.py** (14 connections) — `tests/integration/test_redaction.py`
+- **integration/test_redaction.py** (16 connections) — `tests/integration/test_redaction.py`
 - **TestLayer3StringSanitizationOnEvents** (9 connections) — `tests/integration/test_redaction.py`
 - **TestLayer2PasswordFieldsOnEvents** (8 connections) — `tests/integration/test_redaction.py`
 - **TestCustomConfigOnRealisticEvents** (6 connections) — `tests/integration/test_redaction.py`
@@ -29,19 +29,20 @@
 - **.test_cmd_field_url_credentials_stripped()** (5 connections) — `tests/integration/test_redaction.py`
 - **.test_cmd_list_each_entry_sanitized()** (5 connections) — `tests/integration/test_redaction.py`
 - **.test_msg_field_cli_credentials_stripped()** (5 connections) — `tests/integration/test_redaction.py`
-- *... and 61 more nodes in this community*
+- *... and 59 more nodes in this community*
 
 ## Relationships
 
-- [Warnings Display Config](Warnings_Display_Config.md) (15 shared connections)
-- [Inspect TUI Widget Data](Inspect_TUI_Widget_Data.md) (12 shared connections)
-- [Run State Summary Panel](Run_State_Summary_Panel.md) (10 shared connections)
+- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (16 shared connections)
+- [Inspect TUI Widget Data](Inspect_TUI_Widget_Data.md) (14 shared connections)
+- [Warnings Display Config](Warnings_Display_Config.md) (6 shared connections)
 - [Summary Panel Widget](Summary_Panel_Widget.md) (5 shared connections)
-- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (5 shared connections)
+- [Credential Redaction Patterns](Credential_Redaction_Patterns.md) (4 shared connections)
 - [Rerun Round Trip Tests](Rerun_Round_Trip_Tests.md) (3 shared connections)
+- [Role Chain Extraction](Role_Chain_Extraction.md) (3 shared connections)
+- [Crash Recovery Auto-Save](Crash_Recovery_Auto-Save.md) (3 shared connections)
 - [View Mode Selection](View_Mode_Selection.md) (2 shared connections)
-- [Status Bar Elements](Status_Bar_Elements.md) (1 shared connections)
-- [Community 463](Community_463.md) (1 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
 
 ## Source Files
 
@@ -51,8 +52,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 273 (73%)
-- INFERRED: 101 (27%)
+- EXTRACTED: 271 (73%)
+- INFERRED: 100 (27%)
 - AMBIGUOUS: 0 (0%)
 
 ---

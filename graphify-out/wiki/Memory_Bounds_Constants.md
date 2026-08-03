@@ -1,23 +1,27 @@
 # Memory Bounds Constants
 
-> 22 nodes · cohesion 0.09
+> 34 nodes · cohesion 0.06
 
 ## Key Concepts
 
 - **TestLogPanelSearchOverlay** (19 connections) — `tests/tui/test_panels.py`
+- **TestSummaryPanelElapsedTime** (14 connections) — `tests/tui/test_panels.py`
+- **.test_search_f3_wrap_at_last_match()** (3 connections) — `tests/tui/test_panels.py`
+- **Tests for elapsed time format - TC-288.** (2 connections) — `tests/tui/test_panels.py`
 - **.test_search_case_sensitive_toggle()** (2 connections) — `tests/tui/test_panels.py`
 - **.test_search_empty_result()** (2 connections) — `tests/tui/test_panels.py`
 - **.test_search_f3_navigation_next()** (2 connections) — `tests/tui/test_panels.py`
 - **.test_search_f3_navigation_previous()** (2 connections) — `tests/tui/test_panels.py`
-- **.test_search_f3_wrap_at_last_match()** (2 connections) — `tests/tui/test_panels.py`
 - **.test_search_match_highlighting()** (2 connections) — `tests/tui/test_panels.py`
 - **.test_search_overlay_activation_ctrl_f()** (2 connections) — `tests/tui/test_panels.py`
 - **.test_search_plain_text_mode()** (2 connections) — `tests/tui/test_panels.py`
 - **.test_search_regex_invalid_pattern_handled()** (2 connections) — `tests/tui/test_panels.py`
 - **.test_search_regex_mode()** (2 connections) — `tests/tui/test_panels.py`
-- **Tests for search overlay functionality - TC-278 to TC-283.** (1 connections) — `tests/tui/test_panels.py`
-- **TC-278: Ctrl+F opens search overlay at top of log panel.** (1 connections) — `tests/tui/test_panels.py`
-- **TC-279: Plain text search finds and highlights matching lines.** (1 connections) — `tests/tui/test_panels.py`
+- **.test_elapsed_time_format_hms()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_elapsed_time_from_start_time()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_elapsed_time_less_than_minute()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_elapsed_time_over_99_hours()** (2 connections) — `tests/tui/test_panels.py`
+- **.test_elapsed_time_zero()** (2 connections) — `tests/tui/test_panels.py`
 - **TC-280: Regex search matches patterns.** (1 connections) — `tests/tui/test_panels.py`
 - **TC-280 edge case: Invalid regex patterns handled gracefully.** (1 connections) — `tests/tui/test_panels.py`
 - **TC-281: Case-sensitive toggle affects search matching.** (1 connections) — `tests/tui/test_panels.py`
@@ -25,15 +29,13 @@
 - **TC-282: Shift+F3 jumps to previous match.** (1 connections) — `tests/tui/test_panels.py`
 - **TC-282 edge case: F3 at last match wraps to first.** (1 connections) — `tests/tui/test_panels.py`
 - **TC-283: Search matches are visually highlighted.** (1 connections) — `tests/tui/test_panels.py`
-- **TC-279 edge case: No matches shows empty result.** (1 connections) — `tests/tui/test_panels.py`
+- *... and 9 more nodes in this community*
 
 ## Relationships
 
-- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (3 shared connections)
-- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (2 shared connections)
-- [Run State Summary Panel](Run_State_Summary_Panel.md) (1 shared connections)
-- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
-- [AOM TUI Application](AOM_TUI_Application.md) (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (8 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (6 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (2 shared connections)
 
 ## Source Files
 
@@ -41,8 +43,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 43 (86%)
-- INFERRED: 7 (14%)
+- EXTRACTED: 68 (83%)
+- INFERRED: 14 (17%)
 - AMBIGUOUS: 0 (0%)
 
 ---

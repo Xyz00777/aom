@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **TestExitCodes** (15 connections) — `tests/unit/test_cli.py`
+- **TestExitCodes** (14 connections) — `tests/unit/test_cli.py`
 - **.test_exit_code_0_for_help()** (2 connections) — `tests/unit/test_cli.py`
 - **.test_exit_code_0_for_version()** (2 connections) — `tests/unit/test_cli.py`
 - **.test_exit_code_127_for_missing_ansible()** (2 connections) — `tests/unit/test_cli.py`
@@ -21,10 +21,9 @@
 
 - [Play Definition Tree Population](Play_Definition_Tree_Population.md) (4 shared connections)
 - [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
-- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
-- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (1 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (1 shared connections)
 - [Inspect Data Model Builders](Inspect_Data_Model_Builders.md) (1 shared connections)
-- [Session Recording Tests](Session_Recording_Tests.md) (1 shared connections)
 
 ## Source Files
 
@@ -32,8 +31,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 23 (74%)
-- INFERRED: 8 (26%)
+- EXTRACTED: 23 (77%)
+- INFERRED: 7 (23%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -1,6 +1,6 @@
 # Rerun Round Trip Tests
 
-> 35 nodes · cohesion 0.06
+> 27 nodes · cohesion 0.09
 
 ## Key Concepts
 
@@ -10,10 +10,6 @@
 - **TestRedactionPerformance** (5 connections) — `tests/unit/test_redaction.py`
 - **TestWhitelistFalsePositives** (5 connections) — `tests/unit/test_redaction.py`
 - **_redact_list()** (4 connections) — `src/ansible_aom/core/redaction.py`
-- **TestConfigCustomFields** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_custom_fields_redacted()** (4 connections) — `tests/unit/test_redaction.py`
-- **TestConfigCustomWhitelist** (4 connections) — `tests/unit/test_redaction.py`
-- **.test_custom_whitelist_not_redacted()** (4 connections) — `tests/unit/test_redaction.py`
 - **.test_empty_dict_list_handling()** (4 connections) — `tests/unit/test_redaction.py`
 - **.test_max_depth_truncation()** (4 connections) — `tests/unit/test_redaction.py`
 - **.test_nested_dict_redaction()** (4 connections) — `tests/unit/test_redaction.py`
@@ -29,17 +25,19 @@
 - **TC-158: Password fields in list items are redacted.** (1 connections) — `tests/unit/test_redaction.py`
 - **TC-158 edge case: Max depth (10) truncation.** (1 connections) — `tests/unit/test_redaction.py`
 - **TC-158 edge: Empty dicts and lists handled correctly.** (1 connections) — `tests/unit/test_redaction.py`
-- *... and 10 more nodes in this community*
+- **Tests for TC-159: Whitelist prevents false positive redaction.** (1 connections) — `tests/unit/test_redaction.py`
+- **TC-159: PASSWORD_WHITELIST prevents false positive redaction.** (1 connections) — `tests/unit/test_redaction.py`
+- **TC-159: Configured custom whitelist extends PASSWORD_WHITELIST.** (1 connections) — `tests/unit/test_redaction.py`
+- **Performance-related tests for redaction.** (1 connections) — `tests/unit/test_redaction.py`
+- *... and 2 more nodes in this community*
 
 ## Relationships
 
-- [Warnings Display Config](Warnings_Display_Config.md) (11 shared connections)
-- [Inspect TUI Widget Data](Inspect_TUI_Widget_Data.md) (5 shared connections)
-- [Run State Summary Panel](Run_State_Summary_Panel.md) (5 shared connections)
-- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (5 shared connections)
+- [Warnings Display Config](Warnings_Display_Config.md) (9 shared connections)
+- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (8 shared connections)
+- [Inspect TUI Widget Data](Inspect_TUI_Widget_Data.md) (6 shared connections)
 - [TUI Tree View Tests](TUI_Tree_View_Tests.md) (3 shared connections)
-- [Status Bar Elements](Status_Bar_Elements.md) (1 shared connections)
-- [Community 463](Community_463.md) (1 shared connections)
+- [Crash Recovery Auto-Save](Crash_Recovery_Auto-Save.md) (1 shared connections)
 
 ## Source Files
 
@@ -48,8 +46,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 82 (77%)
-- INFERRED: 25 (23%)
+- EXTRACTED: 66 (76%)
+- INFERRED: 21 (24%)
 - AMBIGUOUS: 0 (0%)
 
 ---

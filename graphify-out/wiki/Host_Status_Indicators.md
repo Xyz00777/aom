@@ -25,7 +25,7 @@
 
 ## Relationships
 
-- [State Transition Validation](State_Transition_Validation.md) (3 shared connections)
+- [First Ctrl-C Cancellation](First_Ctrl-C_Cancellation.md) (3 shared connections)
 
 ## Source Files
 

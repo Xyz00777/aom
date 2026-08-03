@@ -17,7 +17,7 @@
 
 ## Relationships
 
-- [Shell Completion Helpers](Shell_Completion_Helpers.md) (2 shared connections)
+- [Rerun Subcommand Module](Rerun_Subcommand_Module.md) (2 shared connections)
 - [KeyAction TypedDict](KeyAction_TypedDict.md) (1 shared connections)
 
 ## Source Files

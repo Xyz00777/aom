@@ -1,39 +1,29 @@
 # CLI TUI Launch Path
 
-> 17 nodes · cohesion 0.12
+> 6 nodes · cohesion 0.33
 
 ## Key Concepts
 
-- **2026-06-28 — TDD done** (9 connections) — `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
-- **2026-06-28 — Drop (M remaining) suffix from role labels** (7 connections) — `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
-- **learnings.md** (2 connections) — `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
-- **Affected tests** (1 connections) — `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
-- **Bug** (1 connections) — `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
-- **Decision (user 2026-06-28)** (1 connections) — `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
-- **Final shape of `_relabel_role_lines`** (1 connections) — `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
-- **Fix shape (chosen: Option 1 — surgical, not a gut)** (1 connections) — `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
-- **Independent hands-on QA (orchestrator)** (1 connections) — `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
-- **New regression test (written first, watched fail)** (1 connections) — `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
-- **Surprise cross-effects** (1 connections) — `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
-- **Test count delta** (1 connections) — `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
-- **Things explicitly NOT in scope** (1 connections) — `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
-- **Things that proved useful** (1 connections) — `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
-- **Touched test files** (1 connections) — `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
-- **Verification matrix (all green)** (1 connections) — `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
-- **Verification target** (1 connections) — `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
+- **TestGracefulDegradationJSONLParseFailure** (5 connections) — `tests/integration/test_error_handling.py`
+- **.test_malformed_jsonl_does_not_crash()** (3 connections) — `tests/integration/test_error_handling.py`
+- **.test_valid_json_following_malformed_still_parsed()** (3 connections) — `tests/integration/test_error_handling.py`
+- **TC-445: Graceful Degradation - JSONL Parse Failure.** (1 connections) — `tests/integration/test_error_handling.py`
+- **TC-445: Malformed JSONL line is handled gracefully.** (1 connections) — `tests/integration/test_error_handling.py`
+- **TC-445: Valid JSONL after malformed line still processed.** (1 connections) — `tests/integration/test_error_handling.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [Run State Completion Recap](Run_State_Completion_Recap.md) (3 shared connections)
+- [Completion Host Table](Completion_Host_Table.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/fix-remaining-count-direction/learnings.md`
+- `tests/integration/test_error_handling.py`
 
 ## Audit Trail
 
-- EXTRACTED: 32 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 11 (79%)
+- INFERRED: 3 (21%)
 - AMBIGUOUS: 0 (0%)
 
 ---

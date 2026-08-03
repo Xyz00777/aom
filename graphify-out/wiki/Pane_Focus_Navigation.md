@@ -8,7 +8,7 @@
 - **_two_play_state()** (13 connections) — `tests/unit/test_play_boundary_state.py`
 - **_start_play()** (11 connections) — `tests/unit/test_play_boundary_state.py`
 - **_start_task()** (11 connections) — `tests/unit/test_play_boundary_state.py`
-- **test_play_boundary_state.py** (8 connections) — `tests/unit/test_play_boundary_state.py`
+- **test_play_boundary_state.py** (9 connections) — `tests/unit/test_play_boundary_state.py`
 - **_ts()** (8 connections) — `tests/unit/test_play_boundary_state.py`
 - **.test_terminal_runner_events_route_to_task_owner_play()** (7 connections) — `tests/unit/test_play_boundary_state.py`
 - **.test_free_strategy_prior_play_not_force_finalised()** (6 connections) — `tests/unit/test_play_boundary_state.py`
@@ -32,11 +32,10 @@
 
 ## Relationships
 
-- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (5 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (9 shared connections)
 - [Play Definition Tree Population](Play_Definition_Tree_Population.md) (3 shared connections)
-- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (2 shared connections)
-- [CLI Argument Parser](CLI_Argument_Parser.md) (2 shared connections)
-- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
 
 ## Source Files
 
@@ -44,7 +43,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 126 (95%)
+- EXTRACTED: 127 (95%)
 - INFERRED: 7 (5%)
 - AMBIGUOUS: 0 (0%)
 

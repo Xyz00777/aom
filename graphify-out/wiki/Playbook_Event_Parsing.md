@@ -1,47 +1,39 @@
 # Playbook Event Parsing
 
-> 28 nodes · cohesion 0.07
+> 13 nodes · cohesion 0.26
 
 ## Key Concepts
 
-- **AOM Codebase Verification Report** (7 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **Task 1: `aom inspect prune` exists and is tested** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **Task 2: `--yes` doesn't already exist as a global flag** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **Task 3: Pre-commit / CI hook setup** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **Task 4: Inspect TUI's existing refresh rate** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **Task 5: `core/redaction.py:280-283` is the real Layer 4 location** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **aom-codebase-verification.md** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **Implication for v1 plan** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **Implication for v1 plan** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **Implication for v1 plan** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **Implication for v1 plan** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **Implication for v1 plan** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **Summary** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **Verdict: **PASS**** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **Verdict: **PASS** (but with a nuance)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **Verdict: **PASS** (documentation is accurate)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **Verdict: **PASS** (minor line number drift — 279-283 vs 280-283)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **Verdict: **PASS** (the claim is correct — `--yes` does NOT exist as a global flag)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **What was checked** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **What was checked** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **What was checked** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **What was checked** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **What was checked** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **What was found** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- **What was found** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
-- *... and 3 more nodes in this community*
+- **test_render_preflight_scaling.py** (11 connections) — `tests/compact/test_render_preflight_scaling.py`
+- **_build_state()** (10 connections) — `tests/compact/test_render_preflight_scaling.py`
+- **_count_marginal_yields()** (6 connections) — `tests/compact/test_render_preflight_scaling.py`
+- **_renderer_for()** (5 connections) — `tests/compact/test_render_preflight_scaling.py`
+- **test_pending_task_count_does_not_inflate_per_render_walk()** (5 connections) — `tests/compact/test_render_preflight_scaling.py`
+- **test_per_render_marginal_preflight_walk_is_negligible()** (5 connections) — `tests/compact/test_render_preflight_scaling.py`
+- **_force_render()** (3 connections) — `tests/compact/test_render_preflight_scaling.py`
+- **_task_def()** (3 connections) — `tests/compact/test_render_preflight_scaling.py`
+- **Per-render preflight-walk cost must not scale with renders × definitions.  The c** (1 connections) — `tests/compact/test_render_preflight_scaling.py`
+- **Warm one render, then count ``iter_preflight_task_defs`` yields over     ``n_ren** (1 connections) — `tests/compact/test_render_preflight_scaling.py`
+- **Doubling+ the pending-play task count must not increase the number of     prefli** (1 connections) — `tests/compact/test_render_preflight_scaling.py`
+- **After warmup, a steady-state re-render must not re-walk the preflight     tree.** (1 connections) — `tests/compact/test_render_preflight_scaling.py`
+- **One active play (``completed`` done + 1 running + rest pending) plus     two ful** (1 connections) — `tests/compact/test_render_preflight_scaling.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [CLI Interface Tests](CLI_Interface_Tests.md) (4 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (3 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (3 shared connections)
+- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
+- [Hide State Gating Tests](Hide_State_Gating_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/aom-codebase-verification.md`
+- `tests/compact/test_render_preflight_scaling.py`
 
 ## Audit Trail
 
-- EXTRACTED: 54 (100%)
+- EXTRACTED: 53 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

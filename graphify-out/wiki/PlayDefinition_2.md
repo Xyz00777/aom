@@ -1,8 +1,8 @@
 # PlayDefinition
 
-> God node · 340 connections · `src/ansible_aom/core/models.py`
+> God node · 349 connections · `src/ansible_aom/core/models.py`
 
-**Community:** [CLI Argument Parser](CLI_Argument_Parser.md)
+**Community:** [CLI Interface Tests](CLI_Interface_Tests.md)
 
 ## Connections by Relation
 
@@ -18,22 +18,29 @@
 - ._nested_state() `EXTRACTED`
 - ._single_play_single_role_state() `EXTRACTED`
 - _renderer_with_running_task() `INFERRED`
+- _build_state() `EXTRACTED`
 - _setup_state() `INFERRED`
 - _setup() `INFERRED`
-- .test_update_from_state_drops_completed_tasks() `INFERRED`
-- .test_update_from_state_keeps_running_task_visible() `INFERRED`
-- .test_update_from_state_shows_ok_icon_after_completion() `INFERRED`
 - .test_tree_projection_shows_pending_role_tasks() `INFERRED`
+- _state_renderer() `EXTRACTED`
 - _running_state() `INFERRED`
 - _seed_sticky_gap_state() `INFERRED`
 - test_completed_tasks_counts_dynamic_children() `INFERRED`
+- .test_runtime_cache_reuses_preflight_entry() `INFERRED`
 
 ### contains
 - models.py `EXTRACTED`
 
+### imports
+- run_state.py `EXTRACTED`
+- format.py `EXTRACTED`
+- parser.py `EXTRACTED`
+- tree_projection.py `EXTRACTED`
+- includes.py `EXTRACTED`
+- preflight.py `EXTRACTED`
+
 ### indirect_call
 - .test_run_state_definitions_list_contains_play_definition() `INFERRED`
-- .test_run_state_definitions_list() `INFERRED`
 
 ### rationale_for
 - Static play info from --list-tasks and --list-hosts (Definition class). `EXTRACTED`
@@ -42,22 +49,22 @@
 - format_preflight_summary() `EXTRACTED`
 - graft_include_children() `EXTRACTED`
 - count_total_tasks() `EXTRACTED`
-- assemble_definitions() `EXTRACTED`
 - resolve_includes_from_playbook() `EXTRACTED`
+- assemble_definitions() `EXTRACTED`
 - count_total_tasks_seen() `EXTRACTED`
 - _play_def() `EXTRACTED`
 - _play_def() `EXTRACTED`
 - _play_def() `EXTRACTED`
+- collect_tags() `EXTRACTED`
 - _iter_leaf_task_defs() `EXTRACTED`
 - _make_play() `EXTRACTED`
-- collect_tags() `EXTRACTED`
 - _make_play() `EXTRACTED`
 - _count_tasks() `EXTRACTED`
-- _build_name_index() `EXTRACTED`
 - _play() `EXTRACTED`
+- _build_name_index() `EXTRACTED`
+- count_leaf_tasks() `EXTRACTED`
 - _build_definitions() `EXTRACTED`
 - _play_def() `EXTRACTED`
-- count_leaf_tasks() `EXTRACTED`
 - _roles_referenced() `EXTRACTED`
 
 ### uses
@@ -65,22 +72,22 @@
 - [PtyStreamParser](PtyStreamParser.md) `INFERRED`
 - StreamPhase `INFERRED`
 - JsonLineStream `INFERRED`
-- [TreeProjection](TreeProjection.md) `INFERRED`
+- TreeProjection `INFERRED`
 - TestPtyStreamParserStderrLineEmission `INFERRED`
-- PreParseResult `INFERRED`
 - TreeLine `INFERRED`
+- PreParseResult `INFERRED`
 - TestJsonLineStreamBasics `INFERRED`
 - TestListTasksEdgeCases `INFERRED`
 - RendererMirrorMachine `INFERRED`
 - TestListTasksParser `INFERRED`
 - TestPtyStreamParserPhases `INFERRED`
 - TestTaskDefinition `INFERRED`
-- TestTaskMatching `INFERRED`
 - TestListHostsEdgeCases `INFERRED`
 - TestHostRunState `INFERRED`
 - TestPlayRunState `INFERRED`
-- TestStatusBarFormat `INFERRED`
 - TestRunState `INFERRED`
+- TestStatusEnum `INFERRED`
+- TestRoleGrouping `INFERRED`
 
 ---
 

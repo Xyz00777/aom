@@ -1,40 +1,28 @@
 # Unicode Support Detection
 
-> 16 nodes · cohesion 0.16
+> 5 nodes · cohesion 0.40
 
 ## Key Concepts
 
-- **test_renderer_set_definitions.py** (9 connections) — `tests/compact/test_renderer_set_definitions.py`
-- **_build_definitions()** (7 connections) — `tests/compact/test_renderer_set_definitions.py`
-- **test_set_definitions_called_before_start_is_safe()** (4 connections) — `tests/compact/test_renderer_set_definitions.py`
-- **test_set_definitions_prints_summary_above_status_panel()** (4 connections) — `tests/compact/test_renderer_set_definitions.py`
-- **test_set_definitions_unions_hosts_across_plays()** (4 connections) — `tests/compact/test_renderer_set_definitions.py`
-- **test_set_definitions_updates_initial_hosts_total_in_status_bar()** (4 connections) — `tests/compact/test_renderer_set_definitions.py`
-- **test_set_definitions_stores_definitions_on_renderer()** (3 connections) — `tests/compact/test_renderer_set_definitions.py`
-- **test_set_definitions_with_empty_list_emits_no_summary()** (3 connections) — `tests/compact/test_renderer_set_definitions.py`
-- **test_set_definitions_with_empty_list_keeps_zero_hosts()** (3 connections) — `tests/compact/test_renderer_set_definitions.py`
-- **Tests for CompactRenderer.set_definitions (preflight result wiring).** (1 connections) — `tests/compact/test_renderer_set_definitions.py`
-- **Hosts that appear in multiple plays count once each.** (1 connections) — `tests/compact/test_renderer_set_definitions.py`
-- **After preflight, the status bar should show total resolved hosts immediately.** (1 connections) — `tests/compact/test_renderer_set_definitions.py`
-- **Defensive: calling set_definitions before start should not crash.** (1 connections) — `tests/compact/test_renderer_set_definitions.py`
-- **Preflight failure path: empty definitions should not crash and leaves hosts at 0** (1 connections) — `tests/compact/test_renderer_set_definitions.py`
-- **The startup summary lands above the status panel via print_log.** (1 connections) — `tests/compact/test_renderer_set_definitions.py`
-- **Empty preflight result should not print a stray header.** (1 connections) — `tests/compact/test_renderer_set_definitions.py`
+- **.test_play_names_extracted()** (5 connections) — `tests/integration/test_playbook_parser.py`
+- **.test_parser_handles_handler_tasks()** (3 connections) — `tests/integration/test_playbook_parser.py`
+- **Parser handles handler task events.** (2 connections) — `tests/integration/test_playbook_parser.py`
+- **Play names are correctly extracted.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **Parser handles handler task events.** (1 connections) — `tests/integration/test_playbook_parser.py`
 
 ## Relationships
 
-- [App Configuration Settings](App_Configuration_Settings.md) (7 shared connections)
-- [CLI Argument Parser](CLI_Argument_Parser.md) (2 shared connections)
-- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (1 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (2 shared connections)
+- [Shared Renderer Types](Shared_Renderer_Types.md) (2 shared connections)
 
 ## Source Files
 
-- `tests/compact/test_renderer_set_definitions.py`
+- `tests/integration/test_playbook_parser.py`
 
 ## Audit Trail
 
-- EXTRACTED: 40 (83%)
-- INFERRED: 8 (17%)
+- EXTRACTED: 12 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **TestKeyContextEnum** (9 connections) — `tests/tui/test_keybindings.py`
+- **TestKeyContextEnum** (7 connections) — `tests/tui/test_keybindings.py`
 - **.test_all_contexts_are_strings()** (2 connections) — `tests/tui/test_keybindings.py`
 - **.test_global_context_exists()** (2 connections) — `tests/tui/test_keybindings.py`
 - **.test_log_context_exists()** (2 connections) — `tests/tui/test_keybindings.py`
@@ -19,8 +19,7 @@
 
 ## Relationships
 
-- [State Machine Invariants](State_Machine_Invariants.md) (2 shared connections)
-- [Warning Color Formatting](Warning_Color_Formatting.md) (1 shared connections)
+- [test_keybindings.py](test_keybindings.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -28,8 +27,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 23 (92%)
-- INFERRED: 2 (8%)
+- EXTRACTED: 23 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -1,17 +1,15 @@
 # Status Icon Mapping
 
-> 14 nodes · cohesion 0.19
+> 12 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **TestGetActionKeybindings** (9 connections) — `tests/tui/test_keybindings.py`
-- **get_action_keybindings()** (8 connections) — `src/ansible_aom/tui/keybindings.py`
-- **.test_get_action_keybindings_for_navigation()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_action_keybindings_for_quit()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_action_keybindings_for_unknown_action()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_action_keybindings_returns_list()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_action_keybindings_single_key_action()** (3 connections) — `tests/tui/test_keybindings.py`
-- **Get all keys that map to a given action.      Args:         action: The action i** (1 connections) — `src/ansible_aom/tui/keybindings.py`
+- **TestGetActionKeybindings** (7 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_action_keybindings_for_navigation()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_action_keybindings_for_quit()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_action_keybindings_for_unknown_action()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_action_keybindings_returns_list()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_action_keybindings_single_key_action()** (2 connections) — `tests/tui/test_keybindings.py`
 - **Tests for get_action_keybindings function.** (1 connections) — `tests/tui/test_keybindings.py`
 - **get_action_keybindings returns a list.** (1 connections) — `tests/tui/test_keybindings.py`
 - **Quit action should return 'q' key.** (1 connections) — `tests/tui/test_keybindings.py`
@@ -21,19 +19,16 @@
 
 ## Relationships
 
-- [State Machine Invariants](State_Machine_Invariants.md) (3 shared connections)
-- [Module Init File](Module_Init_File.md) (1 shared connections)
-- [Warning Color Formatting](Warning_Color_Formatting.md) (1 shared connections)
+- [test_keybindings.py](test_keybindings.py.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/tui/keybindings.py`
 - `tests/tui/test_keybindings.py`
 
 ## Audit Trail
 
-- EXTRACTED: 26 (67%)
-- INFERRED: 13 (33%)
+- EXTRACTED: 23 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -1,54 +1,65 @@
 # StatusBarConfig Model
 
-> 19 nodes · cohesion 0.13
+> 37 nodes · cohesion 0.08
 
 ## Key Concepts
 
-- **parse_iso_timestamp()** (11 connections) — `src/ansible_aom/core/timestamp.py`
-- **cleanup_old_sessions()** (9 connections) — `src/ansible_aom/session/store.py`
+- **store.py** (34 connections) — `src/ansible_aom/session/store.py`
+- **parse_iso_timestamp()** (19 connections) — `src/ansible_aom/core/timestamp.py`
+- **drivers/replay.py** (19 connections) — `src/ansible_aom/drivers/replay.py`
+- **overhead.py** (13 connections) — `src/ansible_aom/core/overhead.py`
+- **timestamp.py** (10 connections) — `src/ansible_aom/core/timestamp.py`
+- **cleanup_old_sessions()** (10 connections) — `src/ansible_aom/session/store.py`
 - **TestSessionRotation** (7 connections) — `tests/integration/test_session.py`
-- **._event_time()** (5 connections) — `src/ansible_aom/compact/renderer.py`
+- **_parse_iso8601()** (5 connections) — `src/ansible_aom/core/overhead.py`
+- **_parse_timestamp()** (5 connections) — `src/ansible_aom/drivers/replay.py`
+- **test_session_meta_persistence.py** (5 connections) — `tests/unit/test_session_meta_persistence.py`
 - **.test_cleanup_keeps_max_count()** (4 connections) — `tests/integration/test_session.py`
 - **.test_cleanup_keeps_recent_sessions()** (4 connections) — `tests/integration/test_session.py`
 - **.test_cleanup_removes_old_sessions()** (4 connections) — `tests/integration/test_session.py`
 - **.test_cleanup_respects_both_limits()** (4 connections) — `tests/integration/test_session.py`
-- **timestamp.py** (3 connections) — `src/ansible_aom/core/timestamp.py`
+- **test_end_session_without_counts_writes_nulls()** (4 connections) — `tests/unit/test_session_meta_persistence.py`
+- **test_end_session_persists_task_and_host_counts()** (3 connections) — `tests/unit/test_session_meta_persistence.py`
 - **datetime** (2 connections)
-- **Parse ``_timestamp`` from a JSONL event into a Unix float.          Returns ``No** (1 connections) — `src/ansible_aom/compact/renderer.py`
+- **datetime** (2 connections)
+- **datetime** (2 connections)
+- **session/__init__.py** (2 connections) — `src/ansible_aom/session/__init__.py`
+- **Path** (2 connections)
+- **Per-task overhead analysis from JSONL event streams.  Why this exists ----------** (1 connections) — `src/ansible_aom/core/overhead.py`
+- **Parse the ISO-8601 timestamps emitted by ansible.posix.jsonl.      Returns ``Non** (1 connections) — `src/ansible_aom/core/overhead.py`
 - **Canonical ISO 8601 timestamp parsing for ansible-playbook JSONL events.  AOM rea** (1 connections) — `src/ansible_aom/core/timestamp.py`
 - **Parse an ISO 8601 timestamp string, tolerating the ``Z`` UTC suffix.      Args:** (1 connections) — `src/ansible_aom/core/timestamp.py`
-- **Remove old sessions based on policy.      Sessions are cleaned up based on:** (1 connections) — `src/ansible_aom/session/store.py`
-- **TC-228, TC-229, TC-230: Session rotation and cleanup.** (1 connections) — `tests/integration/test_session.py`
-- **TC-228: Keep last N sessions (default 100).** (1 connections) — `tests/integration/test_session.py`
-- **TC-228: Cleanup keeps most recent sessions.** (1 connections) — `tests/integration/test_session.py`
-- **TC-229: Delete sessions older than N days.** (1 connections) — `tests/integration/test_session.py`
-- **Cleanup respects both count and age limits.** (1 connections) — `tests/integration/test_session.py`
+- *... and 12 more nodes in this community*
 
 ## Relationships
 
-- [Run Config Key Normalization](Run_Config_Key_Normalization.md) (7 shared connections)
-- [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (2 shared connections)
-- [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
-- [Heartbeat Liveness Tracker](Heartbeat_Liveness_Tracker.md) (1 shared connections)
-- [Playbook Parser Integration Tests](Playbook_Parser_Integration_Tests.md) (1 shared connections)
-- [Color ASCII Fallback](Color_ASCII_Fallback.md) (1 shared connections)
-- [List-Tasks Failure Handling](List-Tasks_Failure_Handling.md) (1 shared connections)
-- [Community 504](Community_504.md) (1 shared connections)
-- [JSON Renderer](JSON_Renderer.md) (1 shared connections)
-- [Status Bar Widget](Status_Bar_Widget.md) (1 shared connections)
-- [Loop Item Line Tests](Loop_Item_Line_Tests.md) (1 shared connections)
+- [Run Config Key Normalization](Run_Config_Key_Normalization.md) (12 shared connections)
+- [Color ASCII Fallback](Color_ASCII_Fallback.md) (7 shared connections)
+- [Status Bar Widget](Status_Bar_Widget.md) (7 shared connections)
+- [Include Role Discovery](Include_Role_Discovery.md) (4 shared connections)
+- [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (3 shared connections)
+- [Log Filter Helpers](Log_Filter_Helpers.md) (3 shared connections)
+- [List-Tasks Failure Handling](List-Tasks_Failure_Handling.md) (3 shared connections)
+- [Property Based Tests](Property_Based_Tests.md) (3 shared connections)
+- [Heartbeat Liveness Tracker](Heartbeat_Liveness_Tracker.md) (2 shared connections)
+- [Ansible Posix Availability](Ansible_Posix_Availability.md) (2 shared connections)
+- [Loop Item Stream Tests](Loop_Item_Stream_Tests.md) (2 shared connections)
+- [Hide State Normalization](Hide_State_Normalization.md) (2 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/compact/renderer.py`
+- `src/ansible_aom/core/overhead.py`
 - `src/ansible_aom/core/timestamp.py`
+- `src/ansible_aom/drivers/replay.py`
+- `src/ansible_aom/session/__init__.py`
 - `src/ansible_aom/session/store.py`
 - `tests/integration/test_session.py`
+- `tests/unit/test_session_meta_persistence.py`
 
 ## Audit Trail
 
-- EXTRACTED: 42 (68%)
-- INFERRED: 20 (32%)
+- EXTRACTED: 153 (87%)
+- INFERRED: 23 (13%)
 - AMBIGUOUS: 0 (0%)
 
 ---

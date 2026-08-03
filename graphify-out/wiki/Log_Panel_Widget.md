@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_run_diagnostics.py** (17 connections) — `tests/unit/test_run_diagnostics.py`
+- **test_run_diagnostics.py** (19 connections) — `tests/unit/test_run_diagnostics.py`
 - **_FakeSink** (9 connections) — `tests/unit/test_run_diagnostics.py`
 - **test_feed_without_diag_does_not_crash()** (6 connections) — `tests/unit/test_run_diagnostics.py`
 - **test_feed_with_diag_increments_histogram()** (5 connections) — `tests/unit/test_run_diagnostics.py`
@@ -32,10 +32,12 @@
 
 ## Relationships
 
-- [Tree Block Animation](Tree_Block_Animation.md) (4 shared connections)
 - [Run State Completion Recap](Run_State_Completion_Recap.md) (3 shared connections)
-- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (3 shared connections)
-- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (3 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (2 shared connections)
+- [Tree Block Animation](Tree_Block_Animation.md) (2 shared connections)
+- [Replay Determinism Tests](Replay_Determinism_Tests.md) (2 shared connections)
+- [core/__init__.py](core-__init__.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -43,7 +45,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 60 (87%)
+- EXTRACTED: 62 (87%)
 - INFERRED: 9 (13%)
 - AMBIGUOUS: 0 (0%)
 

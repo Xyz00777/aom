@@ -4,9 +4,9 @@
 
 ## Key Concepts
 
+- **core/replay.py** (12 connections) — `src/ansible_aom/core/replay.py`
 - **iter_tree_frames()** (10 connections) — `src/ansible_aom/core/replay.py`
 - **_event_timestamp()** (5 connections) — `src/ansible_aom/core/replay.py`
-- **replay.py** (4 connections) — `src/ansible_aom/core/replay.py`
 - **test_tree_frame_signatures_are_deterministic_and_stable()** (4 connections) — `tests/integration/test_replay_determinism.py`
 - **test_tree_replay_keeps_run_once_rows_separate_across_serial_windows()** (4 connections) — `tests/integration/test_replay_determinism.py`
 - **_tree_frame_signatures()** (3 connections) — `tests/integration/test_replay_determinism.py`
@@ -19,12 +19,13 @@
 
 ## Relationships
 
-- [Community 602](Community_602.md) (5 shared connections)
+- [test_replay_determinism.py](test_replay_determinism.py.md) (6 shared connections)
+- [Heartbeat Liveness Tracker](Heartbeat_Liveness_Tracker.md) (3 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (3 shared connections)
+- [StatusBarConfig Model](StatusBarConfig_Model.md) (3 shared connections)
 - [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (2 shared connections)
-- [StatusBarConfig Model](StatusBarConfig_Model.md) (1 shared connections)
-- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (1 shared connections)
-- [Hide State Gating Tests](Hide_State_Gating_Tests.md) (1 shared connections)
-- [CLI Interface Tests](CLI_Interface_Tests.md) (1 shared connections)
+- [tree.py](tree.py.md) (1 shared connections)
+- [.test_field_exists_with_default_false](test_field_exists_with_default_false.md) (1 shared connections)
 - [Renderer Module Init](Renderer_Module_Init.md) (1 shared connections)
 
 ## Source Files
@@ -34,8 +35,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 31 (82%)
-- INFERRED: 7 (18%)
+- EXTRACTED: 39 (85%)
+- INFERRED: 7 (15%)
 - AMBIGUOUS: 0 (0%)
 
 ---

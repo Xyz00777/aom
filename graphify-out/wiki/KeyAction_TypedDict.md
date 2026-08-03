@@ -4,8 +4,8 @@
 
 ## Key Concepts
 
-- **_compose_host_set()** (13 connections) — `src/ansible_aom/rerun/cli.py`
-- **test_rerun_cli.py** (13 connections) — `tests/unit/test_rerun_cli.py`
+- **test_rerun_cli.py** (14 connections) — `tests/unit/test_rerun_cli.py`
+- **_compose_host_set()** (12 connections) — `src/ansible_aom/rerun/cli.py`
 - **TestComposeHostSet** (8 connections) — `tests/unit/test_rerun_cli.py`
 - **_session_dict()** (7 connections) — `tests/unit/test_rerun_cli.py`
 - **._events()** (6 connections) — `tests/unit/test_rerun_cli.py`
@@ -21,14 +21,13 @@
 
 ## Relationships
 
+- [Rerun Subcommand Module](Rerun_Subcommand_Module.md) (4 shared connections)
 - [Compact Renderer Formatters](Compact_Renderer_Formatters.md) (4 shared connections)
-- [Shell Completion Helpers](Shell_Completion_Helpers.md) (3 shared connections)
 - [Dynamic Include Expansion](Dynamic_Include_Expansion.md) (3 shared connections)
-- [Event Source Adapters](Event_Source_Adapters.md) (1 shared connections)
 - [Frame Parameter Handling](Frame_Parameter_Handling.md) (1 shared connections)
 - [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
-- [Rerun Subcommand Module](Rerun_Subcommand_Module.md) (1 shared connections)
 - [Exit Code Constants](Exit_Code_Constants.md) (1 shared connections)
+- [Shell Completion Helpers](Shell_Completion_Helpers.md) (1 shared connections)
 - [TUI Widgets Module](TUI_Widgets_Module.md) (1 shared connections)
 
 ## Source Files
@@ -38,8 +37,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 58 (78%)
-- INFERRED: 16 (22%)
+- EXTRACTED: 59 (80%)
+- INFERRED: 15 (20%)
 - AMBIGUOUS: 0 (0%)
 
 ---

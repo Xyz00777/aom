@@ -1,17 +1,19 @@
 # Inspect TUI Widget Data
 
-> 57 nodes · cohesion 0.05
+> 64 nodes · cohesion 0.05
 
 ## Key Concepts
 
 - **RedactionConfig** (24 connections)
+- **sanitize_string()** (17 connections) — `src/ansible_aom/core/redaction.py`
+- **redaction.py** (14 connections) — `src/ansible_aom/core/redaction.py`
 - **should_redact()** (14 connections) — `src/ansible_aom/core/redaction.py`
-- **test_redaction_layer4.py** (10 connections) — `tests/unit/test_redaction_layer4.py`
+- **test_redaction_layer4.py** (12 connections) — `tests/unit/test_redaction_layer4.py`
 - **TestLayer2UserConfig** (8 connections) — `tests/unit/test_redaction_layer4.py`
 - **TestRecurseByKeyNotValue** (8 connections) — `tests/unit/test_redaction_layer4.py`
-- **redaction.py** (7 connections) — `src/ansible_aom/core/redaction.py`
 - **TestLayer1ExactMatchKeys** (7 connections) — `tests/unit/test_redaction_layer4.py`
 - **TestWhitelistStillWorks** (7 connections) — `tests/unit/test_redaction_layer4.py`
+- **TestSanitizeStringLayer3Unchanged** (6 connections) — `tests/unit/test_redaction_layer4.py`
 - **TestInvocationsLayer4StaysConsistent** (4 connections) — `tests/unit/test_redaction_layer4.py`
 - **.test_exact_match_does_not_catch_suffix_or_prefix()** (4 connections) — `tests/unit/test_redaction_layer4.py`
 - **.test_exact_match_is_case_insensitive_on_lookup()** (4 connections) — `tests/unit/test_redaction_layer4.py`
@@ -27,17 +29,17 @@
 - **.test_secret_in_value_under_safe_key_not_redacted()** (4 connections) — `tests/unit/test_redaction_layer4.py`
 - **.test_value_substring_password_not_redacted()** (4 connections) — `tests/unit/test_redaction_layer4.py`
 - **.test_config_whitelist_extends_defaults()** (4 connections) — `tests/unit/test_redaction_layer4.py`
-- **default_config()** (3 connections) — `tests/unit/test_redaction_layer4.py`
-- **.test_invocation_module_args_uses_layer1()** (3 connections) — `tests/unit/test_redaction_layer4.py`
-- *... and 32 more nodes in this community*
+- *... and 39 more nodes in this community*
 
 ## Relationships
 
-- [TUI Tree View Tests](TUI_Tree_View_Tests.md) (12 shared connections)
-- [Rerun Round Trip Tests](Rerun_Round_Trip_Tests.md) (5 shared connections)
-- [Status Bar Elements](Status_Bar_Elements.md) (5 shared connections)
-- [Run State Summary Panel](Run_State_Summary_Panel.md) (5 shared connections)
-- [Community 463](Community_463.md) (1 shared connections)
+- [TUI Tree View Tests](TUI_Tree_View_Tests.md) (14 shared connections)
+- [Warnings Display Config](Warnings_Display_Config.md) (9 shared connections)
+- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (8 shared connections)
+- [Rerun Round Trip Tests](Rerun_Round_Trip_Tests.md) (6 shared connections)
+- [Summary Panel Widget](Summary_Panel_Widget.md) (3 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (2 shared connections)
+- [View Mode Selection](View_Mode_Selection.md) (1 shared connections)
 
 ## Source Files
 
@@ -46,8 +48,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 161 (84%)
-- INFERRED: 31 (16%)
+- EXTRACTED: 187 (80%)
+- INFERRED: 48 (20%)
 - AMBIGUOUS: 0 (0%)
 
 ---

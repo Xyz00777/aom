@@ -1,48 +1,41 @@
 # Two-Cut Tree Truncation
 
-> 48 nodes · cohesion 0.04
+> 14 nodes · cohesion 0.33
 
 ## Key Concepts
 
-- **Section 14: Error Handling** (48 connections) — `TEST_SPECIFICATION.md`
-- **TC-441: Crash Recovery - Stay Open After Exit** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-442: Crash Recovery - Panels Interactive** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-443: Crash Recovery - Graceful Degradation Notification** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-444: Crash Recovery - Auto Save Partial Session** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-445: Graceful Degradation - JSONL Parse Failure** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-446: Graceful Degradation - Tree Updates Continue** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-447: Graceful Degradation - list-tasks Failure** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-448: Graceful Degradation - list-tasks Warning Message** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-449: Cancellation - First Ctrl+C Forward to Subprocess** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-450: Cancellation - Second Ctrl+C Kill Everything** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-451: Cancellation - Save Partial Session on Kill** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-452: Password Timeout - 60 Second Limit** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-453: Password Timeout - Cancel with Error** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-454: Password Timeout - Retry Option** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-455: Logging - File Path XDG Compliant** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-456: Logging - Silent During Normal Operation** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-457: Logging - Rotation 10MB 5 Backups** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-458: Logging - Non-Blocking QueueHandler** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-459: Logging - DEBUG Level Events** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-460: Logging - INFO Level Events** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-461: Logging - WARNING Level Events** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-462: Logging - ERROR Level Events** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-463: Logging - Verbose Flag** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-464: Logging - Verbose Console Diagnostics** (1 connections) — `TEST_SPECIFICATION.md`
-- *... and 23 more nodes in this community*
+- **render_session()** (18 connections) — `src/ansible_aom/inspect/text.py`
+- **test_inspect_text_golden.py** (13 connections) — `tests/compact/test_inspect_text_golden.py`
+- **_load()** (11 connections) — `tests/compact/test_inspect_text_golden.py`
+- **test_render_clean_run_has_header_and_no_failure_block()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **test_render_failed_loop_shows_msg_and_failed_items()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **test_render_includes_verbose_section_when_stderr_lines_exist()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **test_render_no_verbose_section_when_no_stderr_events()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **test_render_running_shows_running_status()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **test_render_unreachable_shows_connection_msg()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **test_render_verbose_not_gated_on_failed_status()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **test_render_verbose_play_scoping()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **test_render_verbose_task_scoping()** (3 connections) — `tests/compact/test_inspect_text_golden.py`
+- **Render a session dict as plain text. ANSI-free, deterministic.      When ``play_** (1 connections) — `src/ansible_aom/inspect/text.py`
+- **Golden-frame tests for the text-mode inspect renderer.** (1 connections) — `tests/compact/test_inspect_text_golden.py`
 
 ## Relationships
 
-- [Failure Recap Formatting](Failure_Recap_Formatting.md) (1 shared connections)
+- [ASCII Status Icon Fallback](ASCII_Status_Icon_Fallback.md) (5 shared connections)
+- [Playbook Parser Integration Tests](Playbook_Parser_Integration_Tests.md) (2 shared connections)
+- [Status Bar Widget](Status_Bar_Widget.md) (2 shared connections)
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [RunSummary Schema Contract](RunSummary_Schema_Contract.md) (1 shared connections)
 
 ## Source Files
 
-- `TEST_SPECIFICATION.md`
+- `src/ansible_aom/inspect/text.py`
+- `tests/compact/test_inspect_text_golden.py`
 
 ## Audit Trail
 
-- EXTRACTED: 95 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 49 (69%)
+- INFERRED: 22 (31%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **PtyStreamParser** (0 connections) — `.sisyphus/notepads/new-spec/learnings.md`
+- **PtyStreamParser** (0 connections) — `TEST_SPECIFICATION.md`
 
 ## Relationships
 
@@ -12,7 +12,7 @@
 
 ## Source Files
 
-- `.sisyphus/notepads/new-spec/learnings.md`
+- `TEST_SPECIFICATION.md`
 
 ## Audit Trail
 

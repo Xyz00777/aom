@@ -1,46 +1,36 @@
 # Debug Diagnostics Summary
 
-> 15 nodes · cohesion 0.13
+> 8 nodes · cohesion 0.25
 
 ## Key Concepts
 
-- **LiveDriver** (14 connections) — `src/ansible_aom/drivers/live.py`
-- **_HideStateAction** (5 connections) — `src/ansible_aom/cli.py`
-- **.__call__()** (3 connections) — `src/ansible_aom/cli.py`
+- **LiveDriver** (12 connections) — `src/ansible_aom/drivers/live.py`
+- **test_live_driver_satisfies_event_source()** (4 connections) — `tests/unit/test_event_source.py`
 - **.drive()** (3 connections) — `src/ansible_aom/drivers/live.py`
-- **._run_playbook_worker()** (3 connections) — `src/ansible_aom/tui/app.py`
-- **ArgumentParser** (2 connections)
-- **live.py** (2 connections) — `src/ansible_aom/drivers/live.py`
 - **.__init__()** (2 connections) — `src/ansible_aom/drivers/live.py`
-- **Namespace** (1 connections)
 - **.ansible_args()** (1 connections) — `src/ansible_aom/drivers/live.py`
-- **.playbook()** (1 connections) — `src/ansible_aom/drivers/live.py`
 - **Path** (1 connections)
-- **LiveDriver — :class:`EventSource` that runs a real ``ansible-playbook``.  A thin** (1 connections) — `src/ansible_aom/drivers/live.py`
 - **Spawns ``ansible-playbook`` and pumps its JSONL output.      Parameters mirror :** (1 connections) — `src/ansible_aom/drivers/live.py`
-- **Drive the playbook to completion from a Textual worker thread.          Lives of** (1 connections) — `src/ansible_aom/tui/app.py`
+- **LiveDriver is the production EventSource for ansible-playbook runs.** (1 connections) — `tests/unit/test_event_source.py`
 
 ## Relationships
 
-- [State Transition Validation](State_Transition_Validation.md) (3 shared connections)
-- [Session Recording Tests](Session_Recording_Tests.md) (3 shared connections)
-- [PTY Stream Parser](PTY_Stream_Parser.md) (2 shared connections)
-- [Narrow Terminal View](Narrow_Terminal_View.md) (1 shared connections)
-- [Diagnostics Layer Tests](Diagnostics_Layer_Tests.md) (1 shared connections)
-- [Rerun Main Function](Rerun_Main_Function.md) (1 shared connections)
-- [Tree Block Animation](Tree_Block_Animation.md) (1 shared connections)
-- [Interactive Prompt Tests](Interactive_Prompt_Tests.md) (1 shared connections)
+- [Diagnostics Layer Tests](Diagnostics_Layer_Tests.md) (4 shared connections)
+- [First Ctrl-C Cancellation](First_Ctrl-C_Cancellation.md) (2 shared connections)
+- [Interactive Prompt Tests](Interactive_Prompt_Tests.md) (2 shared connections)
+- [WarningType Enum](WarningType_Enum.md) (1 shared connections)
+- [Session Diagnostics Writing](Session_Diagnostics_Writing.md) (1 shared connections)
+- [Replay Determinism Tests](Replay_Determinism_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/cli.py`
 - `src/ansible_aom/drivers/live.py`
-- `src/ansible_aom/tui/app.py`
+- `tests/unit/test_event_source.py`
 
 ## Audit Trail
 
-- EXTRACTED: 28 (68%)
-- INFERRED: 13 (32%)
+- EXTRACTED: 17 (68%)
+- INFERRED: 8 (32%)
 - AMBIGUOUS: 0 (0%)
 
 ---

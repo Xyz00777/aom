@@ -1,12 +1,11 @@
 # Main TUI Screen
 
-> 28 nodes · cohesion 0.10
+> 26 nodes · cohesion 0.11
 
 ## Key Concepts
 
-- **normalize_hide_states()** (14 connections) — `src/ansible_aom/core/log_filter.py`
+- **normalize_hide_states()** (15 connections) — `src/ansible_aom/core/log_filter.py`
 - **TestNormalizeHideStates** (13 connections) — `tests/unit/test_log_filter.py`
-- **test_log_filter.py** (4 connections) — `tests/unit/test_log_filter.py`
 - **.test_all_valid_states_accepted()** (3 connections) — `tests/unit/test_log_filter.py`
 - **.test_case_insensitive()** (3 connections) — `tests/unit/test_log_filter.py`
 - **.test_deduplicates()** (3 connections) — `tests/unit/test_log_filter.py`
@@ -19,7 +18,6 @@
 - **.test_unknown_state_returns_in_unknown_list()** (3 connections) — `tests/unit/test_log_filter.py`
 - **.test_whitespace_around_tokens_not_stripped()** (3 connections) — `tests/unit/test_log_filter.py`
 - **Lowercase, deduplicate, validate, and separate unknown inputs.      Args:** (1 connections) — `src/ansible_aom/core/log_filter.py`
-- **Unit tests for core/log_filter.py --hide-state helper functions.** (1 connections) — `tests/unit/test_log_filter.py`
 - **Tests for normalize_hide_states — input validation and normalisation.** (1 connections) — `tests/unit/test_log_filter.py`
 - **Empty iterable returns empty frozenset and empty unknown list.** (1 connections) — `tests/unit/test_log_filter.py`
 - **Single known value returns frozenset with that value.** (1 connections) — `tests/unit/test_log_filter.py`
@@ -29,14 +27,14 @@
 - **A value not in VALID_STATES appears in the unknown list.** (1 connections) — `tests/unit/test_log_filter.py`
 - **Known values go to the frozenset; unknown values go to the list.** (1 connections) — `tests/unit/test_log_filter.py`
 - **The first return value is a frozenset, not a plain set.** (1 connections) — `tests/unit/test_log_filter.py`
-- *... and 3 more nodes in this community*
+- **Unknown values appear in the order they were encountered.** (1 connections) — `tests/unit/test_log_filter.py`
+- **Accepts any iterable, e.g. a generator.** (1 connections) — `tests/unit/test_log_filter.py`
+- *... and 1 more nodes in this community*
 
 ## Relationships
 
-- [Inspect Debug Diagnostics](Inspect_Debug_Diagnostics.md) (1 shared connections)
-- [Community 670](Community_670.md) (1 shared connections)
-- [Host Result Hide Filter](Host_Result_Hide_Filter.md) (1 shared connections)
-- [Parser Edge Cases](Parser_Edge_Cases.md) (1 shared connections)
+- [Warning Classification Tests](Warning_Classification_Tests.md) (2 shared connections)
+- [log_filter.py](log_filter.py.md) (2 shared connections)
 
 ## Source Files
 
@@ -45,8 +43,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 55 (71%)
-- INFERRED: 23 (29%)
+- EXTRACTED: 51 (69%)
+- INFERRED: 23 (31%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -1,40 +1,32 @@
 # Role Chain Extraction
 
-> 18 nodes · cohesion 0.11
+> 8 nodes · cohesion 0.25
 
 ## Key Concepts
 
-- **Plan: Two-level "more tasks" truncation with vertical spines** (10 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **Approach (data-model-first, TDD)** (8 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **two-level-truncation.md** (1 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **Files touched** (1 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **Final Verification Wave** (1 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **Goals** (1 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **Non-goals** (1 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **Open questions** (1 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **Problem** (1 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **Status** (1 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **T1 — Extend the data model (`core/tree.py:143-163`)** (1 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **T2 — Two-cut truncation algorithm (`core/tree.py:546-566`)** (1 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **T3 — Post-truncation role-label pass (`core/tree.py`)** (1 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **T4 — Renderer changes (`compact/format.py:564-665`)** (1 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **T5 — ASCII parity (`compact/format.py:599-601`)** (1 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **T6 — TUI parity (`tui/widgets/task_tree.py`)** (1 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **T7 — Spec amendments** (1 connections) — `.sisyphus/plans/two-level-truncation.md`
-- **Verification (F1)** (1 connections) — `.sisyphus/plans/two-level-truncation.md`
+- **TestInvocationModuleArgs** (6 connections) — `tests/unit/test_redaction.py`
+- **.test_deeply_nested_args()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_module_args_list_values()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_module_args_recursive_redaction()** (4 connections) — `tests/unit/test_redaction.py`
+- **Tests for TC-163: invocation.module_args redaction at -vvv.** (1 connections) — `tests/unit/test_redaction.py`
+- **TC-163: Nested module args with exact-match secret keys are redacted.          Q** (1 connections) — `tests/unit/test_redaction.py`
+- **TC-163 edge case: Deeply nested module args.          QC-002: ``secret_key`` is** (1 connections) — `tests/unit/test_redaction.py`
+- **TC-163: Module args with list values containing secrets.** (1 connections) — `tests/unit/test_redaction.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [TUI Tree View Tests](TUI_Tree_View_Tests.md) (3 shared connections)
+- [Warnings Display Config](Warnings_Display_Config.md) (3 shared connections)
+- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (2 shared connections)
 
 ## Source Files
 
-- `.sisyphus/plans/two-level-truncation.md`
+- `tests/unit/test_redaction.py`
 
 ## Audit Trail
 
-- EXTRACTED: 34 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 18 (82%)
+- INFERRED: 4 (18%)
 - AMBIGUOUS: 0 (0%)
 
 ---

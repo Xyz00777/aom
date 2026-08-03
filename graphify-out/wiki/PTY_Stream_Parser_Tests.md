@@ -1,48 +1,41 @@
 # PTY Stream Parser Tests
 
-> 37 nodes · cohesion 0.05
+> 17 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **CLI/TUI Implementation Research - 2026-04-20** (12 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **OPEN QUESTIONS** (6 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **1. Rich Console Output (Non-TUI Mode)** (5 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **2. CLI Framework: Click vs Typer vs argparse** (4 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **3. TUI vs CLI Detection** (4 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **6. Pipe-Friendly Output** (4 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **7. Pager Integration** (4 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **5. Readonly Textual TUI** (3 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **4. Rich Tables for Diff Display** (2 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **cli-tui-implementation.md** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **Auto-TUI Detection Logic** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **Best Practice Pattern:** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **Click Integration** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **Click (Recommended for Complex CLIs)** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **Comparison: Click vs Typer** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **Complete Diff Table Implementation** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **Console Class Usage** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **Final Recommendations** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **JSON Mode** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **JSONL for Event Streams** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **Key Readonly Design Principles:** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **Key Rich Console Features:** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **Multiple Output Formats** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **OQ1: Should `aom inspect` default to TUI or text mode?** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- **OQ2: How to handle long table output - auto-pager or require --pager?** (1 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
-- *... and 12 more nodes in this community*
+- **._many_tasks_state()** (14 connections) — `tests/unit/test_tree_projection.py`
+- **TestRoleLabelsAfterTruncation** (12 connections) — `tests/unit/test_tree_projection.py`
+- **TestTreeLinesPruning** (11 connections) — `tests/unit/test_tree_projection.py`
+- **.test_role_label_shows_total_when_all_tasks_visible_after_cut()** (4 connections) — `tests/unit/test_tree_projection.py`
+- **.test_role_label_shows_total_when_inside_cut()** (4 connections) — `tests/unit/test_tree_projection.py`
+- **.test_role_label_shows_total_when_no_truncation()** (4 connections) — `tests/unit/test_tree_projection.py`
+- **.test_role_label_singular_plural_format()** (4 connections) — `tests/unit/test_tree_projection.py`
+- **.test_collapses_host_leaves_first()** (3 connections) — `tests/unit/test_tree_projection.py`
+- **.test_invariant_one_each_active_role_keeps_one_line()** (3 connections) — `tests/unit/test_tree_projection.py`
+- **.test_tight_budget_preserves_depth_over_breadth()** (3 connections) — `tests/unit/test_tree_projection.py`
+- **.test_within_budget_is_unchanged()** (3 connections) — `tests/unit/test_tree_projection.py`
+- **T3: post-truncation role-label pass.      After `_truncate_two_level` runs, ever** (1 connections) — `tests/unit/test_tree_projection.py`
+- **Re-declaration of ``TestTreeLinesPruning._many_tasks_state`` —         small inl** (1 connections) — `tests/unit/test_tree_projection.py`
+- **Within-budget tree: 1 role with 3 visible tasks (each with 1         host leaf).** (1 connections) — `tests/unit/test_tree_projection.py`
+- **Cut inside the role's task list: 1 role + 3 tasks (each with         1 host leaf** (1 connections) — `tests/unit/test_tree_projection.py`
+- **Edge case: visible == total. The role label reads ``(N tasks)``         — no ``r** (1 connections) — `tests/unit/test_tree_projection.py`
+- **Verify exact format strings across the singular/plural cases:          - ``(1 ta** (1 connections) — `tests/unit/test_tree_projection.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [CLI Interface Tests](CLI_Interface_Tests.md) (21 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (2 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (2 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- `tests/unit/test_tree_projection.py`
 
 ## Audit Trail
 
-- EXTRACTED: 72 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 60 (85%)
+- INFERRED: 11 (15%)
 - AMBIGUOUS: 0 (0%)
 
 ---

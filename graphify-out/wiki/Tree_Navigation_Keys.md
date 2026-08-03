@@ -1,44 +1,34 @@
 # Tree Navigation Keys
 
-> 22 nodes · cohesion 0.09
+> 10 nodes · cohesion 0.27
 
 ## Key Concepts
 
-- **Section 2: Prefix List for `aom_verbose_line` Heuristic** (6 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **Ansible Source Research: Verbosity Handling in ansible-core 2.20.4** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **Prefixes at caplevel 4 (vvvvv) and caplevel 5 (vvvvvv)** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **Section 3: Cross-Check -- SSH Connection Plugin Debug Output** (5 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **Section 1: Claims Verification** (4 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **ansible-source-research.md** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **Claim 1: `ansible.posix.jsonl` is verbosity-agnostic** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **Claim 2: `_dump_results` strips `invocation` + `diff` when `verbosity < 3`** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **Claim 3: `Display.v*()` methods go to stderr, bypassing stdout callbacks** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **Conservative framing** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **Enumerated Prefix List for Heuristic (caplevel >= 4 only)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **From `lib/ansible/inventory/manager.py` (vvvv, caplevel=3)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **From `lib/ansible/plugins/callback/__init__.py` (vvvv, caplevel=3)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **From `lib/ansible/plugins/connection/__init__.py` (vvvv, caplevel=3)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **From `lib/ansible/plugins/connection/ssh.py` (vvvvv, caplevel=4)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **Prefixes at caplevel 1 (vv) -- for reference** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **Prefixes at caplevel 2 (vvv) -- for reference (below conservative boundary)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **Section 4: Open Questions** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **What does `Display.vvv()` look like for local?** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **What does `Display.vvv()` look like for SSH?** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **What does `Display.vvvv()` look like for SSH?** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
-- **What does `Display.vvvvv()` look like for SSH?** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- **test_ignore_errors_callback.py** (5 connections) — `tests/integration/test_ignore_errors_callback.py`
+- **_run_playbook()** (5 connections) — `tests/integration/test_ignore_errors_callback.py`
+- **.test_end_to_end_tally_counts_ignored_failure_as_ok()** (5 connections) — `tests/integration/test_ignore_errors_callback.py`
+- **TestIgnoreErrorsCallback** (4 connections) — `tests/integration/test_ignore_errors_callback.py`
+- **.test_failed_event_carries_ignore_errors_marker()** (2 connections) — `tests/integration/test_ignore_errors_callback.py`
+- **.test_ok_event_has_no_ignore_errors_marker()** (2 connections) — `tests/integration/test_ignore_errors_callback.py`
+- **_has_ansible_posix()** (1 connections) — `tests/integration/test_ignore_errors_callback.py`
+- **Path** (1 connections)
+- **Integration: the bundled ``aom_jsonl`` callback emits ``ignore_errors``.  Ansibl** (1 connections) — `tests/integration/test_ignore_errors_callback.py`
+- **Producer + consumer compose: the ignored failure lands as OK in the         stat** (1 connections) — `tests/integration/test_ignore_errors_callback.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (1 shared connections)
+- [._render_status_panel](_render_status_panel.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/ansible-source-research.md`
+- `tests/integration/test_ignore_errors_callback.py`
 
 ## Audit Trail
 
-- EXTRACTED: 42 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 25 (93%)
+- INFERRED: 2 (7%)
 - AMBIGUOUS: 0 (0%)
 
 ---

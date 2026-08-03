@@ -1,36 +1,26 @@
 # Ansible Posix Version Check
 
-> 15 nodes · cohesion 0.13
+> 4 nodes · cohesion 0.50
 
 ## Key Concepts
 
-- **2026-06-29: Ansible Verbosity Levels × JSONL Callback Research** (7 connections) — `.sisyphus/notepads/research/decisions.md`
-- **2026-06-29: Verbosity handling in existing Ansible/TUI tools** (4 connections) — `.sisyphus/notepads/research/decisions.md`
-- **decisions.md** (3 connections) — `.sisyphus/notepads/research/decisions.md`
-- **2026-05-08: Licensing Research for ansible-aom** (3 connections) — `.sisyphus/notepads/research/decisions.md`
-- **Cross-cutting patterns** (1 connections) — `.sisyphus/notepads/research/decisions.md`
-- **Decision: How AOM should handle verbosity-driven data** (1 connections) — `.sisyphus/notepads/research/decisions.md`
-- **Decision: License choice for ansible-aom** (1 connections) — `.sisyphus/notepads/research/decisions.md`
-- **Gotchas / Surprises** (1 connections) — `.sisyphus/notepads/research/decisions.md`
-- **Implications for ansible-aom** (1 connections) — `.sisyphus/notepads/research/decisions.md`
-- **Key References** (1 connections) — `.sisyphus/notepads/research/decisions.md`
-- **Per-verbosity mapping (final)** (1 connections) — `.sisyphus/notepads/research/decisions.md`
-- **Recommendation for AOM roadmap** (1 connections) — `.sisyphus/notepads/research/decisions.md`
-- **Recommended approach for AOM** (1 connections) — `.sisyphus/notepads/research/decisions.md`
-- **Sources** (1 connections) — `.sisyphus/notepads/research/decisions.md`
-- **Sources reviewed** (1 connections) — `.sisyphus/notepads/research/decisions.md`
+- **.test_empty_playbook_no_plays()** (6 connections) — `tests/integration/test_playbook_parser.py`
+- **Parser handles empty playbook (no plays).** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **Parser handles empty playbook (no plays).** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **Parser handles empty playbook (no plays).** (1 connections) — `tests/integration/test_playbook_parser.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [Shared Renderer Types](Shared_Renderer_Types.md) (2 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/research/decisions.md`
+- `tests/integration/test_playbook_parser.py`
 
 ## Audit Trail
 
-- EXTRACTED: 28 (100%)
+- EXTRACTED: 9 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

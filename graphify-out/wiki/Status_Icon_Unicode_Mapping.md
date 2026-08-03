@@ -1,12 +1,11 @@
 # Status Icon Unicode Mapping
 
-> 39 nodes · cohesion 0.08
+> 37 nodes · cohesion 0.08
 
 ## Key Concepts
 
-- **HeartbeatTracker** (27 connections) — `src/ansible_aom/core/heartbeat.py`
-- **test_heartbeat.py** (22 connections) — `tests/unit/test_heartbeat.py`
-- **heartbeat.py** (3 connections) — `src/ansible_aom/core/heartbeat.py`
+- **HeartbeatTracker** (28 connections) — `src/ansible_aom/core/heartbeat.py`
+- **test_heartbeat.py** (23 connections) — `tests/unit/test_heartbeat.py`
 - **test_cpu_active_too_long_ago_does_not_promote_to_live()** (3 connections) — `tests/unit/test_heartbeat.py`
 - **test_cpu_active_too_long_ago_does_not_rescue_from_stuck()** (3 connections) — `tests/unit/test_heartbeat.py`
 - **test_cpu_activity_keeps_state_working_past_stuck_threshold()** (3 connections) — `tests/unit/test_heartbeat.py`
@@ -29,12 +28,13 @@
 - **test_reason_stuck_when_no_signals_at_all()** (2 connections) — `tests/unit/test_heartbeat.py`
 - **test_state_is_none_before_any_bytes_observed()** (2 connections) — `tests/unit/test_heartbeat.py`
 - **test_stuck_when_only_inactive_cpu_samples_received()** (2 connections) — `tests/unit/test_heartbeat.py`
-- *... and 14 more nodes in this community*
+- **.__init__()** (1 connections) — `src/ansible_aom/core/heartbeat.py`
+- *... and 12 more nodes in this community*
 
 ## Relationships
 
-- [Renderer Event Protocol](Renderer_Event_Protocol.md) (7 shared connections)
-- [Inspect Debug Diagnostics](Inspect_Debug_Diagnostics.md) (2 shared connections)
+- [Renderer Event Protocol](Renderer_Event_Protocol.md) (8 shared connections)
+- [Warning Classification Tests](Warning_Classification_Tests.md) (3 shared connections)
 - [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
 
 ## Source Files
@@ -44,7 +44,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 76 (62%)
+- EXTRACTED: 74 (62%)
 - INFERRED: 46 (38%)
 - AMBIGUOUS: 0 (0%)
 

@@ -1,60 +1,49 @@
 # List Hosts Output Parser
 
-> 52 nodes · cohesion 0.05
+> 24 nodes · cohesion 0.08
 
 ## Key Concepts
 
-- **parse_list_tasks_output()** (30 connections) — `src/ansible_aom/core/parser.py`
-- **TestListTasksEdgeCases** (26 connections) — `tests/unit/test_parser.py`
-- **TestListTasksParser** (25 connections) — `tests/unit/test_parser.py`
-- **.test_blocks_flattened()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_exit_code_error_output()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_exit_code_success_output()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_exit_code_syntax_error_output()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_import_tasks_expanded()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_import_tasks_with_role_prefix()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_list_hosts_stderr_not_in_result()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_list_tasks_play_hosts_pattern_extraction()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_output_no_stderr_in_parsed_content()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_pre_tasks_post_tasks_no_prefix()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_special_section_names_in_play()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_unnamed_task_fallback_module_name()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_empty_tags()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_include_tasks_not_expanded()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_multiple_plays()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_no_json_output()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_play_indent_recognition()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_playbook_header_skipped()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_role_prefix_extraction()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_tab_separator_used()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_task_indent_recognition()** (3 connections) — `tests/unit/test_parser.py`
-- **.test_task_tags_extraction()** (3 connections) — `tests/unit/test_parser.py`
-- *... and 27 more nodes in this community*
+- **TestPasswordPromptPTYIntegration** (26 connections) — `tests/compact/test_password.py`
+- **.test_handle_password_prompt_cursor_positioning_on_tty()** (3 connections) — `tests/compact/test_password.py`
+- **.test_handle_password_prompt_delegates_to_getpass()** (3 connections) — `tests/compact/test_password.py`
+- **.test_handle_password_prompt_empty_child_param()** (3 connections) — `tests/compact/test_password.py`
+- **.test_handle_password_prompt_passes_prompt_text_to_getpass()** (3 connections) — `tests/compact/test_password.py`
+- **.test_handle_password_prompt_returns_empty_on_eof()** (3 connections) — `tests/compact/test_password.py`
+- **.test_handle_password_prompt_returns_empty_on_keyboard_interrupt()** (3 connections) — `tests/compact/test_password.py`
+- **.test_handle_password_prompt_returns_empty_on_os_error()** (3 connections) — `tests/compact/test_password.py`
+- **.test_handle_password_prompt_with_mock_pexpect_child()** (3 connections) — `tests/compact/test_password.py`
+- **.test_is_password_prompt_rejects_partial_match_only()** (3 connections) — `tests/compact/test_password.py`
+- **.test_all_password_patterns_are_valid_regex()** (2 connections) — `tests/compact/test_password.py`
+- **.test_password_patterns_count()** (2 connections) — `tests/compact/test_password.py`
+- **TC-143: Text containing but not ending with password pattern prefix still matche** (1 connections) — `tests/compact/test_password.py`
+- **TC-143: All PASSWORD_PATTERNS entries compile as valid regex.** (1 connections) — `tests/compact/test_password.py`
+- **TC-143: All 10 documented password patterns present.          Ansible-native (7)** (1 connections) — `tests/compact/test_password.py`
+- **TC-143: handle_password_prompt uses getpass.getpass for PTY integration.** (1 connections) — `tests/compact/test_password.py`
+- **TC-143: The prompt text is passed to getpass for display on /dev/tty.** (1 connections) — `tests/compact/test_password.py`
+- **TC-143: child param exists for interface compatibility but unused in compact mod** (1 connections) — `tests/compact/test_password.py`
+- **TC-143: child param accepted for TUI interface compatibility.** (1 connections) — `tests/compact/test_password.py`
+- **TC-143: Cursor positioning escape sequence written before getpass.** (1 connections) — `tests/compact/test_password.py`
+- **TC-143: EOFError from getpass returns empty string (user cancelled).** (1 connections) — `tests/compact/test_password.py`
+- **TC-143: KeyboardInterrupt from getpass returns empty string (user cancelled).** (1 connections) — `tests/compact/test_password.py`
+- **TC-143: OSError from getpass (no TTY) returns empty string.** (1 connections) — `tests/compact/test_password.py`
+- **TC-143: Verify pexpect spawns with PTY, Ansible's getpass reads from /dev/tty.** (1 connections) — `tests/compact/test_password.py`
 
 ## Relationships
 
-- [Secret Redaction Configuration](Secret_Redaction_Configuration.md) (7 shared connections)
-- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (6 shared connections)
-- [State Machine Module](State_Machine_Module.md) (3 shared connections)
-- [Role Group Task Models](Role_Group_Task_Models.md) (3 shared connections)
-- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (2 shared connections)
-- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (2 shared connections)
-- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (2 shared connections)
-- [Per-Task Overhead Analysis](Per-Task_Overhead_Analysis.md) (2 shared connections)
-- [CLI Argument Parser](CLI_Argument_Parser.md) (2 shared connections)
-- [Three-Pane Inspect App](Three-Pane_Inspect_App.md) (2 shared connections)
-- [Run State Completion Recap](Run_State_Completion_Recap.md) (2 shared connections)
-- [Diagnostics and Profiler](Diagnostics_and_Profiler.md) (1 shared connections)
+- [Golden Frame Tests](Golden_Frame_Tests.md) (13 shared connections)
+- [Status Bar Liveness Tests](Status_Bar_Liveness_Tests.md) (8 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
+- [test_password.py](test_password.py.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/parser.py`
-- `tests/unit/test_parser.py`
+- `tests/compact/test_password.py`
 
 ## Audit Trail
 
-- EXTRACTED: 101 (57%)
-- INFERRED: 75 (43%)
+- EXTRACTED: 59 (86%)
+- INFERRED: 10 (14%)
 - AMBIGUOUS: 0 (0%)
 
 ---

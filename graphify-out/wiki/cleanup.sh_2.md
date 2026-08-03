@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **cleanup.sh** (1 connections) — `tests/playbooks/09-handler-tasks/cleanup.sh`
+- **09-handler-tasks/cleanup.sh** (1 connections) — `tests/playbooks/09-handler-tasks/cleanup.sh`
 - **cleanup.sh script** (1 connections) — `tests/playbooks/09-handler-tasks/cleanup.sh`
 
 ## Relationships

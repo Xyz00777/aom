@@ -1,24 +1,80 @@
 # PlayRunState
 
-> 1 nodes · cohesion 1.00
+> God node · 268 connections · `src/ansible_aom/core/models.py`
 
-## Key Concepts
+**Community:** [Play Definition Tree Population](Play_Definition_Tree_Population.md)
 
-- **PlayRunState** (0 connections) — `TEST_SPECIFICATION.md`
+## Connections by Relation
 
-## Relationships
+### calls
+- ._handle_v2_playbook_on_task_start() `EXTRACTED`
+- _state_with_play() `INFERRED`
+- _state_with_play() `INFERRED`
+- ._handle_v2_runner_on_start() `EXTRACTED`
+- _add_results() `INFERRED`
+- _two_level_state() `INFERRED`
+- _spur_projection() `INFERRED`
+- _state_two_hosts_one_failure() `INFERRED`
+- test_format_tree_block_renders_two_level_truncation() `INFERRED`
+- _visible_projection() `INFERRED`
+- _make_state_with_stale_running() `INFERRED`
+- _renderer_with_running_task() `INFERRED`
+- _build_state() `EXTRACTED`
+- _state_first_play_running() `INFERRED`
+- _state_with_failure() `INFERRED`
+- _running_state() `INFERRED`
+- ._state_with() `INFERRED`
+- _two_plays_with_running_tasks() `INFERRED`
+- _seed_sticky_gap_state() `INFERRED`
+- test_completed_tasks_counts_dynamic_children() `INFERRED`
 
-- No strong cross-community connections detected
+### contains
+- models.py `EXTRACTED`
 
-## Source Files
+### imports
+- run_state.py `EXTRACTED`
+- tree_projection.py `EXTRACTED`
 
-- `TEST_SPECIFICATION.md`
+### indirect_call
+- .test_play_start_creates_play_run_state() `INFERRED`
+- .test_run_state_plays_dict_value_is_play_run_state() `INFERRED`
 
-## Audit Trail
+### rationale_for
+- Runtime state for a play execution (State class). `EXTRACTED`
 
-- EXTRACTED: 0 (0%)
-- INFERRED: 0 (0%)
-- AMBIGUOUS: 0 (0%)
+### references
+- ._emit_runtime_play() `EXTRACTED`
+- ._touch_task_lease() `EXTRACTED`
+- ._finalize_play() `EXTRACTED`
+- ._play_runtime_identity() `EXTRACTED`
+- ._task_runtime_identity() `EXTRACTED`
+- ._touch_play_leases() `EXTRACTED`
+- ._leased_play_id() `EXTRACTED`
+- ._remember_running_play() `EXTRACTED`
+- ._resolve_play_hosts() `EXTRACTED`
+- ._play_sticky_identity() `EXTRACTED`
+
+### uses
+- [RunState](RunState.md) `INFERRED`
+- TreeProjection `INFERRED`
+- TestPtyStreamParserStderrLineEmission `INFERRED`
+- TreeLine `INFERRED`
+- TestJsonLineStreamBasics `INFERRED`
+- TestHideStateFlag `INFERRED`
+- TestListTasksEdgeCases `INFERRED`
+- TestListTasksParser `INFERRED`
+- TestPtyStreamParserPhases `INFERRED`
+- TestTaskDefinition `INFERRED`
+- TestListHostsEdgeCases `INFERRED`
+- TestHostRunState `INFERRED`
+- TestPlayRunState `INFERRED`
+- TestRunState `INFERRED`
+- TestStatusEnum `INFERRED`
+- TestRoleGrouping `INFERRED`
+- TestPlayDefinition `INFERRED`
+- TestTaskRunState `INFERRED`
+- TestJsonLineStreamCarryBuffer `INFERRED`
+- TestListHostsParser `INFERRED`
 
 ---
 

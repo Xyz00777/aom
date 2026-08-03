@@ -1,42 +1,35 @@
 # Psutil Safe Probe
 
-> 20 nodes · cohesion 0.10
+> 9 nodes · cohesion 0.31
 
 ## Key Concepts
 
-- **Interactive prompts — diagnosis and plan** (9 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **Plan as TDD slices** (6 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **Architectural options** (5 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **Status: IP1–IP5 shipped** (2 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **interactive-prompts.md** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **A. Pattern-matched suspend (extend the password model)** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **Affected interactive surfaces** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **B. Stall-detection + passthrough** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **C. Full stdin bridging** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **D. Hybrid (recommended)** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **Diagnosis (precise)** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **IP1. Fix `ansible.builtin.pause` (compact mode) — the immediate user pain** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **IP2. Stall-detection safety net** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **IP3. `vars_prompt` plain-text support** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **IP4. TUI integration** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **IP5. Pause-with-seconds visibility (cosmetic)** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **Known limitations (post-implementation)** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **Open questions / risks** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **Quick win** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
-- **Recommended landing order** (1 connections) — `.sisyphus/notepads/plans/interactive-prompts.md`
+- **_renderer_with_running_task()** (10 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
+- **test_preserve_tree_on_cancel.py** (7 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
+- **test_tree_not_duplicated_on_clean_exit()** (3 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
+- **test_tree_printed_after_cancel()** (3 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
+- **test_tree_printed_after_failure()** (3 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
+- **On Ctrl-C / failure exit, the compact panel's tree + host overview must persist** (1 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
+- **Exit 130 (Ctrl-C) → tree + host snapshot lands in scrollback.** (1 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
+- **Non-zero exit on a "failed" state preserves the panel too.** (1 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
+- **A clean exit omits the tree snapshot — the host table still prints     for per-h** (1 connections) — `tests/compact/test_preserve_tree_on_cancel.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (3 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (2 shared connections)
+- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/plans/interactive-prompts.md`
+- `tests/compact/test_preserve_tree_on_cancel.py`
 
 ## Audit Trail
 
-- EXTRACTED: 38 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 25 (83%)
+- INFERRED: 5 (17%)
 - AMBIGUOUS: 0 (0%)
 
 ---

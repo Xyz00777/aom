@@ -1,36 +1,30 @@
 # Module Init File
 
-> 10 nodes · cohesion 0.22
+> 8 nodes · cohesion 0.25
 
 ## Key Concepts
 
-- **SettingsScreen** (8 connections) — `src/ansible_aom/tui/screens/settings.py`
-- **.compose()** (5 connections) — `src/ansible_aom/tui/screens/settings.py`
-- **.action_show_settings()** (3 connections) — `src/ansible_aom/tui/app.py`
-- **._build_display_lines()** (3 connections) — `src/ansible_aom/tui/screens/settings.py`
-- **.action_dismiss()** (2 connections) — `src/ansible_aom/tui/screens/settings.py`
-- **Push the settings screen (mirrors the ``S`` keybinding).** (1 connections) — `src/ansible_aom/tui/app.py`
-- **settings.py** (1 connections) — `src/ansible_aom/tui/screens/settings.py`
-- **Any** (1 connections)
-- **ComposeResult** (1 connections)
-- **Screen** (1 connections)
+- **TestKeybindingConflicts** (5 connections) — `tests/tui/test_keybindings.py`
+- **.test_multiple_keys_can_map_to_same_action()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_no_duplicate_keys_in_keybindings_dict()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_validate_keybindings_returns_no_errors()** (2 connections) — `tests/tui/test_keybindings.py`
+- **Tests for keybinding conflicts - no duplicate bindings.** (1 connections) — `tests/tui/test_keybindings.py`
+- **The KEYBINDINGS dict should have no duplicate keys.** (1 connections) — `tests/tui/test_keybindings.py`
+- **validate_keybindings should return empty list if valid.** (1 connections) — `tests/tui/test_keybindings.py`
+- **Multiple keys can map to the same action (e.g., '/' and 'ctrl+f' for search).** (1 connections) — `tests/tui/test_keybindings.py`
 
 ## Relationships
 
-- [Session Recording Tests](Session_Recording_Tests.md) (2 shared connections)
-- [Auto Version Bump Hook](Auto_Version_Bump_Hook.md) (2 shared connections)
-- [Community 502](Community_502.md) (1 shared connections)
-- [Data Model Unit Tests](Data_Model_Unit_Tests.md) (1 shared connections)
+- [test_keybindings.py](test_keybindings.py.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/tui/app.py`
-- `src/ansible_aom/tui/screens/settings.py`
+- `tests/tui/test_keybindings.py`
 
 ## Audit Trail
 
-- EXTRACTED: 20 (77%)
-- INFERRED: 6 (23%)
+- EXTRACTED: 15 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

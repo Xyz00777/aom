@@ -1,47 +1,39 @@
 # Preflight Definition Assembly
 
-> 32 nodes · cohesion 0.06
+> 15 nodes · cohesion 0.30
 
 ## Key Concepts
 
-- **Recursive Nesting — Investigation Notes** (11 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **[2026-06-23] T2-T3: data model + parser** (8 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **[2026-06-23 21:03 UTC] T4-T5: includes + graft** (6 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **[2026-06-24] NEW BUG: `_emit_pending_play` emits duplicate role headers** (6 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **[2026-06-23] T1: failing tests written** (4 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **learnings.md** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **Confirmed bug shape (current code)** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **Date: 2026-06-23** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **Design note: import_role** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **Exact file:line** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **Knock-on fix — `compact/format.py:collect_tags`** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **Knock-on fix — `core/models.py:_iter_leaf_task_defs`** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **Notes for T6 (projection refactor)** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **Notes for T6 (projection refactor)** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **Plan file** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **Proposed fix approach** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **Reported by user** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **Reproduction (synthetic, matches user output verbatim)** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **Root cause** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **Root cause** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **Spec gaps** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **T2 — call-site updates in `core/tree.py`** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **T2 — `core/models.py` changes** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **T3 — `core/parser.py:group_roles` changes** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- **T4 — `core/includes.py` + `core/models.py`** (1 connections) — `.sisyphus/notepads/recursive-nesting/learnings.md`
-- *... and 7 more nodes in this community*
+- **test_summary_flush_scaling.py** (13 connections) — `tests/compact/test_summary_flush_scaling.py`
+- **test_host_death_flushes_other_pending_tasks()** (8 connections) — `tests/compact/test_summary_flush_scaling.py`
+- **test_revived_host_blocks_completion_again()** (8 connections) — `tests/compact/test_summary_flush_scaling.py`
+- **_logged()** (6 connections) — `tests/compact/test_summary_flush_scaling.py`
+- **_renderer()** (6 connections) — `tests/compact/test_summary_flush_scaling.py`
+- **test_completion_checks_stay_linear_with_a_straggler_host()** (6 connections) — `tests/compact/test_summary_flush_scaling.py`
+- **_summary_lines()** (5 connections) — `tests/compact/test_summary_flush_scaling.py`
+- **_ok()** (4 connections) — `tests/compact/test_summary_flush_scaling.py`
+- **_start()** (4 connections) — `tests/compact/test_summary_flush_scaling.py`
+- **_failed()** (2 connections) — `tests/compact/test_summary_flush_scaling.py`
+- **_unreachable()** (2 connections) — `tests/compact/test_summary_flush_scaling.py`
+- **Per-event cost of the full-completion summary sweep must stay flat.  Regression** (1 connections) — `tests/compact/test_summary_flush_scaling.py`
+- **A host dying in one task completes OTHER tasks it was blocking:     dead hosts l** (1 connections) — `tests/compact/test_summary_flush_scaling.py`
+- **A host whose FAILED result is later overwritten by an OK (retry /     async-poll** (1 connections) — `tests/compact/test_summary_flush_scaling.py`
+- **One slow host must not make per-event completion checks sweep the     whole pend** (1 connections) — `tests/compact/test_summary_flush_scaling.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [App Configuration Settings](App_Configuration_Settings.md) (3 shared connections)
+- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/recursive-nesting/learnings.md`
+- `tests/compact/test_summary_flush_scaling.py`
 
 ## Audit Trail
 
-- EXTRACTED: 62 (100%)
+- EXTRACTED: 68 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **TestPasswordTimeoutDefault** (13 connections) — `tests/compact/test_password.py`
+- **TestPasswordTimeoutDefault** (12 connections) — `tests/compact/test_password.py`
 - **.test_compact_renderer_exists_for_password_handling()** (3 connections) — `tests/compact/test_password.py`
 - **.test_password_handler_returns_empty_for_cancellation()** (3 connections) — `tests/compact/test_password.py`
 - **.test_password_handler_returns_string_for_success()** (3 connections) — `tests/compact/test_password.py`
@@ -29,8 +29,7 @@
 
 - [App Configuration Settings](App_Configuration_Settings.md) (2 shared connections)
 - [Status Bar Liveness Tests](Status_Bar_Liveness_Tests.md) (2 shared connections)
-- [Session Recording Tests](Session_Recording_Tests.md) (1 shared connections)
-- [Pause Lingering Cleanup](Pause_Lingering_Cleanup.md) (1 shared connections)
+- [test_password.py](test_password.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -38,8 +37,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 39 (89%)
-- INFERRED: 5 (11%)
+- EXTRACTED: 39 (91%)
+- INFERRED: 4 (9%)
 - AMBIGUOUS: 0 (0%)
 
 ---

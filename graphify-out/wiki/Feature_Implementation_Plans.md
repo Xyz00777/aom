@@ -1,12 +1,10 @@
 # Feature Implementation Plans
 
-> 3 nodes · cohesion 0.67
+> 1 nodes · cohesion 1.00
 
 ## Key Concepts
 
-- **Podman Role-Relative Include Role Tasks** (2 connections) — `.sisyphus/test-fixtures/roles/podman_role_rel/tasks/main.yml`
-- **Podman Role-Relative Setup Include** (1 connections) — `.sisyphus/test-fixtures/roles/podman_role_rel/tasks/_includes/setup.yml`
-- **Role-Relative Include Test Playbook (TC-094b)** (1 connections) — `.sisyphus/test-fixtures/with_role_rel_include.yml`
+- **14-become-password/site.yml** (0 connections) — `tests/playbooks/14-become-password/site.yml`
 
 ## Relationships
 
@@ -14,13 +12,11 @@
 
 ## Source Files
 
-- `.sisyphus/test-fixtures/roles/podman_role_rel/tasks/_includes/setup.yml`
-- `.sisyphus/test-fixtures/roles/podman_role_rel/tasks/main.yml`
-- `.sisyphus/test-fixtures/with_role_rel_include.yml`
+- `tests/playbooks/14-become-password/site.yml`
 
 ## Audit Trail
 
-- EXTRACTED: 4 (100%)
+- EXTRACTED: 0 (0%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

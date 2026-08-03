@@ -1,59 +1,35 @@
 # Failure Recap Formatting
 
-> 43 nodes · cohesion 0.05
+> 9 nodes · cohesion 0.22
 
 ## Key Concepts
 
-- **AOM Test Specification** (31 connections) — `TEST_SPECIFICATION.md`
-- **Section 15: Implementation Phases** (9 connections) — `TEST_SPECIFICATION.md`
-- **Section 1-2: Project Identity & Architecture** (6 connections) — `TEST_SPECIFICATION.md`
-- **Section 5.5: PTY with pexpect** (5 connections) — `TEST_SPECIFICATION.md`
-- **Section 5.8: Host Name Resolution** (5 connections) — `TEST_SPECIFICATION.md`
-- **Overview** (4 connections) — `TEST_SPECIFICATION.md`
-- **Section 7.6 Supplement: Deprecation Filter Panel (v1.8)** (4 connections) — `TEST_SPECIFICATION.md`
-- **Section 4.1 Supplement: Compact Mode Warning Display (v1.8)** (3 connections) — `TEST_SPECIFICATION.md`
-- **Section 5.4: Role Grouping** (3 connections) — `TEST_SPECIFICATION.md`
-- **TEST_SPECIFICATION.md** (1 connections) — `TEST_SPECIFICATION.md`
-- **Category Definitions** (1 connections) — `TEST_SPECIFICATION.md`
-- **Document History** (1 connections) — `TEST_SPECIFICATION.md`
-- **Priority Definitions** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-001: Package Name Verification** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-002: CLI Entry Point Exists** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-003: Core Module Structure** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-004: Renderer Protocol Implementation** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-005: Renderer Factory Selection** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-122: Role Grouping Threshold** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-123: Role Grouping Display** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-124: pexpect Spawn Configuration** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-125: pexpect Cancellation** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-126: pexpect Stream Processing** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-127: pexpect Thread Worker Pattern** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-149: --list-hosts Resolves Hostnames** (1 connections) — `TEST_SPECIFICATION.md`
-- *... and 18 more nodes in this community*
+- **TestDeprecationWarnings** (10 connections) — `tests/integration/test_playbook_parser.py`
+- **.test_deprecation_warnings_captured()** (6 connections) — `tests/integration/test_playbook_parser.py`
+- **Parser captures PLAY RECAP lines.** (2 connections) — `tests/integration/test_playbook_parser.py`
+- **Integration tests for 17-deprecation-warnings playbook.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **Parser captures [DEPRECATION WARNING]: messages.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **Integration tests for 17-deprecation-warnings playbook.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **Parser captures [DEPRECATION WARNING]: messages.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **Integration tests for 17-deprecation-warnings playbook.** (1 connections) — `tests/integration/test_playbook_parser.py`
+- **Parser captures [DEPRECATION WARNING]: messages.** (1 connections) — `tests/integration/test_playbook_parser.py`
 
 ## Relationships
 
-- [Redaction Config Model](Redaction_Config_Model.md) (2 shared connections)
-- [Integration Event Hooks](Integration_Event_Hooks.md) (1 shared connections)
-- [Password Field Regex](Password_Field_Regex.md) (1 shared connections)
-- [JSONL Fixture Parsing](JSONL_Fixture_Parsing.md) (1 shared connections)
-- [Two-Cut Tree Truncation](Two-Cut_Tree_Truncation.md) (1 shared connections)
-- [Config Loading Tests](Config_Loading_Tests.md) (1 shared connections)
-- [Template Name Regression](Template_Name_Regression.md) (1 shared connections)
-- [Community 621](Community_621.md) (1 shared connections)
-- [CPU Sampling Probing](CPU_Sampling_Probing.md) (1 shared connections)
-- [Phase State Machine](Phase_State_Machine.md) (1 shared connections)
-- [Live Driver Run Flow](Live_Driver_Run_Flow.md) (1 shared connections)
-- [Include Role Dynamic Tasks](Include_Role_Dynamic_Tasks.md) (1 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (3 shared connections)
+- [Shared Renderer Types](Shared_Renderer_Types.md) (2 shared connections)
+- [Compact Display Module Layout](Compact_Display_Module_Layout.md) (1 shared connections)
+- [Run State Completion Recap](Run_State_Completion_Recap.md) (1 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `TEST_SPECIFICATION.md`
+- `tests/integration/test_playbook_parser.py`
 
 ## Audit Trail
 
-- EXTRACTED: 104 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 20 (83%)
+- INFERRED: 4 (17%)
 - AMBIGUOUS: 0 (0%)
 
 ---

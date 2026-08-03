@@ -1,41 +1,40 @@
 # Auto Version Bump Hook
 
-> 22 nodes · cohesion 0.14
+> 80 nodes · cohesion 0.05
 
 ## Key Concepts
 
-- **AomSettings** (21 connections) — `src/ansible_aom/core/config_layer.py`
+- **Path** (20 connections)
+- **AomSettings** (19 connections) — `src/ansible_aom/core/config_layer.py`
+- **MonkeyPatch** (18 connections)
+- **config_layer.py** (12 connections) — `src/ansible_aom/core/config_layer.py`
+- **CaptureConfig** (10 connections) — `src/ansible_aom/core/config_layer.py`
 - **test_config_layer.py** (10 connections) — `tests/unit/test_config_layer.py`
+- **find_config_paths()** (9 connections) — `src/ansible_aom/core/config_layer.py`
 - **_write_yaml()** (9 connections) — `tests/unit/test_config_layer.py`
+- **TestLegacyMigration** (8 connections) — `tests/unit/test_config_layer.py`
+- **TestXdgPathResolution** (8 connections) — `tests/unit/test_config_layer.py`
+- **load_config_with_layers()** (7 connections) — `src/ansible_aom/core/config_layer.py`
+- **migrate_legacy_config()** (7 connections) — `src/ansible_aom/core/config_layer.py`
+- **.test_init_kwargs_beat_yaml()** (7 connections) — `tests/unit/test_config_layer.py`
 - **TestDeepMerge** (7 connections) — `tests/unit/test_config_layer.py`
+- **TestExplicitPathOverride** (7 connections) — `tests/unit/test_config_layer.py`
+- **BaseModel** (6 connections)
 - **.test_nested_submodel_merges_across_files()** (6 connections) — `tests/unit/test_config_layer.py`
 - **.test_partial_submodel_update_preserves_siblings()** (6 connections) — `tests/unit/test_config_layer.py`
 - **.test_user_field_overrides_system_field()** (6 connections) — `tests/unit/test_config_layer.py`
 - **TestEnvVarOverrides** (6 connections) — `tests/unit/test_config_layer.py`
 - **.test_aom_config_env_changes_path_layer()** (6 connections) — `tests/unit/test_config_layer.py`
-- **.test_aom_capture_verbose_env_overrides_yaml()** (5 connections) — `tests/unit/test_config_layer.py`
-- **.settings_customise_sources()** (4 connections) — `src/ansible_aom/core/config_layer.py`
-- **BaseSettings** (2 connections)
-- **Any** (2 connections)
-- **PydanticBaseSettingsSource** (1 connections)
-- **Application settings — see :data:`_BUILTIN_DEFAULT` for the schema.** (1 connections) — `src/ansible_aom/core/config_layer.py`
-- **Unit tests for the multi-layer config system (Task 3.1 / 3.2).  Covers the new :** (1 connections) — `tests/unit/test_config_layer.py`
-- **Nested sub-models are merged, not replaced, across files.** (1 connections) — `tests/unit/test_config_layer.py`
-- **Setting ``capture.verbose`` in user file does not lose system file's         ``c** (1 connections) — `tests/unit/test_config_layer.py`
-- **The later (higher-priority) file wins on key collision.** (1 connections) — `tests/unit/test_config_layer.py`
-- **``nested_model_default_partial_update=True`` keeps siblings.          Without th** (1 connections) — `tests/unit/test_config_layer.py`
-- **``AOM_*`` env vars override YAML values (per pydantic-settings).** (1 connections) — `tests/unit/test_config_layer.py`
-- **``AOM_CONFIG`` env var causes its file to be added to the layer list.** (1 connections) — `tests/unit/test_config_layer.py`
+- **.test_new_file_already_exists_skips_migration()** (6 connections) — `tests/unit/test_config_layer.py`
+- **.test_old_config_yaml_is_migrated()** (6 connections) — `tests/unit/test_config_layer.py`
+- **TestMissingFilesSkipped** (6 connections) — `tests/unit/test_config_layer.py`
+- **_read_yaml()** (5 connections) — `tests/unit/test_config_layer.py`
+- *... and 55 more nodes in this community*
 
 ## Relationships
 
-- [Rerun CLI Entry](Rerun_CLI_Entry.md) (10 shared connections)
-- [Community 511](Community_511.md) (7 shared connections)
-- [Community 604](Community_604.md) (6 shared connections)
-- [Community 502](Community_502.md) (4 shared connections)
-- [Prior Run Totals Injection](Prior_Run_Totals_Injection.md) (3 shared connections)
-- [Module Init File](Module_Init_File.md) (2 shared connections)
-- [Core Module Init](Core_Module_Init.md) (1 shared connections)
+- [First Ctrl-C Cancellation](First_Ctrl-C_Cancellation.md) (2 shared connections)
+- [PTY Stream Parser](PTY_Stream_Parser.md) (1 shared connections)
 
 ## Source Files
 
@@ -44,8 +43,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 75 (76%)
-- INFERRED: 24 (24%)
+- EXTRACTED: 267 (81%)
+- INFERRED: 64 (19%)
 - AMBIGUOUS: 0 (0%)
 
 ---

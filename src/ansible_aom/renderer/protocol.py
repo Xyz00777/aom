@@ -1,10 +1,9 @@
 """Renderer Protocol — the display-side port of the architecture.
 
 See ``ARCHITECTURE.md §4.1``. Every concrete renderer
-(``CompactRenderer``, ``AOMApp``, ``JsonRenderer``, future replay-only
-fixtures, …) sits behind this Protocol so the rest of the system —
-drivers, the CLI, the parity oracle — never sees a concrete
-implementation.
+(``CompactRenderer``, ``JsonRenderer``, future replay-only fixtures, …)
+sits behind this Protocol so the rest of the system — drivers, the CLI,
+the parity oracle — never sees a concrete implementation.
 
 This module is also the source of truth for the protocol surface.
 SPECIFICATION.md §2.3 lists the same methods at a higher level; if
@@ -24,15 +23,14 @@ Method                         Mandatory for                  May no-op for
 ``stop``                       every renderer                 (none)
 ``set_definitions``            every renderer                 (none — empty list
                                                               still permitted)
-``set_prior_run``              compact                        tui, json, replay
+``set_prior_run``              compact                        json, replay
 ``update_state``               every renderer                 (none)
 ``handle_completion``          every renderer                 (none)
-``add_warning``                live (compact + tui)           json, replay-only
-``print_log``                  compact, tui                   json
-``tick``                       compact                        tui (own clock),
-                                                              json, replay
-``note_pty_bytes``             compact (heartbeat)            tui, json, replay
-``note_subprocess_active``     compact (heartbeat)            tui, json, replay
+``add_warning``                compact                        json, replay-only
+``print_log``                  compact                        json
+``tick``                       compact                        json, replay
+``note_pty_bytes``             compact (heartbeat)            json, replay
+``note_subprocess_active``     compact (heartbeat)            json, replay
 ``handle_password_prompt``     live driver only               replay, json
                                                               (no human present;
                                                               fail fast)
@@ -59,10 +57,9 @@ if TYPE_CHECKING:
 class Renderer(Protocol):
     """The display sink for a run.
 
-    Concrete implementations: :class:`CompactRenderer` (compact ANSI),
-    :class:`AOMApp` (Textual TUI), :class:`JsonRenderer` (end-of-run
-    JSON to stdout). Driven by an :class:`EventSource` from
-    ``drivers/``.
+    Concrete implementations: :class:`CompactRenderer` (compact ANSI)
+    and :class:`JsonRenderer` (end-of-run JSON to stdout). Driven by an
+    :class:`EventSource` from ``drivers/``.
     """
 
     # -----------------------------------------------------------------
@@ -73,9 +70,8 @@ class Renderer(Protocol):
         """Begin a run. **Mandatory.**
 
         Called once before any other method on this instance. Renderers
-        use this to initialise their state, start any UI lifecycle
-        (Rich Live, Textual app, …), and stash the playbook name + arg
-        list for later display.
+        use this to initialise their state, start any UI lifecycle, and
+        stash the playbook name + arg list for later display.
         """
         ...
 
@@ -114,7 +110,7 @@ class Renderer(Protocol):
         """Optional. Provide stats from the most-recent matching prior run.
 
         **Mandatory for compact** (drives the "Last run: N tasks in T"
-        hint line above the preflight summary). **TUI, JSON, and replay
+        hint line above the preflight summary). **JSON and replay
         renderers may no-op** — they don't display the hint.
 
         **Must be called before** :meth:`set_definitions` for the
@@ -146,9 +142,8 @@ class Renderer(Protocol):
     def add_warning(self, message: str, is_deprecation: bool = False) -> None:
         """Surface a warning or deprecation to the user.
 
-        **Mandatory for live renderers.** Implementations are expected
-        to make the message visible (above the panel, in a dedicated
-        panel, …) and bump any visible counter.
+        **Mandatory for the compact renderer.** It makes the message
+        visible above the panel and bumps any visible counter.
 
         Headless renderers (``JsonRenderer``, replay-only sinks) may
         implement this as a no-op — warnings are still represented in
@@ -159,9 +154,9 @@ class Renderer(Protocol):
     def print_log(self, message: str) -> None:
         """Print a log line above the live panel.
 
-        **Mandatory for compact and TUI renderers** — the runner uses
-        this to surface stall hints, password prompt notices, and
-        preflight errors that need to be seen verbatim.
+        **Mandatory for the compact renderer** — the runner uses this to
+        surface stall hints, password prompt notices, and preflight
+        errors that need to be seen verbatim.
 
         ``JsonRenderer`` no-ops — the JSON consumer parses the final
         summary, not interleaved log lines.
@@ -175,8 +170,8 @@ class Renderer(Protocol):
         timeout window. Renderers that show elapsed time use this to
         keep the clock moving.
 
-        TUI (Textual has its own clock), JSON (no live UI) and replay
-        (no live runtime) may implement as a no-op.
+        JSON (no live UI) and replay (no live runtime) may implement as
+        a no-op.
         """
         ...
 
@@ -184,7 +179,7 @@ class Renderer(Protocol):
         """Signal that PTY bytes were just received from the subprocess.
 
         Drives the compact renderer's per-task liveness indicator.
-        TUI, JSON, and replay renderers may no-op.
+        JSON and replay renderers may no-op.
         """
         ...
 

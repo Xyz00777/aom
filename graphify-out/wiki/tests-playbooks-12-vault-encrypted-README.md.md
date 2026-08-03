@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **tests/playbooks/12-vault-encrypted/README.md** (0 connections) — `tests/playbooks/12-vault-encrypted/README.md`
+- **12-vault-encrypted/README.md** (0 connections) — `tests/playbooks/12-vault-encrypted/README.md`
 
 ## Relationships
 

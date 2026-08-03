@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **PlayRunState** (0 connections) — `.sisyphus/notepads/implementation/learnings.md`
+- **PlayRunState** (0 connections) — `TEST_SPECIFICATION.md`
 
 ## Relationships
 
@@ -12,7 +12,7 @@
 
 ## Source Files
 
-- `.sisyphus/notepads/implementation/learnings.md`
+- `TEST_SPECIFICATION.md`
 
 ## Audit Trail
 

@@ -4,12 +4,12 @@
 
 ## Key Concepts
 
-- **TestGetKeybindingFunction** (9 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_keybinding_lowercase_letters()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_keybinding_normalizes_modifier_format()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_keybinding_preserves_modifier_case()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_keybinding_returns_dict()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_get_keybinding_uppercase_letters_distinct()** (3 connections) — `tests/tui/test_keybindings.py`
+- **TestGetKeybindingFunction** (7 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_keybinding_lowercase_letters()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_keybinding_normalizes_modifier_format()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_keybinding_preserves_modifier_case()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_keybinding_returns_dict()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_get_keybinding_uppercase_letters_distinct()** (2 connections) — `tests/tui/test_keybindings.py`
 - **Tests for get_keybinding function behavior.** (1 connections) — `tests/tui/test_keybindings.py`
 - **Lowercase letters should find their keybinding.** (1 connections) — `tests/tui/test_keybindings.py`
 - **Uppercase letters are distinct from lowercase for defined caps keys.** (1 connections) — `tests/tui/test_keybindings.py`
@@ -19,9 +19,7 @@
 
 ## Relationships
 
-- [Runner Event Batching](Runner_Event_Batching.md) (5 shared connections)
-- [State Machine Invariants](State_Machine_Invariants.md) (2 shared connections)
-- [Warning Color Formatting](Warning_Color_Formatting.md) (1 shared connections)
+- [test_keybindings.py](test_keybindings.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -29,8 +27,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 23 (77%)
-- INFERRED: 7 (23%)
+- EXTRACTED: 23 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

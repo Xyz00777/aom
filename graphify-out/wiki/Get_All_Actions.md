@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_tree_event_replay.py** (11 connections) — `tests/compact/test_tree_event_replay.py`
+- **test_tree_event_replay.py** (15 connections) — `tests/compact/test_tree_event_replay.py`
 - **_setup_state()** (10 connections) — `tests/compact/test_tree_event_replay.py`
 - **test_tree_after_each_task_completion()** (8 connections) — `tests/compact/test_tree_event_replay.py`
 - **test_tree_after_completion_no_race_window()** (7 connections) — `tests/compact/test_tree_event_replay.py`
@@ -25,12 +25,13 @@
 
 ## Relationships
 
+- [CLI Interface Tests](CLI_Interface_Tests.md) (4 shared connections)
 - [Pause Prompt Heuristic](Pause_Prompt_Heuristic.md) (3 shared connections)
-- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (1 shared connections)
-- [CLI Argument Parser](CLI_Argument_Parser.md) (1 shared connections)
-- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (1 shared connections)
+- [TUI Keybindings Config](TUI_Keybindings_Config.md) (1 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
+- [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (1 shared connections)
+- [tree.py](tree.py.md) (1 shared connections)
 - [Hide State Gating Tests](Hide_State_Gating_Tests.md) (1 shared connections)
-- [CLI Interface Tests](CLI_Interface_Tests.md) (1 shared connections)
 
 ## Source Files
 
@@ -38,7 +39,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 63 (93%)
+- EXTRACTED: 67 (93%)
 - INFERRED: 5 (7%)
 - AMBIGUOUS: 0 (0%)
 

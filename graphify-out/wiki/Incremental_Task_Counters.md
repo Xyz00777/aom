@@ -1,40 +1,33 @@
 # Incremental Task Counters
 
-> 18 nodes · cohesion 0.11
+> 8 nodes · cohesion 0.25
 
 ## Key Concepts
 
-- **Include/Import/Role Counter & Tree Fix Plan** (11 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
-- **Implementation Plan** (7 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
-- **include-import-role-fixes.md** (1 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
-- **Acceptance Criteria** (1 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
-- **Ansible Include/Import Mechanisms — Coverage Audit** (1 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
-- **Estimated Effort** (1 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
-- **Execution Order** (1 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
-- **Open Questions** (1 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
-- **Phase 0: Include Cache Infrastructure (Priority: High)** (1 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
-- **Phase 1: Tree Role Index Fix (Priority: High)** (1 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
-- **Phase 2: Counter Accuracy (Priority: High)** (1 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
-- **Phase 3: Tree Rendering of Dynamic Children (Priority: High)** (1 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
-- **Phase 4: Fixture Expansion (Priority: Medium)** (1 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
-- **Phase 5: Integration Tests (Priority: Medium)** (1 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
-- **Problem Statement** (1 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
-- **Related Files** (1 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
-- **Root Causes** (1 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
-- **What We're NOT Doing (Out of Scope)** (1 connections) — `.sisyphus/notepads/plans/include-import-role-fixes.md`
+- **TestPlayStart** (11 connections) — `tests/unit/test_event_processing.py`
+- **.test_play_start_creates_play_run_state()** (4 connections) — `tests/unit/test_event_processing.py`
+- **.test_play_start_existing_play_updates()** (3 connections) — `tests/unit/test_event_processing.py`
+- **.test_play_start_sets_status_running()** (3 connections) — `tests/unit/test_event_processing.py`
+- **Tests for v2_playbook_on_play_start handling (TC-201).** (1 connections) — `tests/unit/test_event_processing.py`
+- **TC-201: v2_playbook_on_play_start creates new PlayRunState.** (1 connections) — `tests/unit/test_event_processing.py`
+- **TC-201 edge case: Same play.id updates existing PlayRunState.** (1 connections) — `tests/unit/test_event_processing.py`
+- **TC-201: play status is set to RUNNING.** (1 connections) — `tests/unit/test_event_processing.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [CLI Interface Tests](CLI_Interface_Tests.md) (5 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (4 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/plans/include-import-role-fixes.md`
+- `tests/unit/test_event_processing.py`
 
 ## Audit Trail
 
-- EXTRACTED: 34 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 18 (72%)
+- INFERRED: 7 (28%)
 - AMBIGUOUS: 0 (0%)
 
 ---

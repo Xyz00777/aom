@@ -1,48 +1,36 @@
 # Redaction Config Model
 
-> 41 nodes · cohesion 0.05
+> 10 nodes · cohesion 0.20
 
 ## Key Concepts
 
-- **Section 12: Testing Strategy** (41 connections) — `TEST_SPECIFICATION.md`
-- **TC-380: TDD Failing Test Before Implementation** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-381: Test Pyramid Proportions** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-382: Pytest Framework Version** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-383: Pytest-Asyncio Version** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-384: Pytest-Textual-Snapshot Version** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-385: Textual Test App Running** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-386: Textual Test Key Press** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-387: Subprocess Mock pexpect.spawn** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-388: Subprocess Mock is_alive** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-389: Snapshot Test Main Screen** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-390: Snapshot Test with run_before** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-391: Compact Renderer Rich Console Capture** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-392: Compact Renderer inline-snapshot** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-393: Diff Snapshot All Tasks** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-394: Diff Snapshot Changes Only** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-395: Non-TTY Output Testing** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-396: Mock pexpect Integration Test** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-397: parse_play_header Test** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-398: parse_task_with_role Test** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-399: parse_task_without_role Test** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-400: parse_tags Test** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-401: parse_include_tasks_not_expanded Test** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-402: parse_import_tasks_expanded Test** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-403: state_transitions_on_start Test** (1 connections) — `TEST_SPECIFICATION.md`
-- *... and 16 more nodes in this community*
+- **TestVerboseDebugLogging** (13 connections) — `tests/unit/test_cli.py`
+- **.test_non_verbose_does_not_set_debug_level()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_verbose_creates_log_file_with_debug_entries()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_verbose_sets_debug_log_level()** (2 connections) — `tests/unit/test_cli.py`
+- **.test_verbose_sets_diagnostics_debug_flag()** (2 connections) — `tests/unit/test_cli.py`
+- **Tests for TC-009: Verbose enables DEBUG logging.** (1 connections) — `tests/unit/test_cli.py`
+- **TC-009: --verbose sets logging level to DEBUG.** (1 connections) — `tests/unit/test_cli.py`
+- **TC-009: --verbose causes DEBUG entries in log output.** (1 connections) — `tests/unit/test_cli.py`
+- **TC-009: Without --verbose, logging level is not DEBUG.** (1 connections) — `tests/unit/test_cli.py`
+- **--verbose should set diagnostics._debug to True.** (1 connections) — `tests/unit/test_cli.py`
 
 ## Relationships
 
-- [Failure Recap Formatting](Failure_Recap_Formatting.md) (1 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (4 shared connections)
+- [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (1 shared connections)
+- [Inspect Data Model Builders](Inspect_Data_Model_Builders.md) (1 shared connections)
 
 ## Source Files
 
-- `TEST_SPECIFICATION.md`
+- `tests/unit/test_cli.py`
 
 ## Audit Trail
 
-- EXTRACTED: 81 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 19 (73%)
+- INFERRED: 7 (27%)
 - AMBIGUOUS: 0 (0%)
 
 ---

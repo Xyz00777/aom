@@ -1,11 +1,11 @@
 # Shift Modifier Keybindings
 
-> 18 nodes · cohesion 0.27
+> 19 nodes · cohesion 0.25
 
 ## Key Concepts
 
-- **_FakeDisplay** (14 connections) — `tests/integration/test_renderer_eta.py`
-- **test_renderer_eta.py** (12 connections) — `tests/integration/test_renderer_eta.py`
+- **test_renderer_eta.py** (15 connections) — `tests/integration/test_renderer_eta.py`
+- **_FakeDisplay** (15 connections) — `tests/integration/test_renderer_eta.py`
 - **_setup()** (10 connections) — `tests/integration/test_renderer_eta.py`
 - **_complete_task()** (8 connections) — `tests/integration/test_renderer_eta.py`
 - **test_fixed_floor_not_scaled_by_fast_variable_task()** (8 connections) — `tests/integration/test_renderer_eta.py`
@@ -17,6 +17,7 @@
 - **test_eta_appears_once_gate_opens()** (3 connections) — `tests/integration/test_renderer_eta.py`
 - **test_no_eta_below_warmup_gate()** (3 connections) — `tests/integration/test_renderer_eta.py`
 - **test_unmatched_path_does_not_count()** (3 connections) — `tests/integration/test_renderer_eta.py`
+- **.flush_logs()** (1 connections) — `tests/integration/test_renderer_eta.py`
 - **.__init__()** (1 connections) — `tests/integration/test_renderer_eta.py`
 - **.print_log()** (1 connections) — `tests/integration/test_renderer_eta.py`
 - **.stop()** (1 connections) — `tests/integration/test_renderer_eta.py`
@@ -25,10 +26,12 @@
 
 ## Relationships
 
+- [CLI Interface Tests](CLI_Interface_Tests.md) (7 shared connections)
 - [App Configuration Settings](App_Configuration_Settings.md) (6 shared connections)
-- [CLI Argument Parser](CLI_Argument_Parser.md) (5 shared connections)
-- [Compact Renderer Implementation](Compact_Renderer_Implementation.md) (2 shared connections)
-- [JSON Renderer](JSON_Renderer.md) (2 shared connections)
+- [TUI Keybindings Config](TUI_Keybindings_Config.md) (2 shared connections)
+- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
+- [Property Based Tests](Property_Based_Tests.md) (1 shared connections)
 
 ## Source Files
 
@@ -36,7 +39,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 89 (92%)
+- EXTRACTED: 94 (92%)
 - INFERRED: 8 (8%)
 - AMBIGUOUS: 0 (0%)
 

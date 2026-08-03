@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **TestFormatFlag** (17 connections) — `tests/unit/test_cli.py`
+- **TestFormatFlag** (16 connections) — `tests/unit/test_cli.py`
 - **.test_format_flag_does_not_appear_in_ansible_args()** (3 connections) — `tests/unit/test_cli.py`
 - **.test_main_dispatches_json_renderer_when_format_json()** (3 connections) — `tests/unit/test_cli.py`
 - **.test_format_flag_accepts_compact_explicit()** (2 connections) — `tests/unit/test_cli.py`
@@ -23,9 +23,8 @@
 - [Play Definition Tree Population](Play_Definition_Tree_Population.md) (4 shared connections)
 - [Inspect Data Model Builders](Inspect_Data_Model_Builders.md) (2 shared connections)
 - [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
-- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
-- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (1 shared connections)
-- [Session Recording Tests](Session_Recording_Tests.md) (1 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (1 shared connections)
 
 ## Source Files
 
@@ -33,8 +32,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 23 (62%)
-- INFERRED: 14 (38%)
+- EXTRACTED: 23 (64%)
+- INFERRED: 13 (36%)
 - AMBIGUOUS: 0 (0%)
 
 ---

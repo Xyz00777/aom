@@ -1,47 +1,35 @@
 # Crash Recovery Auto-Save
 
-> 20 nodes · cohesion 0.13
+> 10 nodes · cohesion 0.20
 
 ## Key Concepts
 
-- **._body()** (10 connections) — `src/ansible_aom/tui/screens/rerun.py`
-- **.compose()** (7 connections) — `src/ansible_aom/tui/screens/help.py`
-- **._host_breakdown()** (7 connections) — `src/ansible_aom/tui/screens/rerun.py`
-- **._command_panel()** (5 connections) — `src/ansible_aom/tui/screens/rerun.py`
-- **_build_shortcuts_section()** (4 connections) — `src/ansible_aom/tui/screens/help.py`
-- **Text** (4 connections)
-- **.compose()** (4 connections) — `src/ansible_aom/tui/screens/rerun.py`
-- **._session_header()** (4 connections) — `src/ansible_aom/tui/screens/rerun.py`
-- **Panel** (3 connections)
-- **help.py** (3 connections) — `src/ansible_aom/tui/screens/help.py`
-- **Group** (2 connections)
-- **Text** (2 connections)
-- **ComposeResult** (1 connections)
-- **Help overlay for AOM TUI.  Triggered by '?' key. See SPECIFICATION.md Section 10** (1 connections) — `src/ansible_aom/tui/screens/help.py`
-- **Render the keybindings section as a Rich Text.      Each context gets a bold hea** (1 connections) — `src/ansible_aom/tui/screens/help.py`
-- **ComposeResult** (1 connections)
-- **First section: identify which session this rerun targets.** (1 connections) — `src/ansible_aom/tui/screens/rerun.py`
-- **Second section: failed / unreachable / changed host groups.** (1 connections) — `src/ansible_aom/tui/screens/rerun.py`
-- **Third section: the exact ansible-playbook invocation.** (1 connections) — `src/ansible_aom/tui/screens/rerun.py`
-- **Compose all sections into a single Rich renderable.** (1 connections) — `src/ansible_aom/tui/screens/rerun.py`
+- **TestRedactionIntegration** (7 connections) — `tests/unit/test_redaction.py`
+- **.test_empty_event_handling()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_full_event_redaction()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_layer1_takes_precedence()** (4 connections) — `tests/unit/test_redaction.py`
+- **.test_non_dict_value_handling()** (4 connections) — `tests/unit/test_redaction.py`
+- **Integration tests combining multiple redaction layers.** (1 connections) — `tests/unit/test_redaction.py`
+- **All four layers work together on a complete event.** (1 connections) — `tests/unit/test_redaction.py`
+- **Layer 1 (_ansible_no_log) takes precedence over other layers.** (1 connections) — `tests/unit/test_redaction.py`
+- **Edge case: Empty event dict handled gracefully.** (1 connections) — `tests/unit/test_redaction.py`
+- **Edge case: Non-dict values handled correctly.** (1 connections) — `tests/unit/test_redaction.py`
 
 ## Relationships
 
-- [Session Replay Round Trip](Session_Replay_Round_Trip.md) (5 shared connections)
-- [Dynamic Include Expansion](Dynamic_Include_Expansion.md) (3 shared connections)
-- [Inventory Auto Detection](Inventory_Auto_Detection.md) (2 shared connections)
-- [Data Model Unit Tests](Data_Model_Unit_Tests.md) (2 shared connections)
-- [Shell Completion Helpers](Shell_Completion_Helpers.md) (1 shared connections)
+- [Warnings Display Config](Warnings_Display_Config.md) (4 shared connections)
+- [TUI Tree View Tests](TUI_Tree_View_Tests.md) (3 shared connections)
+- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (2 shared connections)
+- [Rerun Round Trip Tests](Rerun_Round_Trip_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/tui/screens/help.py`
-- `src/ansible_aom/tui/screens/rerun.py`
+- `tests/unit/test_redaction.py`
 
 ## Audit Trail
 
-- EXTRACTED: 53 (84%)
-- INFERRED: 10 (16%)
+- EXTRACTED: 23 (82%)
+- INFERRED: 5 (18%)
 - AMBIGUOUS: 0 (0%)
 
 ---

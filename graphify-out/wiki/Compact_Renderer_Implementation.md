@@ -1,64 +1,52 @@
 # Compact Renderer Implementation
 
-> 147 nodes · cohesion 0.02
+> 28 nodes · cohesion 0.07
 
 ## Key Concepts
 
-- **TaskDefinition** (393 connections) — `src/ansible_aom/core/models.py`
 - **TestTaskDefinition** (24 connections) — `tests/unit/test_models.py`
-- **test_models.py** (17 connections) — `tests/unit/test_models.py`
-- **TestTaskMatchingAlgorithm** (16 connections) — `tests/unit/test_event_processing.py`
-- **TestDefinitionVsStateSeparation** (15 connections) — `tests/unit/test_models.py`
-- **TestLinearForceCompletion** (15 connections) — `tests/unit/test_models.py`
-- **TestTaskMatching** (15 connections) — `tests/unit/test_models.py`
-- **TestRunnerTaskCompletionPromotion** (14 connections) — `tests/unit/test_models.py`
-- **TestDynamicChildrenAsPendingInTree** (13 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
-- **TestFreeStrategyMetaTaskVisibility** (12 connections) — `tests/unit/test_models.py`
-- **TestStickyFallbackTreeRender** (12 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
-- **TestIncludeStubHiding** (10 connections) — `tests/unit/test_tree_projection.py`
-- **TestTreeLinesAsyncTaskIdentity** (8 connections) — `tests/unit/test_tree_projection.py`
-- **TestTreeLinesDelegatedTaskIdentity** (8 connections) — `tests/unit/test_tree_projection.py`
-- **TestTreeLinesNestedChildIdentity** (8 connections) — `tests/unit/test_tree_projection.py`
-- **TestTreeLinesPreflightTaskIdentity** (8 connections) — `tests/unit/test_tree_projection.py`
-- **TestTreeLinesSerialWindowIdentity** (8 connections) — `tests/unit/test_tree_projection.py`
-- **.test_host_leaves_for_running_dynamic_child()** (7 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
-- **.test_sticky_2_two_plays_both_running()** (7 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
-- **._active_state()** (7 connections) — `tests/unit/test_tree_projection.py`
-- **TestTreeProjectionCacheRefresh** (7 connections) — `tests/unit/test_tree_projection.py`
-- **.test_completed_dynamic_child_filtered_from_tree()** (6 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
-- **.test_dynamic_child_under_role_header()** (6 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
-- **.test_dynamic_children_show_pending_before_announcement()** (6 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
-- **.test_no_duplicate_for_runtime_announced_dynamic_child()** (6 connections) — `tests/unit/test_tree_classify_and_role_labels.py`
-- *... and 122 more nodes in this community*
+- **.test_task_definition_all_fields_types()** (3 connections) — `tests/unit/test_models.py`
+- **.test_task_definition_children_can_contain_dynamic_tasks()** (3 connections) — `tests/unit/test_models.py`
+- **.test_task_definition_children_defaults_empty_list()** (3 connections) — `tests/unit/test_models.py`
+- **.test_task_definition_is_dynamic_defaults_false()** (3 connections) — `tests/unit/test_models.py`
+- **.test_task_definition_is_dynamic_explicit_true()** (3 connections) — `tests/unit/test_models.py`
+- **.test_task_definition_path_can_be_set()** (3 connections) — `tests/unit/test_models.py`
+- **.test_task_definition_path_defaults_none()** (3 connections) — `tests/unit/test_models.py`
+- **.test_task_definition_required_fields()** (3 connections) — `tests/unit/test_models.py`
+- **.test_task_definition_role_can_be_none()** (3 connections) — `tests/unit/test_models.py`
+- **.test_task_definition_task_order_minus_one_for_dynamic()** (3 connections) — `tests/unit/test_models.py`
+- **.test_task_definition_task_order_non_negative_for_static()** (3 connections) — `tests/unit/test_models.py`
+- **.test_task_definition_uuid_can_be_set()** (3 connections) — `tests/unit/test_models.py`
+- **.test_task_definition_uuid_defaults_none()** (3 connections) — `tests/unit/test_models.py`
+- **Tests for TaskDefinition dataclass - TC-174 to TC-179.** (1 connections) — `tests/unit/test_models.py`
+- **TC-174: TaskDefinition with all required fields.** (1 connections) — `tests/unit/test_models.py`
+- **TC-175: is_dynamic defaults to False for static tasks.** (1 connections) — `tests/unit/test_models.py`
+- **TC-175: is_dynamic can be set to True for dynamic tasks.** (1 connections) — `tests/unit/test_models.py`
+- **TC-176: UUID defaults to None before JSONL matching.** (1 connections) — `tests/unit/test_models.py`
+- **TC-176: UUID can be set after JSONL matching.** (1 connections) — `tests/unit/test_models.py`
+- **TC-177: path defaults to None before JSONL matching.** (1 connections) — `tests/unit/test_models.py`
+- **TC-177: path can be set with file:line format.** (1 connections) — `tests/unit/test_models.py`
+- **TC-178: children defaults to empty list.** (1 connections) — `tests/unit/test_models.py`
+- **TC-178: children can contain TaskDefinition objects.** (1 connections) — `tests/unit/test_models.py`
+- **TC-179: task_order is -1 for dynamic tasks.** (1 connections) — `tests/unit/test_models.py`
+- *... and 3 more nodes in this community*
 
 ## Relationships
 
-- [CLI Argument Parser](CLI_Argument_Parser.md) (75 shared connections)
-- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (60 shared connections)
-- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (60 shared connections)
-- [CLI Interface Tests](CLI_Interface_Tests.md) (53 shared connections)
-- [Per-Task Overhead Analysis](Per-Task_Overhead_Analysis.md) (47 shared connections)
-- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (37 shared connections)
-- [Secret Redaction Configuration](Secret_Redaction_Configuration.md) (28 shared connections)
-- [Runner Session Recording](Runner_Session_Recording.md) (20 shared connections)
-- [Session Recording Tests](Session_Recording_Tests.md) (14 shared connections)
-- [Run Diagnostics Tests](Run_Diagnostics_Tests.md) (12 shared connections)
-- [Status Bar Color Tests](Status_Bar_Color_Tests.md) (11 shared connections)
-- [WarningType Enum](WarningType_Enum.md) (8 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (16 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (3 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (2 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [Check Mode Chip](Check_Mode_Chip.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/core/models.py`
-- `tests/unit/test_event_processing.py`
-- `tests/unit/test_invariants_runstate_renderer.py`
 - `tests/unit/test_models.py`
-- `tests/unit/test_tree_classify_and_role_labels.py`
-- `tests/unit/test_tree_projection.py`
 
 ## Audit Trail
 
-- EXTRACTED: 411 (44%)
-- INFERRED: 521 (56%)
+- EXTRACTED: 55 (71%)
+- INFERRED: 22 (29%)
 - AMBIGUOUS: 0 (0%)
 
 ---

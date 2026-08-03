@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_error_message_extraction.py** (22 connections) — `tests/compact/test_error_message_extraction.py`
+- **test_error_message_extraction.py** (23 connections) — `tests/compact/test_error_message_extraction.py`
 - **_logged()** (21 connections) — `tests/compact/test_error_message_extraction.py`
 - **_renderer()** (21 connections) — `tests/compact/test_error_message_extraction.py`
 - **test_failed_all_error_fields_empty()** (4 connections) — `tests/compact/test_error_message_extraction.py`
@@ -34,6 +34,7 @@
 ## Relationships
 
 - [App Configuration Settings](App_Configuration_Settings.md) (2 shared connections)
+- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
 
 ## Source Files
 
@@ -41,7 +42,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 160 (100%)
+- EXTRACTED: 161 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

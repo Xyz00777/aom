@@ -4,12 +4,12 @@
 
 ## Key Concepts
 
-- **TestPanelToggleKeybindings** (9 connections) — `tests/tui/test_keybindings.py`
-- **.test_key_1_toggles_status_bar()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_key_2_toggles_tree_view()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_key_3_toggles_summary_panel()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_key_4_toggles_log_panel()** (3 connections) — `tests/tui/test_keybindings.py`
-- **.test_key_5_toggles_footer()** (3 connections) — `tests/tui/test_keybindings.py`
+- **TestPanelToggleKeybindings** (7 connections) — `tests/tui/test_keybindings.py`
+- **.test_key_1_toggles_status_bar()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_key_2_toggles_tree_view()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_key_3_toggles_summary_panel()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_key_4_toggles_log_panel()** (2 connections) — `tests/tui/test_keybindings.py`
+- **.test_key_5_toggles_footer()** (2 connections) — `tests/tui/test_keybindings.py`
 - **Tests for panel toggle keybindings - TC-355 through TC-360.** (1 connections) — `tests/tui/test_keybindings.py`
 - **TC-356: '1' toggles Status Bar visibility.** (1 connections) — `tests/tui/test_keybindings.py`
 - **TC-357: '2' toggles Tree View visibility.** (1 connections) — `tests/tui/test_keybindings.py`
@@ -19,9 +19,7 @@
 
 ## Relationships
 
-- [Runner Event Batching](Runner_Event_Batching.md) (5 shared connections)
-- [State Machine Invariants](State_Machine_Invariants.md) (2 shared connections)
-- [Warning Color Formatting](Warning_Color_Formatting.md) (1 shared connections)
+- [test_keybindings.py](test_keybindings.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -29,8 +27,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 23 (77%)
-- INFERRED: 7 (23%)
+- EXTRACTED: 23 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

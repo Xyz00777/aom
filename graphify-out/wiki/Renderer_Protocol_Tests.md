@@ -5,11 +5,11 @@
 ## Key Concepts
 
 - **RunDiagnostics** (15 connections) — `src/ansible_aom/core/diagnostics.py`
-- **test_aom_trace_events.py** (8 connections) — `tests/unit/test_aom_trace_events.py`
+- **test_aom_trace_events.py** (10 connections) — `tests/unit/test_aom_trace_events.py`
 - **_FakeSink** (8 connections) — `tests/unit/test_aom_trace_events.py`
 - **_feed_many()** (8 connections) — `tests/unit/test_aom_trace_events.py`
-- **lifecycle_mark()** (3 connections) — `src/ansible_aom/core/diagnostics.py`
-- **set_last_run_diagnostics()** (3 connections) — `src/ansible_aom/core/diagnostics.py`
+- **lifecycle_mark()** (4 connections) — `src/ansible_aom/core/diagnostics.py`
+- **set_last_run_diagnostics()** (4 connections) — `src/ansible_aom/core/diagnostics.py`
 - **_execution_parser()** (3 connections) — `tests/unit/test_aom_trace_events.py`
 - **test_trace_events_emits_every_100th_event_under_debug()** (3 connections) — `tests/unit/test_aom_trace_events.py`
 - **test_trace_events_silent_when_debug_off()** (3 connections) — `tests/unit/test_aom_trace_events.py`
@@ -32,11 +32,13 @@
 ## Relationships
 
 - [Loop Item Stream Tests](Loop_Item_Stream_Tests.md) (4 shared connections)
-- [Tree Block Animation](Tree_Block_Animation.md) (4 shared connections)
+- [Replay Determinism Tests](Replay_Determinism_Tests.md) (3 shared connections)
+- [Tree Block Animation](Tree_Block_Animation.md) (3 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (2 shared connections)
 - [Run State Completion Recap](Run_State_Completion_Recap.md) (2 shared connections)
-- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (2 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (2 shared connections)
+- [core/__init__.py](core-__init__.py.md) (1 shared connections)
 - [Frame Parameter Handling](Frame_Parameter_Handling.md) (1 shared connections)
-- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
 
 ## Source Files
 
@@ -45,7 +47,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 67 (93%)
+- EXTRACTED: 71 (93%)
 - INFERRED: 5 (7%)
 - AMBIGUOUS: 0 (0%)
 

@@ -1,39 +1,29 @@
 # Tree Projection Utilities
 
-> 18 nodes · cohesion 0.11
+> 8 nodes · cohesion 0.25
 
 ## Key Concepts
 
-- **Plan: Static pre-expansion of `include_tasks` (Plan A)** (11 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
-- **Approach (TDD-first, surgical)** (7 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
-- **include-tasks-pre-expansion.md** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
-- **Acceptance Criteria** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
-- **Files Touched** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
-- **Goals** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
-- **Non-Goals (explicitly out of scope)** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
-- **Out-of-scope follow-ups (parking lot)** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
-- **Phase 0 — Pin down the data flow (no code change, tests only)** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
-- **Phase 1 — Add `_graft_include_children()` (pure core function)** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
-- **Phase 2 — Wire `resolve_includes_from_playbook()` into preflight** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
-- **Phase 3 — Wire `discover_include_with_runtime_path()` into runtime handlers** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
-- **Phase 4 — Hide the include stub in the tree** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
-- **Phase 5 — Pre-flight denormalization for `count_total_tasks_seen`** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
-- **Problem** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
-- **Risks & Mitigations** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
-- **Sequencing & Dependencies** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
-- **Test Specification Updates** (1 connections) — `.sisyphus/plans/include-tasks-pre-expansion.md`
+- **TestAnsiblePosixVersionCheck** (5 connections) — `tests/unit/test_posix_callback.py`
+- **.test_bundled_plugin_does_not_require_ansible_posix_collection()** (2 connections) — `tests/unit/test_posix_callback.py`
+- **.test_fallback_callback_name_is_ansible_posix_jsonl()** (2 connections) — `tests/unit/test_posix_callback.py`
+- **.test_fallback_callback_name_split_correctly()** (2 connections) — `tests/unit/test_posix_callback.py`
+- **Tests for TC-070: ansible.posix Version Check.      AOM never imports the ansibl** (1 connections) — `tests/unit/test_posix_callback.py`
+- **TC-070: When bundled dir missing, callback name is the canonical string.** (1 connections) — `tests/unit/test_posix_callback.py`
+- **TC-070: ansible.posix.jsonl parses as collection='ansible.posix', plugin='jsonl'** (1 connections) — `tests/unit/test_posix_callback.py`
+- **TC-070: When bundled aom_jsonl is selected, ansible.posix isn't required.** (1 connections) — `tests/unit/test_posix_callback.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [Event Hide Filter Logic](Event_Hide_Filter_Logic.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/plans/include-tasks-pre-expansion.md`
+- `tests/unit/test_posix_callback.py`
 
 ## Audit Trail
 
-- EXTRACTED: 34 (100%)
+- EXTRACTED: 15 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

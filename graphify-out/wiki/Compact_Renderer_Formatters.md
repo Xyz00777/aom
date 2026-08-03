@@ -5,7 +5,7 @@
 ## Key Concepts
 
 - **Path** (15 connections)
-- **_resolve_session_id()** (12 connections) — `src/ansible_aom/rerun/cli.py`
+- **_resolve_session_id()** (11 connections) — `src/ansible_aom/rerun/cli.py`
 - **_make_session()** (8 connections) — `tests/unit/test_rerun_cli.py`
 - **TestMain** (7 connections) — `tests/unit/test_rerun_cli.py`
 - **TestResolveSessionId** (7 connections) — `tests/unit/test_rerun_cli.py`
@@ -33,9 +33,9 @@
 ## Relationships
 
 - [KeyAction TypedDict](KeyAction_TypedDict.md) (4 shared connections)
-- [Shell Completion Helpers](Shell_Completion_Helpers.md) (3 shared connections)
-- [Loop Item Line Tests](Loop_Item_Line_Tests.md) (1 shared connections)
-- [Event Source Adapters](Event_Source_Adapters.md) (1 shared connections)
+- [Rerun Subcommand Module](Rerun_Subcommand_Module.md) (2 shared connections)
+- [Run Config Key Normalization](Run_Config_Key_Normalization.md) (1 shared connections)
+- [Shell Completion Helpers](Shell_Completion_Helpers.md) (1 shared connections)
 
 ## Source Files
 
@@ -44,8 +44,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 89 (86%)
-- INFERRED: 14 (14%)
+- EXTRACTED: 89 (87%)
+- INFERRED: 13 (13%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -1,48 +1,39 @@
 # Replay CLI Subcommand
 
-> 47 nodes · cohesion 0.04
+> 14 nodes · cohesion 0.14
 
 ## Key Concepts
 
-- **Section 7: TUI Components** (47 connections) — `TEST_SPECIFICATION.md`
-- **TC-264: Tree View Hierarchy Structure** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-265: Tree View Navigation Up/Down** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-266: Tree View Expand/Collapse Arrow Keys** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-267: Tree View Enter Toggle** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-268: Tree View Uses Textual Tree Widget** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-269: Tree View Reactive Updates** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-270: Tree View Task Name Truncation** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-271: Tree View Role Name Priority in Truncation** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-272: Compact Mode Hard-Truncate at Width-20** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-273: RoleGroup Creation Threshold** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-274: Log Panel Max Lines Bound** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-275: Log Panel Auto-Scroll Behavior** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-276: Log Panel JSON Line Detection** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-277: Log Panel ANSI Color Handling** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-278: Log Panel Search Overlay Activation** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-279: Log Panel Search Plain Text Mode** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-280: Log Panel Search Regex Mode** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-281: Log Panel Search Case-Sensitive Toggle** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-282: Log Panel Search F3 Navigation** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-283: Log Panel Search Match Highlighting** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-284: Log Panel Smart Auto-Scroll Pause** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-285: Summary Panel Current Play Display** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-286: Summary Panel Hosts Progress** (1 connections) — `TEST_SPECIFICATION.md`
-- **TC-287: Summary Panel Tasks Progress** (1 connections) — `TEST_SPECIFICATION.md`
-- *... and 22 more nodes in this community*
+- **TestStatusBarConfig** (12 connections) — `tests/unit/test_config.py`
+- **.test_status_bar_config_custom_elements()** (3 connections) — `tests/unit/test_config.py`
+- **.test_status_bar_config_default_elements()** (3 connections) — `tests/unit/test_config.py`
+- **.test_status_bar_config_elements_are_strings()** (3 connections) — `tests/unit/test_config.py`
+- **.test_status_bar_config_elements_is_list()** (3 connections) — `tests/unit/test_config.py`
+- **.test_status_bar_config_empty_elements_list()** (3 connections) — `tests/unit/test_config.py`
+- **.test_status_bar_config_field_factory()** (3 connections) — `tests/unit/test_config.py`
+- **Tests for StatusBarConfig model - TC-260, TC-307, TC-290.** (1 connections) — `tests/unit/test_config.py`
+- **TC-260: StatusBarConfig has default elements list.** (1 connections) — `tests/unit/test_config.py`
+- **TC-307: StatusBarConfig can have custom elements.** (1 connections) — `tests/unit/test_config.py`
+- **TC-307: elements field is a list.** (1 connections) — `tests/unit/test_config.py`
+- **TC-307 edge case: Empty elements list is valid.** (1 connections) — `tests/unit/test_config.py`
+- **TC-307: elements list contains strings.** (1 connections) — `tests/unit/test_config.py`
+- **TC-260: Field uses default_factory for mutable default.** (1 connections) — `tests/unit/test_config.py`
 
 ## Relationships
 
-- [Failure Recap Formatting](Failure_Recap_Formatting.md) (1 shared connections)
+- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (8 shared connections)
+- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (1 shared connections)
+- [Run State Summary Panel](Run_State_Summary_Panel.md) (1 shared connections)
+- [Renderer Set Definitions](Renderer_Set_Definitions.md) (1 shared connections)
 
 ## Source Files
 
-- `TEST_SPECIFICATION.md`
+- `tests/unit/test_config.py`
 
 ## Audit Trail
 
-- EXTRACTED: 93 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 27 (73%)
+- INFERRED: 10 (27%)
 - AMBIGUOUS: 0 (0%)
 
 ---

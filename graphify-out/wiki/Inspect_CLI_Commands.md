@@ -7,7 +7,7 @@
 - **_renderer()** (34 connections) — `tests/compact/test_hide_state.py`
 - **_task_start()** (32 connections) — `tests/compact/test_hide_state.py`
 - **_logged()** (30 connections) — `tests/compact/test_hide_state.py`
-- **test_hide_state.py** (25 connections) — `tests/compact/test_hide_state.py`
+- **test_hide_state.py** (27 connections) — `tests/compact/test_hide_state.py`
 - **_ok()** (12 connections) — `tests/compact/test_hide_state.py`
 - **TestHideChanged** (9 connections) — `tests/compact/test_hide_state.py`
 - **_skipped()** (8 connections) — `tests/compact/test_hide_state.py`
@@ -33,8 +33,10 @@
 
 ## Relationships
 
-- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (16 shared connections)
+- [CLI Interface Tests](CLI_Interface_Tests.md) (16 shared connections)
 - [App Configuration Settings](App_Configuration_Settings.md) (14 shared connections)
+- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
+- [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (1 shared connections)
 
 ## Source Files
 
@@ -42,7 +44,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 400 (93%)
+- EXTRACTED: 402 (93%)
 - INFERRED: 28 (7%)
 - AMBIGUOUS: 0 (0%)
 

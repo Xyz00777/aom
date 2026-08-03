@@ -1,45 +1,37 @@
 # Limit Args Merging
 
-> 23 nodes · cohesion 0.09
+> 12 nodes · cohesion 0.17
 
 ## Key Concepts
 
-- **F2 — `aom replay <session-id>`** (12 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **F3 — `--no-record`** (7 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **2026-05-12-f2-replay-and-no-record.md** (3 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **F2 Replay + F3 `--no-record` Implementation Plan** (3 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **File Structure** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Self-Review** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Sequencing** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Task 10: `meta.json["status"]` drives completion state** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Task 11: Ctrl+C mid-replay → `(130, "crashed")`** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Task 12: Add `replay` subcommand dispatch in `cli.main`** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Task 13: Implement `replay.cli_main` with argparse + renderer factory** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Task 14: Update `aom --help` epilog to mention `replay`** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Task 15: Integration test — record → replay round-trip** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Task 16: Full-suite verification + lint** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Task 1: Add `record` parameter to `run_playbook`** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Task 2: Add `--no-record` flag to CLI parser** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Task 3: Thread `record` through `_run_compact`** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Task 4: Thread `record` through `AOMApp` and `_run_tui`** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Task 5: Integration test — `--no-record` produces no session dir** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Task 6: Update CLI help epilog for `--no-record`** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Task 7: Define `replay_session` skeleton + load-events test** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Task 8: Pacing — `--speed 0` no sleeps, normal speed scales delta** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
-- **Task 9: Negative-delta guard test** (1 connections) — `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
+- **TestPlaybookOnStats** (13 connections) — `tests/unit/test_event_processing.py`
+- **.test_stats_empty_plays()** (3 connections) — `tests/unit/test_event_processing.py`
+- **.test_stats_no_failures_status_completed()** (3 connections) — `tests/unit/test_event_processing.py`
+- **.test_stats_sets_end_time()** (3 connections) — `tests/unit/test_event_processing.py`
+- **.test_stats_with_failures_status_failed()** (3 connections) — `tests/unit/test_event_processing.py`
+- **.test_stats_with_unreachable_status_failed()** (3 connections) — `tests/unit/test_event_processing.py`
+- **Tests for v2_playbook_on_stats handling (TC-214).** (1 connections) — `tests/unit/test_event_processing.py`
+- **TC-214: v2_playbook_on_stats sets RunState.end_time.** (1 connections) — `tests/unit/test_event_processing.py`
+- **TC-214: Stats with no failures sets status to COMPLETED.** (1 connections) — `tests/unit/test_event_processing.py`
+- **TC-214: Stats with failures sets status to FAILED.** (1 connections) — `tests/unit/test_event_processing.py`
+- **TC-214: Stats with unreachable sets status to FAILED.** (1 connections) — `tests/unit/test_event_processing.py`
+- **TC-214 edge case: Stats with empty plays dict still works.** (1 connections) — `tests/unit/test_event_processing.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [CLI Interface Tests](CLI_Interface_Tests.md) (7 shared connections)
+- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (3 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (1 shared connections)
 
 ## Source Files
 
-- `docs/superpowers/plans/2026-05-12-f2-replay-and-no-record.md`
+- `tests/unit/test_event_processing.py`
 
 ## Audit Trail
 
-- EXTRACTED: 44 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 28 (82%)
+- INFERRED: 6 (18%)
 - AMBIGUOUS: 0 (0%)
 
 ---

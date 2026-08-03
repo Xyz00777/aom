@@ -31,9 +31,9 @@
 
 ## Relationships
 
-- [Crash Recovery Notification](Crash_Recovery_Notification.md) (1 shared connections)
-- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
-- [Community 461](Community_461.md) (1 shared connections)
+- [Session List View](Session_List_View.md) (1 shared connections)
+- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [test_icons.py](test_icons.py.md) (1 shared connections)
 
 ## Source Files
 

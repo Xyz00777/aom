@@ -22,7 +22,7 @@
 ## Relationships
 
 - [Run Config Key Normalization](Run_Config_Key_Normalization.md) (3 shared connections)
-- [Loop Item Line Tests](Loop_Item_Line_Tests.md) (1 shared connections)
+- [StatusBarConfig Model](StatusBarConfig_Model.md) (1 shared connections)
 
 ## Source Files
 
