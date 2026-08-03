@@ -1,0 +1,3 @@
+[submodule "graphify-out"]
+	path = graphify-out
+	url = /tmp/aom-graphify.git
