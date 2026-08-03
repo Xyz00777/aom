@@ -1,0 +1,50 @@
+# Path
+
+> 47 nodes · cohesion 0.07
+
+## Key Concepts
+
+- **Path** (17 connections)
+- **test_runner_interactive_prompts.py** (11 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **_fake_pause_prompt_command()** (10 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **TestNewlineTerminatedPromptPath** (5 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **._fake_newline_terminated_prompt()** (5 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_pause_prompt_answer_forwarded_to_child()** (5 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_custom_pause_prompt_without_press_enter_phrasing()** (5 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_default_bracketed_format_is_caught()** (5 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_question_mark_prompt_is_caught()** (5 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_yes_no_prompt_triggers_handler()** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **TestKeyboardInterruptDuringPromptAborts** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **._fake_pause_with_capture()** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_ctrl_c_at_prompt_returns_130_not_zero()** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **TestMultilineBlockPromptColonOnOwnLine** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_colon_on_own_line_block_round_trip()** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_newline_terminated_vars_prompt_round_trip()** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_real_ansible_pause_newline_terminated_round_trip()** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **TestNoPromptNoSpuriousInteractiveCall** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **TestPausePromptDetected** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_pause_prompt_triggers_handle_interactive_prompt()** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **TestRealAnsiblePauseFormat** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_full_real_ansible_pause_round_trip()** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **TestStalePlaintextDoesNotArmPrompt** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **.test_jsonl_then_latest_plaintext_prompt_still_fires()** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- **TestVarsPromptDetected** (4 connections) — `tests/integration/test_runner_interactive_prompts.py`
+- *... and 22 more nodes in this community*
+
+## Relationships
+
+- [run_playbook](run_playbook.md) (14 shared connections)
+
+## Source Files
+
+- `tests/integration/test_runner_interactive_prompts.py`
+
+## Audit Trail
+
+- EXTRACTED: 148 (91%)
+- INFERRED: 14 (9%)
+- AMBIGUOUS: 0 (0%)
+
+---
+
+*Part of the graphify knowledge wiki. See [index](index.md) to navigate.*
