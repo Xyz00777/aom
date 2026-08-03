@@ -29,6 +29,12 @@ if ! command -v graphify >/dev/null 2>&1; then
   exit 0
 fi
 
+# git sets GIT_DIR / GIT_INDEX_FILE when it runs hooks, which makes
+# `git -C graphify-out ...` resolve the superproject's gitdir instead of
+# the submodule's. Unset them so submodule commands address the right
+# repo.
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE 2>/dev/null || true
+
 # Only regenerate when HEAD touched graph-relevant files.
 GRAPH_RELEVANT='^(src/.*\.py|tests/.*\.py|docs/.*\.md|ARCHITECTURE\.md|SPECIFICATION\.md|pyproject\.toml)$'
 if ! git show --name-only --pretty=format: HEAD | grep -qE "$GRAPH_RELEVANT"; then
@@ -59,7 +65,9 @@ if git -C graphify-out rev-parse --git-dir >/dev/null 2>&1 \
       .graphify_analysis.json .graphify_semantic_marker GRAPH_TREE.html \
       GRAPH_REPORT.md graph.html wiki/ 2>/dev/null || true
     git -C graphify-out commit -m "chore: regenerate graph artifacts" >/dev/null 2>&1 || true
-    git -C graphify-out push 2>/dev/null \
+    # Submodules sit on a detached HEAD, so a bare `git push` pushes
+    # nothing. Push the detached HEAD explicitly to the main branch.
+    git -C graphify-out push origin HEAD:main 2>/dev/null \
       || echo "graphify: submodule push skipped (no reachable remote)"
   fi
 fi
