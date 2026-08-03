@@ -450,7 +450,7 @@ class TestHelpFlag:
         help_file = io.StringIO()
         parser.print_help(help_file)
         output = help_file.getvalue()
-        assert "--tui" in output or "--verbose" in output
+        assert "--verbose" in output
 
 
 class TestVersionFlag:

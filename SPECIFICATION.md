@@ -26,7 +26,7 @@ AOM combines the best of all approaches: robust JSONL parsing, interactive TUI w
 | Aspect | Previous | AOM |
 |--------|----------|-----|
 | Default view | Full TUI or streaming text | Compact nom-style (streaming) |
-| Full TUI | Always on | Optional via `--tui` flag |
+| Full TUI | Always on | Removed (2026-08) |
 | Parsing | Regex or JSON callback | JSONL only (ansible.posix.jsonl) |
 | Task matching | Name-based (fragile) | Task IDs (reliable) |
 | Configuration | Multi-layer hierarchy | Single config.yaml + CLI args |
@@ -204,7 +204,7 @@ def create_renderer(
 ```
 
 This Protocol-based architecture allows:
-- Runtime renderer selection via `--tui` flag
+- Runtime renderer selection via `--format`
 - Shared core logic in `ansible_aom.core`
 - Clean separation between UI and business logic
 - Independent testing of each renderer
@@ -247,9 +247,6 @@ aom [OPTIONS] <playbook> [ANSIBLE_OPTIONS]
 # Basic usage (compact view)
 aom playbook.yml
 
-# Full TUI mode
-aom --tui playbook.yml
-
 # With Ansible options
 aom playbook.yml -i inventory.ini --limit webservers
 
@@ -265,7 +262,6 @@ aom inspect <session-id> --failed
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--tui` | flag | false | Launch full multi-panel TUI |
 | `--verbose` / `-v` | flag | false | Print pre-execution diagnostics; enable DEBUG logging |
 | `--help` | flag | - | Show help message |
 | `--version` | flag | - | Show version |
@@ -295,7 +291,6 @@ aom inspect <session-id> --tree           # Show task tree
 aom inspect <session-id> --export         # Export as .aom artifact
 aom inspect diff <id1> <id2>              # Compare two runs
 aom inspect prune --days 30               # Cleanup old sessions
-aom inspect --tui                         # Optional TUI mode for browsing
 ```
 
 Output formats:
@@ -457,9 +452,6 @@ aom site.yml --hide-state ok --hide-state skipped
 contains every event, regardless of `--hide-state`. The filter only affects
 what is printed to the terminal in compact mode.
 
-**TUI mode**: The Textual TUI (`--tui`) has its own log pipeline and is not
-affected by `--hide-state`. This is a compact-only flag in v1.
-
 **Default**: No states are hidden — all per-host lines print as usual, matching
 pre-`--hide-state` behaviour.
 
@@ -517,44 +509,6 @@ The role label and footer counts in compact mode were corrected in v0.93
 Visible effect: role labels read `(N tasks)` consistently with the
 footer math, and the TUI tree drops completed tasks during the run but
 retains their final icons after completion.
-
-### 4.2 Full TUI (--tui mode)
-
-Multi-panel interactive interface:
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│  [RUNNING] site.yml | Play: Configure Webservers | 0:04:23 | 23/45      │
-├────────────────────────────────────────┬────────────────────────────────┤
-│                                        │  Summary                        │
-│  Tree View                             │  ───────────────────────────────│
-│  ────────────────────────────────────  │  Play: Configure Webservers     │
-│  ▼ ● Play: Configure Webservers        │  Hosts: 2/2 complete            │
-│    ▼ ● Role: nginx (5 tasks)           │  Tasks: 23/45 complete          │
-│      ● Install nginx           web1    │  Elapsed: 0:04:23               │
-│      ● Install nginx           web2    │                                 │
-│      ◐ Configure firewall      web1    │  Host Summary:                  │
-│      □ Configure firewall      web2    │  web1: ● 12 ok, ◆ 3 changed    │
-│      □ Start services          web1,2  │  web2: ◐ 1 running, ● 11 ok, ○ 2 skipped │
-│    □ Task: Deploy config               ├────────────────────────────────┤
-│                                        │  Log Panel                      │
-│                                        │  ───────────────────────────────│
-│                                        │  TASK [Install nginx]            │
-│                                        │  ok: [web1] => {"changed": ...}  │
-│                                        │  ok: [web2] => {"changed": ...}  │
-│                                        │  TASK [Configure firewall]        │
-│                                        │  ...                             │
-├────────────────────────────────────────┴────────────────────────────────┤
-│  ? Help | q Quit | ↑↓ Navigate | → Expand | ← Collapse | Tab Switch    │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-**Layout Components:**
-- Status Bar (top, configurable)
-- Tree View (left panel)
-- Summary Panel (right top)
-- Log Panel (right bottom)
-- Footer (help shortcuts)
 
 ### 4.3 Non-TTY Behavior
 
@@ -2673,27 +2627,11 @@ ansible-aom/
 │       │   ├── password.py     # Password pass-through (getpass)
 │       │   ├── format.py       # Pure formatters (tree lines, host tables)
 │       │   └── exit_code.py    # Re-export shim → core.exit_code
-│       ├── tui/                # Textual renderer (--tui mode)
+│       ├── tui/                # Textual inspect viewer only
 │       │   ├── __init__.py
-│       │   ├── app.py          # AOMApp (satisfies Protocol)
-│       │   ├── keybindings.py  # Key action → binding table
-│       │   ├── screens/
-│       │   │   ├── __init__.py
-│       │   │   ├── main.py     # Main TUI screen
-│       │   │   ├── help.py     # Help overlay (?)
-│       │   │   ├── settings.py # Settings screen (S)
-│       │   │   ├── inspect.py  # Readonly inspect TUI
-│       │   │   ├── rerun.py    # Re-run dialog (Shift+R)
-│       │   │   └── quit_confirm.py # Quit confirmation dialog
-│       │   └── widgets/
+│       │   └── screens/
 │       │       ├── __init__.py
-│       │       ├── task_tree.py    # Tree widget (Play/RoleGroup/Task/Host)
-│       │       ├── log_panel.py    # RichLog with search
-│       │       ├── summary_panel.py # Play-level overview
-│       │       ├── status_bar.py   # Configurable status bar
-│       │       └── debug_panel.py  # Full internal state
-│       ├── styles/
-│       │   └── app.tcss            # Textual CSS
+│       │       └── inspect.py  # Readonly inspect TUI (aom inspect)
 │       ├── ansible/            # Subprocess + callback internals
 │       │   ├── __init__.py
 │       │   ├── runner.py       # pexpect-driven ansible-playbook runner
@@ -3192,9 +3130,8 @@ This section captures the key decisions from the 55 user questions.
 - Role grouping: Auto-collapse at 5+ consecutive
 
 ### Views
-- **Dual Backend Architecture**: Two rendering backends sharing common core
 - Default: Compact mode (ANSI renderer: Rich Console + cursor manipulation)
-- Optional: Full TUI via `--tui` flag (Textual framework)
+- Inspect: Textual readonly viewer (`aom inspect`)
 - Shared Core: State machine, JSONL parser, models, session manager
 - Non-TTY: ANSI formatting preserved
 

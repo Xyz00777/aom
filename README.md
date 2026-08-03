@@ -35,13 +35,11 @@ fatal: [web3]: FAILED! => SSH connection failed
   FAILED: web3 — Install nginx
 ```
 
-Two render modes:
+Render mode:
 
 - **Compact** (default) — single status panel pinned to the bottom of
   your terminal; ansible's normal log streams above it. No alternate
   screen, no full takeover. Works in pipes, CI, `tee`, anywhere.
-- **TUI** (`--tui`) — full multi-panel Textual UI: task tree, summary,
-  log, debug. Best for long playbooks where you want to drill in.
 
 Every run is recorded to `~/.local/state/aom/sessions/<id>/` so
 `aom inspect` can replay it later.
@@ -75,7 +73,6 @@ aom --help
 
 ```bash
 aom site.yml                          # compact view
-aom --tui site.yml                    # full TUI
 aom site.yml -i inv.ini --tags deploy # any ansible-playbook flag works
 aom site.yml -vvv                     # ansible verbosity flows through
 ```
@@ -149,10 +146,9 @@ Powered by `argcomplete`; tab-completes subcommands (`inspect`,
 
 | Flag | Effect |
 |------|--------|
-| `--tui` | Launch the full multi-panel TUI (default is compact). |
 | `--verbose` | Print AOM diagnostics (resolved `ansible-playbook` path, env, terminal size), enable DEBUG logging, enable pexpect/event traces, and print post-run `[aom-debug]` summary. Equivalent to `AOM_DEBUG=1`. |
-| `--format {compact,json}` | `compact` (default) streams the nom-style live view. `json` is silent during the run and emits a single JSON object on stdout at completion, designed for CI and `jq` pipelines. Mutually exclusive with `--tui`. |
-| `--hide-state <state>` | Suppress per-host lines of the given state from the live compact log. Accepts comma-separated values (e.g. `--hide-state ok,skipped`) or repeated invocations. Choices: `ok`, `changed`, `failed`, `skipped`, `unreachable`. The status panel, recording, and `aom inspect` are unaffected. Ignored under `--tui`. |
+| `--format {compact,json}` | `compact` (default) streams the nom-style live view. `json` is silent during the run and emits a single JSON object on stdout at completion, designed for CI and `jq` pipelines. |
+| `--hide-state <state>` | Suppress per-host lines of the given state from the live compact log. Accepts comma-separated values (e.g. `--hide-state ok,skipped`) or repeated invocations. Choices: `ok`, `changed`, `failed`, `skipped`, `unreachable`. The status panel, recording, and `aom inspect` are unaffected. |
 | `--no-record` | Disable session recording for this run. No directory is written under `~/.local/state/aom/sessions/`. Debug output from `--verbose` is unaffected. |
 | `--install-completion {bash,zsh,fish}` | Print the rc-file snippet for the given shell to stdout, then exit. Pipe to your rc file (e.g. `aom --install-completion bash >> ~/.bashrc`). Powered by `argcomplete`; tab-completes subcommands, flags, and recorded session IDs. |
 | `--version` | Print version and exit. |
@@ -175,28 +171,26 @@ ansible-playbook ─────►│ PTY (pexpect)        │
                        │  • password prompts  │     PRE_RUN_PROMPTS
                        │  • JSONL events      │     EXECUTION
                        │  • PLAY RECAP        │     POST_RUN_RECAP
-                       └──────────┬───────────┘
-                                  ▼
-                       ┌──────────────────────┐
-                       │ RunState             │   pure-Python state
-                       │  • plays / tasks     │   no I/O, no Textual
-                       │  • dynamic include   │   include_tasks grafted
-                       │    expansion         │     under parent at runtime
-                       └──────────┬───────────┘
-                                  ▼
-                  ┌───────────────┴───────────────┐
-                  ▼                               ▼
-       ┌─────────────────┐             ┌──────────────────┐
-       │ CompactRenderer │             │ AOMApp (Textual) │
-       │ Rich Live panel │             │ full TUI         │
-       └─────────────────┘             └──────────────────┘
-                  │
-                  ▼
-          ~/.local/state/aom/sessions/<uuidv7>/
-            ├── events.jsonl     ← immutable events, including aom_stderr_line
-            ├── meta.json        ← playbook, start/end, status
-            ├── diagnostics.json ← derived lifecycle and renderer diagnostics
-            └── index.db         ← optional, disposable inspect index
+                        └──────────┬───────────┘
+                                   ▼
+                        ┌──────────────────────┐
+                        │ RunState             │   pure-Python state
+                        │  • plays / tasks     │   no I/O, no Textual
+                        │  • dynamic include   │   include_tasks grafted
+                        │    expansion         │     under parent at runtime
+                        └──────────┬───────────┘
+                                   ▼
+                        ┌─────────────────────┐
+                        │ CompactRenderer     │
+                        │ Rich Live panel     │
+                        └─────────────────────┘
+                                   │
+                                   ▼
+           ~/.local/state/aom/sessions/<uuidv7>/
+             ├── events.jsonl     ← immutable events, including aom_stderr_line
+             ├── meta.json        ← playbook, start/end, status
+             ├── diagnostics.json ← derived lifecycle and renderer diagnostics
+             └── index.db         ← optional, disposable inspect index
 ```
 
 `events.jsonl` is the session source of truth. Stderr is stored there as
