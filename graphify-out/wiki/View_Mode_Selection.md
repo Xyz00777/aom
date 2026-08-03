@@ -28,10 +28,10 @@
 
 ## Relationships
 
-- [TUI Tree View Tests](TUI_Tree_View_Tests.md) (2 shared connections)
-- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
-- [Inspect TUI Widget Data](Inspect_TUI_Widget_Data.md) (1 shared connections)
-- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [redact_event](redact_event.md) (2 shared connections)
+- [AppConfig](AppConfig.md) (1 shared connections)
+- [RedactionConfig](RedactionConfig.md) (1 shared connections)
+- [json.py](json.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -39,8 +39,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 65 (97%)
-- INFERRED: 2 (3%)
+- EXTRACTED: 67 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

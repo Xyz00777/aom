@@ -33,8 +33,7 @@
 ## Relationships
 
 - [KeyAction TypedDict](KeyAction_TypedDict.md) (4 shared connections)
-- [Rerun Subcommand Module](Rerun_Subcommand_Module.md) (2 shared connections)
-- [Run Config Key Normalization](Run_Config_Key_Normalization.md) (1 shared connections)
+- [load_session](load_session.md) (3 shared connections)
 - [Shell Completion Helpers](Shell_Completion_Helpers.md) (1 shared connections)
 
 ## Source Files
@@ -44,8 +43,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 89 (87%)
-- INFERRED: 13 (13%)
+- EXTRACTED: 102 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

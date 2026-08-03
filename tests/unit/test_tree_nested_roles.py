@@ -17,9 +17,9 @@ Bug summary (proved by the current implementation in ``core/tree.py``):
   fixed, the TUI wouldn't pick up deeper task nodes on status updates.
 
 These tests pin the *target* shape after the data-model-first fix
-(``TaskRunState.parent_role``, recursive ``group_roles``, recursive
-walk in ``TaskTree``). They MUST fail on the current code (proving the
-bug) and MUST pass after T2-T7 land.
+(``TaskRunState.parent_role``, recursive ``group_roles``). They MUST
+fail on the current code (proving the bug) and MUST pass after T2-T7
+land.
 
 Convention follows ``tests/unit/test_tree_projection.py``,
 ``tests/unit/test_tree_ungrouped_roles.py``, and
@@ -34,7 +34,6 @@ from ansible_aom.core.models import (
     PlayDefinition,
     RoleGroupDefinition,
     RunState,
-    Status,
     TaskDefinition,
 )
 from ansible_aom.core.tree import TreeProjection
@@ -123,7 +122,7 @@ class TestNestedRoleRendersAsSubBranch:
     ``role: podman``) must render the inner role as its own ``role:``
     header under the outer role, not as a flat task list.
 
-    Mirrors the user-reported tree from ``aom --tui``::
+    Mirrors the user-reported tree view::
 
         play: Setup rootless Podman for Scrutiny web server
         └─ role: podman (40 tasks)
@@ -521,85 +520,6 @@ class TestMixedConsecutiveAndNestedRoles:
         assert angie_idx < helper_idx, (
             f"angie sub-branch should appear before helper sub-branch; "
             f"angie_idx={angie_idx}, helper_idx={helper_idx}"
-        )
-
-
-class TestTuiWidgetWalksRecursively:
-    """``TaskTree.apply_state_icons`` indexes only one level into role
-    children (``task_tree.py:184-188``). With nested roles, deeper task
-    nodes are skipped during status updates, leaving them stuck at the
-    PENDING icon. The fix must walk role children recursively.
-    """
-
-    def test_tui_widget_walks_recursively(self) -> None:
-        from ansible_aom.core.icons import STATUS_ICONS
-        from ansible_aom.tui.widgets.task_tree import TaskTree
-
-        state = RunState(playbook="site.yml")
-        state.definitions = [
-            _play_def(
-                "p1",
-                "Mixed roles",
-                [
-                    RoleGroupDefinition(
-                        role="podman",
-                        tasks=[
-                            TaskDefinition(
-                                name="podman native task",
-                                role="podman",
-                                tags=[],
-                                play_id="p1",
-                                play_order=0,
-                                task_order=0,
-                            ),
-                            TaskDefinition(
-                                name="angie_ssl_terminator : Copy certificates",
-                                role="angie_ssl_terminator",
-                                parent_role="podman",
-                                tags=[],
-                                play_id="p1",
-                                play_order=0,
-                                task_order=1,
-                            ),
-                        ],
-                    )
-                ],
-            )
-        ]
-        _fire_startup(state, play_id="play-1", play_name="Mixed roles")
-
-        _fire_running_task(
-            state,
-            "t-angie",
-            "angie_ssl_terminator : Copy certificates",
-            host="web1",
-        )
-
-        widget = TaskTree(label="main.yml")
-        widget.populate_from_definitions(state.definitions)
-        widget.apply_state_icons(state)
-
-        after_labels: list[str] = []
-
-        def _walk_after(node) -> None:
-            label_text = node.label.plain if hasattr(node.label, "plain") else str(node.label)
-            after_labels.append(label_text)
-            for child in node.children:
-                _walk_after(child)
-
-        for play_node in widget.root.children:
-            _walk_after(play_node)
-
-        running_icon = STATUS_ICONS[Status.RUNNING]
-
-        angie_labels = [lbl for lbl in after_labels if "Copy certificates" in lbl]
-        assert angie_labels, (
-            f"the nested angie task node never appears in the tree after "
-            f"apply_state_icons. After labels: {after_labels}"
-        )
-        assert any(running_icon in lbl for lbl in angie_labels), (
-            f"nested angie task not showing RUNNING icon after apply_state_icons; "
-            f"expected '{running_icon}', got: {angie_labels}"
         )
 
 

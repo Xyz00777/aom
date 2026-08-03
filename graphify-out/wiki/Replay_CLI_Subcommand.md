@@ -21,10 +21,8 @@
 
 ## Relationships
 
-- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (8 shared connections)
-- [Timestamp Timezone Formatting](Timestamp_Timezone_Formatting.md) (1 shared connections)
-- [Run State Summary Panel](Run_State_Summary_Panel.md) (1 shared connections)
-- [Renderer Set Definitions](Renderer_Set_Definitions.md) (1 shared connections)
+- [WarningEntry](WarningEntry.md) (7 shared connections)
+- [AppConfig](AppConfig.md) (4 shared connections)
 
 ## Source Files
 

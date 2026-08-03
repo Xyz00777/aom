@@ -33,8 +33,9 @@
 
 ## Relationships
 
-- [Warning Classification Tests](Warning_Classification_Tests.md) (2 shared connections)
 - [log_filter.py](log_filter.py.md) (2 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
+- [_BoundedSet](_BoundedSet.md) (1 shared connections)
 
 ## Source Files
 
@@ -43,8 +44,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 51 (69%)
-- INFERRED: 23 (31%)
+- EXTRACTED: 74 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -32,8 +32,8 @@
 
 ## Relationships
 
-- [Replay Determinism Tests](Replay_Determinism_Tests.md) (3 shared connections)
-- [Session Diagnostics Writing](Session_Diagnostics_Writing.md) (1 shared connections)
+- [run_playbook](run_playbook.md) (3 shared connections)
+- [test_live_driver_drives_renderer_with_fake_subprocess](test_live_driver_drives_renderer_with_fake_subprocess.md) (1 shared connections)
 
 ## Source Files
 

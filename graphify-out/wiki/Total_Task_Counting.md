@@ -23,10 +23,9 @@
 
 ## Relationships
 
-- [Include Role Discovery](Include_Role_Discovery.md) (3 shared connections)
-- [Run Config Key Normalization](Run_Config_Key_Normalization.md) (2 shared connections)
-- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
-- [StatusBarConfig Model](StatusBarConfig_Model.md) (1 shared connections)
+- [load_session](load_session.md) (4 shared connections)
+- [SessionManager](SessionManager.md) (2 shared connections)
+- [json.py](json.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -34,8 +33,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 52 (91%)
-- INFERRED: 5 (9%)
+- EXTRACTED: 57 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

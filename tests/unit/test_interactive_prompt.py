@@ -116,77 +116,6 @@ class TestCompactRendererInteractivePrompt:
         assert restarted == [True]
 
 
-class TestAOMAppInteractivePrompt:
-    """AOMApp must implement handle_interactive_prompt via suspend + input."""
-
-    def test_method_exists(self) -> None:
-        from ansible_aom.tui.app import AOMApp
-
-        app = AOMApp()
-        assert hasattr(app, "handle_interactive_prompt")
-
-    def test_suspends_then_reads_input(self) -> None:
-        from ansible_aom.tui.app import AOMApp
-
-        app = AOMApp()
-        suspended = False
-
-        class FakeSuspend:
-            def __enter__(self):
-                nonlocal suspended
-                suspended = True
-                return self
-
-            def __exit__(self, *args):
-                pass
-
-        with (
-            patch.object(app, "suspend", return_value=FakeSuspend()),
-            patch("builtins.input", return_value="yes"),
-        ):
-            answer = app.handle_interactive_prompt("Deploy? Press Enter: ")
-
-        assert suspended is True
-        assert answer == "yes"
-
-    def test_writes_prompt_to_stdout_not_input_arg(self, capsys) -> None:
-        """Same readline-routes-prompt-to-stderr bug applies to the TUI path."""
-        from ansible_aom.tui.app import AOMApp
-
-        app = AOMApp()
-        with (
-            patch.object(app, "suspend"),
-            patch("builtins.input", return_value="") as mock_input,
-        ):
-            app.handle_interactive_prompt("Deploy? Press Enter: ")
-        mock_input.assert_called_once_with()
-        out = capsys.readouterr().out
-        assert "Deploy? Press Enter: " in out
-
-    def test_returns_empty_on_eof(self) -> None:
-        from ansible_aom.tui.app import AOMApp
-
-        app = AOMApp()
-        with (
-            patch.object(app, "suspend"),
-            patch("builtins.input", side_effect=EOFError),
-        ):
-            assert app.handle_interactive_prompt("x: ") == ""
-
-    def test_keyboard_interrupt_propagates_so_run_can_abort(self) -> None:
-        from ansible_aom.tui.app import AOMApp
-
-        app = AOMApp()
-        import pytest as _pytest
-
-        with (
-            patch.object(app, "suspend"),
-            patch("builtins.input", side_effect=KeyboardInterrupt),
-        ):
-            with _pytest.raises(KeyboardInterrupt):
-                app.handle_interactive_prompt("x: ")
-
-
 class TestProtocol:
     """Renderer protocol gains the interactive prompt method."""
 
@@ -206,9 +135,3 @@ class TestProtocol:
         from ansible_aom.renderer.protocol import Renderer
 
         assert isinstance(CompactRenderer(), Renderer)
-
-    def test_aom_app_still_satisfies_protocol(self) -> None:
-        from ansible_aom.renderer.protocol import Renderer
-        from ansible_aom.tui.app import AOMApp
-
-        assert isinstance(AOMApp(), Renderer)

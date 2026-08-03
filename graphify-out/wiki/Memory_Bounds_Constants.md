@@ -33,9 +33,9 @@
 
 ## Relationships
 
-- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (8 shared connections)
-- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (6 shared connections)
-- [Role Group Task Models](Role_Group_Task_Models.md) (2 shared connections)
+- [HostRunState](HostRunState.md) (8 shared connections)
+- [WarningEntry](WarningEntry.md) (6 shared connections)
+- [WarningType](WarningType.md) (2 shared connections)
 
 ## Source Files
 

@@ -34,16 +34,6 @@ class TestReplayDispatch:
             main()
             mock_main.assert_called_once_with(["abc123", "--speed", "5"])
 
-    def test_replay_forwards_renderer_flags(self) -> None:
-        from ansible_aom.cli import main
-
-        with (
-            patch("ansible_aom.drivers.replay.cli_main", return_value=0) as mock_main,
-            patch("sys.argv", ["aom", "replay", "abc123", "--tui"]),
-        ):
-            main()
-            mock_main.assert_called_once_with(["abc123", "--tui"])
-
     def test_replay_propagates_exit_code(self) -> None:
         from ansible_aom.cli import main
 
@@ -95,24 +85,6 @@ class TestReplayCLIMain:
         # Default = compact renderer (mode="compact").
         kw = mock_factory.call_args.kwargs
         assert kw.get("mode") == "compact"
-
-    def test_cli_main_tui_flag_selects_tui_renderer(self, tmp_path: Path) -> None:
-        from ansible_aom.drivers.replay import cli_main
-
-        _make_session(
-            tmp_path,
-            "abc",
-            [{"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-08T10:00:00Z"}],
-        )
-
-        with (
-            patch("ansible_aom.drivers.replay.replay_session", return_value=0),
-            patch("ansible_aom.drivers.replay.create_renderer") as mock_factory,
-        ):
-            mock_factory.return_value = object()
-            cli_main(["abc", "--state-dir", str(tmp_path), "--tui"])
-
-        assert mock_factory.call_args.kwargs.get("mode") == "tui"
 
     def test_cli_main_speed_forwarded(self, tmp_path: Path) -> None:
         from ansible_aom.drivers.replay import cli_main
@@ -169,16 +141,3 @@ class TestReplayCLIMain:
             exit_code = cli_main(["nope", "--state-dir", str(tmp_path)])
 
         assert exit_code == 1
-
-    def test_compact_and_tui_are_mutually_exclusive(self, tmp_path: Path) -> None:
-        """Passing both --compact and --tui exits with usage error (argparse SystemExit)."""
-        import pytest
-
-        from ansible_aom.drivers.replay import cli_main
-
-        with (
-            patch("ansible_aom.drivers.replay.replay_session", return_value=0),
-            patch("ansible_aom.drivers.replay.create_renderer", return_value=object()),
-            pytest.raises(SystemExit),
-        ):
-            cli_main(["abc", "--state-dir", str(tmp_path), "--compact", "--tui"])

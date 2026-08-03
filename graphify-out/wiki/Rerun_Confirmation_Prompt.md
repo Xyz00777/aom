@@ -21,15 +21,16 @@
 
 ## Relationships
 
-- [Ungrouped Role Tree Tests](Ungrouped_Role_Tree_Tests.md) (5 shared connections)
-- [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (3 shared connections)
-- [CLI Interface Tests](CLI_Interface_Tests.md) (3 shared connections)
-- [Log Panel Search](Log_Panel_Search.md) (3 shared connections)
-- [WarningEntry Dataclass](WarningEntry_Dataclass.md) (2 shared connections)
-- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
-- [Tree Projection Lifecycle](Tree_Projection_Lifecycle.md) (1 shared connections)
+- [IncludeCacheEntry](IncludeCacheEntry.md) (4 shared connections)
+- [_discover_role](_discover_role.md) (3 shared connections)
+- [json.py](json.py.md) (3 shared connections)
+- [Path](Path.md) (3 shared connections)
+- [TestGraftIncludeChildren](TestGraftIncludeChildren.md) (2 shared connections)
+- [HostRunState](HostRunState.md) (1 shared connections)
+- [RunState](RunState.md) (1 shared connections)
 - [PreParseResult Assembly](PreParseResult_Assembly.md) (1 shared connections)
-- [Exit Code From State](Exit_Code_From_State.md) (1 shared connections)
+- [TaskDefinition](TaskDefinition.md) (1 shared connections)
+- [PlayDefinition](PlayDefinition.md) (1 shared connections)
 
 ## Source Files
 
@@ -38,8 +39,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 29 (58%)
-- INFERRED: 21 (42%)
+- EXTRACTED: 35 (70%)
+- INFERRED: 15 (30%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -34,14 +34,13 @@
 ## Relationships
 
 - [Play Boundary State Tests](Play_Boundary_State_Tests.md) (4 shared connections)
+- [json.py](json.py.md) (3 shared connections)
 - [Include Import Role Tasks](Include_Import_Role_Tasks.md) (3 shared connections)
-- [StatusBarConfig Model](StatusBarConfig_Model.md) (2 shared connections)
-- [Diagnostics Layer Tests](Diagnostics_Layer_Tests.md) (2 shared connections)
+- [ReplayDriver](ReplayDriver.md) (2 shared connections)
 - [test_replay_determinism.py](test_replay_determinism.py.md) (2 shared connections)
 - [Diagnostics CLI Wiring](Diagnostics_CLI_Wiring.md) (2 shared connections)
-- [Interactive Prompt Tests](Interactive_Prompt_Tests.md) (1 shared connections)
-- [Include Role Discovery](Include_Role_Discovery.md) (1 shared connections)
-- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [Renderer](Renderer.md) (1 shared connections)
+- [load_session](load_session.md) (1 shared connections)
 
 ## Source Files
 
@@ -50,8 +49,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 102 (74%)
-- INFERRED: 36 (26%)
+- EXTRACTED: 105 (76%)
+- INFERRED: 33 (24%)
 - AMBIGUOUS: 0 (0%)
 
 ---

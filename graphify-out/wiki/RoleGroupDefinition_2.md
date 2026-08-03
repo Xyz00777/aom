@@ -1,32 +1,32 @@
 # RoleGroupDefinition
 
-> God node · 156 connections · `src/ansible_aom/core/models.py`
+> God node · 152 connections · `src/ansible_aom/core/models.py`
 
-**Community:** [CLI Interface Tests](CLI_Interface_Tests.md)
+**Community:** [TaskDefinition](TaskDefinition.md)
 
 ## Connections by Relation
 
 ### calls
-- ._many_tasks_state() `INFERRED`
-- _two_level_state() `INFERRED`
-- test_format_tree_block_renders_two_level_truncation() `INFERRED`
-- ._nested_state() `INFERRED`
-- ._single_play_single_role_state() `INFERRED`
-- .test_mixed_consecutive_and_nested_roles() `INFERRED`
-- .test_nested_role_renders_as_sub_branch() `INFERRED`
-- .test_runtime_podman_prefix_does_not_duplicate_role_header() `INFERRED`
-- ._multi_task_role_with_completed_task() `INFERRED`
-- .test_regression_flat_role_tasks_unchanged() `INFERRED`
-- ._multi_play_completed_state() `INFERRED`
-- .test_arbitrary_depth_renders_correctly() `INFERRED`
-- .test_task_label_strips_role_prefix_and_pending_visible() `INFERRED`
-- .test_no_double_counting_preflight_and_runtime() `INFERRED`
-- .test_preflight_duplicate_role_header_bug() `INFERRED`
-- .test_tui_widget_walks_recursively() `INFERRED`
-- .test_single_level_role_one_inner_footer() `INFERRED`
-- .test_no_inner_footer_when_role_has_no_remaining() `INFERRED`
-- .test_role_total_single_role_unchanged() `INFERRED`
-- .test_inner_footer_does_not_count_upcoming_plays_tasks() `INFERRED`
+- ._many_tasks_state() `EXTRACTED`
+- group_roles() `EXTRACTED`
+- test_format_tree_block_renders_two_level_truncation() `EXTRACTED`
+- ._nested_state() `EXTRACTED`
+- ._single_play_single_role_state() `EXTRACTED`
+- .test_mixed_consecutive_and_nested_roles() `EXTRACTED`
+- .test_nested_role_renders_as_sub_branch() `EXTRACTED`
+- .test_runtime_podman_prefix_does_not_duplicate_role_header() `EXTRACTED`
+- ._multi_task_role_with_completed_task() `EXTRACTED`
+- .test_regression_flat_role_tasks_unchanged() `EXTRACTED`
+- ._multi_play_completed_state() `EXTRACTED`
+- .test_arbitrary_depth_renders_correctly() `EXTRACTED`
+- .test_task_label_strips_role_prefix_and_pending_visible() `EXTRACTED`
+- .test_no_double_counting_preflight_and_runtime() `EXTRACTED`
+- .test_preflight_duplicate_role_header_bug() `EXTRACTED`
+- .test_single_level_role_one_inner_footer() `EXTRACTED`
+- .test_no_inner_footer_when_role_has_no_remaining() `EXTRACTED`
+- .test_role_total_single_role_unchanged() `EXTRACTED`
+- .test_inner_footer_does_not_count_upcoming_plays_tasks() `EXTRACTED`
+- .test_outer_footer_appears_when_budget_overflow() `EXTRACTED`
 
 ### contains
 - models.py `EXTRACTED`
@@ -39,7 +39,6 @@
 - includes.py `EXTRACTED`
 
 ### indirect_call
-- group_roles() `INFERRED`
 - collect_tags() `INFERRED`
 - _iter_leaf_task_defs() `INFERRED`
 - _count_tasks() `INFERRED`
@@ -67,23 +66,23 @@
 ### uses
 - [RunState](RunState.md) `INFERRED`
 - [PtyStreamParser](PtyStreamParser.md) `INFERRED`
-- StreamPhase `INFERRED`
-- JsonLineStream `INFERRED`
-- TreeProjection `INFERRED`
+- [StreamPhase](StreamPhase.md) `INFERRED`
+- [JsonLineStream](JsonLineStream.md) `INFERRED`
+- [TreeProjection](TreeProjection.md) `INFERRED`
 - TestPtyStreamParserStderrLineEmission `INFERRED`
 - TreeLine `INFERRED`
 - PreParseResult `INFERRED`
 - TestJsonLineStreamBasics `INFERRED`
 - TestListTasksEdgeCases `INFERRED`
 - TestListTasksParser `INFERRED`
-- TestPtyStreamParserPhases `INFERRED`
+- [TestPtyStreamParserPhases](TestPtyStreamParserPhases.md) `INFERRED`
 - TestTaskDefinition `INFERRED`
 - TestListHostsEdgeCases `INFERRED`
-- TestHostRunState `INFERRED`
+- [TestHostRunState](TestHostRunState.md) `INFERRED`
 - TestPlayRunState `INFERRED`
 - TestRunState `INFERRED`
-- TestStatusEnum `INFERRED`
-- TestRoleGrouping `INFERRED`
+- [TestStatusEnum](TestStatusEnum.md) `INFERRED`
+- [TestRoleGrouping](TestRoleGrouping.md) `INFERRED`
 - TestPlayDefinition `INFERRED`
 
 ---

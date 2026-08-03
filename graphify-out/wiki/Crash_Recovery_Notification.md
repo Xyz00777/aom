@@ -9,7 +9,7 @@
 
 ## Relationships
 
-- [Session List View](Session_List_View.md) (1 shared connections)
+- [icons.py](icons.py.md) (1 shared connections)
 - [Error Handling Tests](Error_Handling_Tests.md) (1 shared connections)
 
 ## Source Files
@@ -18,8 +18,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 3 (75%)
-- INFERRED: 1 (25%)
+- EXTRACTED: 4 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

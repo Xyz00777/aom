@@ -44,7 +44,7 @@
 - [TestClassifyPrompt](TestClassifyPrompt.md) (3 shared connections)
 - [TestClassifySshDebug](TestClassifySshDebug.md) (3 shared connections)
 - [TestFirstMatchWins](TestFirstMatchWins.md) (2 shared connections)
-- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [StreamPhase](StreamPhase.md) (1 shared connections)
 
 ## Source Files
 
@@ -53,8 +53,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 86 (42%)
-- INFERRED: 117 (58%)
+- EXTRACTED: 191 (94%)
+- INFERRED: 12 (6%)
 - AMBIGUOUS: 0 (0%)
 
 ---

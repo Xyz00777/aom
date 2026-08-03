@@ -34,7 +34,7 @@
 ## Relationships
 
 - [Warning Pattern Classification](Warning_Pattern_Classification.md) (9 shared connections)
-- [Session List View](Session_List_View.md) (2 shared connections)
+- [icons.py](icons.py.md) (2 shared connections)
 - [test_icons.py](test_icons.py.md) (1 shared connections)
 - [TUI Widget Framework](TUI_Widget_Framework.md) (1 shared connections)
 - [CLI Framework Architecture](CLI_Framework_Architecture.md) (1 shared connections)
@@ -50,8 +50,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 115 (98%)
-- INFERRED: 2 (2%)
+- EXTRACTED: 117 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

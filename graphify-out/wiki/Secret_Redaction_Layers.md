@@ -20,7 +20,7 @@
 ## Relationships
 
 - [core/__init__.py](core-__init__.py.md) (1 shared connections)
-- [Frame Parameter Handling](Frame_Parameter_Handling.md) (1 shared connections)
+- [IO](IO.md) (1 shared connections)
 
 ## Source Files
 

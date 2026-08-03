@@ -11,10 +11,10 @@
 
 ## Relationships
 
-- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (2 shared connections)
-- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (1 shared connections)
-- [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
-- [Action Keybindings Lookup](Action_Keybindings_Lookup.md) (1 shared connections)
+- [Display](Display.md) (2 shared connections)
+- [HostRunState](HostRunState.md) (1 shared connections)
+- [CompactRenderer](CompactRenderer.md) (1 shared connections)
+- [TestSignalHandling](TestSignalHandling.md) (1 shared connections)
 
 ## Source Files
 

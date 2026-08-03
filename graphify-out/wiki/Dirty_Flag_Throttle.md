@@ -27,10 +27,10 @@
 
 ## Relationships
 
-- [TUI Keybindings Config](TUI_Keybindings_Config.md) (1 shared connections)
-- [Pause Prompt Heuristic](Pause_Prompt_Heuristic.md) (1 shared connections)
-- [Session List View](Session_List_View.md) (1 shared connections)
-- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
+- [format_tree_block](format_tree_block.md) (1 shared connections)
+- [icons.py](icons.py.md) (1 shared connections)
+- [HostRunState](HostRunState.md) (1 shared connections)
 - [test_icons.py](test_icons.py.md) (1 shared connections)
 
 ## Source Files
@@ -40,8 +40,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 40 (70%)
-- INFERRED: 17 (30%)
+- EXTRACTED: 57 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

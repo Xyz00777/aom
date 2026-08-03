@@ -33,9 +33,9 @@
 
 ## Relationships
 
-- [Tree Block Animation](Tree_Block_Animation.md) (4 shared connections)
+- [run_playbook](run_playbook.md) (4 shared connections)
 - [test_password.py](test_password.py.md) (1 shared connections)
-- [Golden Frame Tests](Golden_Frame_Tests.md) (1 shared connections)
+- [is_password_prompt](is_password_prompt.md) (1 shared connections)
 - [CLI Main Entry Point](CLI_Main_Entry_Point.md) (1 shared connections)
 
 ## Source Files
@@ -45,8 +45,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 79 (68%)
-- INFERRED: 38 (32%)
+- EXTRACTED: 117 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

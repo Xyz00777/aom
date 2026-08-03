@@ -16,9 +16,8 @@
 
 ## Relationships
 
-- [App Configuration Settings](App_Configuration_Settings.md) (2 shared connections)
-- [TUI Keybindings Config](TUI_Keybindings_Config.md) (1 shared connections)
-- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
+- [renderer.py](renderer.py.md) (2 shared connections)
+- [CompactRenderer](CompactRenderer.md) (2 shared connections)
 
 ## Source Files
 

@@ -27,14 +27,13 @@
 
 ## Relationships
 
-- [Pause Prompt Heuristic](Pause_Prompt_Heuristic.md) (7 shared connections)
-- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (6 shared connections)
-- [CLI Interface Tests](CLI_Interface_Tests.md) (6 shared connections)
-- [.test_field_exists_with_default_false](test_field_exists_with_default_false.md) (4 shared connections)
-- [TUI Keybindings Config](TUI_Keybindings_Config.md) (1 shared connections)
-- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
+- [HostRunState](HostRunState.md) (7 shared connections)
+- [format_tree_block](format_tree_block.md) (7 shared connections)
+- [TreeProjection](TreeProjection.md) (5 shared connections)
+- [.from_run_state](from_run_state.md) (4 shared connections)
+- [RunState](RunState.md) (2 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
 - [tree.py](tree.py.md) (1 shared connections)
-- [Hide State Gating Tests](Hide_State_Gating_Tests.md) (1 shared connections)
 
 ## Source Files
 
@@ -42,8 +41,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 62 (78%)
-- INFERRED: 17 (22%)
+- EXTRACTED: 75 (95%)
+- INFERRED: 4 (5%)
 - AMBIGUOUS: 0 (0%)
 
 ---

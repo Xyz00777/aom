@@ -17,13 +17,15 @@
 
 ## Relationships
 
-- [CLI Interface Tests](CLI_Interface_Tests.md) (6 shared connections)
-- [Ungrouped Role Tree Tests](Ungrouped_Role_Tree_Tests.md) (4 shared connections)
-- [Log Panel Search](Log_Panel_Search.md) (3 shared connections)
-- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (2 shared connections)
-- [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (1 shared connections)
+- [RunState](RunState.md) (6 shared connections)
+- [IncludeCacheEntry](IncludeCacheEntry.md) (3 shared connections)
+- [Path](Path.md) (3 shared connections)
+- [_discover_role](_discover_role.md) (1 shared connections)
+- [json.py](json.py.md) (1 shared connections)
+- [TaskDefinition](TaskDefinition.md) (1 shared connections)
+- [PlayDefinition](PlayDefinition.md) (1 shared connections)
 - [Rerun Confirmation Prompt](Rerun_Confirmation_Prompt.md) (1 shared connections)
-- [WarningEntry Dataclass](WarningEntry_Dataclass.md) (1 shared connections)
+- [TestGraftIncludeChildren](TestGraftIncludeChildren.md) (1 shared connections)
 
 ## Source Files
 
@@ -32,8 +34,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 25 (62%)
-- INFERRED: 15 (38%)
+- EXTRACTED: 33 (82%)
+- INFERRED: 7 (18%)
 - AMBIGUOUS: 0 (0%)
 
 ---

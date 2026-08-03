@@ -29,8 +29,8 @@
 - [Keybinding Conflict Validation](Keybinding_Conflict_Validation.md) (5 shared connections)
 - [State Transition Validation](State_Transition_Validation.md) (2 shared connections)
 - [TestClassifierRules](TestClassifierRules.md) (2 shared connections)
-- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
-- [StatusBarConfig Model](StatusBarConfig_Model.md) (1 shared connections)
+- [StreamPhase](StreamPhase.md) (1 shared connections)
+- [load_session](load_session.md) (1 shared connections)
 - [TestClassifyEmpty](TestClassifyEmpty.md) (1 shared connections)
 - [TestClassifyError](TestClassifyError.md) (1 shared connections)
 - [TestClassifyPrompt](TestClassifyPrompt.md) (1 shared connections)
@@ -44,8 +44,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 41 (55%)
-- INFERRED: 34 (45%)
+- EXTRACTED: 42 (56%)
+- INFERRED: 33 (44%)
 - AMBIGUOUS: 0 (0%)
 
 ---

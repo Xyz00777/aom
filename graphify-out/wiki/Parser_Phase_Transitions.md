@@ -29,8 +29,8 @@
 
 ## Relationships
 
-- [App Configuration Settings](App_Configuration_Settings.md) (5 shared connections)
-- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
+- [CompactRenderer](CompactRenderer.md) (5 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
 
 ## Source Files
 

@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **PtyStreamParser** (0 connections) — `TEST_SPECIFICATION.md`
+- **PtyStreamParser** (0 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
 
 ## Relationships
 
@@ -12,7 +12,7 @@
 
 ## Source Files
 
-- `TEST_SPECIFICATION.md`
+- `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
 
 ## Audit Trail
 

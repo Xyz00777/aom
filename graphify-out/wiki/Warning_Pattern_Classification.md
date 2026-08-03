@@ -34,8 +34,8 @@
 ## Relationships
 
 - [Error Handling Tests](Error_Handling_Tests.md) (9 shared connections)
-- [Session List View](Session_List_View.md) (1 shared connections)
-- [Role Group Task Models](Role_Group_Task_Models.md) (1 shared connections)
+- [icons.py](icons.py.md) (1 shared connections)
+- [HostRunState](HostRunState.md) (1 shared connections)
 - [test_icons.py](test_icons.py.md) (1 shared connections)
 
 ## Source Files

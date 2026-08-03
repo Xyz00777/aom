@@ -20,9 +20,9 @@
 
 ## Relationships
 
-- [Rerun Subcommand Module](Rerun_Subcommand_Module.md) (2 shared connections)
+- [load_session](load_session.md) (2 shared connections)
 - [Ansible Posix Availability](Ansible_Posix_Availability.md) (1 shared connections)
-- [Version String Parsing](Version_String_Parsing.md) (1 shared connections)
+- [test_completion.py](test_completion.py.md) (1 shared connections)
 - [KeyAction TypedDict](KeyAction_TypedDict.md) (1 shared connections)
 - [Compact Renderer Formatters](Compact_Renderer_Formatters.md) (1 shared connections)
 
@@ -33,8 +33,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 26 (57%)
-- INFERRED: 20 (43%)
+- EXTRACTED: 44 (96%)
+- INFERRED: 2 (4%)
 - AMBIGUOUS: 0 (0%)
 
 ---

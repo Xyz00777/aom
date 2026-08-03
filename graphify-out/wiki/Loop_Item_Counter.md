@@ -11,8 +11,8 @@
 
 ## Relationships
 
-- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (2 shared connections)
-- [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
+- [HostRunState](HostRunState.md) (2 shared connections)
+- [CompactRenderer](CompactRenderer.md) (1 shared connections)
 
 ## Source Files
 

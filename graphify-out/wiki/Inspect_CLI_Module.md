@@ -18,9 +18,9 @@
 
 ## Relationships
 
-- [App Configuration Settings](App_Configuration_Settings.md) (2 shared connections)
-- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
-- [Frame Parameter Handling](Frame_Parameter_Handling.md) (1 shared connections)
+- [CompactRenderer](CompactRenderer.md) (2 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
+- [IO](IO.md) (1 shared connections)
 
 ## Source Files
 
@@ -28,8 +28,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 32 (94%)
-- INFERRED: 2 (6%)
+- EXTRACTED: 33 (97%)
+- INFERRED: 1 (3%)
 - AMBIGUOUS: 0 (0%)
 
 ---

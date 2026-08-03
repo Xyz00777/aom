@@ -34,8 +34,8 @@
 ## Relationships
 
 - [log_filter.py](log_filter.py.md) (2 shared connections)
-- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
-- [Heartbeat Liveness Tracker](Heartbeat_Liveness_Tracker.md) (1 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
+- [._emit_event_log](_emit_event_log.md) (1 shared connections)
 
 ## Source Files
 
@@ -44,8 +44,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 57 (54%)
-- INFERRED: 49 (46%)
+- EXTRACTED: 106 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

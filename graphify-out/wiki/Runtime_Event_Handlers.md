@@ -23,10 +23,10 @@
 
 ## Relationships
 
-- [App Configuration Settings](App_Configuration_Settings.md) (3 shared connections)
-- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
-- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
-- [CLI Interface Tests](CLI_Interface_Tests.md) (1 shared connections)
+- [CompactRenderer](CompactRenderer.md) (3 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
+- [HostRunState](HostRunState.md) (1 shared connections)
+- [PlayDefinition](PlayDefinition.md) (1 shared connections)
 
 ## Source Files
 

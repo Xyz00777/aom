@@ -1,117 +1,65 @@
 # RunState
 
-> God node · 592 connections · `src/ansible_aom/core/run_state.py`
+> 266 nodes · cohesion 0.01
 
-**Community:** [CLI Interface Tests](CLI_Interface_Tests.md)
+## Key Concepts
 
-## Connections by Relation
+- **RunState** (581 connections) — `src/ansible_aom/core/run_state.py`
+- **test_event_processing.py** (30 connections) — `tests/unit/test_event_processing.py`
+- **TestRunState** (21 connections) — `tests/unit/test_models.py`
+- **TestRunStateUnknownEvent** (19 connections) — `tests/unit/test_parser.py`
+- **TestHandleEventDispatcher** (17 connections) — `tests/unit/test_event_processing.py`
+- **datetime** (15 connections)
+- **TestElapsedTimeFormat** (15 connections) — `tests/unit/test_event_processing.py`
+- **TestHandleEventMalformedPayloads** (15 connections) — `tests/unit/test_event_processing.py`
+- **._handle_v2_playbook_on_task_start()** (14 connections) — `src/ansible_aom/core/run_state.py`
+- **TestTimestampLocalTimezone** (14 connections) — `tests/unit/test_event_processing.py`
+- **._handle_v2_runner_on_start()** (13 connections) — `src/ansible_aom/core/run_state.py`
+- **._task_dict()** (13 connections) — `src/ansible_aom/core/run_state.py`
+- **TestPlaybookOnStats** (13 connections) — `tests/unit/test_event_processing.py`
+- **._handle_v2_runner_on_failed()** (12 connections) — `src/ansible_aom/core/run_state.py`
+- **._handle_v2_runner_on_ok()** (12 connections) — `src/ansible_aom/core/run_state.py`
+- **._handle_v2_runner_on_skipped()** (12 connections) — `src/ansible_aom/core/run_state.py`
+- **._handle_v2_runner_on_unreachable()** (12 connections) — `src/ansible_aom/core/run_state.py`
+- **._resolve_play_id()** (12 connections) — `src/ansible_aom/core/run_state.py`
+- **_reserve_host_run_state()** (11 connections) — `src/ansible_aom/core/run_state.py`
+- **._resolve_runner_task()** (11 connections) — `src/ansible_aom/core/run_state.py`
+- **TestEventProcessingEdgeCases** (11 connections) — `tests/unit/test_event_processing.py`
+- **TestHandleEventTimestampParsing** (11 connections) — `tests/unit/test_event_processing.py`
+- **TestHandleEventUnknownType** (11 connections) — `tests/unit/test_event_processing.py`
+- **TestHandlerTaskStart** (11 connections) — `tests/unit/test_event_processing.py`
+- **TestPlaybookOnStart** (11 connections) — `tests/unit/test_event_processing.py`
+- *... and 241 more nodes in this community*
 
-### calls
-- run_playbook() `EXTRACTED`
-- _spur_projection() `EXTRACTED`
-- _state_two_hosts_one_failure() `INFERRED`
-- test_format_tree_block_renders_two_level_truncation() `EXTRACTED`
-- _visible_projection() `EXTRACTED`
-- iter_tree_frames() `INFERRED`
-- .test_tree_projection_shows_pending_role_tasks() `INFERRED`
-- .test_watchdog_emits_warning_and_returns_when_no_eof() `INFERRED`
-- .test_watchdog_emits_warning_via_logger() `INFERRED`
-- .test_watchdog_path_calls_expect() `INFERRED`
-- .test_mixed_consecutive_and_nested_roles() `EXTRACTED`
-- .test_nested_role_renders_as_sub_branch() `EXTRACTED`
-- .test_runtime_podman_prefix_does_not_duplicate_role_header() `EXTRACTED`
-- .start() `INFERRED`
-- test_completed_tasks_counts_dynamic_children() `INFERRED`
-- .test_runtime_cache_reuses_preflight_entry() `INFERRED`
-- .test_clean_eof_after_stats_no_warning() `INFERRED`
-- .test_regression_flat_role_tasks_unchanged() `EXTRACTED`
-- test_count_total_tasks_grows_with_runtime_announced_tasks() `INFERRED`
-- test_host_leaves_dropped_when_budget_tight() `EXTRACTED`
+## Relationships
 
-### contains
-- run_state.py `EXTRACTED`
+- [HostRunState](HostRunState.md) (208 shared connections)
+- [TaskDefinition](TaskDefinition.md) (65 shared connections)
+- [json.py](json.py.md) (42 shared connections)
+- [PlayDefinition](PlayDefinition.md) (42 shared connections)
+- [.from_run_state](from_run_state.md) (40 shared connections)
+- [StreamPhase](StreamPhase.md) (28 shared connections)
+- [_drive](_drive.md) (17 shared connections)
+- [Inspect CLI Commands](Inspect_CLI_Commands.md) (16 shared connections)
+- [AOM TUI Application](AOM_TUI_Application.md) (15 shared connections)
+- [TestCrossPlayLookupIsolation](TestCrossPlayLookupIsolation.md) (12 shared connections)
+- [TestV2PlaybookOnStatsCrossCheck](TestV2PlaybookOnStatsCrossCheck.md) (11 shared connections)
+- [Run Diagnostics Tests](Run_Diagnostics_Tests.md) (9 shared connections)
 
-### imports
-- json.py `EXTRACTED`
-- format.py `EXTRACTED`
-- [runner.py](runner.py.md) `EXTRACTED`
-- tree_projection.py `EXTRACTED`
-- includes.py `EXTRACTED`
-- core/replay.py `EXTRACTED`
-- parity.py `EXTRACTED`
-- core/exit_code.py `EXTRACTED`
+## Source Files
 
-### indirect_call
-- .test_app_has_runstate_after_start() `INFERRED`
+- `src/ansible_aom/core/run_state.py`
+- `src/ansible_aom/formats/json.py`
+- `tests/unit/test_event_processing.py`
+- `tests/unit/test_loop_item_count.py`
+- `tests/unit/test_models.py`
+- `tests/unit/test_parser.py`
 
-### method
-- ._handle_v2_playbook_on_task_start() `EXTRACTED`
-- ._handle_v2_runner_on_start() `EXTRACTED`
-- ._task_dict() `EXTRACTED`
-- ._handle_v2_runner_on_failed() `EXTRACTED`
-- ._handle_v2_runner_on_ok() `EXTRACTED`
-- ._handle_v2_runner_on_skipped() `EXTRACTED`
-- ._handle_v2_runner_on_unreachable() `EXTRACTED`
-- ._resolve_play_id() `EXTRACTED`
-- ._graft_or_match_task() `EXTRACTED`
-- ._resolve_runner_task() `EXTRACTED`
-- ._handle_v2_runner_item_on() `EXTRACTED`
-- ._hosts_dict() `EXTRACTED`
-- ._graft_role_pending_siblings() `EXTRACTED`
-- ._note_unmatched() `EXTRACTED`
-- ._prior_host_start_time() `EXTRACTED`
-- ._finalize_play() `EXTRACTED`
-- ._handle_v2_playbook_on_play_start() `EXTRACTED`
-- ._bump_tree_revision() `EXTRACTED`
-- ._handle_v2_playbook_on_handler_task_start() `EXTRACTED`
-- ._handle_v2_playbook_on_stats() `EXTRACTED`
+## Audit Trail
 
-### rationale_for
-- Complete execution state (State class). `EXTRACTED`
-
-### references
-- .from_run_state() `EXTRACTED`
-- parse_jsonl_output() `EXTRACTED`
-- _drive() `EXTRACTED`
-- _feed() `EXTRACTED`
-- determine_exit_code() `EXTRACTED`
-- format_failure_recap() `EXTRACTED`
-- _drive() `EXTRACTED`
-- _play_start() `EXTRACTED`
-- _task_start() `EXTRACTED`
-- _discover_role() `EXTRACTED`
-- _state() `EXTRACTED`
-- _state_with_play() `EXTRACTED`
-- _state_with_play() `EXTRACTED`
-- ._many_tasks_state() `EXTRACTED`
-- _add_results() `EXTRACTED`
-- _state() `EXTRACTED`
-- _two_level_state() `EXTRACTED`
-- _two_play_state() `EXTRACTED`
-- count_total_tasks_seen() `EXTRACTED`
-- count_completed_tasks() `EXTRACTED`
-
-### uses
-- [TaskDefinition](TaskDefinition.md) `INFERRED`
-- [PlayDefinition](PlayDefinition.md) `INFERRED`
-- [HostRunState](HostRunState.md) `INFERRED`
-- [Status](Status.md) `INFERRED`
-- [PlayRunState](PlayRunState.md) `INFERRED`
-- [TaskRunState](TaskRunState.md) `INFERRED`
-- [RoleGroupDefinition](RoleGroupDefinition.md) `INFERRED`
-- JsonRenderer `INFERRED`
-- JsonlEvent `INFERRED`
-- TreeProjection `INFERRED`
-- IncludeCacheEntry `INFERRED`
-- TreeLine `INFERRED`
-- TestHideStateFlag `INFERRED`
-- _SessionSink `INFERRED`
-- RoleCacheEntry `INFERRED`
-- _NullSink `INFERRED`
-- TestRendererProtocol `INFERRED`
-- TestHideStateCompactPlumbing `INFERRED`
-- TestNoRedactFlag `INFERRED`
-- TestRendererFactory `INFERRED`
+- EXTRACTED: 1099 (71%)
+- INFERRED: 446 (29%)
+- AMBIGUOUS: 0 (0%)
 
 ---
 

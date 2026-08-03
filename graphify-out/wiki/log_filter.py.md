@@ -14,8 +14,8 @@
 - [Main TUI Screen](Main_TUI_Screen.md) (2 shared connections)
 - [Host Result Hide Filter](Host_Result_Hide_Filter.md) (2 shared connections)
 - [Parser Edge Cases](Parser_Edge_Cases.md) (2 shared connections)
-- [First Ctrl-C Cancellation](First_Ctrl-C_Cancellation.md) (1 shared connections)
-- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
+- [ansible_aom/cli.py](ansible_aom-cli.py.md) (1 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
 
 ## Source Files
 

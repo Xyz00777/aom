@@ -22,7 +22,7 @@
 ## Relationships
 
 - [core/__init__.py](core-__init__.py.md) (1 shared connections)
-- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [json.py](json.py.md) (1 shared connections)
 
 ## Source Files
 

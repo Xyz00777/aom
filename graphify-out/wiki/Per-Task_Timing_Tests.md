@@ -25,10 +25,9 @@
 
 ## Relationships
 
-- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (6 shared connections)
-- [App Configuration Settings](App_Configuration_Settings.md) (4 shared connections)
-- [Ansible Runner Subprocess](Ansible_Runner_Subprocess.md) (1 shared connections)
-- [Frame Parameter Handling](Frame_Parameter_Handling.md) (1 shared connections)
+- [Display](Display.md) (6 shared connections)
+- [CompactRenderer](CompactRenderer.md) (4 shared connections)
+- [IO](IO.md) (2 shared connections)
 
 ## Source Files
 

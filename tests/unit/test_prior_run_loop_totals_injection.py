@@ -39,13 +39,3 @@ class TestCompactInjection:
         r.set_prior_run(None)
         assert r._state is not None
         assert r._state.loop_totals == {}
-
-
-class TestTuiInjection:
-    def test_set_prior_run_copies_loop_totals_into_run_state(self):
-        from ansible_aom.tui.app import AOMApp
-
-        app = AOMApp(playbook="site.yml")
-        app.start("site.yml", [])
-        app.set_prior_run(_prior_with_totals())
-        assert app.run_state.loop_totals == {"site.yml:5": {"web1": 12}}

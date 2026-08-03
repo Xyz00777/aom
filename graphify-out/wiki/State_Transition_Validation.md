@@ -18,7 +18,8 @@
 
 ## Relationships
 
-- [First Ctrl-C Cancellation](First_Ctrl-C_Cancellation.md) (3 shared connections)
+- [ansible_aom/cli.py](ansible_aom-cli.py.md) (2 shared connections)
+- [load_session](load_session.md) (1 shared connections)
 
 ## Source Files
 
@@ -27,8 +28,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 21 (68%)
-- INFERRED: 10 (32%)
+- EXTRACTED: 31 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

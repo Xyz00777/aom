@@ -22,8 +22,8 @@
 
 ## Relationships
 
-- [TUI Screens Module](TUI_Screens_Module.md) (1 shared connections)
-- [App Configuration Settings](App_Configuration_Settings.md) (1 shared connections)
+- [state_machine.py](state_machine.py.md) (1 shared connections)
+- [CompactRenderer](CompactRenderer.md) (1 shared connections)
 
 ## Source Files
 

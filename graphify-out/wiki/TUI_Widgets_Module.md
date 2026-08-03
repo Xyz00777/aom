@@ -17,7 +17,7 @@
 
 ## Relationships
 
-- [Rerun Subcommand Module](Rerun_Subcommand_Module.md) (2 shared connections)
+- [load_session](load_session.md) (2 shared connections)
 - [KeyAction TypedDict](KeyAction_TypedDict.md) (1 shared connections)
 
 ## Source Files
@@ -27,8 +27,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 19 (66%)
-- INFERRED: 10 (34%)
+- EXTRACTED: 29 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

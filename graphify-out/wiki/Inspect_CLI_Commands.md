@@ -33,10 +33,10 @@
 
 ## Relationships
 
-- [CLI Interface Tests](CLI_Interface_Tests.md) (16 shared connections)
-- [App Configuration Settings](App_Configuration_Settings.md) (14 shared connections)
-- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
-- [Status Icon Animation Tests](Status_Icon_Animation_Tests.md) (1 shared connections)
+- [RunState](RunState.md) (16 shared connections)
+- [CompactRenderer](CompactRenderer.md) (14 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
+- [json.py](json.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -44,8 +44,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 402 (93%)
-- INFERRED: 28 (7%)
+- EXTRACTED: 406 (94%)
+- INFERRED: 24 (6%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -1,101 +1,69 @@
 # TaskDefinition
 
-> God node · 376 connections · `src/ansible_aom/core/models.py`
+> 203 nodes · cohesion 0.02
 
-**Community:** [CLI Interface Tests](CLI_Interface_Tests.md)
+## Key Concepts
 
-## Connections by Relation
+- **TaskDefinition** (357 connections) — `src/ansible_aom/core/models.py`
+- **RoleGroupDefinition** (152 connections) — `src/ansible_aom/core/models.py`
+- **TestTaskDefinition** (24 connections) — `tests/unit/test_models.py`
+- **test_models.py** (18 connections) — `tests/unit/test_models.py`
+- **TestRoleGroupDefinition** (18 connections) — `tests/unit/test_models.py`
+- **TestMemoryBounds** (17 connections) — `tests/unit/test_models.py`
+- **TestTaskMatchingAlgorithm** (16 connections) — `tests/unit/test_event_processing.py`
+- **TestDefinitionVsStateSeparation** (15 connections) — `tests/unit/test_models.py`
+- **TestLinearForceCompletion** (15 connections) — `tests/unit/test_models.py`
+- **TestTaskMatching** (15 connections) — `tests/unit/test_models.py`
+- **TestRunnerTaskCompletionPromotion** (14 connections) — `tests/unit/test_models.py`
+- **test_tree_nested_roles.py** (14 connections) — `tests/unit/test_tree_nested_roles.py`
+- **HostRow** (13 connections) — `src/ansible_aom/core/tree_projection.py`
+- **TestFreeStrategyMetaTaskVisibility** (12 connections) — `tests/unit/test_models.py`
+- **_iter_leaf_task_defs()** (10 connections) — `src/ansible_aom/core/run_state.py`
+- **_play_def()** (10 connections) — `tests/unit/test_tree_nested_roles.py`
+- **.test_mixed_consecutive_and_nested_roles()** (10 connections) — `tests/unit/test_tree_nested_roles.py`
+- **.test_nested_role_renders_as_sub_branch()** (10 connections) — `tests/unit/test_tree_nested_roles.py`
+- **.test_runtime_podman_prefix_does_not_duplicate_role_header()** (10 connections) — `tests/unit/test_tree_nested_roles.py`
+- **TestIncludeStubHiding** (10 connections) — `tests/unit/test_tree_projection.py`
+- **_fire_startup()** (9 connections) — `tests/unit/test_tree_nested_roles.py`
+- **_line_summary()** (9 connections) — `tests/unit/test_tree_nested_roles.py`
+- **.test_regression_flat_role_tasks_unchanged()** (9 connections) — `tests/unit/test_tree_nested_roles.py`
+- **TestTreeKindIncludesMore** (9 connections) — `tests/unit/test_tree_projection.py`
+- **.test_arbitrary_depth_renders_correctly()** (8 connections) — `tests/unit/test_tree_nested_roles.py`
+- *... and 178 more nodes in this community*
 
-### calls
-- assemble_definitions() `INFERRED`
-- ._many_tasks_state() `EXTRACTED`
-- _two_level_state() `INFERRED`
-- ._graft_or_match_task() `EXTRACTED`
-- test_format_tree_block_renders_two_level_truncation() `INFERRED`
-- _td() `INFERRED`
-- ._nested_state() `EXTRACTED`
-- ._single_play_single_role_state() `EXTRACTED`
-- _renderer_with_running_task() `INFERRED`
-- _setup_state() `INFERRED`
-- .test_tree_projection_shows_pending_role_tasks() `INFERRED`
-- .test_mixed_consecutive_and_nested_roles() `INFERRED`
-- .test_nested_role_renders_as_sub_branch() `INFERRED`
-- .test_runtime_podman_prefix_does_not_duplicate_role_header() `INFERRED`
-- _running_state() `INFERRED`
-- _seed_sticky_gap_state() `INFERRED`
-- test_completed_tasks_counts_dynamic_children() `INFERRED`
-- .test_runtime_cache_reuses_preflight_entry() `INFERRED`
-- .test_graft_preserves_existing_children() `EXTRACTED`
-- ._multi_task_role_with_completed_task() `INFERRED`
+## Relationships
 
-### contains
-- models.py `EXTRACTED`
+- [HostRunState](HostRunState.md) (105 shared connections)
+- [PlayDefinition](PlayDefinition.md) (104 shared connections)
+- [.from_run_state](from_run_state.md) (79 shared connections)
+- [RunState](RunState.md) (65 shared connections)
+- [WarningType](WarningType.md) (29 shared connections)
+- [TestCrossPlayLookupIsolation](TestCrossPlayLookupIsolation.md) (25 shared connections)
+- [TestUngroupedRoleTasksInTree](TestUngroupedRoleTasksInTree.md) (15 shared connections)
+- [TestRoleGrouping](TestRoleGrouping.md) (13 shared connections)
+- [IncludeCacheEntry](IncludeCacheEntry.md) (12 shared connections)
+- [WarningEntry](WarningEntry.md) (11 shared connections)
+- [json.py](json.py.md) (10 shared connections)
+- [TreeProjection](TreeProjection.md) (8 shared connections)
 
-### imports
-- run_state.py `EXTRACTED`
-- format.py `EXTRACTED`
-- tree_projection.py `EXTRACTED`
-- includes.py `EXTRACTED`
-- preflight.py `EXTRACTED`
+## Source Files
 
-### indirect_call
-- _count_tasks() `INFERRED`
-- _count_role_group_tasks() `INFERRED`
-- _roles_referenced() `INFERRED`
-- test_run_preflight_grafts_include_children_into_definitions() `INFERRED`
-- .test_play_definition_can_have_mixed_tasks_and_groups() `INFERRED`
-- .test_role_group_at_end_of_list() `INFERRED`
-- .test_role_group_definition_tasks_list() `INFERRED`
-- .test_four_same_role_tasks_no_grouping() `INFERRED`
-- .test_mixed_roles_no_grouping() `INFERRED`
-- .test_role_group_with_mixed_none_role() `INFERRED`
+- `src/ansible_aom/compact/format.py`
+- `src/ansible_aom/core/includes.py`
+- `src/ansible_aom/core/models.py`
+- `src/ansible_aom/core/run_state.py`
+- `src/ansible_aom/core/tree_projection.py`
+- `tests/unit/test_event_processing.py`
+- `tests/unit/test_invariants_runstate_renderer.py`
+- `tests/unit/test_models.py`
+- `tests/unit/test_tree_nested_roles.py`
+- `tests/unit/test_tree_projection.py`
 
-### rationale_for
-- Static task info from --list-tasks (Definition class). `EXTRACTED`
+## Audit Trail
 
-### references
-- iter_preflight_task_defs() `EXTRACTED`
-- _graft_section_dfs() `EXTRACTED`
-- _iter_leaf_task_defs() `EXTRACTED`
-- _make_play() `EXTRACTED`
-- _make_play() `EXTRACTED`
-- ._graft_role_pending_siblings() `EXTRACTED`
-- _include_stub() `EXTRACTED`
-- _build_name_index() `EXTRACTED`
-- _td() `EXTRACTED`
-- _td_tagged() `EXTRACTED`
-- _task() `EXTRACTED`
-- ._active_state() `EXTRACTED`
-- _iter_task_def_tree() `EXTRACTED`
-- _leaves_of_role_group() `EXTRACTED`
-- _task() `EXTRACTED`
-- _make_task() `EXTRACTED`
-- _graft_children() `EXTRACTED`
-- _td() `EXTRACTED`
-- _index_into() `EXTRACTED`
-- _find_stub_by_role() `EXTRACTED`
-
-### uses
-- [RunState](RunState.md) `INFERRED`
-- TreeProjection `INFERRED`
-- TestPtyStreamParserStderrLineEmission `INFERRED`
-- TreeLine `INFERRED`
-- TestJsonLineStreamBasics `INFERRED`
-- TestListTasksEdgeCases `INFERRED`
-- RendererMirrorMachine `INFERRED`
-- TestListTasksParser `INFERRED`
-- TestPtyStreamParserPhases `INFERRED`
-- TestTaskDefinition `INFERRED`
-- TestListHostsEdgeCases `INFERRED`
-- TestHostRunState `INFERRED`
-- TestPlayRunState `INFERRED`
-- TestRunState `INFERRED`
-- TestStatusEnum `INFERRED`
-- TestRoleGrouping `INFERRED`
-- TestPlayDefinition `INFERRED`
-- TestTaskRunState `INFERRED`
-- TestJsonLineStreamCarryBuffer `INFERRED`
-- TestListHostsParser `INFERRED`
+- EXTRACTED: 859 (65%)
+- INFERRED: 454 (35%)
+- AMBIGUOUS: 0 (0%)
 
 ---
 

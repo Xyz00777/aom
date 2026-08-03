@@ -26,12 +26,13 @@
 
 ## Relationships
 
-- [CLI Interface Tests](CLI_Interface_Tests.md) (7 shared connections)
-- [App Configuration Settings](App_Configuration_Settings.md) (6 shared connections)
-- [TUI Keybindings Config](TUI_Keybindings_Config.md) (2 shared connections)
-- [Warning Classification Tests](Warning_Classification_Tests.md) (1 shared connections)
-- [Task Definition Live Refresh](Task_Definition_Live_Refresh.md) (1 shared connections)
-- [Property Based Tests](Property_Based_Tests.md) (1 shared connections)
+- [CompactRenderer](CompactRenderer.md) (6 shared connections)
+- [PlayDefinition](PlayDefinition.md) (5 shared connections)
+- [TaskDefinition](TaskDefinition.md) (2 shared connections)
+- [PriorRun](PriorRun.md) (2 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
+- [HostRunState](HostRunState.md) (1 shared connections)
+- [history.py](history.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -39,8 +40,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 94 (92%)
-- INFERRED: 8 (8%)
+- EXTRACTED: 98 (96%)
+- INFERRED: 4 (4%)
 - AMBIGUOUS: 0 (0%)
 
 ---

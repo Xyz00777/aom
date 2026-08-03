@@ -33,9 +33,9 @@
 
 ## Relationships
 
-- [Tree Block Animation](Tree_Block_Animation.md) (10 shared connections)
+- [run_playbook](run_playbook.md) (10 shared connections)
 - [Credential String Sanitization](Credential_String_Sanitization.md) (1 shared connections)
-- [Interactive Prompt Tests](Interactive_Prompt_Tests.md) (1 shared connections)
+- [Renderer](Renderer.md) (1 shared connections)
 - [Renderer ETA Wiring](Renderer_ETA_Wiring.md) (1 shared connections)
 
 ## Source Files
@@ -45,8 +45,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 169 (84%)
-- INFERRED: 32 (16%)
+- EXTRACTED: 201 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

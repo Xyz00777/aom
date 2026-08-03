@@ -1,9 +1,8 @@
 """Cross-renderer parity invariant.
 
-Feed the same recorded JSONL stream through all three renderers
-(CompactRenderer, JsonRenderer, AOMApp) and assert their final
-``RunState`` projections are identical via
-``core.parity.reduce_state_for_parity``.
+Feed the same recorded JSONL stream through the two renderers
+(CompactRenderer and JsonRenderer) and assert their final ``RunState``
+projections are identical via ``core.parity.reduce_state_for_parity``.
 
 The point is not to test rendering output — that's covered by
 snapshot tests — but to assert that the *state* every renderer
@@ -27,7 +26,6 @@ import pytest
 from ansible_aom.compact.renderer import CompactRenderer
 from ansible_aom.core.parity import reduce_state_for_parity
 from ansible_aom.formats.json import JsonRenderer
-from ansible_aom.tui.app import AOMApp
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 
@@ -80,45 +78,20 @@ def _drive_json(events: list[dict], capsys: pytest.CaptureFixture[str]) -> dict:
     return reduce_state_for_parity(renderer._state)
 
 
-def _drive_tui(events: list[dict]) -> dict:
-    """Drive an AOMApp through every event and reduce its RunState.
-
-    AOMApp's renderer-protocol methods work outside a Textual event
-    loop: ``_safe_call_from_thread`` catches the RuntimeError
-    ``call_from_thread`` raises when no loop is running and falls
-    back to a direct call. That gives us a synchronous path through
-    the same code the worker thread would normally execute.
-    """
-    app = AOMApp()
-    app.start("test.yml", [])
-    app.set_definitions([])
-    for event in events:
-        app.update_state(event)
-    app.handle_completion(0, "completed")
-    app.stop()
-    return reduce_state_for_parity(app.run_state)
-
-
 @pytest.mark.parametrize("fixture_name", PARITY_FIXTURES)
 def test_all_renderers_agree_on_reduced_state(
     fixture_name: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """For each fixture, all three renderers must reduce to the same dict."""
+    """For each fixture, both renderers must reduce to the same dict."""
     events = _load_events(FIXTURES_DIR / fixture_name)
     assert events, f"fixture {fixture_name} is empty"
 
     compact_view = _drive_compact(events)
     json_view = _drive_json(events, capsys)
-    tui_view = _drive_tui(events)
 
-    # Equality is symmetric — assert pairwise for clearer diffs.
     assert compact_view == json_view, (
         f"compact vs json disagreed on {fixture_name}:\n"
         f"  compact: {compact_view}\n  json:    {json_view}"
-    )
-    assert compact_view == tui_view, (
-        f"compact vs tui disagreed on {fixture_name}:\n"
-        f"  compact: {compact_view}\n  tui:     {tui_view}"
     )
 
 
