@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_diagnostics_summary_print.py** (9 connections) — `tests/unit/test_diagnostics_summary_print.py`
+- **test_diagnostics_summary_print.py** (10 connections) — `tests/unit/test_diagnostics_summary_print.py`
 - **_populate()** (5 connections) — `tests/unit/test_diagnostics_summary_print.py`
 - **test_set_debug_disables_summary()** (3 connections) — `tests/unit/test_diagnostics_summary_print.py`
 - **test_set_debug_enables_summary()** (3 connections) — `tests/unit/test_diagnostics_summary_print.py`
@@ -19,7 +19,8 @@
 
 ## Relationships
 
-- [Frame Parameter Handling](Frame_Parameter_Handling.md) (1 shared connections)
+- [core/__init__.py](core-__init__.py.md) (1 shared connections)
+- [IO](IO.md) (1 shared connections)
 
 ## Source Files
 
@@ -27,7 +28,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 31 (100%)
+- EXTRACTED: 32 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

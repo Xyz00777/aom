@@ -1,48 +1,42 @@
 # Per-Task Timing Tests
 
-> 39 nodes · cohesion 0.05
+> 18 nodes · cohesion 0.20
 
 ## Key Concepts
 
-- **Section 1: Exhaustive Line Category Enumeration** (39 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 10: SSH Return Code / Censored Output (`rc=%s` at caplevel=2, vvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 11: ControlPersist Broken Pipe (`RETRYING BECAUSE OF CONTROLPERSIST BROKEN PIPE` at caplevel=2, vvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 12: Connection Lock Messages (`CONNECTION: pid ...` at caplevel=3, vvvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 13: Persistent Connection Reset (`resetting persistent connection` at caplevel=3, vvvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 14: Callback Loading (`Loading callback plugin` at caplevel=3, vvvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 15: Inventory Plugin Setup (`setting up inventory plugins` at caplevel=3, vvvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 16: Inventory Parsing Results (`Parsed ... inventory source` at caplevel=2, vvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 17: Inventory Plugin Declined (`declined parsing` at caplevel=2, vvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 18: Local Connection Establishment (`ESTABLISH LOCAL CONNECTION FOR USER:` at caplevel=2, vvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 19: Local EXEC/PUT/FETCH (caplevel=2, vvv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 1: Warnings (`[WARNING]:`)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 20: Local User Detection (`Current user (uid=...)` at caplevel=1, vv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 21: Vault Password Prompts (interactive, to stderr)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 22: Become Password Prompts (interactive, to stderr)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 23: Vault Decryption Attempts (`Trying to use vault secret` at vvvvv, caplevel=4)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 24: Vault Encryption Details (`Encrypting with vault_id` at vvvvv, caplevel=4)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 25: Vault Decrypt Success (`Decrypt successful with secret` at vvvvv, caplevel=4)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 26: Vault ID Matching (`encrypt_vault_id=` at vvvvv, caplevel=4)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 27: Vault Password File Loading (`Reading vault password file` at vvvvv, caplevel=4)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 28: Vault Password Script Execution (`The vault password file ... is a client script` at vvvvv, caplevel=4)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 29: Plugin Loading Debug (`trying ...` at debug level)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 2: Deprecation Warnings (`[DEPRECATION WARNING]:`)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 30: Config File Loading (`Using ... as config file` at caplevel=1, v)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- **Category 31: Play Count (`N plays in ...` at caplevel=1, vv)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
-- *... and 14 more nodes in this community*
+- **_fresh_display()** (10 connections) — `tests/compact/test_log_flush_batching.py`
+- **test_log_flush_batching.py** (9 connections) — `tests/compact/test_log_flush_batching.py`
+- **_pin_window_closed()** (9 connections) — `tests/compact/test_log_flush_batching.py`
+- **TestLeadingEdgeFlush** (8 connections) — `tests/compact/test_log_flush_batching.py`
+- **TestDrainOnOtherFrames** (6 connections) — `tests/compact/test_log_flush_batching.py`
+- **TestRendererTickFlushes** (4 connections) — `tests/compact/test_log_flush_batching.py`
+- **.test_shrink_to_degraded_does_not_lose_pending_logs()** (3 connections) — `tests/compact/test_log_flush_batching.py`
+- **.test_stop_drains_pending_logs()** (3 connections) — `tests/compact/test_log_flush_batching.py`
+- **.test_update_drains_pending_logs_above_new_status()** (3 connections) — `tests/compact/test_log_flush_batching.py`
+- **.test_buffered_lines_flush_together_in_one_frame()** (3 connections) — `tests/compact/test_log_flush_batching.py`
+- **.test_flush_logs_drains_buffer()** (3 connections) — `tests/compact/test_log_flush_batching.py`
+- **.test_lines_within_window_are_buffered_not_written()** (3 connections) — `tests/compact/test_log_flush_batching.py`
+- **.test_tick_drains_pending_display_logs()** (3 connections) — `tests/compact/test_log_flush_batching.py`
+- **.test_first_log_line_of_burst_renders_immediately()** (2 connections) — `tests/compact/test_log_flush_batching.py`
+- **.test_flush_logs_is_noop_when_buffer_empty()** (2 connections) — `tests/compact/test_log_flush_batching.py`
+- **Cross-event log batching — cap frame rate during event storms.  Per-event batchi** (1 connections) — `tests/compact/test_log_flush_batching.py`
+- **The quiet-period tick is the backstop flush: the last lines of         a burst m** (1 connections) — `tests/compact/test_log_flush_batching.py`
+- **Force 'a flush just happened' so subsequent print_log calls buffer.** (1 connections) — `tests/compact/test_log_flush_batching.py`
 
 ## Relationships
 
-- [Ansible Password Redaction](Ansible_Password_Redaction.md) (1 shared connections)
+- [Display](Display.md) (6 shared connections)
+- [CompactRenderer](CompactRenderer.md) (4 shared connections)
+- [IO](IO.md) (2 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/stderr-classification-taxonomy.md`
+- `tests/compact/test_log_flush_batching.py`
 
 ## Audit Trail
 
-- EXTRACTED: 77 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 67 (91%)
+- INFERRED: 7 (9%)
 - AMBIGUOUS: 0 (0%)
 
 ---

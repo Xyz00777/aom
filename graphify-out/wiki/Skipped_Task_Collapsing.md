@@ -5,7 +5,7 @@
 ## Key Concepts
 
 - **StderrLevel** (26 connections) — `src/ansible_aom/core/stderr_classifier.py`
-- **test_stderr_classifier.py** (24 connections) — `tests/unit/test_stderr_classifier.py`
+- **test_stderr_classifier.py** (25 connections) — `tests/unit/test_stderr_classifier.py`
 - **TestClassifyConnectionLifecycle** (7 connections) — `tests/unit/test_stderr_classifier.py`
 - **TestClassifyDeprecation** (7 connections) — `tests/unit/test_stderr_classifier.py`
 - **TestClassifyInventory** (7 connections) — `tests/unit/test_stderr_classifier.py`
@@ -34,17 +34,17 @@
 ## Relationships
 
 - [Prompt Detection Heuristics](Prompt_Detection_Heuristics.md) (17 shared connections)
-- [Profile Tracemalloc Wiring](Profile_Tracemalloc_Wiring.md) (11 shared connections)
+- [Profile Tracemalloc Wiring](Profile_Tracemalloc_Wiring.md) (12 shared connections)
 - [Keybinding Conflict Validation](Keybinding_Conflict_Validation.md) (11 shared connections)
-- [Community 465](Community_465.md) (2 shared connections)
-- [Community 514](Community_514.md) (2 shared connections)
-- [Community 575](Community_575.md) (2 shared connections)
-- [Community 612](Community_612.md) (2 shared connections)
-- [Community 576](Community_576.md) (2 shared connections)
-- [Community 532](Community_532.md) (2 shared connections)
-- [Community 578](Community_578.md) (2 shared connections)
-- [Community 487](Community_487.md) (2 shared connections)
-- [Community 577](Community_577.md) (2 shared connections)
+- [TestClassifierRules](TestClassifierRules.md) (2 shared connections)
+- [TestClassifyEmpty](TestClassifyEmpty.md) (2 shared connections)
+- [TestClassifyError](TestClassifyError.md) (2 shared connections)
+- [TestClassifyPrompt](TestClassifyPrompt.md) (2 shared connections)
+- [TestClassifySshDebug](TestClassifySshDebug.md) (2 shared connections)
+- [TestClassifyWarning](TestClassifyWarning.md) (2 shared connections)
+- [TestFirstMatchWins](TestFirstMatchWins.md) (2 shared connections)
+- [TestHostExtraction](TestHostExtraction.md) (2 shared connections)
+- [TestLevelMap](TestLevelMap.md) (2 shared connections)
 
 ## Source Files
 
@@ -53,8 +53,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 72 (59%)
-- INFERRED: 51 (41%)
+- EXTRACTED: 82 (66%)
+- INFERRED: 42 (34%)
 - AMBIGUOUS: 0 (0%)
 
 ---

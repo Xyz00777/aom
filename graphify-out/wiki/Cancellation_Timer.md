@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_psutil_safe_probe.py** (8 connections) — `tests/unit/test_psutil_safe_probe.py`
+- **test_psutil_safe_probe.py** (10 connections) — `tests/unit/test_psutil_safe_probe.py`
 - **test_probe_failure_disables_psutil_in_diagnostics()** (2 connections) — `tests/unit/test_psutil_safe_probe.py`
 - **test_probe_failure_returns_false_without_importing_psutil()** (2 connections) — `tests/unit/test_psutil_safe_probe.py`
 - **test_probe_runs_once_per_process()** (2 connections) — `tests/unit/test_psutil_safe_probe.py`
@@ -22,7 +22,8 @@
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [test_posix_callback.py](test_posix_callback.py.md) (1 shared connections)
+- [core/__init__.py](core-__init__.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -30,7 +31,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 28 (100%)
+- EXTRACTED: 30 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

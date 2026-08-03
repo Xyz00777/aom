@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **should_hide_event()** (28 connections) — `src/ansible_aom/core/log_filter.py`
+- **should_hide_event()** (29 connections) — `src/ansible_aom/core/log_filter.py`
 - **TestShouldHideEvent** (26 connections) — `tests/unit/test_log_filter.py`
 - **.test_empty_event_type_never_hidden()** (3 connections) — `tests/unit/test_log_filter.py`
 - **.test_multiple_hide_states_match_any()** (3 connections) — `tests/unit/test_log_filter.py`
@@ -33,9 +33,9 @@
 
 ## Relationships
 
-- [Heartbeat Liveness Tracker](Heartbeat_Liveness_Tracker.md) (2 shared connections)
-- [Community 670](Community_670.md) (1 shared connections)
-- [Main TUI Screen](Main_TUI_Screen.md) (1 shared connections)
+- [._emit_event_log](_emit_event_log.md) (2 shared connections)
+- [log_filter.py](log_filter.py.md) (2 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -44,8 +44,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 72 (59%)
-- INFERRED: 50 (41%)
+- EXTRACTED: 123 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

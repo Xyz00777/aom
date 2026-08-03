@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **classify()** (75 connections) — `src/ansible_aom/core/stderr_classifier.py`
+- **classify()** (77 connections) — `src/ansible_aom/core/stderr_classifier.py`
 - **TestClassifyRunLevel** (14 connections) — `tests/unit/test_stderr_classifier.py`
 - **TestClassifySshInfo** (14 connections) — `tests/unit/test_stderr_classifier.py`
 - **TestClassifyVault** (13 connections) — `tests/unit/test_stderr_classifier.py`
@@ -36,15 +36,15 @@
 - [Skipped Task Collapsing](Skipped_Task_Collapsing.md) (17 shared connections)
 - [Profile Tracemalloc Wiring](Profile_Tracemalloc_Wiring.md) (6 shared connections)
 - [Keybinding Conflict Validation](Keybinding_Conflict_Validation.md) (6 shared connections)
-- [Community 487](Community_487.md) (5 shared connections)
-- [Community 532](Community_532.md) (4 shared connections)
+- [TestHostExtraction](TestHostExtraction.md) (5 shared connections)
+- [TestClassifyWarning](TestClassifyWarning.md) (4 shared connections)
 - [State Transition Validation](State_Transition_Validation.md) (3 shared connections)
-- [Community 514](Community_514.md) (3 shared connections)
-- [Community 575](Community_575.md) (3 shared connections)
-- [Community 612](Community_612.md) (3 shared connections)
-- [Community 576](Community_576.md) (3 shared connections)
-- [Community 578](Community_578.md) (2 shared connections)
-- [16-Color Fallback](16-Color_Fallback.md) (1 shared connections)
+- [TestClassifyEmpty](TestClassifyEmpty.md) (3 shared connections)
+- [TestClassifyError](TestClassifyError.md) (3 shared connections)
+- [TestClassifyPrompt](TestClassifyPrompt.md) (3 shared connections)
+- [TestClassifySshDebug](TestClassifySshDebug.md) (3 shared connections)
+- [TestFirstMatchWins](TestFirstMatchWins.md) (2 shared connections)
+- [StreamPhase](StreamPhase.md) (1 shared connections)
 
 ## Source Files
 
@@ -53,8 +53,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 84 (42%)
-- INFERRED: 117 (58%)
+- EXTRACTED: 191 (94%)
+- INFERRED: 12 (6%)
 - AMBIGUOUS: 0 (0%)
 
 ---

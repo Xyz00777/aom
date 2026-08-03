@@ -5,7 +5,7 @@
 ## Key Concepts
 
 - **TestFuzzNoFalsePositives** (8 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
-- **test_aom_verbose_line_fuzz.py** (6 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
+- **test_aom_verbose_line_fuzz.py** (7 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
 - **_build_corpus()** (3 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
 - **_generate_line()** (3 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
 - **_random_text()** (2 connections) — `tests/unit/test_aom_verbose_line_fuzz.py`
@@ -21,7 +21,7 @@
 ## Relationships
 
 - [Prompt Detection Heuristics](Prompt_Detection_Heuristics.md) (3 shared connections)
-- [Profile Tracemalloc Wiring](Profile_Tracemalloc_Wiring.md) (1 shared connections)
+- [Profile Tracemalloc Wiring](Profile_Tracemalloc_Wiring.md) (2 shared connections)
 
 ## Source Files
 
@@ -29,8 +29,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 30 (88%)
-- INFERRED: 4 (12%)
+- EXTRACTED: 34 (97%)
+- INFERRED: 1 (3%)
 - AMBIGUOUS: 0 (0%)
 
 ---

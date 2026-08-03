@@ -112,7 +112,7 @@ def check_terminal_size(lines: int | None = None, columns: int | None = None) ->
             False,
             f"Terminal too small: {lines}×{columns}. "
             f"Minimum: {MINIMUM_LINES}×{MINIMUM_COLUMNS}. "
-            f"Resize or use --no-tui flag.",
+            "Resize the terminal to continue.",
         )
     return True, ""
 

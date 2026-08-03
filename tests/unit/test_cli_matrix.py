@@ -32,21 +32,7 @@ _HELP_TARGETS: list[tuple[str, list[str]]] = [
 # Documented mutually-exclusive combos. Each row:
 #   (label, argv-without-program, expected stderr fragment)
 # Keep in sync with cli.py error messages and any argparse mutex groups.
-_MUTEX_CASES: list[tuple[str, list[str], str]] = [
-    (
-        "tui+json",
-        # --tui and --format must precede the playbook positional;
-        # argparse REMAINDER consumes anything after the positional verbatim
-        # and forwards it to ansible-playbook.
-        ["--tui", "--format", "json", "site.yml"],
-        "--tui and --format json are mutually exclusive",
-    ),
-    (
-        "replay-compact+tui",
-        ["replay", "abcd1234", "--compact", "--tui"],
-        "not allowed with argument",
-    ),
-]
+_MUTEX_CASES: list[tuple[str, list[str], str]] = []
 
 
 def _run_cli(argv: list[str]) -> subprocess.CompletedProcess[str]:

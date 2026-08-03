@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_history_task_wall.py** (14 connections) — `tests/unit/test_history_task_wall.py`
+- **test_history_task_wall.py** (16 connections) — `tests/unit/test_history_task_wall.py`
 - **_prior()** (11 connections) — `tests/unit/test_history_task_wall.py`
 - **Path** (9 connections)
 - **_write_session_with_events()** (8 connections) — `tests/unit/test_history_task_wall.py`
@@ -22,8 +22,10 @@
 
 ## Relationships
 
-- [JSON Renderer](JSON_Renderer.md) (2 shared connections)
-- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [history.py](history.py.md) (2 shared connections)
+- [json.py](json.py.md) (1 shared connections)
+- [build_run_config_key](build_run_config_key.md) (1 shared connections)
+- [find_previous_run](find_previous_run.md) (1 shared connections)
 
 ## Source Files
 
@@ -31,8 +33,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 99 (98%)
-- INFERRED: 2 (2%)
+- EXTRACTED: 103 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -25,9 +25,9 @@
 
 ## Relationships
 
-- [Community 466](Community_466.md) (1 shared connections)
-- [Community 613](Community_613.md) (1 shared connections)
-- [Community 488](Community_488.md) (1 shared connections)
+- [DOCUMENTATION CHECKLIST (added per user question 2026-06-30)](DOCUMENTATION_CHECKLIST_%28added_per_user_question_2026-06-30%29.md) (1 shared connections)
+- [11. CLI flags & config (answers Q33–Q36, plus Q4.2 refactor)](11._CLI_flags_%26_config_%28answers_Q33%E2%80%93Q36%2C_plus_Q4.2_refactor%29.md) (1 shared connections)
+- [Q&A log](Q%26A_log.md) (1 shared connections)
 
 ## Source Files
 

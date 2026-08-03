@@ -1,22 +1,23 @@
 # TUI Widget Framework
 
-> 1 nodes · cohesion 1.00
+> 2 nodes · cohesion 1.00
 
 ## Key Concepts
 
-- **ReadonlySessionViewer** (0 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **.test_all_icons_are_single_character()** (2 connections) — `tests/unit/test_icons.py`
+- **All status icons are single Unicode characters.** (1 connections) — `tests/unit/test_icons.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [Error Handling Tests](Error_Handling_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- `tests/unit/test_icons.py`
 
 ## Audit Trail
 
-- EXTRACTED: 0 (0%)
+- EXTRACTED: 3 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

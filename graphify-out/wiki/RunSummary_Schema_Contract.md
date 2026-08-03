@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_golden_frames.py** (16 connections) — `tests/compact/test_golden_frames.py`
+- **test_golden_frames.py** (17 connections) — `tests/compact/test_golden_frames.py`
 - **_ts()** (8 connections) — `tests/compact/test_golden_frames.py`
 - **GoldenFixture** (6 connections) — `tests/compact/test_golden_frames.py`
 - **_render()** (6 connections) — `tests/compact/test_golden_frames.py`
@@ -33,10 +33,11 @@
 
 ## Relationships
 
-- [App Configuration Settings](App_Configuration_Settings.md) (2 shared connections)
-- [Frame Parameter Handling](Frame_Parameter_Handling.md) (1 shared connections)
-- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
-- [ASCII Status Icon Fallback](ASCII_Status_Icon_Fallback.md) (1 shared connections)
+- [CompactRenderer](CompactRenderer.md) (2 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
+- [IO](IO.md) (1 shared connections)
+- [json.py](json.py.md) (1 shared connections)
+- [text.py](text.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -44,8 +45,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 82 (96%)
-- INFERRED: 3 (4%)
+- EXTRACTED: 84 (98%)
+- INFERRED: 2 (2%)
 - AMBIGUOUS: 0 (0%)
 
 ---

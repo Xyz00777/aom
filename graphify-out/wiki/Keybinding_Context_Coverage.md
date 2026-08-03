@@ -21,8 +21,9 @@
 
 ## Relationships
 
-- [Run Config Key Normalization](Run_Config_Key_Normalization.md) (3 shared connections)
-- [Loop Item Line Tests](Loop_Item_Line_Tests.md) (1 shared connections)
+- [SessionManager](SessionManager.md) (2 shared connections)
+- [load_session](load_session.md) (1 shared connections)
+- [Path](Path.md) (1 shared connections)
 
 ## Source Files
 
@@ -31,8 +32,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 27 (75%)
-- INFERRED: 9 (25%)
+- EXTRACTED: 35 (97%)
+- INFERRED: 1 (3%)
 - AMBIGUOUS: 0 (0%)
 
 ---

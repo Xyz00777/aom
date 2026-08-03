@@ -20,8 +20,8 @@
 
 ## Relationships
 
-- [Community 466](Community_466.md) (1 shared connections)
-- [Community 533](Community_533.md) (1 shared connections)
+- [DOCUMENTATION CHECKLIST (added per user question 2026-06-30)](DOCUMENTATION_CHECKLIST_%28added_per_user_question_2026-06-30%29.md) (1 shared connections)
+- [Appendix: Anchor research notes](Appendix-_Anchor_research_notes.md) (1 shared connections)
 - [Crash Recovery Stay Open](Crash_Recovery_Stay_Open.md) (1 shared connections)
 
 ## Source Files

@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **__init__.py** (0 connections) — `tests/tui/__init__.py`
+- **tests/tui/__init__.py** (0 connections) — `tests/tui/__init__.py`
 
 ## Relationships
 

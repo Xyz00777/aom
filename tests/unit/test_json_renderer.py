@@ -314,7 +314,7 @@ def test_factory_returns_json_renderer_for_json_format():
     from ansible_aom.formats.json import JsonRenderer
     from ansible_aom.renderer.factory import create_renderer
 
-    renderer = create_renderer(tui_mode=False, format="json")
+    renderer = create_renderer(mode="json")
     assert isinstance(renderer, JsonRenderer)
 
 
@@ -322,7 +322,7 @@ def test_factory_default_format_is_compact():
     from ansible_aom.compact.renderer import CompactRenderer
     from ansible_aom.renderer.factory import create_renderer
 
-    renderer = create_renderer(tui_mode=False)
+    renderer = create_renderer()
     assert isinstance(renderer, CompactRenderer)
 
 
@@ -330,17 +330,8 @@ def test_factory_compact_format_explicit_returns_compact_renderer():
     from ansible_aom.compact.renderer import CompactRenderer
     from ansible_aom.renderer.factory import create_renderer
 
-    renderer = create_renderer(tui_mode=False, format="compact")
+    renderer = create_renderer(mode="compact")
     assert isinstance(renderer, CompactRenderer)
-
-
-def test_factory_tui_mode_still_wins_over_format():
-    """tui_mode=True returns AOMApp regardless of format (CLI prevents this combo)."""
-    from ansible_aom.renderer.factory import create_renderer
-    from ansible_aom.tui.app import AOMApp
-
-    renderer = create_renderer(tui_mode=True, format="json")
-    assert isinstance(renderer, AOMApp)
 
 
 # =============================================================================

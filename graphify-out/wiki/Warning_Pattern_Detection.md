@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_real_ansible.py** (8 connections) — `tests/integration/test_real_ansible.py`
+- **test_real_ansible.py** (9 connections) — `tests/integration/test_real_ansible.py`
 - **_run_aom()** (8 connections) — `tests/integration/test_real_ansible.py`
 - **_parse_jsonl_through_core()** (6 connections) — `tests/integration/test_real_ansible.py`
 - **Path** (6 connections)
@@ -29,8 +29,9 @@
 
 ## Relationships
 
-- [Three-Pane Inspect App](Three-Pane_Inspect_App.md) (2 shared connections)
-- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [JsonLineStream](JsonLineStream.md) (2 shared connections)
+- [StreamPhase](StreamPhase.md) (1 shared connections)
+- [json.py](json.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -38,8 +39,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 69 (97%)
-- INFERRED: 2 (3%)
+- EXTRACTED: 71 (99%)
+- INFERRED: 1 (1%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **impl-gaps/learnings.md** (0 connections) — `.sisyphus/notepads/impl-gaps/learnings.md`
+- **02-single-task-changed/site.yml** (0 connections) — `tests/playbooks/02-single-task-changed/site.yml`
 
 ## Relationships
 
@@ -12,7 +12,7 @@
 
 ## Source Files
 
-- `.sisyphus/notepads/impl-gaps/learnings.md`
+- `tests/playbooks/02-single-task-changed/site.yml`
 
 ## Audit Trail
 

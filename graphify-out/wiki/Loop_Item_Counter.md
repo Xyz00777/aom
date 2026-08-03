@@ -1,37 +1,27 @@
 # Loop Item Counter
 
-> 15 nodes · cohesion 0.13
+> 4 nodes · cohesion 0.50
 
 ## Key Concepts
 
-- **4. Code quotes for all matches found** (6 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
-- **Existing stderr Classification in AOM** (6 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
-- **1. Does AOM's PTY parser already classify stderr lines by type?** (4 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
-- **existing-stderr-classification.md** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
-- **2. Does AOM's model carry a "kind" or "type" field on stderr lines?** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
-- **3. Are there existing regex patterns for SSH, CONNECTION, etc.?** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
-- **5. Verdict: PARTIAL-EXISTS** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
-- **Category 1: Warnings / Deprecations** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
-- **Category 2: Password prompts** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
-- **Category 3: Everything else (unclassified plaintext)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
-- **Interactive prompt detection (pure functions in core/)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
-- **Password prompt patterns (duplicated in runner.py for pexpect)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
-- **Stderr consumption points in runner.py** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
-- **Stderr recording (no classification)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
-- **Warning classification (parser.py)** (1 connections) — `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
+- **.test_update_state_streams_log_lines_for_significant_events()** (4 connections) — `tests/integration/test_compact_renderer.py`
+- **TC-043: Minimum terminal size is 24 lines x 80 columns.** (2 connections) — `tests/integration/test_compact_renderer.py`
+- **.test_minimum_size_constants()** (2 connections) — `tests/integration/test_compact_renderer.py`
+- **Each significant JSONL event must produce a log line above the panel.          W** (1 connections) — `tests/integration/test_compact_renderer.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [HostRunState](HostRunState.md) (2 shared connections)
+- [CompactRenderer](CompactRenderer.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/2026-06-30-verbosity-pre-impl-interview/existing-stderr-classification.md`
+- `tests/integration/test_compact_renderer.py`
 
 ## Audit Trail
 
-- EXTRACTED: 28 (100%)
-- INFERRED: 0 (0%)
+- EXTRACTED: 8 (89%)
+- INFERRED: 1 (11%)
 - AMBIGUOUS: 0 (0%)
 
 ---

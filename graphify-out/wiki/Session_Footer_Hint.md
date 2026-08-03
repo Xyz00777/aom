@@ -20,7 +20,7 @@
 
 ## Relationships
 
-- [App Configuration Settings](App_Configuration_Settings.md) (6 shared connections)
+- [CompactRenderer](CompactRenderer.md) (6 shared connections)
 
 ## Source Files
 

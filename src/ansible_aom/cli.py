@@ -11,6 +11,7 @@ import os
 import shutil
 import sys
 from collections.abc import Sequence
+from typing import Literal
 
 import argcomplete
 
@@ -34,6 +35,7 @@ _DEFAULT_INVENTORY_NAMES = (
 # All flags ansible-playbook accepts for specifying inventory; if the user
 # already supplied any of these we leave their args alone.
 _INVENTORY_FLAGS = ("-i", "--inventory", "--inventory-file")
+OutputFormat = Literal["compact", "json"]
 
 
 def detect_default_inventory() -> str | None:
@@ -223,10 +225,9 @@ def create_parser() -> argparse.ArgumentParser:
         epilog="""
 Examples:
   aom playbook.yml                      Run playbook with compact view (default)
-  aom --tui playbook.yml                Run with the full multi-panel TUI
   aom playbook.yml -i inv.ini -v        Flags after the playbook are forwarded
   aom playbook.yml -vvv --tags=deploy   …including ansible-playbook's own -v / -vv / -vvv
-  aom inspect                           Launch the TUI on the most recent run
+  aom inspect                           Launch the Textual session viewer
   aom inspect --text                    Dump the most recent run as plain text
   aom inspect prune --days 30           Delete sessions older than N days
   aom replay <session-id>               Replay a recorded session at original pace
@@ -326,20 +327,13 @@ See README.md and SPECIFICATION.md in the source tree for full details.
     )
 
     parser.add_argument(
-        "--tui",
-        action="store_true",
-        help="Launch full multi-panel TUI instead of compact view",
-    )
-
-    parser.add_argument(
         "--format",
         choices=["compact", "json"],
         default="compact",
         help=(
             "Output format. 'compact' (default) streams the nom-style live view. "
             "'json' is silent during the run and emits a single JSON object on stdout "
-            "at completion — designed for CI and `jq` pipelines. "
-            "Mutually exclusive with --tui."
+            "at completion — designed for CI and `jq` pipelines."
         ),
     )
 
@@ -503,7 +497,7 @@ def _run_compact(
     playbook: str,
     ansible_args: list[str],
     record: bool = True,
-    format: str = "compact",
+    format: OutputFormat = "compact",
     hide_states: list[str] | None = None,
     capture_verbose: bool = False,
     show_failed_hint: bool = True,
@@ -515,14 +509,12 @@ def _run_compact(
     The composition root pattern: one EventSource (LiveDriver), one
     Renderer (factory-built), one call. See ARCHITECTURE.md §4.
     """
-    from typing import cast
-
     from ansible_aom.drivers.live import LiveDriver
-    from ansible_aom.renderer.factory import RenderMode, create_renderer
+    from ansible_aom.renderer.factory import create_renderer
 
     try:
         renderer = create_renderer(
-            mode=cast(RenderMode, format),
+            mode=format,
             is_tty=sys.stdout.isatty(),
             hide_states=hide_states if hide_states is not None else [],
             record=record,
@@ -542,34 +534,6 @@ def _run_compact(
         traceback.print_exc(file=sys.stderr)
         print(f"Error: {e}", file=sys.stderr)
         return 1
-
-
-def _run_tui(playbook: str, ansible_args: list[str], record: bool = True) -> int:
-    """Launch the Textual TUI driven by a LiveDriver.
-
-    AOMApp owns its own event loop (``app.run()``) and pumps the
-    driver from a worker thread; the driver wraps the same pexpect
-    runner the compact path uses. ``app.exit_code`` is whatever
-    ``driver.drive`` returned, reachable after ``app.run()`` exits.
-    ``None`` (user quit before completion) maps to exit 1 — we treat
-    an aborted-by-quit run as non-success without pretending to know
-    the playbook's true outcome.
-    """
-    from ansible_aom.drivers.live import LiveDriver
-    from ansible_aom.tui.app import AOMApp
-
-    try:
-        driver = LiveDriver(playbook, ansible_args, record=record)
-        app = AOMApp(driver=driver, playbook=playbook, ansible_args=ansible_args)
-        app.run()
-    except KeyboardInterrupt:
-        print("Cancelled by user", file=sys.stderr)
-        return 130
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
-    exit_code = app.exit_code
-    return exit_code if exit_code is not None else 1
 
 
 def main() -> int:
@@ -662,14 +626,6 @@ def main() -> int:
         aom_logger.debug("--list-tasks summary: verbose mode enabled, diagnostics printed")
 
     if args.playbook:
-        if args.tui and args.format == "json":
-            print(
-                "aom: --tui and --format json are mutually exclusive. "
-                "Use --format json without --tui for end-of-run JSON output.",
-                file=sys.stderr,
-            )
-            return 2
-
         if detect_duplicate_playbook(args.playbook, args.ansible_args):
             print(
                 f"aom: '{args.playbook}' appears twice on the command line — "
@@ -682,14 +638,7 @@ def main() -> int:
 
         record = not args.no_record
         hide_states: list[str] = list(args.hide_state) if args.hide_state is not None else []
-        if args.tui and hide_states:
-            print(
-                "aom: --hide-state only affects compact mode and is ignored in --tui.",
-                file=sys.stderr,
-            )
         try:
-            if args.tui:
-                return _run_tui(args.playbook, ansible_args, record=record)
             from ansible_aom.core.config_layer import load_config_with_layers
 
             config = load_config_with_layers()

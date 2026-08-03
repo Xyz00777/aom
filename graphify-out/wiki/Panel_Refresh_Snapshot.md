@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_session_diagnostics.py** (10 connections) — `tests/unit/test_session_diagnostics.py`
+- **test_session_diagnostics.py** (12 connections) — `tests/unit/test_session_diagnostics.py`
 - **Path** (7 connections)
 - **_start_and_end()** (7 connections) — `tests/unit/test_session_diagnostics.py`
 - **test_disk_failure_during_diagnostics_write_does_not_break_end()** (5 connections) — `tests/unit/test_session_diagnostics.py`
@@ -23,9 +23,10 @@
 
 ## Relationships
 
-- [Run Config Key Normalization](Run_Config_Key_Normalization.md) (2 shared connections)
-- [Total Task Counting](Total_Task_Counting.md) (2 shared connections)
-- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [load_session](load_session.md) (3 shared connections)
+- [SessionManager](SessionManager.md) (2 shared connections)
+- [core/__init__.py](core-__init__.py.md) (1 shared connections)
+- [json.py](json.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -33,8 +34,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 51 (93%)
-- INFERRED: 4 (7%)
+- EXTRACTED: 57 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

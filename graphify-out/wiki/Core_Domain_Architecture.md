@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_profile_tracemalloc.py** (11 connections) — `tests/unit/test_profile_tracemalloc.py`
+- **test_profile_tracemalloc.py** (12 connections) — `tests/unit/test_profile_tracemalloc.py`
 - **Path** (2 connections)
 - **test_dump_profile_noop_when_off()** (2 connections) — `tests/unit/test_profile_tracemalloc.py`
 - **test_dump_profile_writes_pstats()** (2 connections) — `tests/unit/test_profile_tracemalloc.py`
@@ -20,7 +20,7 @@
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [core/__init__.py](core-__init__.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -28,7 +28,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 26 (100%)
+- EXTRACTED: 27 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

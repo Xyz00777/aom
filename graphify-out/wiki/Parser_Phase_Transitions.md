@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_skipped_collapsing.py** (10 connections) — `tests/compact/test_skipped_collapsing.py`
+- **test_skipped_collapsing.py** (11 connections) — `tests/compact/test_skipped_collapsing.py`
 - **_logged()** (10 connections) — `tests/compact/test_skipped_collapsing.py`
 - **_renderer()** (10 connections) — `tests/compact/test_skipped_collapsing.py`
 - **_skipped()** (9 connections) — `tests/compact/test_skipped_collapsing.py`
@@ -29,7 +29,8 @@
 
 ## Relationships
 
-- [App Configuration Settings](App_Configuration_Settings.md) (5 shared connections)
+- [CompactRenderer](CompactRenderer.md) (5 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -37,8 +38,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 116 (97%)
-- INFERRED: 3 (3%)
+- EXTRACTED: 117 (98%)
+- INFERRED: 3 (2%)
 - AMBIGUOUS: 0 (0%)
 
 ---

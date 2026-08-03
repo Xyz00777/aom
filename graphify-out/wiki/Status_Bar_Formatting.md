@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_properties_parser.py** (9 connections) — `tests/unit/test_properties_parser.py`
+- **test_properties_parser.py** (10 connections) — `tests/unit/test_properties_parser.py`
 - **valid_event_dicts()** (5 connections) — `tests/unit/test_properties_parser.py`
 - **test_valid_events_survive_garbage_interleaving()** (4 connections) — `tests/unit/test_properties_parser.py`
 - **_encode_event_line()** (3 connections) — `tests/unit/test_properties_parser.py`
@@ -23,9 +23,10 @@
 
 ## Relationships
 
-- [Three-Pane Inspect App](Three-Pane_Inspect_App.md) (2 shared connections)
-- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
-- [Run State Completion Recap](Run_State_Completion_Recap.md) (1 shared connections)
+- [JsonLineStream](JsonLineStream.md) (2 shared connections)
+- [StreamPhase](StreamPhase.md) (1 shared connections)
+- [json.py](json.py.md) (1 shared connections)
+- [PtyStreamParser](PtyStreamParser.md) (1 shared connections)
 
 ## Source Files
 
@@ -33,8 +34,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 39 (93%)
-- INFERRED: 3 (7%)
+- EXTRACTED: 43 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

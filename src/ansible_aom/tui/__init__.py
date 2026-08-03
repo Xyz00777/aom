@@ -1,1 +1,1 @@
-"""TUI renderer module for AOM - Textual-based multi-panel interface."""
+"""Textual inspect viewer package for AOM sessions."""

@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **tests/playbooks/28-host-pattern-filtering/site.yml** (0 connections) — `tests/playbooks/28-host-pattern-filtering/site.yml`
+- **28-host-pattern-filtering/site.yml** (0 connections) — `tests/playbooks/28-host-pattern-filtering/site.yml`
 
 ## Relationships
 

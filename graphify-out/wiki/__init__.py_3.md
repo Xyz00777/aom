@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **__init__.py** (0 connections) — `tests/fixtures/sessions/__init__.py`
+- **sessions/__init__.py** (0 connections) — `tests/fixtures/sessions/__init__.py`
 
 ## Relationships
 

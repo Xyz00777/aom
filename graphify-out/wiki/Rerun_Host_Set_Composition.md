@@ -4,8 +4,8 @@
 
 ## Key Concepts
 
+- **test_tree_pipe_continuation.py** (13 connections) — `tests/compact/test_tree_pipe_continuation.py`
 - **_spur_projection()** (12 connections) — `tests/compact/test_tree_pipe_continuation.py`
-- **test_tree_pipe_continuation.py** (10 connections) — `tests/compact/test_tree_pipe_continuation.py`
 - **_two_plays_with_running_tasks()** (9 connections) — `tests/compact/test_tree_pipe_continuation.py`
 - **test_ascii_mode_uses_pipe_substitute()** (5 connections) — `tests/compact/test_tree_pipe_continuation.py`
 - **test_last_play_children_have_plain_indent()** (5 connections) — `tests/compact/test_tree_pipe_continuation.py`
@@ -27,11 +27,13 @@
 
 ## Relationships
 
-- [Pause Prompt Heuristic](Pause_Prompt_Heuristic.md) (7 shared connections)
-- [Play Definition Tree Population](Play_Definition_Tree_Population.md) (6 shared connections)
-- [Hide State Gating Tests](Hide_State_Gating_Tests.md) (5 shared connections)
-- [CLI Interface Tests](CLI_Interface_Tests.md) (4 shared connections)
-- [Status Bar Warning Panels](Status_Bar_Warning_Panels.md) (2 shared connections)
+- [HostRunState](HostRunState.md) (7 shared connections)
+- [format_tree_block](format_tree_block.md) (7 shared connections)
+- [TreeProjection](TreeProjection.md) (5 shared connections)
+- [.from_run_state](from_run_state.md) (4 shared connections)
+- [RunState](RunState.md) (2 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
+- [tree.py](tree.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -39,8 +41,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 59 (78%)
-- INFERRED: 17 (22%)
+- EXTRACTED: 75 (95%)
+- INFERRED: 4 (5%)
 - AMBIGUOUS: 0 (0%)
 
 ---

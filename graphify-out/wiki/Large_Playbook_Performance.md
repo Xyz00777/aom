@@ -18,7 +18,7 @@
 
 ## Relationships
 
-- [Community 466](Community_466.md) (1 shared connections)
+- [DOCUMENTATION CHECKLIST (added per user question 2026-06-30)](DOCUMENTATION_CHECKLIST_%28added_per_user_question_2026-06-30%29.md) (1 shared connections)
 
 ## Source Files
 

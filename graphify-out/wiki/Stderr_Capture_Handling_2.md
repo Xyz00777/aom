@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_free_strategy_task_header.py** (9 connections) — `tests/compact/test_free_strategy_task_header.py`
+- **test_free_strategy_task_header.py** (10 connections) — `tests/compact/test_free_strategy_task_header.py`
 - **_printed()** (6 connections) — `tests/compact/test_free_strategy_task_header.py`
 - **_renderer()** (6 connections) — `tests/compact/test_free_strategy_task_header.py`
 - **_runner_start()** (5 connections) — `tests/compact/test_free_strategy_task_header.py`
@@ -19,7 +19,8 @@
 
 ## Relationships
 
-- [App Configuration Settings](App_Configuration_Settings.md) (2 shared connections)
+- [CompactRenderer](CompactRenderer.md) (2 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -27,7 +28,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 50 (100%)
+- EXTRACTED: 51 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

@@ -1,22 +1,23 @@
 # Rich Display Backend
 
-> 1 nodes · cohesion 1.00
+> 2 nodes · cohesion 1.00
 
 ## Key Concepts
 
-- **Rich Console** (0 connections) — `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- **.test_ok_icon_is_unicode()** (2 connections) — `tests/unit/test_icons.py`
+- **TC-365: OK icon is valid Unicode character.** (1 connections) — `tests/unit/test_icons.py`
 
 ## Relationships
 
-- No strong cross-community connections detected
+- [Error Handling Tests](Error_Handling_Tests.md) (1 shared connections)
 
 ## Source Files
 
-- `.sisyphus/notepads/new-spec/cli-tui-implementation.md`
+- `tests/unit/test_icons.py`
 
 ## Audit Trail
 
-- EXTRACTED: 0 (0%)
+- EXTRACTED: 3 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

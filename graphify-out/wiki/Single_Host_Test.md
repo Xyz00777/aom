@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **tests/playbooks/27-single-host-localhost/site.yml** (0 connections) — `tests/playbooks/27-single-host-localhost/site.yml`
+- **27-single-host-localhost/site.yml** (0 connections) — `tests/playbooks/27-single-host-localhost/site.yml`
 
 ## Relationships
 

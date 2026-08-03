@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_emit_event_log_batching.py** (11 connections) — `tests/compact/test_emit_event_log_batching.py`
+- **test_emit_event_log_batching.py** (12 connections) — `tests/compact/test_emit_event_log_batching.py`
 - **_renderer()** (7 connections) — `tests/compact/test_emit_event_log_batching.py`
 - **_task_start()** (6 connections) — `tests/compact/test_emit_event_log_batching.py`
 - **_print_log_calls()** (5 connections) — `tests/compact/test_emit_event_log_batching.py`
@@ -27,7 +27,8 @@
 
 ## Relationships
 
-- [App Configuration Settings](App_Configuration_Settings.md) (6 shared connections)
+- [CompactRenderer](CompactRenderer.md) (6 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -35,7 +36,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 74 (95%)
+- EXTRACTED: 75 (95%)
 - INFERRED: 4 (5%)
 - AMBIGUOUS: 0 (0%)
 

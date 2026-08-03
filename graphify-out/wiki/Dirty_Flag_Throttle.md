@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **get_status_color()** (12 connections) — `src/ansible_aom/core/icons.py`
+- **get_status_color()** (13 connections) — `src/ansible_aom/core/icons.py`
 - **TestGetStatusColor** (10 connections) — `tests/unit/test_icons.py`
 - **.test_get_status_color_changed()** (3 connections) — `tests/unit/test_icons.py`
 - **.test_get_status_color_completed()** (3 connections) — `tests/unit/test_icons.py`
@@ -27,10 +27,11 @@
 
 ## Relationships
 
-- [Pause Prompt Heuristic](Pause_Prompt_Heuristic.md) (1 shared connections)
-- [Crash Recovery Notification](Crash_Recovery_Notification.md) (1 shared connections)
-- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
-- [Community 461](Community_461.md) (1 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
+- [format_tree_block](format_tree_block.md) (1 shared connections)
+- [icons.py](icons.py.md) (1 shared connections)
+- [HostRunState](HostRunState.md) (1 shared connections)
+- [test_icons.py](test_icons.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -39,8 +40,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 39 (70%)
-- INFERRED: 17 (30%)
+- EXTRACTED: 57 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

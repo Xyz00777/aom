@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **tests/playbooks/26-empty-playbook/site.yml** (0 connections) — `tests/playbooks/26-empty-playbook/site.yml`
+- **26-empty-playbook/site.yml** (0 connections) — `tests/playbooks/26-empty-playbook/site.yml`
 
 ## Relationships
 

@@ -1046,24 +1046,6 @@ class TestViewModeSelection:
 
         assert isinstance(renderer, CompactRenderer)
 
-    def test_factory_creates_compact_renderer_when_tui_false(self):
-        """tui_mode=False creates CompactRenderer."""
-        from ansible_aom.renderer.factory import create_renderer
-
-        renderer = create_renderer(tui_mode=False)
-        from ansible_aom.compact.renderer import CompactRenderer
-
-        assert isinstance(renderer, CompactRenderer)
-
-    def test_factory_creates_tui_renderer_when_tui_true(self):
-        """tui_mode=True creates Textual AOMApp."""
-        from ansible_aom.renderer.factory import create_renderer
-
-        renderer = create_renderer(tui_mode=True)
-        # AOMApp is created, may not import without Textual available
-        assert hasattr(renderer, "start")
-        assert hasattr(renderer, "update_state")
-
 
 # ============================================================================
 # Password Prompt Integration

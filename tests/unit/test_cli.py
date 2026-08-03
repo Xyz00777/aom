@@ -30,7 +30,6 @@ CORE_MODULE_PATHS = [
     "src/ansible_aom/compact/renderer.py",
     "src/ansible_aom/compact/display.py",
     "src/ansible_aom/compact/password.py",
-    "src/ansible_aom/tui/app.py",
     "src/ansible_aom/inspect/cli.py",
     "src/ansible_aom/inspect/formatters.py",
     "src/ansible_aom/inspect/text.py",
@@ -284,14 +283,6 @@ class TestRendererProtocol:
         renderer = CompactRenderer()
         assert isinstance(renderer, Renderer)
 
-    def test_textual_app_satisfies_protocol(self):
-        """TC-004: AOMApp (Textual) satisfies Renderer Protocol."""
-        from ansible_aom.renderer.protocol import Renderer
-        from ansible_aom.tui.app import AOMApp
-
-        app = AOMApp()
-        assert isinstance(app, Renderer)
-
 
 class TestRendererFactory:
     """Tests for TC-005: Renderer Factory Selection."""
@@ -302,22 +293,11 @@ class TestRendererFactory:
 
         assert callable(create_renderer)
 
-    def test_factory_returns_renderer_for_tui_mode(self):
-        """TC-005: create_renderer(tui_mode=True) returns AOMApp."""
-        from ansible_aom.renderer.factory import create_renderer
-
-        renderer = create_renderer(tui_mode=True)
-        assert hasattr(renderer, "start")
-        assert hasattr(renderer, "update_state")
-        assert hasattr(renderer, "handle_password_prompt")
-        assert hasattr(renderer, "handle_completion")
-        assert hasattr(renderer, "stop")
-
     def test_factory_returns_renderer_for_compact_mode(self):
-        """TC-005: create_renderer(tui_mode=False) returns CompactRenderer."""
+        """TC-005: create_renderer() returns CompactRenderer."""
         from ansible_aom.renderer.factory import create_renderer
 
-        renderer = create_renderer(tui_mode=False)
+        renderer = create_renderer()
         assert hasattr(renderer, "start")
         assert hasattr(renderer, "update_state")
         assert hasattr(renderer, "handle_password_prompt")
@@ -336,7 +316,7 @@ class TestRendererFactory:
         from ansible_aom.compact.renderer import CompactRenderer
         from ansible_aom.renderer.factory import create_renderer
 
-        renderer = create_renderer(tui_mode=False, is_tty=False)
+        renderer = create_renderer(is_tty=False)
         assert isinstance(renderer, CompactRenderer)
         assert renderer._display.is_tty is False
 
@@ -345,7 +325,7 @@ class TestRendererFactory:
         from ansible_aom.compact.renderer import CompactRenderer
         from ansible_aom.renderer.factory import create_renderer
 
-        renderer = create_renderer(tui_mode=False, record=True, capture_verbose=True)
+        renderer = create_renderer(record=True, capture_verbose=True)
         assert isinstance(renderer, CompactRenderer)
         assert renderer._recording is True
         assert renderer._capture_verbose is True
@@ -355,7 +335,7 @@ class TestRendererFactory:
         from ansible_aom.compact.renderer import CompactRenderer
         from ansible_aom.renderer.factory import create_renderer
 
-        renderer = create_renderer(tui_mode=False, show_failed_hint=False)
+        renderer = create_renderer(show_failed_hint=False)
         assert isinstance(renderer, CompactRenderer)
         assert renderer._show_failed_hint is False
 
@@ -365,7 +345,6 @@ class TestRendererFactory:
         from ansible_aom.renderer.factory import create_renderer
 
         renderer = create_renderer(
-            tui_mode=False,
             show_warnings=False,
             show_deprecations=False,
         )
@@ -400,35 +379,6 @@ class TestBasicCLIInvocation:
         with patch("sys.argv", ["aom"]):
             result = main()
             assert result == 0
-
-
-class TestTUIModeFlag:
-    """Tests for TC-007: TUI Mode Flag."""
-
-    def test_tui_flag_exists(self):
-        """TC-007: --tui flag exists in parser."""
-        from ansible_aom.cli import create_parser
-
-        parser = create_parser()
-        args = parser.parse_args(["--tui", "playbook.yml"])
-        assert args.tui is True
-
-    def test_tui_flag_defaults_false(self):
-        """TC-007: TUI mode defaults to False."""
-        from ansible_aom.cli import create_parser
-
-        parser = create_parser()
-        args = parser.parse_args(["playbook.yml"])
-        assert args.tui is False
-
-    def test_tui_flag_works_at_start(self):
-        """TC-007: --tui can be specified before playbook."""
-        from ansible_aom.cli import create_parser
-
-        parser = create_parser()
-        args = parser.parse_args(["--tui", "playbook.yml"])
-        assert args.tui is True
-        assert args.playbook == "playbook.yml"
 
 
 class TestVerboseFlag:
@@ -1103,16 +1053,6 @@ class TestFormatFlag:
         args = parser.parse_args(["--format", "json", "playbook.yml", "-i", "inv.ini"])
         assert args.format == "json"
         assert args.ansible_args == ["-i", "inv.ini"]
-
-    def test_main_rejects_tui_plus_json_format(self, capsys):
-        """`aom --tui --format json playbook.yml` exits 2 with a usage error."""
-        from ansible_aom.cli import main
-
-        with patch("sys.argv", ["aom", "--tui", "--format", "json", "playbook.yml"]):
-            result = main()
-        assert result == 2
-        captured = capsys.readouterr()
-        assert "--tui" in captured.err and "--format json" in captured.err
 
     def test_main_dispatches_json_renderer_when_format_json(self):
         """`aom --format json playbook.yml` constructs a JsonRenderer."""

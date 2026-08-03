@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **format_status_bar()** (0 connections) — `.sisyphus/notepads/implementation/learnings.md`
+- **format_status_bar()** (0 connections) — `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
 
 ## Relationships
 
@@ -12,7 +12,7 @@
 
 ## Source Files
 
-- `.sisyphus/notepads/implementation/learnings.md`
+- `docs/superpowers/specs/2026-06-16-run-duration-estimate-design.md`
 
 ## Audit Trail
 

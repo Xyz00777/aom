@@ -19,7 +19,7 @@
 
 ## Relationships
 
-- [Shell Completion Helpers](Shell_Completion_Helpers.md) (2 shared connections)
+- [load_session](load_session.md) (2 shared connections)
 - [KeyAction TypedDict](KeyAction_TypedDict.md) (1 shared connections)
 
 ## Source Files
@@ -29,8 +29,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 23 (59%)
-- INFERRED: 16 (41%)
+- EXTRACTED: 39 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

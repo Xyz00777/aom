@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **tests/playbooks/14-become-password/README.md** (0 connections) — `tests/playbooks/14-become-password/README.md`
+- **14-become-password/README.md** (0 connections) — `tests/playbooks/14-become-password/README.md`
 
 ## Relationships
 

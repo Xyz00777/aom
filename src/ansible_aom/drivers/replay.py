@@ -5,9 +5,9 @@ Both halves of the replay subcommand live here:
 * :func:`replay_session` reads ``events.jsonl`` + ``meta.json`` from
   ``<session_dir>/<session_id>/`` and feeds each event into the
   provided renderer at the original ``_timestamp`` cadence (or scaled
-  by ``speed``). The renderer interface is identical to the one the
-  live runner drives, so the replay command can use the same
-  factory-built CompactRenderer or AOMApp.
+   by ``speed``). The renderer interface is identical to the one the
+   live runner drives, and replay always uses a factory-built
+   CompactRenderer.
 * :class:`ReplayDriver` wraps that loop behind the :class:`EventSource`
   protocol so ``cli.py`` only sees the two-protocol composition root.
 
@@ -167,7 +167,7 @@ class ReplayDriver:
 _REPLAY_HELP_EPILOG = """\
 Replay reads <session-id>/events.jsonl and <session-id>/meta.json from
 the AOM state directory (default ~/.local/state/aom/sessions) and
-feeds the recorded events through the renderer of your choice.
+feeds the recorded events through the compact renderer.
 
 Speed control:
   --speed 1    real time (default)
@@ -221,23 +221,6 @@ def _build_parser() -> argparse.ArgumentParser:
             "Use a high speed for long sessions."
         ),
     )
-    mode = parser.add_mutually_exclusive_group()
-    mode.add_argument(
-        "--compact",
-        dest="mode",
-        action="store_const",
-        const="compact",
-        help="Use the compact renderer (default)",
-    )
-    mode.add_argument(
-        "--tui",
-        dest="mode",
-        action="store_const",
-        const="tui",
-        help="Use the full multi-panel Textual TUI",
-    )
-    parser.set_defaults(mode="compact")
-
     argcomplete.autocomplete(parser)
     return parser
 
@@ -260,7 +243,7 @@ def cli_main(argv: list[str]) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    renderer = create_renderer(mode=args.mode, is_tty=sys.stdout.isatty())
+    renderer = create_renderer(mode="compact", is_tty=sys.stdout.isatty())
     driver = ReplayDriver(
         session_dir=args.state_dir,
         session_id=args.session_id,

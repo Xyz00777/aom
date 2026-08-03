@@ -24,7 +24,8 @@
 
 ## Relationships
 
-- [Run State Summary Panel](Run_State_Summary_Panel.md) (5 shared connections)
+- [AppConfig](AppConfig.md) (4 shared connections)
+- [WarningEntry](WarningEntry.md) (1 shared connections)
 
 ## Source Files
 

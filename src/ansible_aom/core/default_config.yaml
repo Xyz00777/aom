@@ -25,10 +25,6 @@ inspect:
   # Reserved for v1.1+: per-tab config, default tab, etc.
   default_tab: summary
 
-tui:
-  # Reserved: keybindings, theme overrides.
-  theme: default
-
 log:
   max_lines: 50000
 

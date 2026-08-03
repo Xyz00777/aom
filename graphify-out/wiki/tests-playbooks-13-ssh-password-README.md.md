@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **tests/playbooks/13-ssh-password/README.md** (0 connections) — `tests/playbooks/13-ssh-password/README.md`
+- **13-ssh-password/README.md** (0 connections) — `tests/playbooks/13-ssh-password/README.md`
 
 ## Relationships
 

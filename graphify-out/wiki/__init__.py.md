@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **__init__.py** (1 connections) — `tests/integration/__init__.py`
+- **integration/__init__.py** (1 connections) — `tests/integration/__init__.py`
 - **Integration tests for AOM.  These tests exercise multiple components together.** (1 connections) — `tests/integration/__init__.py`
 
 ## Relationships

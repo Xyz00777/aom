@@ -31,9 +31,9 @@
 
 ## Relationships
 
-- [Crash Recovery Notification](Crash_Recovery_Notification.md) (1 shared connections)
-- [Compact Renderer Integration Tests](Compact_Renderer_Integration_Tests.md) (1 shared connections)
-- [Community 461](Community_461.md) (1 shared connections)
+- [icons.py](icons.py.md) (1 shared connections)
+- [HostRunState](HostRunState.md) (1 shared connections)
+- [test_icons.py](test_icons.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -42,8 +42,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 47 (77%)
-- INFERRED: 14 (23%)
+- EXTRACTED: 61 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -24,15 +24,15 @@
 - [Skipped Task Collapsing](Skipped_Task_Collapsing.md) (11 shared connections)
 - [Prompt Detection Heuristics](Prompt_Detection_Heuristics.md) (6 shared connections)
 - [Profile Tracemalloc Wiring](Profile_Tracemalloc_Wiring.md) (5 shared connections)
-- [Community 465](Community_465.md) (1 shared connections)
-- [Community 514](Community_514.md) (1 shared connections)
-- [Community 575](Community_575.md) (1 shared connections)
-- [Community 612](Community_612.md) (1 shared connections)
-- [Community 576](Community_576.md) (1 shared connections)
-- [Community 532](Community_532.md) (1 shared connections)
-- [Community 578](Community_578.md) (1 shared connections)
-- [Community 487](Community_487.md) (1 shared connections)
-- [Community 577](Community_577.md) (1 shared connections)
+- [TestClassifierRules](TestClassifierRules.md) (1 shared connections)
+- [TestClassifyEmpty](TestClassifyEmpty.md) (1 shared connections)
+- [TestClassifyError](TestClassifyError.md) (1 shared connections)
+- [TestClassifyPrompt](TestClassifyPrompt.md) (1 shared connections)
+- [TestClassifySshDebug](TestClassifySshDebug.md) (1 shared connections)
+- [TestClassifyWarning](TestClassifyWarning.md) (1 shared connections)
+- [TestFirstMatchWins](TestFirstMatchWins.md) (1 shared connections)
+- [TestHostExtraction](TestHostExtraction.md) (1 shared connections)
+- [TestLevelMap](TestLevelMap.md) (1 shared connections)
 
 ## Source Files
 
@@ -41,8 +41,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 26 (41%)
-- INFERRED: 37 (59%)
+- EXTRACTED: 33 (52%)
+- INFERRED: 30 (48%)
 - AMBIGUOUS: 0 (0%)
 
 ---

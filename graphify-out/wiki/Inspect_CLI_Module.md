@@ -6,7 +6,7 @@
 
 - **_final_line()** (7 connections) — `tests/compact/test_completion_label.py`
 - **TestCompletionLabel** (7 connections) — `tests/compact/test_completion_label.py`
-- **test_completion_label.py** (4 connections) — `tests/compact/test_completion_label.py`
+- **test_completion_label.py** (5 connections) — `tests/compact/test_completion_label.py`
 - **.test_ctrl_c_shows_cancelled()** (3 connections) — `tests/compact/test_completion_label.py`
 - **.test_executable_missing_shows_not_found()** (3 connections) — `tests/compact/test_completion_label.py`
 - **.test_completed_has_no_label()** (2 connections) — `tests/compact/test_completion_label.py`
@@ -18,8 +18,9 @@
 
 ## Relationships
 
-- [App Configuration Settings](App_Configuration_Settings.md) (2 shared connections)
-- [Frame Parameter Handling](Frame_Parameter_Handling.md) (1 shared connections)
+- [CompactRenderer](CompactRenderer.md) (2 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
+- [IO](IO.md) (1 shared connections)
 
 ## Source Files
 
@@ -27,8 +28,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 31 (94%)
-- INFERRED: 2 (6%)
+- EXTRACTED: 33 (97%)
+- INFERRED: 1 (3%)
 - AMBIGUOUS: 0 (0%)
 
 ---

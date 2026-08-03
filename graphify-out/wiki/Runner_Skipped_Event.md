@@ -1,17 +1,11 @@
 # Runner Skipped Event
 
-> 46 nodes · cohesion 0.04
+> 18 nodes · cohesion 0.11
 
 ## Key Concepts
 
 - **`aom inspect` Rebuild Implementation Plan** (17 connections) — `docs/superpowers/plans/2026-05-20-inspect-rebuild.md`
-- **`aom inspect` rebuild — design** (13 connections) — `docs/superpowers/specs/2026-05-20-inspect-rebuild-design.md`
-- **Testing strategy** (6 connections) — `docs/superpowers/specs/2026-05-20-inspect-rebuild-design.md`
-- **TUI layout** (6 connections) — `docs/superpowers/specs/2026-05-20-inspect-rebuild-design.md`
-- **Architecture** (4 connections) — `docs/superpowers/specs/2026-05-20-inspect-rebuild-design.md`
-- **2026-05-20-inspect-rebuild.md** (2 connections) — `docs/superpowers/plans/2026-05-20-inspect-rebuild.md`
-- **2026-05-20-inspect-rebuild-design.md** (2 connections) — `docs/superpowers/specs/2026-05-20-inspect-rebuild-design.md`
-- **CLI surface** (2 connections) — `docs/superpowers/specs/2026-05-20-inspect-rebuild-design.md`
+- **2026-05-20-inspect-rebuild.md** (1 connections) — `docs/superpowers/plans/2026-05-20-inspect-rebuild.md`
 - **File structure** (1 connections) — `docs/superpowers/plans/2026-05-20-inspect-rebuild.md`
 - **Plan self-review notes** (1 connections) — `docs/superpowers/plans/2026-05-20-inspect-rebuild.md`
 - **Task 10: Test-leakage fix (autouse `isolated_state_dir`)** (1 connections) — `docs/superpowers/plans/2026-05-20-inspect-rebuild.md`
@@ -28,8 +22,6 @@
 - **Task 7: Text-mode renderer (`inspect/text.py`)** (1 connections) — `docs/superpowers/plans/2026-05-20-inspect-rebuild.md`
 - **Task 8: Rebuild `inspect/cli.py` (drop list/show/diff, add --text)** (1 connections) — `docs/superpowers/plans/2026-05-20-inspect-rebuild.md`
 - **Task 9: Runner prints session-ID footer** (1 connections) — `docs/superpowers/plans/2026-05-20-inspect-rebuild.md`
-- **Compact / golden frame tests** (1 connections) — `docs/superpowers/specs/2026-05-20-inspect-rebuild-design.md`
-- *... and 21 more nodes in this community*
 
 ## Relationships
 
@@ -38,11 +30,10 @@
 ## Source Files
 
 - `docs/superpowers/plans/2026-05-20-inspect-rebuild.md`
-- `docs/superpowers/specs/2026-05-20-inspect-rebuild-design.md`
 
 ## Audit Trail
 
-- EXTRACTED: 90 (100%)
+- EXTRACTED: 34 (100%)
 - INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 

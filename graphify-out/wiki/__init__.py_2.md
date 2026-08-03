@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **__init__.py** (0 connections) — `tests/compact/__init__.py`
+- **tests/compact/__init__.py** (0 connections) — `tests/compact/__init__.py`
 
 ## Relationships
 

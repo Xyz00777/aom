@@ -5,7 +5,7 @@
 ## Key Concepts
 
 - **_FakeSpawn** (13 connections) — `tests/unit/test_runner_ctrl_c_race.py`
-- **_patch_runner_for_fake_subprocess()** (8 connections) — `tests/unit/test_runner_ctrl_c_race.py`
+- **_patch_runner_for_fake_subprocess()** (9 connections) — `tests/unit/test_runner_ctrl_c_race.py`
 - **.test_sigint_after_failed_child_returns_child_exit_code()** (6 connections) — `tests/unit/test_runner_ctrl_c_race.py`
 - **.test_sigint_during_handle_completion_returns_child_exit_code()** (6 connections) — `tests/unit/test_runner_ctrl_c_race.py`
 - **.test_sigint_mid_run_returns_130()** (6 connections) — `tests/unit/test_runner_ctrl_c_race.py`
@@ -32,7 +32,8 @@
 
 ## Relationships
 
-- [Tree Block Animation](Tree_Block_Animation.md) (3 shared connections)
+- [run_playbook](run_playbook.md) (3 shared connections)
+- [test_live_driver_drives_renderer_with_fake_subprocess](test_live_driver_drives_renderer_with_fake_subprocess.md) (1 shared connections)
 
 ## Source Files
 
@@ -40,8 +41,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 70 (96%)
-- INFERRED: 3 (4%)
+- EXTRACTED: 70 (95%)
+- INFERRED: 4 (5%)
 - AMBIGUOUS: 0 (0%)
 
 ---

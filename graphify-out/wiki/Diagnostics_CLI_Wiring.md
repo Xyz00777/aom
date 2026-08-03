@@ -1,48 +1,32 @@
 # Diagnostics CLI Wiring
 
-> 19 nodes · cohesion 0.11
+> 8 nodes · cohesion 0.36
 
 ## Key Concepts
 
-- **StatusBar** (25 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **.update_play_name()** (4 connections) — `src/ansible_aom/tui/screens/main.py`
-- **.__init__()** (3 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **.set_current_task()** (2 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **.set_host_count()** (2 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **.set_memory_usage()** (2 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **.set_playbook_name()** (2 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **.set_subprocess_pid()** (2 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **.set_task_progress()** (2 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **Update play name on SummaryPanel and playbook name on StatusBar.** (1 connections) — `src/ansible_aom/tui/screens/main.py`
-- **Widget** (1 connections)
-- **Set memory usage.          Args:             rss_mb: Resident set size in MB** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **Set the subprocess PID.          Args:             pid: The subprocess PID (or N** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **Configurable status bar showing playbook name, time, progress.** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **Initialize the status bar widget.          Args:             config: Status bar** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **Set the playbook name.          Args:             name: The playbook file name** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **Set task progress.          Args:             completed: Number of completed tas** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **Set the current task name.          Args:             task: The current task nam** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
-- **Set host progress count.          Args:             completed: Number of complet** (1 connections) — `src/ansible_aom/tui/widgets/status_bar.py`
+- **.test_replay_uses_meta_status_failed_when_recorded_failed()** (6 connections) — `tests/integration/test_replay.py`
+- **.test_record_then_replay_produces_same_event_sequence()** (5 connections) — `tests/integration/test_replay.py`
+- **integration/test_replay.py** (4 connections) — `tests/integration/test_replay.py`
+- **_fake_ansible_command()** (3 connections) — `tests/integration/test_replay.py`
+- **TestRecordThenReplay** (3 connections) — `tests/integration/test_replay.py`
+- **Path** (2 connections)
+- **Integration test: record a fake run, then replay it.  Drives ``run_playbook`` ag** (1 connections) — `tests/integration/test_replay.py`
+- **A recorded failure (exit 2) writes meta.status=failed; replay         forwards t** (1 connections) — `tests/integration/test_replay.py`
 
 ## Relationships
 
-- [Non-Interactive Renderers](Non-Interactive_Renderers.md) (5 shared connections)
-- [Session Recording Tests](Session_Recording_Tests.md) (4 shared connections)
-- [Compact Display Logic](Compact_Display_Logic.md) (3 shared connections)
-- [Run State Summary Panel](Run_State_Summary_Panel.md) (2 shared connections)
-- [Community 605](Community_605.md) (2 shared connections)
-- [Community 684](Community_684.md) (1 shared connections)
-- [Community 477](Community_477.md) (1 shared connections)
+- [run_playbook](run_playbook.md) (2 shared connections)
+- [Hide State Normalization](Hide_State_Normalization.md) (2 shared connections)
+- [json.py](json.py.md) (1 shared connections)
 
 ## Source Files
 
-- `src/ansible_aom/tui/screens/main.py`
-- `src/ansible_aom/tui/widgets/status_bar.py`
+- `tests/integration/test_replay.py`
 
 ## Audit Trail
 
-- EXTRACTED: 44 (81%)
-- INFERRED: 10 (19%)
+- EXTRACTED: 21 (84%)
+- INFERRED: 4 (16%)
 - AMBIGUOUS: 0 (0%)
 
 ---

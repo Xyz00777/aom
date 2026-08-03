@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **CompactRenderer** (0 connections) — `.sisyphus/notepads/hide-state/learnings.md`
+- **CompactRenderer** (0 connections) — `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
 
 ## Relationships
 
@@ -12,7 +12,7 @@
 
 ## Source Files
 
-- `.sisyphus/notepads/hide-state/learnings.md`
+- `docs/superpowers/specs/2026-06-02-live-loop-item-streaming-design.md`
 
 ## Audit Trail
 

@@ -1,69 +1,24 @@
 # HostRunState
 
-> God node · 309 connections · `src/ansible_aom/core/models.py`
+> 1 nodes · cohesion 1.00
 
-**Community:** [Play Definition Tree Population](Play_Definition_Tree_Population.md)
+## Key Concepts
 
-## Connections by Relation
+- **HostRunState** (0 connections) — `TEST_SPECIFICATION.md`
 
-### calls
-- ._handle_v2_playbook_on_task_start() `EXTRACTED`
-- _state_with_play() `INFERRED`
-- _state_with_play() `INFERRED`
-- ._handle_v2_runner_on_start() `EXTRACTED`
-- _add_results() `INFERRED`
-- _two_level_state() `INFERRED`
-- _spur_projection() `INFERRED`
-- _state_two_hosts_one_failure() `INFERRED`
-- test_format_tree_block_renders_two_level_truncation() `INFERRED`
-- _visible_projection() `INFERRED`
-- _make_state_with_stale_running() `INFERRED`
-- _renderer_with_running_task() `INFERRED`
-- _state_first_play_running() `INFERRED`
-- .test_update_from_state_drops_completed_tasks() `INFERRED`
-- .test_update_from_state_keeps_running_task_visible() `INFERRED`
-- .test_update_from_state_shows_ok_icon_after_completion() `INFERRED`
-- ._handle_v2_runner_item_on() `EXTRACTED`
-- ._handle_v2_runner_on_failed() `EXTRACTED`
-- ._handle_v2_runner_on_ok() `EXTRACTED`
-- ._handle_v2_runner_on_skipped() `EXTRACTED`
+## Relationships
 
-### contains
-- models.py `EXTRACTED`
+- No strong cross-community connections detected
 
-### indirect_call
-- .test_runner_ok_creates_host_run_state() `INFERRED`
-- .test_task_run_state_hosts_dict_key_is_hostname_string() `INFERRED`
+## Source Files
 
-### rationale_for
-- Runtime state for a task execution on a host (State class). `EXTRACTED`
+- `TEST_SPECIFICATION.md`
 
-### references
-- _reserve_host_run_state() `EXTRACTED`
-- _effective_status() `EXTRACTED`
-- _host_leaf_label() `EXTRACTED`
+## Audit Trail
 
-### uses
-- [RunState](RunState.md) `INFERRED`
-- [TreeProjection](TreeProjection.md) `INFERRED`
-- TestPtyStreamParserStderrLineEmission `INFERRED`
-- TreeLine `INFERRED`
-- TestJsonLineStreamBasics `INFERRED`
-- TestHideStateFlag `INFERRED`
-- TestListTasksEdgeCases `INFERRED`
-- TestListTasksParser `INFERRED`
-- TestPtyStreamParserPhases `INFERRED`
-- TestTaskDefinition `INFERRED`
-- TestTaskMatching `INFERRED`
-- TestListHostsEdgeCases `INFERRED`
-- TestHostRunState `INFERRED`
-- TestPlayRunState `INFERRED`
-- TestStatusBarFormat `INFERRED`
-- TestRunState `INFERRED`
-- TestStatusEnum `INFERRED`
-- TestRoleGrouping `INFERRED`
-- TestPlayDefinition `INFERRED`
-- TestTaskRunState `INFERRED`
+- EXTRACTED: 0 (0%)
+- INFERRED: 0 (0%)
+- AMBIGUOUS: 0 (0%)
 
 ---
 

@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_task_summary.py** (21 connections) — `tests/compact/test_task_summary.py`
+- **test_task_summary.py** (22 connections) — `tests/compact/test_task_summary.py`
 - **_last_summary_line()** (16 connections) — `tests/compact/test_task_summary.py`
 - **_play_start()** (16 connections) — `tests/compact/test_task_summary.py`
 - **_renderer()** (16 connections) — `tests/compact/test_task_summary.py`
@@ -33,7 +33,8 @@
 
 ## Relationships
 
-- [App Configuration Settings](App_Configuration_Settings.md) (14 shared connections)
+- [CompactRenderer](CompactRenderer.md) (14 shared connections)
+- [renderer.py](renderer.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -41,7 +42,7 @@
 
 ## Audit Trail
 
-- EXTRACTED: 270 (96%)
+- EXTRACTED: 271 (96%)
 - INFERRED: 10 (4%)
 - AMBIGUOUS: 0 (0%)
 

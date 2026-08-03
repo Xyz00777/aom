@@ -4,7 +4,7 @@
 
 ## Key Concepts
 
-- **test_redaction_redteam_fixture.py** (11 connections) — `tests/unit/test_redaction_redteam_fixture.py`
+- **test_redaction_redteam_fixture.py** (13 connections) — `tests/unit/test_redaction_redteam_fixture.py`
 - **Any** (8 connections)
 - **_build_config()** (6 connections) — `tests/unit/test_redaction_redteam_fixture.py`
 - **_load_fixture()** (5 connections) — `tests/unit/test_redaction_redteam_fixture.py`
@@ -28,8 +28,10 @@
 
 ## Relationships
 
-- [TUI Tree View Tests](TUI_Tree_View_Tests.md) (2 shared connections)
-- [StreamPhase Enum](StreamPhase_Enum.md) (1 shared connections)
+- [redact_event](redact_event.md) (2 shared connections)
+- [AppConfig](AppConfig.md) (1 shared connections)
+- [RedactionConfig](RedactionConfig.md) (1 shared connections)
+- [json.py](json.py.md) (1 shared connections)
 
 ## Source Files
 
@@ -37,8 +39,8 @@
 
 ## Audit Trail
 
-- EXTRACTED: 63 (97%)
-- INFERRED: 2 (3%)
+- EXTRACTED: 67 (100%)
+- INFERRED: 0 (0%)
 - AMBIGUOUS: 0 (0%)
 
 ---

@@ -64,10 +64,6 @@ class InspectConfig(BaseModel):
     default_tab: str = "summary"
 
 
-class TuiConfig(BaseModel):
-    theme: str = "default"
-
-
 class LogConfig(BaseModel):
     max_lines: int = Field(default=50000, ge=1000, le=100000)
 
@@ -91,7 +87,6 @@ class AomSettings(BaseSettings):
     redaction: RedactionConfig = Field(default_factory=RedactionConfig)
     live: LiveConfig = Field(default_factory=LiveConfig)
     inspect: InspectConfig = Field(default_factory=InspectConfig)
-    tui: TuiConfig = Field(default_factory=TuiConfig)
     log: LogConfig = Field(default_factory=LogConfig)
     session: SessionConfig = Field(default_factory=SessionConfig)
 
