@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# graphify-post-commit: refresh the knowledge graph AFTER a commit lands.
+#
+# Why post-commit + amend and not a pre-commit hook: the pre-commit
+# framework stashes-then-restores the working tree around its pre-commit
+# hooks, which silently rolls back both the graphify-out submodule commit
+# and the gitlink `git add` this script performs. post-commit runs after
+# that machinery is done, so the regeneration can safely commit the
+# submodule and fold the new pointer into the same commit via
+# `git commit --amend`.
+#
+# Only runs when the commit touched graph-relevant files (source, tests,
+# docs, pyproject) so unrelated commits don't trigger a wasteful
+# regeneration. Recursion from the amend is blocked by the
+# AOM_GRAPHIFY_POST_COMMIT env var.
+set -euo pipefail
+
+if [ -n "${AOM_GRAPHIFY_POST_COMMIT:-}" ]; then
+  exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || exit 0)"
+cd "$REPO_ROOT"
+
+if [ ! -d graphify-out ] || [ ! -f graphify-out/graph.json ]; then
+  exit 0
+fi
+if ! command -v graphify >/dev/null 2>&1; then
+  exit 0
+fi
+
+# Only regenerate when HEAD touched graph-relevant files.
+GRAPH_RELEVANT='^(src/.*\.py|tests/.*\.py|docs/.*\.md|ARCHITECTURE\.md|SPECIFICATION\.md|pyproject\.toml)$'
+if ! git show --name-only --pretty=format: HEAD | grep -qE "$GRAPH_RELEVANT"; then
+  exit 0
+fi
+
+git submodule update --init graphify-out 2>/dev/null || true
+
+export GRAPHIFY_VIZ_NODE_LIMIT="${GRAPHIFY_VIZ_NODE_LIMIT:-20000}"
+if ! python3 -c "import numpy" 2>/dev/null; then
+  _LIBSTDCXX="$(gcc -print-file-name=libstdc++.so.6 2>/dev/null || true)"
+  if [ -n "$_LIBSTDCXX" ] && [ -f "$_LIBSTDCXX" ]; then
+    export LD_LIBRARY_PATH="$(dirname "$_LIBSTDCXX")${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+  fi
+fi
+
+graphify install 2>/dev/null || true
+graphify update . 2>/dev/null || true
+graphify cluster-only . 2>/dev/null || true
+graphify tree 2>/dev/null || true
+[ -f graphify-out/graph.json ] && graphify export wiki 2>/dev/null || true
+
+# Commit + push the refreshed artifacts inside the submodule.
+if git -C graphify-out rev-parse --git-dir >/dev/null 2>&1 \
+  && git -C graphify-out remote >/dev/null 2>&1; then
+  if ! git -C graphify-out diff --quiet; then
+    git -C graphify-out add -u graph.json .graphify_labels.json \
+      .graphify_analysis.json .graphify_semantic_marker GRAPH_TREE.html \
+      GRAPH_REPORT.md graph.html wiki/ 2>/dev/null || true
+    git -C graphify-out commit -m "chore: regenerate graph artifacts" >/dev/null 2>&1 || true
+    git -C graphify-out push 2>/dev/null \
+      || echo "graphify: submodule push skipped (no reachable remote)"
+  fi
+fi
+
+# Fold the new submodule pointer into the just-created commit. Guarded so
+# the post-commit fire from the amend itself returns immediately.
+if ! git -C "$REPO_ROOT" diff --quiet HEAD -- graphify-out; then
+  git -C "$REPO_ROOT" add graphify-out
+  AOM_GRAPHIFY_POST_COMMIT=1 \
+    git -C "$REPO_ROOT" commit --amend --no-edit --no-verify >/dev/null 2>&1 \
+    || true
+fi
