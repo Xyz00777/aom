@@ -20,7 +20,7 @@ dependencies = [
     "rich",
     "pyyaml>=6.0",
     "pydantic>=2.0",
-    "pydantic-settings>=2.0",
+    "pydantic-settings>=2.14.2",
     "pexpect>=4.8",
     "psutil>=5.9",
     "argcomplete>=3.5",        # bash/zsh/fish tab-completion for the CLI
