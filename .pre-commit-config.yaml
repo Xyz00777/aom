@@ -32,13 +32,13 @@ repos:
       # (testmon selection against the committed state, execution
       # against the live tree, no framework stash).
 
-      - id: graphify-refresh
-        name: "graphify: refresh graph + tree + wiki (AST-only)"
-        entry: bash .agent/hooks/graphify-refresh.sh
-        language: system
-        pass_filenames: false
-        files: ^(src/.*\.py|tests/.*\.py|docs/.*\.md|ARCHITECTURE\.md|SPECIFICATION\.md|pyproject\.toml)$
-        stages: [pre-commit]
+      # NOTE: graphify is intentionally NOT a pre-commit framework hook.
+      # The framework stashes-then-restores the working tree around its
+      # pre-commit hooks, silently rolling back both the graphify-out
+      # submodule commit and the gitlink `git add`. It runs instead as a
+      # post-commit hook (.githooks/post-commit-graphify) installed by
+      # scripts/install-hooks.sh, which amends the graphify pointer into
+      # the commit that triggered it.
 
       - id: verify-anchors
         name: "verify design doc anchors (path:line-line) against the file system"

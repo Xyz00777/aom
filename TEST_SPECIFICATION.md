@@ -102,15 +102,6 @@ direction of dependencies.
 **Fixture/Setup:** Valid playbook file
 **Edge Cases:** Missing playbook file
 
-### TC-007: TUI Mode Flag
-**Section:** 3.2
-**Category:** integration
-**Priority:** high
-**Description:** `--tui` flag launches full Textual TUI instead of compact view
-**Test:** With `--tui`, Textual app launches; without it, compact ANSI renderer launches
-**Fixture/Setup:** Terminal with TTY
-**Edge Cases:** Non-TTY environment
-
 ### TC-008: Verbose Flag Diagnostics
 **Section:** 3.2
 **Category:** integration
@@ -232,8 +223,8 @@ direction of dependencies.
 **Section:** 3.3
 **Category:** integration
 **Priority:** low
-**Description:** `aom inspect --tui` launches TUI for browsing sessions
-**Test:** Textual TUI launches with session list
+**Description:** `aom inspect` launches the Textual viewer on a TTY
+**Test:** On a TTY, Textual TUI launches with session list; `--text` or a non-TTY stdout renders plain text
 **Fixture/Setup:** Terminal with TTY
 **Edge Cases:** Non-TTY environment
 
@@ -5051,17 +5042,6 @@ the count parens.
 - inspect output includes all tasks and hosts.
 - `--failed` list shows failed tasks that were suppressed from the live log.
 - inspect is driven from events.jsonl, not from the live log buffer.
-
-### TC-658: TUI Mode Ignores --hide-state
-**Section:** 4.2 Full TUI
-**Priority:** P2 — Feature — Boundary
-
-**Test Steps:**
-1. Run `aom --tui playbook.yml --hide-state ok`.
-
-**Expected Outcome:**
-- The TUI log panel shows all log lines regardless of the flag.
-- A warning may be printed to stderr that --hide-state only affects compact mode.
 
 ### TC-659: Default Behaviour Unchanged
 **Section:** 4.1 Compact View — State Filtering

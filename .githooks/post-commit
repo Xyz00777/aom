@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# post-commit: fold repo-generated artifacts into the just-created commit.
+#
+# The pre-commit framework stashes-then-restores the working tree around
+# its pre-commit hooks, silently rolling back any `git add` (and any
+# nested submodule commit) a pre-commit hook performs — so neither the
+# version bump nor the graphify submodule refresh can run there.
+# post-commit runs after that machinery; each step folds its result into
+# the commit via `git commit --amend` (env-guarded against recursion).
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+if [ -x scripts/bump_version.py ]; then
+  AOM_BUMP_HOOK_RUNNING="${AOM_BUMP_HOOK_RUNNING:-}" uv run scripts/bump_version.py || true
+fi
+
+if [ -x .githooks/post-commit-graphify ]; then
+  .githooks/post-commit-graphify || true
+fi

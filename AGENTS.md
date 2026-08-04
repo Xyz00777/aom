@@ -2,12 +2,12 @@
 
 ## What We're Building
 
-**ansible-aom** — nom-style TUI for monitoring `ansible-playbook` in real time. Think `nom build` but for Ansible.
+**ansible-aom** — nom-style live view for monitoring `ansible-playbook` in real time. Think `nom build` but for Ansible.
 
 - **Default**: Compact ANSI streaming view (lightweight, no Textual)
-- **Optional**: Full multi-panel Textual TUI (`--tui` flag)
+- **Inspect**: Textual viewer for browsing recorded sessions (`aom inspect`)
 - **Parsing**: JSONL only via `ansible.posix.jsonl` callback — never regex
-- **Stack**: Python 3.14, Textual ≥0.60, pexpect, Rich, Pydantic
+- **Stack**: Python 3.14, Textual ≥0.60 (inspect viewer only), pexpect, Rich, Pydantic
 - **Build**: hatchling, managed by `uv`
 
 ## Setup (One Time)
