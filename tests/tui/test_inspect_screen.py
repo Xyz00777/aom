@@ -1006,7 +1006,7 @@ async def test_footer_focus_text_tracks_run_play_task_and_v_flash(state_dir: Pat
 
     app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["multi_host"])
     async with app.run_test() as pilot:
-        await pilot.pause()
+        await _settle(pilot)
 
         app.focus_runs()
         await pilot.pause()
