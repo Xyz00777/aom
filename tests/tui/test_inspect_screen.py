@@ -420,7 +420,7 @@ async def test_detail_pane_shows_failure_msg(state_dir: Path):
 
     app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
     async with app.run_test() as pilot:
-        await pilot.pause()
+        await _settle(pilot)
         # Auto-jump to first failure means the failed-loop task detail is shown.
         body = app._detail_text
         assert "Install brew casks" in body
@@ -1135,7 +1135,7 @@ async def test_detail_block_includes_action_and_no_session_stderr(state_dir: Pat
 
     app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
     async with app.run_test() as pilot:
-        await pilot.pause()
+        await _settle(pilot)
         body = app._detail_text
         assert "ACTION community.general.homebrew_cask" in body
         # The previous version embedded "stderr.log (tail)" here; the
@@ -1156,7 +1156,7 @@ async def test_y_yanks_detail(state_dir: Path):
 
     app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["failed_loop"])
     async with app.run_test() as pilot:
-        await pilot.pause()
+        await _settle(pilot)
         detail = app._detail_text
         await pilot.press("y")
         await pilot.pause()
