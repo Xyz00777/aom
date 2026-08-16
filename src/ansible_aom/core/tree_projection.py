@@ -2062,15 +2062,6 @@ class TreeProjection:
                 or extended[-len(runtime_name_chain) :] != runtime_name_chain
             ):
                 extended = _collapse_role_path(extended + runtime_name_chain)
-            # Final defensive pass: drop non-consecutive duplicates that
-            # the per-step ``_collapse_role_path`` (which only collapses
-            # consecutive duplicates) cannot catch. Without this, a
-            # runtime-only task arriving after a sibling sub-branch
-            # closes can produce e.g.
-            # ``("podman", "angie_ssl_terminator", "podman")`` and the
-            # renderer emits a duplicate ``role: podman`` header. The
-            # aggressive collapse ensures one ``role:`` header per
-            # unique nesting level regardless of chain assembly.
             return _collapse_role_path_aggressive(extended)
 
         def _task_identity(task: TaskRunState) -> str:
@@ -2209,6 +2200,7 @@ class TreeProjection:
                     preflight_path = _collapse_role_path(inherited_role_path + (entry.role,))
                 else:
                     preflight_path = inherited_role_path
+
                 runtime = _pick_runtime(
                     entry.name, matched_runtime_task_ids, preferred_hosts, entry.path
                 )
@@ -2318,6 +2310,7 @@ class TreeProjection:
                 continue
             runtime_name_chain = _name_role_chain(task.name)
             full_role_path = _extend_role_path(last_emitted_role_path, (), task, runtime_name_chain)
+
             items.append((kind, task.name, full_role_path, task))
             emitted_names.add(task.name)
             emitted_task_ids.add(task_identity)
