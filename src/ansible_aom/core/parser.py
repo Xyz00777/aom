@@ -76,6 +76,16 @@ def _safe_loads(line: str) -> Any:
     return orjson.loads(line)
 
 
+_RETRYING_RE = re.compile(
+    r"FAILED\s*-\s*RETRYING:\s*(?:\[(?P<host1>[^\]]+)\]|(?P<host2>[^:]+)):\s*(?P<task>.*?)\s*\((?P<left>\d+)\s+retries\s+left\)",
+    re.IGNORECASE,
+)
+_ASYNC_POLL_RE = re.compile(
+    r"ASYNC\s+POLL\s+on\s+(?P<host>[^:]+):\s*jid=(?P<jid>\S+)",
+    re.IGNORECASE,
+)
+
+
 class StreamPhase(Enum):
     """PTY stream parsing phases."""
 
@@ -382,7 +392,45 @@ class PtyStreamParser:
         # Not warning-family: any open warning block ends here.
         self._current_warning = None
 
+        retry_m = _RETRYING_RE.search(clean)
+        if retry_m:
+            host = (retry_m.group("host1") or retry_m.group("host2") or "").strip()
+            retries_left = int(retry_m.group("left"))
+            task_name = retry_m.group("task").strip()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            return [
+                cast(
+                    JsonlEvent,
+                    {
+                        "_event": "v2_runner_retry",
+                        "_timestamp": now_iso,
+                        "host": host,
+                        "retries_left": retries_left,
+                        "task": {"name": task_name},
+                    },
+                )
+            ]
+
+        poll_m = _ASYNC_POLL_RE.search(clean)
+        if poll_m:
+            host = poll_m.group("host").strip()
+            jid = poll_m.group("jid").strip()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            return [
+                cast(
+                    JsonlEvent,
+                    {
+                        "_event": "v2_runner_on_async_poll",
+                        "_timestamp": now_iso,
+                        "host": host,
+                        "ansible_job_id": jid,
+                        "task": {},
+                    },
+                )
+            ]
+
         # Classify the line via stderr_classifier and emit a synthetic
+
         # aom_stderr_line event so the session recording captures it.
         classified = classify(clean)
         now_iso = datetime.now(timezone.utc).isoformat()

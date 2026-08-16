@@ -278,6 +278,8 @@ def _host_leaf_label(hostname: str, hs: HostRunState, total: int | None = None) 
     known, else a bare ``(N items)``. Non-looped hosts (count 0) render the
     bare hostname.
     """
+    if hs.poll_hint:
+        return f"{hostname}  ({hs.poll_hint})"
     if hs.loop_items_done <= 0:
         return hostname
     if total is not None and total > 0:
