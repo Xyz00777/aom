@@ -34,7 +34,8 @@ from ansible_aom.core.parser import (
     parse_list_tasks_output,
 )
 
-_PREFLIGHT_TIMEOUT_S = 30.0
+_PREFLIGHT_TIMEOUT_S = float(os.environ.get("AOM_PREFLIGHT_TIMEOUT", "120.0"))
+
 
 # When ansible-playbook gets bad args, argparse dumps `usage:`, the error line,
 # then the full `--help` text again to stderr. Keep only the actual error.
