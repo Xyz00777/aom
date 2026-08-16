@@ -3323,19 +3323,16 @@ class TestTaskCompletionLifecycle:
         p = TreeProjection.from_run_state(state)
         play_lines = [ln for ln in p.tree_lines(budget=25) if ln.kind == "play"]
         play_names = [ln.label.removeprefix("play: ") for ln in play_lines]
-        assert play_names == ["Play A", "Play B"], f"both plays should appear; got {play_names!r}"
+        # Play A has finished and has no running tasks, so only the active Play B appears
+        assert play_names == ["Play B"], f"only active play should appear; got {play_names!r}"
 
         task_lines = [ln for ln in p.tree_lines(budget=25) if ln.kind == "task"]
         task_names = [ln.label.split("  ")[0] for ln in task_lines]
-        # T1 is completed and should NOT appear.
-        # T2 is pending and MUST appear (this was the bug).
-        # T3 is running and should appear.
-        assert "T1" not in task_names, f"completed task T1 should not appear, got {task_names!r}"
-        assert "T2" in task_names, (
-            f"pending task T2 should appear (regression: it was being skipped "
-            f"because Play A had T1 completed and no running tasks), got {task_names!r}"
-        )
         assert "T3" in task_names, f"running task T3 should appear, got {task_names!r}"
+        assert "T1" not in task_names, f"completed task T1 should not appear, got {task_names!r}"
+        assert "T2" not in task_names, (
+            f"skipped preflight task T2 of finished play should not appear, got {task_names!r}"
+        )
 
 
 class TestIncludeStubHiding:

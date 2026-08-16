@@ -1603,16 +1603,14 @@ class TreeProjection:
                     # row leases still age out independently.
                     active_play_id = self._last_running_play_runtime_id
 
-        active_play_seen = False
-        for runtime, play_def in ordered_plays:
-            is_active = (
-                runtime is not None
-                and active_play_id is not None
-                and self._play_runtime_identity(runtime) == active_play_id
-            )
-            if is_active:
-                active_play_seen = True
+        active_play_index: int | None = None
+        if active_play_id is not None:
+            for idx, (rt, _) in enumerate(ordered_plays):
+                if rt is not None and self._play_runtime_identity(rt) == active_play_id:
+                    active_play_index = idx
+                    break
 
+        for idx, (runtime, play_def) in enumerate(ordered_plays):
             if runtime is not None:
                 if active_play_id is not None:
                     if self._play_runtime_identity(runtime) != active_play_id:
@@ -1624,6 +1622,11 @@ class TreeProjection:
                         if runtime.status == Status.COMPLETED:
                             continue
                         items = self._play_running_and_pending(runtime, include_cross_play=False)
+                        # If an active play has already started after this play,
+                        # and this prior play has no running tasks, it is completed.
+                        if active_play_index is not None and idx < active_play_index:
+                            if not any(k == "running" for k, _, _, _ in items):
+                                continue
                         # Hide plays whose every task is finished: no
                         # running, no pending, only ``runtime.tasks``
                         # left as completed history. A play with some
@@ -1637,7 +1640,7 @@ class TreeProjection:
                 # Preflight-only plays that appear before the active play in the
                 # playbook definition order were skipped (e.g. via --tags or
                 # when: conditions) and will not run. Do not emit them as pending.
-                if active_play_id is not None and not active_play_seen:
+                if active_play_index is not None and idx < active_play_index:
                     continue
                 self._emit_pending_play(lines, play_def, now)
         return lines
@@ -2005,9 +2008,10 @@ class TreeProjection:
             runtime_by_name[task.name].append(task)
             if task.path is not None:
                 runtime_by_path[task.path].append(task)
-            stripped = strip_role_prefix(task.name)
-            if stripped != task.name:
-                runtime_by_name[stripped].append(task)
+            curr = task.name
+            while " : " in curr:
+                curr = curr.split(" : ", 1)[1].strip()
+                runtime_by_name[curr].append(task)
 
         # Generic cross-play borrowing is intentionally disabled here.
         # Rows are built only from the current play's runtime tasks; any
