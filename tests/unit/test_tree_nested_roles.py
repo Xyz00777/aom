@@ -1027,3 +1027,86 @@ class TestTaskLabelStripsRolePrefixAndPendingVisible:
             assert any(ch.isdigit() for ch in label), (
                 f"trailing indicator must report the count of dropped tasks; got {label!r}"
             )
+
+
+class TestConcurrentFreeStrategyRoleClustering:
+    """When free strategy executes tasks out of order on different hosts,
+    tasks from a parent role and a sub-role must not fracture into
+    repeatedly opened and closed role headers.
+    """
+
+    def test_interleaved_parent_and_sub_role_tasks_cluster_contiguous(self) -> None:
+        state = RunState(playbook="main.yml")
+        state.definitions = [
+            _play_def(
+                "p1",
+                "Deploy Keepalived for Proxmox VIP",
+                [
+                    RoleGroupDefinition(
+                        role="angie_ssl_terminator",
+                        tasks=[
+                            TaskDefinition(
+                                name="Create angie config directories",
+                                role="angie_ssl_terminator",
+                                tags=[],
+                                play_id="p1",
+                                play_order=0,
+                                task_order=0,
+                            ),
+                            RoleGroupDefinition(
+                                role="podman",
+                                tasks=[
+                                    TaskDefinition(
+                                        name="podman : Pre-pull Angie image",
+                                        role="podman",
+                                        tags=[],
+                                        play_id="p1",
+                                        play_order=0,
+                                        task_order=1,
+                                    ),
+                                    TaskDefinition(
+                                        name="podman : Apply iptables fix",
+                                        role="podman",
+                                        tags=[],
+                                        play_id="p1",
+                                        play_order=0,
+                                        task_order=2,
+                                    ),
+                                ],
+                            ),
+                            TaskDefinition(
+                                name="Deploy TLS certificates for sidecar",
+                                role="angie_ssl_terminator",
+                                tags=[],
+                                play_id="p1",
+                                play_order=0,
+                                task_order=3,
+                            ),
+                        ],
+                    ),
+                ],
+            )
+        ]
+        _fire_startup(state, play_id="play-1", play_name="Deploy Keepalived for Proxmox VIP")
+
+        # ds5 is running the sub-role task (Pre-pull Angie image)
+        _fire_running_task(
+            state, "t-sub", "angie_ssl_terminator : podman : Pre-pull Angie image", host="ds5"
+        )
+        # ds9 is running the parent role task (Create angie config directories)
+        _fire_running_task(
+            state, "t-parent", "angie_ssl_terminator : Create angie config directories", host="ds9"
+        )
+
+        lines = TreeProjection.from_run_state(state).tree_lines(budget=80)
+        seq = _line_summary(lines)
+
+        angie_headers = [lbl for d, k, lbl in seq if k == "role" and "angie_ssl_terminator" in lbl]
+        podman_headers = [lbl for d, k, lbl in seq if k == "role" and "podman" in lbl]
+
+        assert len(angie_headers) == 1, (
+            f"angie_ssl_terminator header must appear exactly once, got: {angie_headers}"
+        )
+        assert len(podman_headers) == 1, (
+            f"podman header must appear exactly once, got: {podman_headers}"
+        )

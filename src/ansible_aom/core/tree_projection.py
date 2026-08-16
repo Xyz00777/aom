@@ -141,6 +141,54 @@ def _play_target_hostnames(play: "PlayRunState", play_def: "PlayDefinition | Non
     return hostnames
 
 
+def _cluster_items_by_role_path(
+    items: list[tuple[str, str, tuple[str, ...], TaskRunState | None]],
+) -> list[tuple[str, str, tuple[str, ...], TaskRunState | None]]:
+    """Group items so tasks sharing the same role branch stay contiguous,
+    preventing multi-host concurrency from repeatedly opening and closing
+    role headers.
+    """
+    if not items:
+        return items
+
+    by_path: dict[tuple[str, ...], list[tuple[str, str, tuple[str, ...], TaskRunState | None]]] = (
+        defaultdict(list)
+    )
+    path_order: list[tuple[str, ...]] = []
+    for item in items:
+        rpath = item[2]
+        if rpath not in by_path:
+            path_order.append(rpath)
+        by_path[rpath].append(item)
+
+    clustered: list[tuple[str, str, tuple[str, ...], TaskRunState | None]] = []
+    emitted_paths: set[tuple[str, ...]] = set()
+
+    def _emit_path_and_descendants(target_path: tuple[str, ...]) -> None:
+        if target_path in emitted_paths:
+            return
+        emitted_paths.add(target_path)
+        if target_path in by_path:
+            clustered.extend(by_path[target_path])
+        for p in path_order:
+            if (
+                p not in emitted_paths
+                and len(p) > len(target_path)
+                and p[: len(target_path)] == target_path
+            ):
+                _emit_path_and_descendants(p)
+
+    for p in path_order:
+        if p not in emitted_paths:
+            root = (p[0],) if p else ()
+            if root not in emitted_paths and root in by_path:
+                _emit_path_and_descendants(root)
+            else:
+                _emit_path_and_descendants(p)
+
+    return clustered
+
+
 @dataclass(frozen=True)
 class TreeLine:
     """One rendered line in the tree.
@@ -1786,15 +1834,10 @@ class TreeProjection:
         if not running_items and not pending_items:
             return
 
-        # Render the running task first (top of the active subtree),
-        # then pending tasks. The running task's role path may extend
-        # deeper than any pending task's path (e.g. an
-        # ``include_role`` grafted under a preflight role that the
-        # preflight didn't surface). The role-chain emitter reuses
-        # the running task's already-opened inner roles when a
-        # pending task arrives next, so the chain doesn't reopen
-        # outer roles it already closed.
-        play_items = running_items + pending_items
+        # Render running tasks and pending tasks clustered by their hierarchical
+        # role path so that multi-host concurrency does not interleave tasks
+        # and repeatedly open/close role headers.
+        play_items = _cluster_items_by_role_path(running_items + pending_items)
 
         lines.append(
             TreeLine(
@@ -2318,6 +2361,7 @@ class TreeProjection:
             if stripped != task.name:
                 emitted_names.add(stripped)
 
+        items = _cluster_items_by_role_path(items)
         self._prp_render_memo[id(play)] = items
         return items
 
