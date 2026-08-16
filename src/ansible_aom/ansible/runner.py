@@ -970,7 +970,8 @@ def _handle_timeout_branch(
                     sink.record_stderr(line)
             stall_count = 0
 
-    renderer.tick()
+    if hasattr(renderer, "tick"):
+        renderer.tick()
     return stall_count
 
 
