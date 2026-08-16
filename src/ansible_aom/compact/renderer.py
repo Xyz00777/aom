@@ -81,6 +81,7 @@ from ansible_aom.core.log_filter import (
     should_hide_host_result,
 )
 from ansible_aom.core.models import RunState, Status
+from ansible_aom.core.stderr_classifier import is_profiling_banner
 from ansible_aom.core.tree import TreeProjection, run_state_status_counts
 from ansible_aom.core.tree_projection import task_complete_on_all_targets
 
@@ -291,6 +292,9 @@ class CompactRenderer:
         # (retry recovery). All are rare; the memo is hot the rest of the
         # time.
         self._play_dead_cache: dict[str, set[str]] = {}
+        self._current_play_id: str = ""
+        self._fan_out_groups: dict[tuple[str, str, str], set[str]] = {}
+        self._fan_out_group_keys: dict[str, tuple[str, str, str]] = {}
         # "The task whose header is currently on screen" — the most
         # recently announced UUID. Drives the ``[task: …]`` straggler
         # suffix (a result whose task differs from this reads as
@@ -427,6 +431,9 @@ class CompactRenderer:
         self._completed_task_ids = _BoundedSet(_COMPLETED_TASK_IDS_CAP)
         self._announced_task_uuids = _BoundedSet(_ANNOUNCED_TASK_UUIDS_CAP)
         self._play_dead_cache = {}
+        self._current_play_id = ""
+        self._fan_out_groups = {}
+        self._fan_out_group_keys = {}
         # ``_estimate`` is set by ``set_prior_run`` and not reset here, the
         # same way ``_prior_run`` isn't — only the per-run accumulators are.
         self._progress = RunProgress()
@@ -1402,15 +1409,18 @@ class CompactRenderer:
                 summary_now = self._task_last_result_time(task_uuid) or now
             else:
                 emit = task_complete_on_all_targets(
-                    self._state, task_uuid, dead_by_play=self._play_dead_cache
+                    self._state,
+                    task_uuid,
+                    dead_by_play=self._play_dead_cache,
+                    fan_out_groups=self._fan_out_groups,
                 )
                 summary_now = now
             if emit:
                 self._emit_task_summary(task_uuid, summary_now)
-                self._discard_task_state(task_uuid)
                 emitted.append(task_uuid)
         for task_uuid in emitted:
             del self._announced_order[task_uuid]
+            self._discard_task_state(task_uuid)
 
     def _maybe_flush_completed(self, task_uuid: str, now: float) -> None:
         """Emit ``task_uuid``'s summary if it just completed on all targets.
@@ -1419,13 +1429,41 @@ class CompactRenderer:
         with the task a terminal event belongs to (or, at announce time,
         the task being displaced as "current"), so ordinary events pay one
         completion check instead of a sweep over every pending task.
+
+        When the task is a member of a multi-UUID fan-out group (mitogen
+        free strategy assigns per-host UUIDs to dynamically included
+        tasks), the group completes as a unit: the terminal event that
+        completes one member completes every still-pending member, so all
+        of them are summarised here. Bounded by the group size (typically
+        2-3), never a sweep over the whole pending backlog.
         """
         if self._state is None or task_uuid not in self._announced_order:
             return
-        if task_complete_on_all_targets(self._state, task_uuid, dead_by_play=self._play_dead_cache):
-            self._emit_task_summary(task_uuid, now)
-            self._discard_task_state(task_uuid)
-            del self._announced_order[task_uuid]
+        if not task_complete_on_all_targets(
+            self._state,
+            task_uuid,
+            dead_by_play=self._play_dead_cache,
+            fan_out_groups=self._fan_out_groups,
+        ):
+            return
+        # The event's own task is complete. If it belongs to a fan-out
+        # group, every other still-pending member is complete too (the
+        # group shares one host union) — summarise them all now so no
+        # member lingers until the run-end force flush.
+        to_emit = [task_uuid]
+        group_key = self._fan_out_group_keys.get(task_uuid)
+        if group_key is not None:
+            members = self._fan_out_groups.get(group_key)
+            if members is not None:
+                to_emit.extend(
+                    member
+                    for member in members
+                    if member != task_uuid and member in self._announced_order
+                )
+        for member in to_emit:
+            self._emit_task_summary(member, now)
+            del self._announced_order[member]
+            self._discard_task_state(member)
 
     def _discard_task_state(self, task_uuid: str) -> None:
         """Drop a summarised task's per-task bookkeeping (keeps memory
@@ -1433,6 +1471,18 @@ class CompactRenderer:
         self._task_start_times.pop(task_uuid, None)
         self._task_names.pop(task_uuid, None)
         self._task_inline_duration_hosts.pop(task_uuid, None)
+        group_key = self._fan_out_group_keys.get(task_uuid)
+        if group_key is None:
+            return
+        members = self._fan_out_groups.get(group_key)
+        if members is None:
+            self._fan_out_group_keys.pop(task_uuid, None)
+            return
+        if any(member_uuid in self._announced_order for member_uuid in members):
+            return
+        for member_uuid in members:
+            self._fan_out_group_keys.pop(member_uuid, None)
+        del self._fan_out_groups[group_key]
 
     def _task_has_terminal_result(self, task_uuid: str) -> bool:
         """True when ``task_uuid`` has at least one non-RUNNING host result."""
@@ -1633,6 +1683,11 @@ class CompactRenderer:
         """
         if task_uuid and task_uuid in self._announced_task_uuids:
             return
+        task_path = task_meta.get("path")
+        if task_uuid and task_path:
+            group_key = (self._current_play_id, task_name, task_path)
+            self._fan_out_groups.setdefault(group_key, set()).add(task_uuid)
+            self._fan_out_group_keys[task_uuid] = group_key
         # First: dispose of any skipped-host buffer left over from the
         # previous task. If that task only ever produced skipped
         # results, collapse them; otherwise (the buffer would have been
@@ -1708,6 +1763,7 @@ class CompactRenderer:
         name = event.get("_event")
         event_time = self._event_time(event)
         if name == "v2_playbook_on_play_start":
+            self._current_play_id = event.get("play", {}).get("id", "")
             play_name = event.get("play", {}).get("name", "") or "(unnamed)"
             self._display.print_log(f"\nPLAY [{play_name}] " + "*" * 50)
         elif name == "v2_playbook_on_task_start":
@@ -1907,6 +1963,21 @@ class CompactRenderer:
                 self._flush_ready_summaries(event_time, force=True)
                 # Clear so a subsequent run doesn't see a stale last task.
                 self._last_task_uuid = None
+        elif name == "aom_stderr_line":
+            # SPEC: "Display stderr lines in log panel (TUI) or console
+            # (compact)". AOM records non-warning stderr as synthetic
+            # aom_stderr_line events; surface them live so real stderr
+            # output (module stderr, etc.) isn't silently dropped from the
+            # on-screen log. Third-party profiling banners (e.g. profile_tasks,
+            # timer) are suppressed because AOM computes native task durations.
+            # The raw line may carry ANSI SGR escapes (the parser stores the
+            # un-stripped line); strip them for the log, matching how the
+            # classifier sees the text. Blank lines are noise — skip them.
+            raw_line = event.get("line")
+            if isinstance(raw_line, str) and raw_line.strip():
+                clean_line = _strip_sgr(raw_line)
+                if not is_profiling_banner(clean_line):
+                    self._display.print_log(clean_line)
 
     def _loop_item_lines(self, host: str, result: dict) -> list[str]:
         """Expand a looped task's per-host ``results`` array into log lines.

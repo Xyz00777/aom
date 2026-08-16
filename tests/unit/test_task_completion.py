@@ -23,11 +23,21 @@ def _play_start(play_id: str = "p1") -> dict:
     return {"_event": "v2_playbook_on_play_start", "play": {"id": play_id, "name": "P"}}
 
 
-def _runner_start(task_id: str, host: str, play_id: str = "p1") -> dict:
+def _runner_start(
+    task_id: str,
+    host: str,
+    play_id: str = "p1",
+    *,
+    task_name: str = "T",
+    task_path: str | None = None,
+) -> dict:
+    task = {"id": task_id, "name": task_name}
+    if task_path is not None:
+        task["path"] = task_path
     return {
         "_event": "v2_runner_on_start",
         "_timestamp": "2026-05-11T10:00:00Z",
-        "task": {"id": task_id, "name": "T"},
+        "task": task,
         "play": {"id": play_id},
         "host": host,
     }
@@ -134,3 +144,52 @@ def test_no_target_information_is_not_complete() -> None:
     s = RunState(playbook="site.yml")
     s.handle_event(_play_start())
     assert task_complete_on_all_targets(s, "t1") is False
+
+
+def test_fan_out_member_complete_when_group_hosts_terminal() -> None:
+    s = _state(["a", "b", "c"])
+    path = "roles/example/tasks/main.yml:7"
+    _ran_ok_with_meta(s, "u1", "a", path)
+    _ran_ok_with_meta(s, "u2", "b", path)
+    groups = {("p1", "T", path): {"u1", "u2"}}
+
+    assert task_complete_on_all_targets(s, "u1", fan_out_groups=groups) is True
+    assert task_complete_on_all_targets(s, "u2", fan_out_groups=groups) is True
+    assert task_complete_on_all_targets(s, "u1") is False
+    assert task_complete_on_all_targets(s, "u2") is False
+
+
+def test_fan_out_group_blocks_until_all_members_terminal() -> None:
+    s = _state(["a", "b"])
+    path = "roles/example/tasks/main.yml:7"
+    _ran_ok_with_meta(s, "u1", "a", path)
+    s.handle_event(_runner_start("u2", "b", task_path=path))
+    groups = {("p1", "T", path): {"u1", "u2"}}
+
+    assert task_complete_on_all_targets(s, "u1", fan_out_groups=groups) is False
+
+
+def test_fan_out_ignores_dead_hosts() -> None:
+    s = _state(["a", "b"])
+    path = "roles/example/tasks/main.yml:7"
+    _ran_ok_with_meta(s, "u1", "a", path)
+    s.handle_event(_runner_start("u2", "b", task_path=path))
+    s.handle_event(_runner_start("killer", "b"))
+    s.handle_event(_failed("killer", "b"))
+    groups = {("p1", "T", path): {"u1", "u2"}}
+
+    assert task_complete_on_all_targets(s, "u1", fan_out_groups=groups) is True
+
+
+def test_single_instance_keeps_old_semantics() -> None:
+    s = _state(["a", "b"])
+    path = "roles/example/tasks/main.yml:7"
+    _ran_ok_with_meta(s, "u1", "a", path)
+    groups = {("p1", "T", path): {"u1"}}
+
+    assert task_complete_on_all_targets(s, "u1", fan_out_groups=groups) is False
+
+
+def _ran_ok_with_meta(s: RunState, task_id: str, host: str, path: str) -> None:
+    s.handle_event(_runner_start(task_id, host, task_path=path))
+    s.handle_event(_ok(task_id, host))

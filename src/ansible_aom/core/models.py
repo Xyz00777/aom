@@ -32,6 +32,44 @@ def strip_role_prefix(name: str) -> str:
     return name
 
 
+def _is_template_match(preflight_name: str, runtime_name: str) -> bool:
+    """Return True if ``runtime_name`` could be a resolved version of
+    ``preflight_name`` (which may contain ``{{ ... }}`` templates).
+
+    The match is a wildcard subsequence: split ``preflight_name`` on
+    ``{{ ... }}`` to get the static fragments, then verify each
+    fragment appears as a substring of the runtime name, in order,
+    with each fragment consuming at least one new runtime character.
+    The Jinja expressions themselves are wildcards — they absorb any
+    text the resolved variable contributes.
+
+    Requires at least one non-empty static fragment. A preflight name
+    that is entirely a Jinja expression (e.g. ``{{ var }}``) has no
+    static text to anchor a match, so this function returns False for
+    any runtime name — such exact-equality matches are handled by the
+    caller's direct name comparison path instead.
+
+    This handles punctuation adjacent to a Jinja expression — e.g.
+    ``{{ user }}'s`` resolving to ``angie-sidecar's`` — by matching on
+    the *character-level* fragments (``"Ensure "`` then ``"'s home exists"``)
+    rather than whitespace-delimited tokens. A token-level match would
+    compare skeleton word ``'s`` against runtime word ``angie-sidecar's``
+    and fail.
+    """
+    if "{{" not in preflight_name:
+        return False
+    fragments = [f for f in _JINJA_RE.split(preflight_name) if f]
+    if not fragments:
+        return False
+    cursor = 0
+    for fragment in fragments:
+        idx = runtime_name.find(fragment, cursor)
+        if idx == -1:
+            return False
+        cursor = idx + len(fragment)
+    return True
+
+
 def runtime_role_from_task_name(task_name: str) -> str | None:
     """Infer an ``include_role``-style runtime role from a task name.
 

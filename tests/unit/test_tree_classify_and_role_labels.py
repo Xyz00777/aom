@@ -1432,32 +1432,20 @@ class TestCrossPlayLookupIsolation:
         # (its name is empty) and the tree only renders plays that match
         # a preflight definition or are the active sticky anchor.
         play_lines = [ln.label for ln in lines if ln.kind == "play"]
+        # Play 1 has completed and has no running tasks, so it is dismissed;
+        # only the currently active Play 2 appears in the live tree.
         assert "play: Deploy database" in play_lines, f"Running play must appear, got: {play_lines}"
-
-        # The handler task's runtime lives in play-handler, not play-1, so
-        # the original play's preflight entry for "Restart nginx" shows as
-        # □ pending (cross-play borrow is intentionally disabled). The play
-        # therefore stays visible. What MUST NOT happen is the handler task
-        # showing as a running/changed row in the original play — that
-        # would be the cursor-fallback bug regressing.
-        assert "play: Deploy webservers" in play_lines, (
-            f"Original play must remain visible (handler runtime lives in play-handler), got: {play_lines}"
+        assert "play: Deploy webservers" not in play_lines, (
+            f"Prior completed play must not linger when subsequent play is active, got: {play_lines}"
         )
 
         task_lines = [ln for ln in lines if ln.kind == "task"]
         task_labels = [ln.label for ln in task_lines]
-        # "Restart nginx" appears as □ pending under "Deploy webservers"
-        # (its runtime belongs to play-handler, which has no preflight
-        # match and so is not rendered as a standalone play). What we
-        # guard against is the handler task showing up as ◐ running or
-        # * ok/changed under the wrong play — that would mean the
-        # cursor-fallback bug regressed.
-        restart_lines = [ln for ln in lines if "Restart nginx" in ln.label]
-        assert len(restart_lines) == 1, (
-            f"Restart nginx must appear exactly once (as □ pending under Deploy webservers), got: {restart_lines}"
+        assert any("Install postgres" in lbl for lbl in task_labels), (
+            f"Active play task must appear, got: {task_labels}"
         )
-        assert restart_lines[0].status == Status.PENDING, (
-            f"Handler task must render as □ pending in original play, not as running/ok in handler play: {restart_lines[0]}"
+        assert not any("Restart nginx" in lbl for lbl in task_labels), (
+            f"Completed play handler task must not linger, got: {task_labels}"
         )
 
     def test_own_running_task_still_renders_with_cross_play(self) -> None:

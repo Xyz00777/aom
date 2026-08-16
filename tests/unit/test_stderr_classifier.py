@@ -17,6 +17,7 @@ from ansible_aom.core.stderr_classifier import (
     StderrLevel,
     StderrSource,
     classify,
+    is_profiling_banner,
 )
 
 # =============================================================================
@@ -513,6 +514,67 @@ class TestClassifyRunLevel:
     def test_plugin_loading_debug(self) -> None:
         event = classify("trying /path/to/plugin/directory")
         assert event.source is StderrSource.RUN_LEVEL
+
+
+# =============================================================================
+# Source: profile_tasks callback banner
+# =============================================================================
+
+
+class TestClassifyProfileTasksBanner:
+    """The ``ansible.posix.profile_tasks`` callback emits a per-task banner line
+    to stderr when enabled via ``callbacks_enabled`` (e.g. a user's ansible.cfg).
+    Its shape is a localized timestamp, the previous task's elapsed time, and the
+    total playbook elapsed time, padded with ``*`` to a fixed width:
+
+        ``Dienstag 04 August 2026  19:02:51 +0200 (0:00:00.477)       0:00:00.477 *******``
+
+    The timestamp prefix is locale-dependent (any day/month language), so the
+    rule must anchor on the structurally-stable trailing portion: two
+    ``(H:MM:SS.mmm)``-style durations and the ``*``-padded tail. These are
+    redundant with AOM's ``v2_playbook_on_task_start`` / ``v2_runner_on_start``
+    events, so they classify as RUN_LEVEL diagnostics rather than UNKNOWN."""
+
+    def test_german_banner(self) -> None:
+        line = "Dienstag 04 August 2026  19:02:51 +0200 (0:00:00.477)       0:00:00.477 *******"
+        event = classify(line)
+        assert event.source is StderrSource.RUN_LEVEL
+        assert event.host is None
+        assert event.line == line
+
+    def test_english_banner(self) -> None:
+        line = "Tuesday 04 August 2026  19:02:51 +0200 (0:00:00.025)       0:00:00.025 *******"
+        event = classify(line)
+        assert event.source is StderrSource.RUN_LEVEL
+        assert event.host is None
+
+    def test_multi_minute_elapsed(self) -> None:
+        """Elapsed durations can exceed an hour (e.g. 0:03:08.100); the rule
+        must still match."""
+        line = "Dienstag 04 August 2026  19:05:58 +0200 (0:03:00.786)       0:03:08.103 *******"
+        event = classify(line)
+        assert event.source is StderrSource.RUN_LEVEL
+
+    def test_banner_without_date_prefix_uses_filled_width(self) -> None:
+        """Some profile_tasks variants emit just ``(elapsed) total *******``
+        without the date when configured so; the trailing duration + stars
+        pattern still identifies it."""
+        line = "(0:00:00.025)       0:00:00.025 *******"
+        event = classify(line)
+        assert event.source is StderrSource.RUN_LEVEL
+
+    def test_is_profiling_banner_helper(self) -> None:
+        """is_profiling_banner correctly identifies profiling banners and rejects normal stderr lines."""
+        assert is_profiling_banner(
+            "Sonntag 16 August 2026  21:35:07 +0200 (0:00:00.896)       0:00:53.332 ******** "
+        )
+        assert is_profiling_banner(
+            "Dienstag 04 August 2026  19:02:51 +0200 (0:00:00.477)       0:00:00.477 *******"
+        )
+        assert is_profiling_banner("(0:00:00.025)       0:00:00.025 *******")
+        assert not is_profiling_banner("fatal: [web1]: FAILED!")
+        assert not is_profiling_banner("[WARNING]: something went wrong")
+        assert not is_profiling_banner("TASK [Ensure ZFS userspace tools are installed]")
 
 
 # =============================================================================

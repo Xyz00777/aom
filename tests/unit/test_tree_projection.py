@@ -556,6 +556,48 @@ class TestTreeLinesBasic:
         assert by_label["web1"].status == Status.FAILED
         assert by_label["web2"].status == Status.RUNNING
 
+    def test_task_with_unreachable_host_drops_from_tree_when_all_hosts_finish(self):
+        # When all hosts complete a task (even if one was UNREACHABLE),
+        # the task must not remain pinned in the live tree when the next task runs.
+        state = self._running_task_state()
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_unreachable",
+                "_timestamp": "2026-04-20T10:00:10Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "hosts": {"web1": {"unreachable": True, "msg": "ssh dead"}},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-04-20T10:00:12Z",
+                "task": {"id": "t1", "name": "Install nginx"},
+                "hosts": {"web2": {"ok": True, "changed": False}},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-04-20T10:00:13Z",
+                "task": {"id": "t2", "name": "Start nginx service"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-04-20T10:00:14Z",
+                "task": {"id": "t2", "name": "Start nginx service"},
+                "host": "web2",
+            }
+        )
+        p = TreeProjection.from_run_state(state)
+        task_lines = [ln for ln in p.tree_lines(budget=20) if ln.kind == "task"]
+        assert len(task_lines) == 1
+        assert "Start nginx service" in task_lines[0].label
+        assert "Install nginx" not in [ln.label for ln in task_lines]
+
     def test_terminal_leaf_elapsed_is_frozen_at_completion(self):
         # A terminal leaf shows how long the host took (end - start),
         # not a clock that keeps growing after the host finished.
@@ -3281,19 +3323,16 @@ class TestTaskCompletionLifecycle:
         p = TreeProjection.from_run_state(state)
         play_lines = [ln for ln in p.tree_lines(budget=25) if ln.kind == "play"]
         play_names = [ln.label.removeprefix("play: ") for ln in play_lines]
-        assert play_names == ["Play A", "Play B"], f"both plays should appear; got {play_names!r}"
+        # Play A has finished and has no running tasks, so only the active Play B appears
+        assert play_names == ["Play B"], f"only active play should appear; got {play_names!r}"
 
         task_lines = [ln for ln in p.tree_lines(budget=25) if ln.kind == "task"]
         task_names = [ln.label.split("  ")[0] for ln in task_lines]
-        # T1 is completed and should NOT appear.
-        # T2 is pending and MUST appear (this was the bug).
-        # T3 is running and should appear.
-        assert "T1" not in task_names, f"completed task T1 should not appear, got {task_names!r}"
-        assert "T2" in task_names, (
-            f"pending task T2 should appear (regression: it was being skipped "
-            f"because Play A had T1 completed and no running tasks), got {task_names!r}"
-        )
         assert "T3" in task_names, f"running task T3 should appear, got {task_names!r}"
+        assert "T1" not in task_names, f"completed task T1 should not appear, got {task_names!r}"
+        assert "T2" not in task_names, (
+            f"skipped preflight task T2 of finished play should not appear, got {task_names!r}"
+        )
 
 
 class TestIncludeStubHiding:

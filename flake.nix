@@ -47,12 +47,25 @@
             ruff
             mypy
             stdenv.cc
+            # Profiling: sampling/attach profilers, syscall & system stats
+            py-spy
+            strace
+            perf
           ] ++ (with python.pkgs; [
             pytest
             pytest-asyncio
             pytest-cov
             textual-dev
             ansible-core
+            # Profiling & performance analysis tools
+            pyinstrument   # sampling profiler, readable call trees
+            scalene        # line-level CPU/memory profiler, can attach to a running process
+            pyperf         # reliable microbenchmarks
+            objgraph       # object graphs for leak hunting
+            snakeviz       # cProfile visualization (web UI)
+            gprof2dot      # cProfile -> flame graph / dot conversion
+            line-profiler  # kernprof: per-line profiling
+            memory-profiler # mprof: per-line RSS tracking
           ]);
 
           shellHook = ''

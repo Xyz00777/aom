@@ -607,3 +607,126 @@ class TestTemplateVariableNameMismatch:
             "Empty-skeleton preflight must not match even an identical runtime name; "
             "exact-equality handles that case"
         )
+
+    def test_completed_play_with_multiple_templated_tasks_dropped_from_tree(self):
+        """When a completed play had multiple tasks with Jinja template names (e.g. 5 tasks
+        named 'Get the user ID for {{ user }}') and a subsequent play is running, the completed
+        play must be dropped from the tree and not leave lingering pending template tasks."""
+        state = RunState(playbook="site.yml")
+        state.definitions = [
+            _play_def(
+                "p1",
+                "Deploy Keepalived",
+                [
+                    _td("Get the user ID for {{ user }}", role="angie", pid="1", order=0),
+                    _td("Get the user ID for {{ user }}", role="angie", pid="1", order=1),
+                    _td("Get the user ID for {{ user }}", role="angie", pid="1", order=2),
+                ],
+            ),
+            _play_def(
+                "p2",
+                "Setup Podman",
+                [
+                    _td("Install podman", pid="2", order=0),
+                ],
+            ),
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
+        # Play 1 starts
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy Keepalived"},
+            }
+        )
+        # Task 1 in Play 1 runs and finishes
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "angie : Get the user ID for sidecar1"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-22T10:00:03Z",
+                "task": {"id": "t1", "name": "angie : Get the user ID for sidecar1"},
+                "play": {"id": "p1"},
+                "hosts": {"web1": {"changed": False}},
+            }
+        )
+        # Task 2 in Play 1 runs and finishes
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:04Z",
+                "task": {"id": "t2", "name": "angie : Get the user ID for sidecar2"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-22T10:00:05Z",
+                "task": {"id": "t2", "name": "angie : Get the user ID for sidecar2"},
+                "play": {"id": "p1"},
+                "hosts": {"web1": {"changed": False}},
+            }
+        )
+        # Task 3 in Play 1 runs and finishes
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:06Z",
+                "task": {"id": "t3", "name": "angie : Get the user ID for sidecar3"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-22T10:00:07Z",
+                "task": {"id": "t3", "name": "angie : Get the user ID for sidecar3"},
+                "play": {"id": "p1"},
+                "hosts": {"web1": {"changed": False}},
+            }
+        )
+        # Play 2 starts
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:08Z",
+                "play": {"id": "p2", "name": "Setup Podman"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:09Z",
+                "task": {"id": "t4", "name": "Install podman"},
+                "play": {"id": "p2"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:10Z",
+                "task": {"id": "t4", "name": "Install podman"},
+                "host": "web1",
+            }
+        )
+
+        p = TreeProjection.from_run_state(state)
+        lines = p.tree_lines(budget=25)
+
+        # Completed Play 1 must NOT appear in tree with lingering pending template tasks
+        assert not any("Deploy Keepalived" in ln.label for ln in lines), (
+            f"Completed play should not appear in tree, got lines: {[ln.label for ln in lines]}"
+        )
+        assert not any("{{ user }}" in ln.label for ln in lines), (
+            f"Unresolved template tasks should not linger in tree, "
+            f"got lines: {[ln.label for ln in lines]}"
+        )

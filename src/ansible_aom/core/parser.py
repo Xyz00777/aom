@@ -356,6 +356,29 @@ class PtyStreamParser:
                 self._current_warning = entry
             return []
 
+        # ansible-core 2.20 deprecation blocks emitted WITHOUT SGR codes
+        # (e.g. under the mitogen strategy, where workers write from a
+        # non-TTY context) arrive as plaintext: the header line, then the
+        # source-context and help-text continuation lines. While a
+        # *deprecation* block is open, fold an uncolored plaintext line
+        # into it instead of closing the block — otherwise each
+        # continuation becomes a spurious ``source='unknown'``
+        # aom_stderr_line event. Plain ``[WARNING]`` blocks are excluded:
+        # their continuations are always magenta-wrapped, and an uncolored
+        # line after one (e.g. ``TASK [nginx] *******``) is a new line, not
+        # a continuation. Lines carrying any other colour (red, green, …)
+        # still close the block and emit their own event. The block also
+        # closes on a blank line or a JSONL event (see feed_line).
+        if (
+            self._current_warning is not None
+            and self._current_warning.type == WarningType.DEPRECATION
+            and not _ANSI_SGR_RE.search(line)
+        ):
+            self._current_warning.message = (
+                self._current_warning.message.rstrip() + " " + clean.strip()
+            )
+            return []
+
         # Not warning-family: any open warning block ends here.
         self._current_warning = None
 
