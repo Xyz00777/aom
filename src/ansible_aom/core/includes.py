@@ -808,6 +808,11 @@ def _graft_section_dfs(
             continue
         yaml_name = str(task.get("name") or "")
         stub = name_index.get(yaml_name)
+        if stub is None and yaml_name:
+            for k, v in name_index.items():
+                if strip_role_prefix(k) == yaml_name or k.endswith(f" : {yaml_name}"):
+                    stub = v
+                    break
         if stub is None and not yaml_name:
             stub = _find_stub_by_role(name_index)
         if stub is None:
