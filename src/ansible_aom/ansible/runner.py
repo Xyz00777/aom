@@ -20,6 +20,8 @@ import logging
 import os
 import sys
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -32,7 +34,7 @@ from ansible_aom.ansible.preflight import run_preflight
 from ansible_aom.core import diagnostics
 from ansible_aom.core.event_types import JsonlEvent
 from ansible_aom.core.models import WarningType
-from ansible_aom.core.parser import PtyStreamParser, StreamPhase
+from ansible_aom.core.parser import PreParseResult, PtyStreamParser, StreamPhase
 
 # Re-exported under their historical underscore-prefixed names so existing
 # tests that patch / import them from this module keep working unchanged.
@@ -49,6 +51,56 @@ from ansible_aom.session.history import find_previous_run
 from ansible_aom.session.store import SessionManager
 
 logger = logging.getLogger(__name__)
+
+
+class _AsyncPreflight:
+    """Manages asynchronous background execution of preflight."""
+
+    def __init__(self, future: Future[PreParseResult], preflight_t0: int) -> None:
+        self.future = future
+        self.preflight_t0 = preflight_t0
+        self.applied = False
+        self.result: PreParseResult | None = None
+        self.resolved_host_count: int = 0
+        self.preflight_task_count: int = 0
+
+    def apply(
+        self,
+        state: RunState,
+        renderer: Renderer,
+        sink: _SessionSink | _NullSink,
+        diag: diagnostics.RunDiagnostics | None = None,
+    ) -> None:
+        if self.applied:
+            return
+        self.applied = True
+        try:
+            self.result = self.future.result()
+        except Exception as exc:
+            logger.warning("Background preflight failed: %s", exc)
+            self.result = PreParseResult(
+                plays=[],
+                play_hosts=[],
+                definitions=[],
+                errors=[f"preflight error: {exc}"],
+                include_cache={},
+            )
+
+        diagnostics.lifecycle_mark("preflight_end")
+        if diag is not None:
+            diag.note_preflight_elapsed_ms((time.monotonic_ns() - self.preflight_t0) // 1_000_000)
+
+        self.resolved_host_count = len(
+            {host for play in self.result.definitions for host in play.resolved_hosts}
+        )
+        self.preflight_task_count = count_leaf_tasks(self.result.definitions)
+
+        # Update renderer and state definitions
+        renderer.set_definitions(self.result.definitions)
+
+        for err in self.result.errors:
+            renderer.add_warning(err, False)
+            sink.record_stderr(err)
 
 
 def _bundled_callback_dir() -> Path | None:
@@ -416,37 +468,36 @@ def run_playbook(
     else:
         sink = _NullSink()
 
-    # Preflight: --list-tasks + --list-hosts in parallel before spawning
-    # the JSONL run so the renderer can show plays/tasks/host count from
-    # the very first frame. Failures are non-fatal — surfaced as warnings.
+    # Preflight: spawn in background thread so large playbooks don't delay
+    # ansible-playbook spawn. If preflight completes within the 200ms grace
+    # window, apply immediately before spawn. Otherwise, apply dynamically
+    # mid-run the moment the background worker finishes.
     diagnostics.lifecycle_mark("preflight_start")
     _preflight_t0 = time.monotonic_ns()
-    pre_result = run_preflight(playbook=playbook, ansible_args=ansible_args)
-    diag.note_preflight_elapsed_ms((time.monotonic_ns() - _preflight_t0) // 1_000_000)
-    diagnostics.lifecycle_mark("preflight_end")
 
-    # Union of resolved hosts across plays — preflight is best-effort,
-    # so a play with no resolved_hosts simply contributes nothing.
-    resolved_host_count = len(
-        {host for play in pre_result.definitions for host in play.resolved_hosts}
+    preflight_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="aom-preflight")
+    preflight_future = preflight_executor.submit(
+        run_preflight,
+        playbook=playbook,
+        ansible_args=ansible_args,
     )
-    preflight_task_count = count_leaf_tasks(pre_result.definitions)
+    async_preflight = _AsyncPreflight(preflight_future, _preflight_t0)
+
+    try:
+        preflight_future.result(timeout=0.2)
+        async_preflight.apply(state, renderer, sink, diag=diag)
+    except FutureTimeoutError, TimeoutError:
+        pass
+    except Exception:
+        async_preflight.apply(state, renderer, sink, diag=diag)
 
     # Look up a matching prior completed run (same run-config + host
     # count) so the compact renderer can surface "Last run: N tasks in T".
-    # Must be pushed BEFORE ``set_definitions`` so the hint is part of
-    # the one-shot startup summary the compact renderer prints there.
     key = build_run_config_key(playbook=playbook, ansible_args=ansible_args)
-    prior = find_previous_run(resolved_session_dir, key, host_count=resolved_host_count)
+    prior = find_previous_run(
+        resolved_session_dir, key, host_count=async_preflight.resolved_host_count
+    )
     renderer.set_prior_run(prior)
-    renderer.set_definitions(pre_result.definitions)
-
-    # add_warning prints the message above the panel AND bumps the counter.
-    # The renderer's own dedupe handles repeats so it's safe to forward
-    # every error here without extra filtering.
-    for err in pre_result.errors:
-        renderer.add_warning(err, False)
-        sink.record_stderr(err)
 
     child: pexpect.spawn | None = None
     try:
@@ -473,11 +524,12 @@ def run_playbook(
             # Command not found / not executable — surface as 127.
             sink.end(
                 "crashed",
-                preflight_task_count=preflight_task_count,
-                resolved_host_count=resolved_host_count,
+                preflight_task_count=async_preflight.preflight_task_count,
+                resolved_host_count=async_preflight.resolved_host_count,
             )
             renderer.handle_completion(127, "crashed")
             return 127
+
         diagnostics.lifecycle_mark("spawn")
 
         profiler = diagnostics.get_profiler()
@@ -488,7 +540,16 @@ def run_playbook(
         # returning and ``run_playbook`` returning lands SIGINT here.
         exit_code: int | None = None
         try:
-            exit_code = _drive(child, parser, state, renderer, timeout, sink, diag=diag)
+            exit_code = _drive(
+                child,
+                parser,
+                state,
+                renderer,
+                timeout,
+                sink,
+                async_preflight=async_preflight,
+                diag=diag,
+            )
         finally:
             if profiler is not None:
                 profiler.disable()
@@ -497,8 +558,8 @@ def run_playbook(
         final_status = "completed" if exit_code == 0 else "failed"
         sink.end(
             final_status,
-            preflight_task_count=preflight_task_count,
-            resolved_host_count=resolved_host_count,
+            preflight_task_count=async_preflight.preflight_task_count,
+            resolved_host_count=async_preflight.resolved_host_count,
         )
         renderer.handle_completion(exit_code, final_status)
         diagnostics.lifecycle_mark("completion")
@@ -515,8 +576,8 @@ def run_playbook(
                 logger.debug("child cleanup during Ctrl+C failed", exc_info=True)
         sink.end(
             "crashed",
-            preflight_task_count=preflight_task_count,
-            resolved_host_count=resolved_host_count,
+            preflight_task_count=async_preflight.preflight_task_count,
+            resolved_host_count=async_preflight.resolved_host_count,
         )
         # R7 race guard: if the child already exited cleanly (exitstatus
         # is set and the child is no longer alive) before SIGINT fired,
@@ -533,7 +594,16 @@ def run_playbook(
         renderer.handle_completion(130, "crashed")
         return 130
     finally:
+        if async_preflight is not None and not async_preflight.applied:
+            try:
+                preflight_executor.shutdown(wait=False, cancel_futures=True)
+                diagnostics.lifecycle_mark("preflight_end")
+            except Exception:
+                pass
+        else:
+            preflight_executor.shutdown(wait=False)
         renderer.stop()
+
         try:
             stderr_tty = sys.stderr.isatty()
         except AttributeError, ValueError:
@@ -552,6 +622,7 @@ def _drive(
     timeout: float,
     sink: _SessionSink | _NullSink,
     *,
+    async_preflight: _AsyncPreflight | None = None,
     diag: diagnostics.RunDiagnostics | None = None,
 ) -> int:
     """Read the PTY until EOF, feeding lines to the parser/renderer.
@@ -597,7 +668,15 @@ def _drive(
     # the next post-stats TIMEOUT turns into a synthetic EOF + warning.
 
     while True:
+        if (
+            async_preflight is not None
+            and not async_preflight.applied
+            and async_preflight.future.done()
+        ):
+            async_preflight.apply(state, renderer, sink, diag=diag)
+
         # Post-stats: a single ``expect`` call covers the whole watchdog
+
         # window. Pre-stats: keep the regular per-read timeout so the
         # liveness / prompt heuristics still tick on the normal cadence.
         # R11: once ``v2_playbook_on_stats`` has set the run's
