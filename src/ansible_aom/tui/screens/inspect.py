@@ -1093,7 +1093,7 @@ class InspectApp(App):
         # ``Tree.add`` / ``add_leaf`` treat a plain string as literal text;
         # passing a ``rich.Text`` parses the embedded markup so the stats
         # icons show in their per-status colour.
-        label_text = Text.from_markup(f"{node.label}  {_stats_label(node.stats)}".strip())
+        label_text = Text.from_markup(f"{escape(node.label)}  {_stats_label(node.stats)}".strip())
         is_leaf = not node.children
         if is_leaf:
             parent.add_leaf(label_text, data=node)

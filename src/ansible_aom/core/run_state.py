@@ -39,6 +39,7 @@ from ansible_aom.core.models import (
     Status,
     TaskDefinition,
     TaskRunState,
+    _is_template_match,
     _iter_task_def_tree,
     runtime_role_from_task_name,
     strip_role_prefix,
@@ -396,6 +397,9 @@ class RunState:
             "v2_runner_item_on_failed": self._handle_v2_runner_item_on,
             "v2_runner_item_on_skipped": self._handle_v2_runner_item_on,
             "v2_playbook_on_stats": self._handle_v2_playbook_on_stats,
+            "aom_stderr_line": self._handle_internal_event,
+            "aom_connection_acquired": self._handle_internal_event,
+            "aom_connection_released": self._handle_internal_event,
         }
 
         handler = handler_map.get(event_type)
@@ -404,6 +408,19 @@ class RunState:
         elif event_type:
             self.unknown_events[event_type] = self.unknown_events.get(event_type, 0) + 1
             logger.debug(f"Unknown event type: {event_type}")
+
+    def _handle_internal_event(self, event: JsonlEvent, ts: datetime) -> None:
+        """Recognize an AOM-internal synthetic event that carries no run-state.
+
+        ``aom_stderr_line`` (from the PTY parser) and the ``aom_connection_*``
+        pair (from the bundled aom_connection notification callback) are
+        consumed by other layers — the parser's per-host connection tracking
+        and the inspect verbose panel — not by the run-state machine. They are
+        dispatched here so they are *handled* like every other known event
+        type instead of falling through to the R5 future-drift counter, which
+        would otherwise report a bogus "(N unknown events: aom_stderr_line×N)"
+        footer on any run that records stderr lines.
+        """
 
     def _handle_v2_playbook_on_start(self, event: JsonlEvent, ts: datetime) -> None:
         """Handle v2_playbook_on_start event."""
@@ -642,7 +659,11 @@ class RunState:
         return entry.parent_role
 
     def _graft_or_match_task(
-        self, task_id: str, task_name: str, task_path: str | None = None
+        self,
+        task_id: str,
+        task_name: str,
+        task_path: str | None = None,
+        play_id: str | None = None,
     ) -> None:
         """Update the dynamic-expansion cursor for an arriving task.
 
@@ -660,58 +681,78 @@ class RunState:
         if not self.definitions or not task_name or task_id in self._grafted_uuids:
             return
 
-        # HS-5: path/name → leaf lookup via the precomputed indexes (built
-        # when ``definitions`` was assigned). Falls back to scanning only if
-        # the indexes are somehow stale, which __setattr__ rules out.
-        path_index = self._task_def_by_path
-        if task_path and path_index is not None:
-            leaf = path_index.get(task_path)
-            if leaf is not None:
-                self._last_matched_task_def = leaf
-                return
+        leaf: TaskDefinition | None = None
+        play_def_target: PlayDefinition | None = None
 
-        index = self._task_def_index
-        if index is not None:
-            leaf = index.get(task_name)
-            if leaf is None:
-                leaf = index.get(strip_role_prefix(task_name))
-            if leaf is None:
-                # Try template-variable match: runtime "Get ID for
-                # angie-sidecar" vs preflight "Get ID for {{ user }}".
-                # Algorithm mirrors ``tree_projection._is_template_match``:
-                # split the preflight on ``{{ ... }}`` to get static
-                # fragments, then verify each appears as a substring of
-                # the runtime name in order (Jinja expressions are
-                # wildcards). This handles punctuation adjacent to a
-                # Jinja expression (``{{ user }}'s`` resolving to
-                # ``angie-sidecar's``) that a whitespace-token match
-                # would reject.  An entirely-templated preflight name
-                # (e.g. ``{{ var }}``) has no static fragments, so it
-                # cannot match via this loop — such exact-equality
-                # matches are handled by the caller's direct name
-                # comparison path.
-                for preflight_name, tdef in index.items():
-                    if "{{" not in preflight_name:
-                        continue
-                    fragments = [f for f in _JINJA_RE.split(preflight_name) if f]
-                    if not fragments:
-                        continue
-                    cursor = 0
-                    matched = True
-                    for fragment in fragments:
-                        idx = task_name.find(fragment, cursor)
-                        if idx == -1:
-                            matched = False
-                            break
-                        cursor = idx + len(fragment)
-                    if matched:
-                        leaf = tdef
+        if play_id:
+            if self._play_def_by_id:
+                play_def_target = self._play_def_by_id.get(play_id)
+            if play_def_target is None and play_id in self.plays and self._play_def_by_name:
+                play_def_target = self._play_def_by_name.get(self.plays[play_id].name.strip())
+
+        task_name_stripped = strip_role_prefix(task_name)
+
+        if play_def_target is not None:
+            # First search within the target play's task definitions
+            if task_path:
+                for cand in _iter_leaf_task_defs([play_def_target]):
+                    if cand.path == task_path:
+                        leaf = cand
                         break
-            if leaf is not None:
-                self._last_matched_task_def = leaf
-                return
+            if leaf is None:
+                for cand in _iter_leaf_task_defs([play_def_target]):
+                    if cand.name == task_name or strip_role_prefix(cand.name) == task_name_stripped:
+                        leaf = cand
+                        break
+                    if "{{" in cand.name:
+                        cand_stripped = strip_role_prefix(cand.name)
+                        if (
+                            _is_template_match(cand.name, task_name)
+                            or _is_template_match(cand.name, task_name_stripped)
+                            or _is_template_match(cand_stripped, task_name)
+                            or _is_template_match(cand_stripped, task_name_stripped)
+                        ):
+                            leaf = cand
+                            break
+
+        if leaf is None and play_def_target is None:
+            # Fall back to global index when play is unknown
+            path_index = self._task_def_by_path
+            if task_path and path_index is not None:
+                leaf = path_index.get(task_path)
+
+            index = self._task_def_index
+            if leaf is None and index is not None:
+                leaf = index.get(task_name)
+                if leaf is None:
+                    leaf = index.get(task_name_stripped)
+                if leaf is None:
+                    for preflight_name, tdef in index.items():
+                        if "{{" not in preflight_name:
+                            continue
+                        preflight_stripped = strip_role_prefix(preflight_name)
+                        if (
+                            _is_template_match(preflight_name, task_name)
+                            or _is_template_match(preflight_name, task_name_stripped)
+                            or _is_template_match(preflight_stripped, task_name)
+                            or _is_template_match(preflight_stripped, task_name_stripped)
+                        ):
+                            leaf = tdef
+                            break
+
+        if leaf is not None:
+            self._last_matched_task_def = leaf
+            return
 
         parent = self._last_matched_task_def
+        if parent is not None and play_def_target is not None:
+            # Ensure parent belongs to the target play definition
+            if parent.play_id != play_def_target.id:
+                parent = None
+                current_play_leaves = list(_iter_leaf_task_defs([play_def_target]))
+                if current_play_leaves:
+                    parent = current_play_leaves[-1]
+
         if parent is None:
             # No preflight task has matched yet — leave the unknown task as
             # an orphan rather than grafting it onto an arbitrary node.
@@ -724,9 +765,26 @@ class RunState:
         # subsequent ``task_start`` for a role task would re-graft
         # the task the sibling helper already inserted, growing the
         # children list past the role's real task count.
-        if any(child.name == task_name for child in parent.children):
+        matched_child: TaskDefinition | None = None
+        task_name_stripped = strip_role_prefix(task_name)
+        for child in parent.children:
+            if child.name == task_name or strip_role_prefix(child.name) == task_name_stripped:
+                matched_child = child
+                break
+            if "{{" in child.name:
+                child_stripped = strip_role_prefix(child.name)
+                if (
+                    _is_template_match(child.name, task_name)
+                    or _is_template_match(child.name, task_name_stripped)
+                    or _is_template_match(child_stripped, task_name)
+                    or _is_template_match(child_stripped, task_name_stripped)
+                ):
+                    matched_child = child
+                    break
+        if matched_child is not None:
             if task_id:
                 self._grafted_uuids.add(task_id)
+            self._last_matched_task_def = matched_child
             return
 
         # Grafted task: detect role-in-role via the runtime prefix. When the
@@ -860,11 +918,7 @@ class RunState:
         """
         from ansible_aom.core.includes import _discover_role
 
-        # Per-parent dedupe key. The same role nested under different
-        # parents needs its own graft (each parent is a distinct
-        # subtree), but the same role re-appearing under the same
-        # parent is a no-op after the first graft.
-        parent_key = f"{parent.play_id}:{id(parent)}:{role_name.lower()}"
+        parent_key = f"{parent.play_id}:{graft_parent_role or ''}:{role_name.lower()}"
         if parent_key in self._grafted_role_names:
             return
         self._grafted_role_names.add(parent_key)
@@ -893,13 +947,40 @@ class RunState:
                 if stripped != runtime_task.name:
                     runtime_started_names.add(stripped)
 
+        def _sibling_matches(candidate: str, target: str) -> bool:
+            if candidate == target:
+                return True
+            c_stripped = strip_role_prefix(candidate)
+            t_stripped = strip_role_prefix(target)
+            if c_stripped == t_stripped or candidate == t_stripped or c_stripped == target:
+                return True
+            if "{{" in candidate:
+                if (
+                    _is_template_match(candidate, target)
+                    or _is_template_match(candidate, t_stripped)
+                    or _is_template_match(c_stripped, target)
+                    or _is_template_match(c_stripped, t_stripped)
+                ):
+                    return True
+            if "{{" in target:
+                if (
+                    _is_template_match(target, candidate)
+                    or _is_template_match(target, c_stripped)
+                    or _is_template_match(t_stripped, candidate)
+                    or _is_template_match(t_stripped, c_stripped)
+                ):
+                    return True
+            return False
+
         for role_task_name in entry.task_names:
             # The runtime task name carries the ``"role : "`` prefix
             # (e.g. ``"podman : Install podman"``); the cached name
             # does not. Match against both forms so a pre-grafted
             # sibling isn't duplicated.
             prefixed = f"{role_name} : {role_task_name}"
-            if prefixed == current_task_name or role_task_name == current_task_name:
+            if _sibling_matches(prefixed, current_task_name) or _sibling_matches(
+                role_task_name, current_task_name
+            ):
                 continue
             # Nested include_role: the current task may carry a
             # deeper role chain than ``role_name : role_task_name``
@@ -915,11 +996,19 @@ class RunState:
                 if " : " in current_task_name
                 else current_task_name
             )
-            if current_task_tail == role_task_name:
+            if _sibling_matches(role_task_name, current_task_tail) or _sibling_matches(
+                prefixed, current_task_tail
+            ):
                 continue
-            if prefixed in existing_names or role_task_name in existing_names:
+            if any(
+                _sibling_matches(prefixed, en) or _sibling_matches(role_task_name, en)
+                for en in existing_names
+            ):
                 continue
-            if role_task_name in runtime_started_names or prefixed in runtime_started_names:
+            if any(
+                _sibling_matches(prefixed, rn) or _sibling_matches(role_task_name, rn)
+                for rn in runtime_started_names
+            ):
                 continue
             parent.children.append(
                 TaskDefinition(
@@ -953,7 +1042,7 @@ class RunState:
             parent_role = self._parent_role_from_cache(task_name)
             discover_include_with_runtime_path(self, task_path, parent_role)
 
-        self._graft_or_match_task(task_id, task_name, task_path)
+        self._graft_or_match_task(task_id, task_name, task_path, play_id=play_id)
 
         if play_missing:
             self.plays[play_id] = PlayRunState(
@@ -1112,7 +1201,7 @@ class RunState:
             parent_role = self._parent_role_from_cache(task_name)
             discover_include_with_runtime_path(self, task_path, parent_role)
 
-        self._graft_or_match_task(task_id, task_name, task_path)
+        self._graft_or_match_task(task_id, task_name, task_path, play_id=play_id)
 
         if play_id not in self.plays:
             self.plays[play_id] = PlayRunState(

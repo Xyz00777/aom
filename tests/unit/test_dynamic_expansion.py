@@ -684,3 +684,130 @@ class TestIncludeRoleStubInsideOuterRole:
                 f"so the projection nests the inner role under the outer "
                 f"role; got parent_role={child.parent_role!r} on {child.name!r}"
             )
+
+    def test_role_task_with_template_variable_not_duplicated_as_pending_sibling(
+        self, tmp_path: Path
+    ) -> None:
+        """When an included role has a task whose name contains Jinja templates
+        (e.g. 'Get the user ID for {{ user }}') and runtime starts with the resolved name,
+        the sibling grafter and tree projection must match them and not duplicate
+        the pending template task."""
+        from ansible_aom.core.tree import TreeProjection
+
+        roles_dir = tmp_path / "roles"
+        angie_dir = roles_dir / "angie"
+        (angie_dir / "tasks").mkdir(parents=True)
+        (angie_dir / "tasks" / "main.yml").write_text(
+            "- name: Get the user ID for {{ sidecar_user }}\n"
+            "  command: id -u\n"
+            "- name: Configure sidecar\n"
+            "  command: setup\n"
+        )
+        parent = TaskDefinition(
+            name="include_role: angie",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        defs = [
+            PlayDefinition(
+                id="1",
+                name="Deploy VIP",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[parent],
+            )
+        ]
+        playbook_path = str(tmp_path / "site.yml")
+        state = RunState(playbook=playbook_path, definitions=defs)
+        state.handle_event(_play_start(play_id="1", name="Deploy VIP"))
+        state.handle_event(_task_start("uuid-stub", "include_role: angie", play_id="1"))
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "task": {"id": "uuid-stub", "name": "include_role: angie"},
+                "play": {"id": "1"},
+                "hosts": {"web1": {"changed": False}},
+            }
+        )
+        # First task of role arrives with RESOLVED name
+        state.handle_event(
+            _task_start("uuid-1", "angie : Get the user ID for sidecar_bob", play_id="1")
+        )
+        state.handle_event(_runner_start("uuid-1", "angie : Get the user ID for sidecar_bob"))
+
+        # Check grafted children under parent
+        child_names = [c.name for c in parent.children]
+        # Should have exactly 2 tasks (the running task and the 1 pending sibling), NOT 3!
+        assert len(parent.children) == 2, f"Expected 2 children under parent, got: {child_names}"
+        assert not any("{{ sidecar_user }}" in name for name in child_names), (
+            f"Pending sibling should not duplicate the running template task, got: {child_names}"
+        )
+
+        # Check TreeProjection
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=25)
+        # Must have running task and pending sibling, and no unresolved template line
+        labels = [ln.label for ln in lines]
+        assert any("sidecar_bob" in lbl for lbl in labels)
+        assert any("Configure sidecar" in lbl for lbl in labels)
+        assert not any("{{ sidecar_user }}" in lbl for lbl in labels)
+
+    def test_task_matching_scoped_to_current_play_not_cross_play(self) -> None:
+        """When two plays share identical task names (e.g. 'Ensure firewalld is started'),
+        tasks in Play 2 must match Play 2's TaskDefinition and never graft onto Play 1."""
+        p1_t1 = TaskDefinition(
+            name="Ensure firewalld is started",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        p2_t1 = TaskDefinition(
+            name="Ensure firewalld is started",
+            role=None,
+            tags=[],
+            play_id="2",
+            play_order=1,
+            task_order=0,
+        )
+        defs = [
+            PlayDefinition(
+                id="1", name="Play 1", hosts="all", resolved_hosts=["web1"], tasks=[p1_t1]
+            ),
+            PlayDefinition(
+                id="2", name="Play 2", hosts="all", resolved_hosts=["web1"], tasks=[p2_t1]
+            ),
+        ]
+        state = RunState(playbook="site.yml", definitions=defs)
+        # Play 1 runs
+        state.handle_event(_play_start(play_id="1", name="Play 1"))
+        state.handle_event(_task_start("p1-task", "Ensure firewalld is started", play_id="1"))
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "task": {"id": "p1-task", "name": "Ensure firewalld is started"},
+                "play": {"id": "1"},
+                "hosts": {"web1": {"changed": False}},
+            }
+        )
+
+        # Play 2 starts and runs its own task with the same name
+        state.handle_event(_play_start(play_id="2", name="Play 2"))
+        state.handle_event(_task_start("p2-task", "Ensure firewalld is started", play_id="2"))
+        # Dynamic task arrives in Play 2
+        state.handle_event(_task_start("p2-dynamic", "Reload systemd daemon for user", play_id="2"))
+
+        # Must graft onto Play 2, NOT Play 1!
+        assert len(p1_t1.children) == 0, (
+            f"Play 1 task must have no grafted children, got {p1_t1.children}"
+        )
+        assert len(p2_t1.children) == 1, (
+            f"Play 2 task must have 1 grafted child, got {p2_t1.children}"
+        )
+        assert p2_t1.children[0].name == "Reload systemd daemon for user"

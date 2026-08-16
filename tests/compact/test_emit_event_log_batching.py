@@ -147,3 +147,63 @@ class TestRunnerOkMixedChanged:
         payload: str = _print_log_calls(r)[0]
         assert "changed: [web1]" in payload
         assert "ok: [web2]" in payload
+
+
+class TestStderrLineRendering:
+    """aom_stderr_line events must render in the live compact log.
+
+    SPECIFICATION.md (Stderr Capture): "Display stderr lines in log panel
+    (TUI) or console (compact)". AOM records non-warning stderr as
+    synthetic aom_stderr_line events; the compact renderer must print
+    them so real stderr output (module output, profiling-callback
+    banners) is visible live, not silently dropped.
+    """
+
+    def _stderr_line(self, text: str, source: str = "run_level") -> dict:
+        return {
+            "_event": "aom_stderr_line",
+            "_timestamp": "2026-05-11T10:00:01Z",
+            "line": text,
+            "source": source,
+            "level": 1,
+        }
+
+    def test_stderr_line_prints_to_log(self):
+        r = _renderer()
+        r._emit_event_log(self._stderr_line("some stderr text"))
+
+        assert r._display.print_log.call_count == 1
+        payload: str = _print_log_calls(r)[0]
+        assert "some stderr text" in payload
+
+    def test_profile_tasks_banner_line_is_suppressed_in_compact_view(self):
+        """Redundant profile_tasks / timer banners from third-party callbacks
+        must be suppressed from the live compact view to avoid duplicate clutter."""
+        r = _renderer()
+        german_banner = (
+            "Dienstag 04 August 2026  19:02:51 +0200 (0:00:00.477)       0:00:00.477 *******"
+        )
+        r._emit_event_log(self._stderr_line(german_banner))
+        assert r._display.print_log.call_count == 0
+
+        english_banner = (
+            "Tuesday 04 August 2026  19:02:51 +0200 (0:00:00.025)       0:00:00.025 *******"
+        )
+        r._emit_event_log(self._stderr_line(english_banner))
+        assert r._display.print_log.call_count == 0
+
+    def test_stderr_line_with_ansi_escapes_is_stripped(self):
+        r = _renderer()
+        raw = "\x1b[1;35m[WARNING]\x1b[0m some text"
+        r._emit_event_log(self._stderr_line(raw, source="warning"))
+
+        payload: str = _print_log_calls(r)[0]
+        assert "\x1b[" not in payload
+        assert "some text" in payload
+
+    def test_blank_stderr_line_is_silent(self):
+        """Empty/whitespace-only stderr lines produce no log noise."""
+        r = _renderer()
+        r._emit_event_log(self._stderr_line("   "))
+
+        assert r._display.print_log.call_count == 0

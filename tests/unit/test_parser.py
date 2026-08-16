@@ -1582,6 +1582,35 @@ class TestMultiLineWarningContinuation:
         events = parser.feed_line("\x1b[31mred non-warning text\x1b[0m\n")
         assert len(events) == 1
         assert events[0]["_event"] == "aom_stderr_line"
+
+    def test_uncolored_continuation_folds_into_open_warning(self):
+        """ansible-core 2.20 deprecation blocks emitted WITHOUT SGR codes
+        (e.g. under the mitogen strategy, where workers write from a
+        non-TTY context) still fold: the source-context and help-text
+        lines must join the open warning instead of becoming standalone
+        ``source='unknown'`` aom_stderr_line events."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        parser.feed_line('[DEPRECATION WARNING]: The internal "vars" dictionary is deprecated.\n')
+        e1 = parser.feed_line("14         # tasks/shared                   tasks/shared\n")
+        e2 = parser.feed_line("Use the `vars` and `varnames` lookups instead.\n")
+        assert e1 == []
+        assert e2 == []
+        assert len(parser.warnings) == 1
+        msg = parser.warnings[0].message
+        assert 'The internal "vars" dictionary is deprecated.' in msg
+        assert "Use the `vars` and `varnames` lookups instead." in msg
+
+    def test_uncolored_continuation_after_blank_line_is_unknown(self):
+        """A blank line closes the warning block; a later uncolored line
+        with no open block is still classified (not folded)."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        parser.feed_line("[DEPRECATION WARNING]: first warning\n")
+        parser.feed_line("\n")
+        events = parser.feed_line("Use the `vars` and `varnames` lookups instead.\n")
+        assert len(events) == 1
+        assert events[0]["source"] == "unknown"
         assert "red non-warning text" not in parser.warnings[0].message
 
 

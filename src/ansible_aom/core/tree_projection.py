@@ -25,6 +25,7 @@ from ansible_aom.core.models import (
     Status,
     TaskDefinition,
     TaskRunState,
+    _is_template_match,
     iter_preflight_task_defs,
     runtime_role_from_task_name,
     strip_role_prefix,
@@ -122,44 +123,6 @@ def _name_role_chain(name: str) -> tuple[str, ...]:
             break
         chain.append(segment)
     return tuple(chain)
-
-
-def _is_template_match(preflight_name: str, runtime_name: str) -> bool:
-    """Return True if ``runtime_name`` could be a resolved version of
-    ``preflight_name`` (which may contain ``{{ ... }}`` templates).
-
-    The match is a wildcard subsequence: split ``preflight_name`` on
-    ``{{ ... }}`` to get the static fragments, then verify each
-    fragment appears as a substring of the runtime name, in order,
-    with each fragment consuming at least one new runtime character.
-    The Jinja expressions themselves are wildcards — they absorb any
-    text the resolved variable contributes.
-
-    Requires at least one non-empty static fragment. A preflight name
-    that is entirely a Jinja expression (e.g. ``{{ var }}``) has no
-    static text to anchor a match, so this function returns False for
-    any runtime name — such exact-equality matches are handled by the
-    caller's direct name comparison path instead.
-
-    This handles punctuation adjacent to a Jinja expression — e.g.
-    ``{{ user }}'s`` resolving to ``angie-sidecar's`` — by matching on
-    the *character-level* fragments (``"Ensure "`` then ``"'s home exists"``)
-    rather than whitespace-delimited tokens. A token-level match would
-    compare skeleton word ``'s`` against runtime word ``angie-sidecar's``
-    and fail.
-    """
-    if "{{" not in preflight_name:
-        return False
-    fragments = [f for f in _TEMPLATE_RE.split(preflight_name) if f]
-    if not fragments:
-        return False
-    cursor = 0
-    for fragment in fragments:
-        idx = runtime_name.find(fragment, cursor)
-        if idx == -1:
-            return False
-        cursor = idx + len(fragment)
-    return True
 
 
 def _play_target_hostnames(play: "PlayRunState", play_def: "PlayDefinition | None") -> set[str]:
@@ -361,6 +324,7 @@ def task_complete_on_all_targets(
     task_uuid: str,
     *,
     dead_by_play: dict[str, set[str]] | None = None,
+    fan_out_groups: dict[tuple[str, str, str], set[str]] | None = None,
 ) -> bool:
     """True when every live target host has finished ``task_uuid``.
 
@@ -377,6 +341,14 @@ def task_complete_on_all_targets(
     set is what makes the per-task summary reflect the whole play instead
     of whichever cohort happened to have reported first.
 
+    Some free-strategy implementations assign a separate UUID to each
+    host for a dynamically included task. ``fan_out_groups`` maps the
+    shared ``(play_id, task name, task path)`` identity to those UUIDs.
+    For groups with multiple members, completion instead covers the union
+    of hosts observed across every member: every live host in that union
+    must have a terminal entry in at least one member. Missing and
+    singleton groups retain the target-set behavior above unchanged.
+
     ``dead_by_play`` is an optional memo dict (play_id → dead-host set)
     filled lazily. The dead-host scan is O(play tasks × hosts); without a
     memo, a caller checking many tasks per event re-pays it per call —
@@ -385,9 +357,10 @@ def task_complete_on_all_targets(
     dies (failed/unreachable), a play (re)starts, or a formerly-dead
     host's result is overwritten (retry recovery).
 
-    Returns False when the task is unknown or no target information is
-    available yet — callers treat "can't tell" as "not complete" and
-    fall back to the run-end forced flush.
+    Returns False when the task is unknown, or when neither target
+    information nor a multi-member fan-out host union is available yet.
+    Callers treat "can't tell" as "not complete" and fall back to the
+    run-end forced flush.
     """
     for play in run_state.plays.values():
         task = play.tasks.get(task_uuid)
@@ -395,7 +368,12 @@ def task_complete_on_all_targets(
             continue
         play_def = _play_def_for_state(run_state, play)
         targets = _play_target_hostnames(play, play_def)
-        if not targets:
+        fan_out_members: set[str] | None = None
+        if fan_out_groups is not None and task.path:
+            members = fan_out_groups.get((play.play_id, task.name, task.path))
+            if members is not None and len(members) > 1:
+                fan_out_members = members
+        if not targets and fan_out_members is None:
             return False
         # A host that died *before* reaching this task never runs it and
         # must not block completion. One that died *in* this task has a
@@ -408,6 +386,23 @@ def task_complete_on_all_targets(
                 dead_by_play[play.play_id] = dead
         else:
             dead = play_dead_hosts(play)
+
+        if fan_out_members is not None:
+            group_hosts: set[str] = set()
+            terminal_hosts: set[str] = set()
+            for member_uuid in fan_out_members:
+                member = play.tasks.get(member_uuid)
+                if member is None:
+                    continue
+                group_hosts.update(member.hosts)
+                terminal_hosts.update(
+                    hostname
+                    for hostname, host_state in member.hosts.items()
+                    if host_state.status != Status.RUNNING
+                )
+            live_group_hosts = group_hosts - dead
+            return bool(group_hosts) and live_group_hosts <= terminal_hosts
+
         for hostname in targets:
             hs = task.hosts.get(hostname)
             if hs is not None:
@@ -1608,7 +1603,16 @@ class TreeProjection:
                     # row leases still age out independently.
                     active_play_id = self._last_running_play_runtime_id
 
+        active_play_seen = False
         for runtime, play_def in ordered_plays:
+            is_active = (
+                runtime is not None
+                and active_play_id is not None
+                and self._play_runtime_identity(runtime) == active_play_id
+            )
+            if is_active:
+                active_play_seen = True
+
             if runtime is not None:
                 if active_play_id is not None:
                     if self._play_runtime_identity(runtime) != active_play_id:
@@ -1630,6 +1634,11 @@ class TreeProjection:
                             continue
                 self._emit_runtime_play(lines, runtime, now)
             elif play_def is not None:
+                # Preflight-only plays that appear before the active play in the
+                # playbook definition order were skipped (e.g. via --tags or
+                # when: conditions) and will not run. Do not emit them as pending.
+                if active_play_id is not None and not active_play_seen:
+                    continue
                 self._emit_pending_play(lines, play_def, now)
         return lines
 
@@ -2063,6 +2072,14 @@ class TreeProjection:
         def _task_identity(task: TaskRunState) -> str:
             return task.task_id or task.name
 
+        latest_task = next(reversed(play.tasks.values())) if play.tasks else None
+        latest_task_id = _task_identity(latest_task) if latest_task else None
+        has_running_tasks = any(
+            any(hs.status == Status.RUNNING for hs in t.hosts.values())
+            or (not t.hosts and t.status == Status.RUNNING)
+            for t in play.tasks.values()
+        )
+
         def _classify(runtime: TaskRunState | None) -> str:
             """Return ``"running"`` / ``"pending"`` / ``"completed"``.
 
@@ -2084,14 +2101,16 @@ class TreeProjection:
                 return "running" if runtime.status == Status.RUNNING else "pending"
             if any(hs.status == Status.RUNNING for hs in runtime.hosts.values()):
                 return "running"
-            # A task with at least one FAILED or UNREACHABLE host must stay
-            # visible in the tree — otherwise the failure "vanishes" once all
-            # hosts reach terminal status (especially with --hide-state ok).
-            if any(
-                _effective_status(hs) in (Status.FAILED, Status.UNREACHABLE)
-                for hs in runtime.hosts.values()
-            ):
-                return "running"
+            # A task with at least one FAILED or UNREACHABLE host stays visible
+            # in the tree while no further task has started or is running,
+            # so the user can see the failure summary during the gap (TC-329).
+            # Once the next task starts, it drops off.
+            if not has_running_tasks and _task_identity(runtime) == latest_task_id:
+                if any(
+                    _effective_status(hs) in (Status.FAILED, Status.UNREACHABLE)
+                    for hs in runtime.hosts.values()
+                ):
+                    return "running"
             return "completed"
 
         def _pick_runtime(
@@ -2144,10 +2163,14 @@ class TreeProjection:
 
             _append_candidates(task_name)
             if "{{" in task_name:
+                task_name_stripped = strip_role_prefix(task_name)
                 for candidate_name, candidate_tasks in runtime_by_name.items():
                     stripped_candidate_name = strip_role_prefix(candidate_name)
-                    if not _is_template_match(task_name, candidate_name) and not _is_template_match(
-                        task_name, stripped_candidate_name
+                    if (
+                        not _is_template_match(task_name, candidate_name)
+                        and not _is_template_match(task_name, stripped_candidate_name)
+                        and not _is_template_match(task_name_stripped, candidate_name)
+                        and not _is_template_match(task_name_stripped, stripped_candidate_name)
                     ):
                         continue
                     for candidate in candidate_tasks:
@@ -2189,11 +2212,15 @@ class TreeProjection:
                     # Preflight name has unresolved Jinja2 template — try
                     # to find a runtime task whose resolved name matches
                     # the template skeleton.
+                    entry_stripped = strip_role_prefix(entry.name)
                     for candidate_name in runtime_by_name:
                         stripped_candidate_name = strip_role_prefix(candidate_name)
-                        if not _is_template_match(
-                            entry.name, candidate_name
-                        ) and not _is_template_match(entry.name, stripped_candidate_name):
+                        if (
+                            not _is_template_match(entry.name, candidate_name)
+                            and not _is_template_match(entry.name, stripped_candidate_name)
+                            and not _is_template_match(entry_stripped, candidate_name)
+                            and not _is_template_match(entry_stripped, stripped_candidate_name)
+                        ):
                             continue
                         runtime = _pick_runtime(
                             candidate_name, matched_runtime_task_ids, preferred_hosts

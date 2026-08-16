@@ -111,6 +111,17 @@ class StderrEvent:
     line: str
 
 
+# Ansible profiling callback banner regex (e.g. profile_tasks / timer).
+_PROFILE_TASKS_BANNER_RE = re.compile(
+    r".*\((?:\d+:)?\d{2}:\d{2}\.\d{3}\)\s+(?:\d+:)?\d{2}:\d{2}\.\d{3}\s+\*{3,}\s*$"
+)
+
+
+def is_profiling_banner(line: str) -> bool:
+    """True if ``line`` is an external callback profiling banner (e.g. profile_tasks)."""
+    return bool(_PROFILE_TASKS_BANNER_RE.match(line))
+
+
 # -----------------------------------------------------------------------------
 # CLASSIFIER_RULES
 # -----------------------------------------------------------------------------
@@ -227,6 +238,16 @@ CLASSIFIER_RULES: list[tuple[StderrSource, re.Pattern[str], bool]] = [
     (StderrSource.RUN_LEVEL, re.compile(r"^Current user \(uid="), False),
     # 30. Plugin loading debug.
     (StderrSource.RUN_LEVEL, re.compile(r"^trying "), False),
+    # 31. ansible.posix.profile_tasks callback banner. The timestamp prefix
+    #     is locale-dependent (any day/month language), so anchor on the
+    #     structurally-stable trailing portion: two ``(H:MM:SS.mmm)``-style
+    #     durations followed by the ``*``-padded tail. ``.*`` tolerates the
+    #     variable date prefix (classify uses ``re.match``, start-anchored).
+    (
+        StderrSource.RUN_LEVEL,
+        _PROFILE_TASKS_BANNER_RE,
+        False,
+    ),
 ]
 
 

@@ -26,6 +26,7 @@ def _play_def(hosts: list[str]) -> PlayDefinition:
 def _renderer(hosts: list[str]) -> CompactRenderer:
     r = CompactRenderer(is_tty=False)
     r.start("test.yml", [])
+    r._start_time = 1778493600.0  # 2026-05-11T10:00:00Z
     r._colorize = False
     r._display = MagicMock()
     r.set_definitions([_play_def(hosts)])

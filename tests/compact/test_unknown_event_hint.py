@@ -56,6 +56,63 @@ def test_completion_no_hint_when_all_known(capsys):
     assert "unknown events" not in captured.out
 
 
+def test_aom_synthetic_stderr_events_are_not_unknown(capsys):
+    """AOM's own ``aom_stderr_line`` synthetic events are known — they must
+    not be flagged by the R5 future-drift hint. A run that only records
+    stderr lines (e.g. ansible.posix.profile_tasks banners) should not end
+    with a bogus "(N unknown events: aom_stderr_line×N)" footer."""
+    renderer = CompactRenderer(is_tty=False)
+    renderer.start("site.yml", [])
+    state = _empty_state()
+    for _ in range(3):
+        state.handle_event(
+            {
+                "_event": "aom_stderr_line",
+                "_timestamp": "2026-08-05T00:00:00Z",
+                "line": "Dienstag 04 August 2026  19:02:51 +0200 (0:00:00.477)"
+                "       0:00:00.477 *******",
+                "source": "run_level",
+            }
+        )
+    renderer._state = state
+
+    renderer.handle_completion(0, "completed")
+
+    captured = capsys.readouterr()
+    assert "unknown events" not in captured.out
+    assert "aom_stderr_line" not in captured.out
+
+
+def test_aom_connection_events_are_not_unknown(capsys):
+    """The bundled aom_connection notification callback's synthetic events
+    are also AOM-internal and must not trip the future-drift hint."""
+    renderer = CompactRenderer(is_tty=False)
+    renderer.start("site.yml", [])
+    state = _empty_state()
+    state.handle_event(
+        {
+            "_event": "aom_connection_acquired",
+            "_timestamp": "2026-08-05T00:00:00Z",
+            "host": "web1",
+            "connection_id": "conn-1",
+        }
+    )
+    state.handle_event(
+        {
+            "_event": "aom_connection_released",
+            "_timestamp": "2026-08-05T00:00:00Z",
+            "host": "web1",
+            "connection_id": "conn-1",
+        }
+    )
+    renderer._state = state
+
+    renderer.handle_completion(0, "completed")
+
+    captured = capsys.readouterr()
+    assert "unknown events" not in captured.out
+
+
 def test_completion_no_hint_when_state_is_none(capsys):
     """stop()'d renderer with state=None must still complete cleanly."""
     renderer = CompactRenderer(is_tty=False)

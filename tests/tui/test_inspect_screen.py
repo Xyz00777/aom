@@ -1345,3 +1345,68 @@ async def test_detail_pane_shows_debug_var_payload(state_dir: Path):
         assert "module returned no message" not in body
         # Payload text must not be interpreted as Rich markup.
         assert "[bold]not markup[/]" in body.replace("\\[", "[")
+
+
+def _write_bracketed_task_name_session(state_dir: Path) -> str:
+    sid = "019e9000-0000-7000-8000-000000000099"
+    session_dir = state_dir / sid
+    session_dir.mkdir(parents=True)
+    (session_dir / "meta.json").write_text(
+        json.dumps(
+            {
+                "playbook": "bracket.yml",
+                "status": "completed",
+                "start_time": "2026-07-01T10:00:00Z",
+                "end_time": "2026-07-01T10:00:02Z",
+                "duration_seconds": 2,
+            }
+        )
+        + "\n"
+    )
+    task = {"id": "t1", "name": "Deploy {{ hostvars['db']['ip'] }} [bold]tag[/]"}
+    events = [
+        {"_event": "v2_playbook_on_play_start", "play": {"id": "p1", "name": "all"}},
+        {
+            "_event": "v2_playbook_on_task_start",
+            "_timestamp": "2026-07-01T10:00:00.000000Z",
+            "task": task,
+            "play": {"id": "p1", "name": "all"},
+        },
+        {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "2026-07-01T10:00:01.000000Z",
+            "task": task,
+            "play": {"id": "p1", "name": "all"},
+            "hosts": {
+                "web1": {
+                    "_ansible_no_log": False,
+                    "action": "command",
+                    "changed": False,
+                }
+            },
+        },
+    ]
+    (session_dir / "events.jsonl").write_text("".join(json.dumps(e) + "\n" for e in events))
+    return sid
+
+
+@pytest.mark.asyncio
+async def test_tasks_tree_handles_task_name_with_brackets_and_jinja(state_dir: Path):
+    """Task names containing Jinja templates with brackets (e.g. ``{{ hostvars['db']['ip'] }}``)
+    or bracketed tags must render verbatim in the Tasks tree and not crash Text.from_markup."""
+    from textual.widgets import Tree
+
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    sid = _write_bracketed_task_name_session(state_dir)
+    app = InspectApp(state_dir=state_dir, initial_session_id=sid)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        tree = app.query_one("#tasks-tree", Tree)
+        # Tree must have nodes rendered without crash
+        assert len(tree.root.children) > 0
+        play_node = tree.root.children[0]
+        assert len(play_node.children) > 0
+        task_node = play_node.children[0]
+        # Check label plain text contains the full unescaped task name
+        assert "Deploy {{ hostvars['db']['ip'] }} [bold]tag[/]" in task_node.label.plain
