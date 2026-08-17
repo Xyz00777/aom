@@ -2063,6 +2063,13 @@ class TreeProjection:
         # explicit ownership model needs to be represented upstream.
 
         play_def = self._play_def_for(play)
+        preflight_known_role_paths: set[tuple[str, ...]] = set()
+        if play_def is not None:
+            preflight_known_role_paths = {
+                _collapse_role_path_aggressive(role_path)
+                for _, role_path in iter_preflight_task_defs(play_def.tasks)
+                if role_path
+            }
 
         items: list[tuple[str, str, tuple[str, ...], TaskRunState | None]] = []
         emitted_names: set[str] = set()
@@ -2107,7 +2114,16 @@ class TreeProjection:
                 or extended[-len(runtime_name_chain) :] != runtime_name_chain
             ):
                 extended = _collapse_role_path(extended + runtime_name_chain)
-            return _collapse_role_path_aggressive(extended)
+            res = _collapse_role_path_aggressive(extended)
+            if preflight_known_role_paths and res and res not in preflight_known_role_paths:
+                candidates = [
+                    p
+                    for p in preflight_known_role_paths
+                    if len(p) > len(res) and p[-len(res) :] == res
+                ]
+                if len(candidates) == 1:
+                    return candidates[0]
+            return res
 
         def _task_identity(task: TaskRunState) -> str:
             return task.task_id or task.name

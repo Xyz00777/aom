@@ -1110,3 +1110,95 @@ class TestConcurrentFreeStrategyRoleClustering:
         assert len(podman_headers) == 1, (
             f"podman header must appear exactly once, got: {podman_headers}"
         )
+
+
+class TestNestedSubroleDynamicRuntimeTaskClustering:
+    """When a sub-role task arrives at runtime with a bare single-segment role prefix
+
+    (e.g. ``podman : Wait for host after lingering reboot``), but the play
+    only has ``podman`` as a sub-role under ``angie_ssl_terminator``, it must
+    resolve to the nested role path ``('angie_ssl_terminator', 'podman')`` and
+    NOT create a duplicate top-level ``role: podman`` header.
+    """
+
+    def test_dynamic_subrole_task_clusters_into_parent_nested_role(self) -> None:
+        state = RunState("main.yml")
+        play_def = PlayDefinition(
+            id="p1",
+            name="Deploy Keepalived for Proxmox VIP",
+            hosts="all",
+            resolved_hosts=["ds5", "ds9"],
+            tasks=[
+                RoleGroupDefinition(
+                    role="angie_ssl_terminator",
+                    tasks=[
+                        RoleGroupDefinition(
+                            role="podman",
+                            tasks=[
+                                TaskDefinition(
+                                    name="podman : Ensure Podman API service is started directly",
+                                    role="podman",
+                                    tags=[],
+                                    play_id="p1",
+                                    play_order=0,
+                                    task_order=0,
+                                ),
+                                TaskDefinition(
+                                    name="podman : Apply iptables cold-boot fix",
+                                    role="podman",
+                                    tags=[],
+                                    play_id="p1",
+                                    play_order=0,
+                                    task_order=1,
+                                ),
+                            ],
+                        ),
+                        TaskDefinition(
+                            name="Deploy TLS certificates for sidecar",
+                            role="angie_ssl_terminator",
+                            tags=[],
+                            play_id="p1",
+                            play_order=0,
+                            task_order=2,
+                        ),
+                    ],
+                ),
+                TaskDefinition(
+                    name="Install keepalived",
+                    role=None,
+                    tags=[],
+                    play_id="p1",
+                    play_order=0,
+                    task_order=3,
+                ),
+            ],
+        )
+        state.definitions = [play_def]
+        _fire_startup(state, play_id="play-1", play_name="Deploy Keepalived for Proxmox VIP")
+
+        # ds5 is running preflight-matched sub-role task
+        _fire_running_task(
+            state,
+            "t-ds5",
+            "angie_ssl_terminator : podman : Ensure Podman API service is started directly",
+            host="ds5",
+            play_id="play-1",
+        )
+        # ds9 is running dynamic/unmatched sub-role task with bare "podman : " prefix
+        _fire_running_task(
+            state,
+            "t-ds9",
+            "podman : Wait for host after lingering reboot",
+            host="ds9",
+            play_id="play-1",
+        )
+
+        lines = TreeProjection.from_run_state(state).tree_lines(budget=80)
+        seq = _line_summary(lines)
+
+        podman_headers = [(d, lbl) for d, k, lbl in seq if k == "role" and "podman" in lbl]
+        assert len(podman_headers) == 1, (
+            f"Expected exactly 1 podman role header, got {len(podman_headers)}: {podman_headers}"
+        )
+        # Ensure podman is nested under angie_ssl_terminator (depth 3)
+        assert podman_headers[0][0] == 3, f"Expected podman at depth 3, got: {podman_headers[0]}"
