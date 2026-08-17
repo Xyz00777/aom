@@ -1094,19 +1094,6 @@ class RunState:
         # overwrite each host entry as the events arrive.
         resolved_hosts = self._resolve_play_hosts(play)
         if not resolved_hosts and play.detected_strategy == "linear":
-            # No preflight match (preflight failed, or the play name in
-            # --list-tasks output differs from the JSONL play name).
-            # Under linear every host runs every task in lockstep, so
-            # the hosts seen on earlier tasks of this play are the task's
-            # host set too. Without this, the task keeps an empty hosts
-            # map and the tree falls back to rendering every play target
-            # as RUNNING forever, contradicting the streamed results.
-            # Not applicable under free strategy, where per-host
-            # v2_runner_on_start is the start signal.
-            #
-            # Hosts whose latest result is FAILED or UNREACHABLE are
-            # excluded: ansible removes them from the play, so later
-            # tasks never run on them.
             last_status: dict[str, Status] = {}
             for other_task in play.tasks.values():
                 if other_task.task_id == task_id:
@@ -1216,24 +1203,25 @@ class RunState:
             self.plays[play_id].detected_strategy = "free"
         elif self.plays[play_id].detected_strategy == "linear":
             # A v2_runner_on_start event means the playbook is NOT
-            # running with lockstep enabled (the JSONL callback
-            # guards runner_on_start behind `if self._is_lockstep:
-            # return`). Flip to free — the earlier linear detection
-            # by task_start was premature. Any still-RUNNING host
-            # entries synthesised under that premature assumption are
-            # guesses about hosts that may not have started the task;
-            # drop them and let the per-host start events rebuild the
-            # map. Entries with real terminal results were replaced
-            # wholesale by the terminal handlers and survive.
+            # running with lockstep enabled. Flip to free.
             self.plays[play_id].detected_strategy = "free"
-            for task in self.plays[play_id].tasks.values():
+            for t in self.plays[play_id].tasks.values():
                 stale = [
                     stale_host
-                    for stale_host, hs in task.hosts.items()
+                    for stale_host, hs in t.hosts.items()
                     if hs.synthesised and hs.status == Status.RUNNING
                 ]
                 for stale_host in stale:
-                    del task.hosts[stale_host]
+                    del t.hosts[stale_host]
+        elif self.plays[play_id].detected_strategy == "free":
+            if task_id in self.plays[play_id].tasks:
+                stale = [
+                    stale_host
+                    for stale_host, hs in self.plays[play_id].tasks[task_id].hosts.items()
+                    if hs.synthesised and hs.status == Status.RUNNING
+                ]
+                for stale_host in stale:
+                    del self.plays[play_id].tasks[task_id].hosts[stale_host]
 
         play = self.plays[play_id]
 

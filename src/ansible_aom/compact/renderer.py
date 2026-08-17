@@ -1763,9 +1763,12 @@ class CompactRenderer:
         name = event.get("_event")
         event_time = self._event_time(event)
         if name == "v2_playbook_on_play_start":
+            if event_time is not None and self._announced_order:
+                self._flush_ready_summaries(event_time, force=True)
             self._current_play_id = event.get("play", {}).get("id", "")
             play_name = event.get("play", {}).get("name", "") or "(unnamed)"
             self._display.print_log(f"\nPLAY [{play_name}] " + "*" * 50)
+
         elif name == "v2_playbook_on_task_start":
             task = self._task_dict(event)
             self._announce_task(

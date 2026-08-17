@@ -453,14 +453,30 @@ def task_complete_on_all_targets(
             live_group_hosts = group_hosts - dead
             return bool(group_hosts) and live_group_hosts <= terminal_hosts
 
+        # Build map of task order index in this play to check if hosts have advanced past task_uuid
+        task_order = {tid: idx for idx, tid in enumerate(play.tasks)}
+        current_idx = task_order.get(task_uuid, -1)
+
         for hostname in targets:
             hs = task.hosts.get(hostname)
             if hs is not None:
-                if hs.status == Status.RUNNING:
+                if hs.status == Status.RUNNING and not (
+                    hs.synthesised and play.detected_strategy == "free"
+                ):
                     return False  # still running this task
             elif hostname not in dead:
-                return False  # hasn't reached this task yet, and still alive
+                # If hostname has already started or completed any task strictly
+                # after task_uuid in this play, it has passed task_uuid and won't run it.
+                has_passed = False
+                if current_idx >= 0:
+                    for later_tid in list(play.tasks.keys())[current_idx + 1 :]:
+                        if hostname in play.tasks[later_tid].hosts:
+                            has_passed = True
+                            break
+                if not has_passed:
+                    return False  # hasn't reached this task yet, and still alive
         return True
+
     return False
 
 
