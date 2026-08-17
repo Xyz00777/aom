@@ -3882,9 +3882,14 @@ class TestMultiLevelInnerFooters:
             footer_idx = lines.index(footer)
             closest_role = None
             for j in range(footer_idx - 1, -1, -1):
-                if lines[j].kind == "role" and lines[j].identity is not None:
+                if (
+                    lines[j].kind == "role"
+                    and lines[j].identity is not None
+                    and lines[j].depth < footer.depth
+                ):
                     closest_role = lines[j].identity
                     break
+
             assert closest_role is not None, (
                 f"inner footer at idx {footer_idx} must have a role "
                 f"ancestor; got {[ln.label for ln in lines[:footer_idx]]}"

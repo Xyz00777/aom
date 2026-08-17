@@ -1202,3 +1202,71 @@ class TestNestedSubroleDynamicRuntimeTaskClustering:
         )
         # Ensure podman is nested under angie_ssl_terminator (depth 3)
         assert podman_headers[0][0] == 3, f"Expected podman at depth 3, got: {podman_headers[0]}"
+
+    def test_active_subrole_rendered_before_parent_pending_tasks(self) -> None:
+        """TC-ACTIVE-SUBROLE: When a nested sub-role is actively running, it must be rendered
+        BEFORE the parent role's pending tasks, reflecting actual execution order."""
+        state = RunState(playbook="site.yml")
+        play_def = _play_def(
+            "p1",
+            "Deploy SSL Terminator for Jellyfin",
+            [
+                RoleGroupDefinition(
+                    role="angie_ssl_terminator",
+                    tasks=[
+                        RoleGroupDefinition(
+                            role="podman",
+                            tasks=[
+                                TaskDefinition(
+                                    name="Restart if lingering get activated",
+                                    role="podman",
+                                    tags=[],
+                                    play_id="p1",
+                                    play_order=0,
+                                    task_order=0,
+                                ),
+                            ],
+                        ),
+                        TaskDefinition(
+                            name="Deploy TLS certificates for sidecar",
+                            role="angie_ssl_terminator",
+                            tags=[],
+                            play_id="p1",
+                            play_order=0,
+                            task_order=1,
+                        ),
+                        TaskDefinition(
+                            name="Reload systemd daemon for user",
+                            role="angie_ssl_terminator",
+                            tags=[],
+                            play_id="p1",
+                            play_order=0,
+                            task_order=2,
+                        ),
+                    ],
+                ),
+            ],
+        )
+        state.definitions = [play_def]
+        _fire_startup(state, play_id="play-1", play_name="Deploy SSL Terminator for Jellyfin")
+
+        _fire_running_task(
+            state,
+            "t-podman",
+            "Restart if lingering get activated",
+            host="jellyfinai",
+            play_id="play-1",
+        )
+
+        lines = TreeProjection.from_run_state(state).tree_lines(budget=80)
+        labels = [ln.label for ln in lines]
+
+        # Verify podman role comes BEFORE parent pending tasks
+        podman_idx = next(i for i, lbl in enumerate(labels) if "role: podman" in lbl)
+        parent_pending_idx = next(
+            i for i, lbl in enumerate(labels) if "Deploy TLS certificates" in lbl
+        )
+        assert podman_idx < parent_pending_idx, (
+            f"Active sub-role 'podman' (idx {podman_idx}) should appear before "
+            f"parent pending task (idx {parent_pending_idx}). Full labels: {labels}"
+        )

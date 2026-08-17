@@ -168,15 +168,31 @@ def _cluster_items_by_role_path(
         if target_path in emitted_paths:
             return
         emitted_paths.add(target_path)
+
+        # Check if any descendant has running items
+        descendants = [
+            p
+            for p in path_order
+            if p not in emitted_paths
+            and len(p) > len(target_path)
+            and p[: len(target_path)] == target_path
+        ]
+        running_descendants = [
+            p for p in descendants if any(it[0] == "running" for it in by_path[p])
+        ]
+        pending_descendants = [p for p in descendants if p not in running_descendants]
+
+        # 1. Emit running descendants first so active work is visible at the top
+        for p in running_descendants:
+            _emit_path_and_descendants(p)
+
+        # 2. Emit target path items
         if target_path in by_path:
             clustered.extend(by_path[target_path])
-        for p in path_order:
-            if (
-                p not in emitted_paths
-                and len(p) > len(target_path)
-                and p[: len(target_path)] == target_path
-            ):
-                _emit_path_and_descendants(p)
+
+        # 3. Emit remaining pending descendants
+        for p in pending_descendants:
+            _emit_path_and_descendants(p)
 
     for p in path_order:
         if p not in emitted_paths:
