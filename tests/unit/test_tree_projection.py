@@ -4446,10 +4446,12 @@ class TestMultiPlayTruncationWithRoleFooters:
             f"got {[ln.label for ln in more_lines]}"
         )
 
-    def test_no_inner_footer_when_cut_lands_in_play_tasks_without_role(self) -> None:
+    def test_inner_play_footer_reports_play_remaining_when_cut_lands_in_direct_play_tasks(
+        self,
+    ) -> None:
         """When a budget cut truncates tasks directly under a play (no role),
-        only the outer footer at depth 0 is emitted. No bogus inner footer
-        counting tasks from subsequent plays should be emitted."""
+        the play's inner footer reports remaining tasks in THAT play (depth 2),
+        and the outer footer reports remaining tasks across ALL plays (depth 0)."""
         play1_tasks = [
             TaskDefinition(
                 name=f"play1 direct task {i}",
@@ -4514,16 +4516,22 @@ class TestMultiPlayTruncationWithRoleFooters:
                 "play": {"id": "p1"},
             }
         )
-        # Budget=10 fits playbook (1) + play 1 (1) + 5 tasks + host + outer footer = 9 lines.
         projection = TreeProjection.from_run_state(state)
         lines = projection.tree_lines(budget=10)
 
         more_lines = [ln for ln in lines if ln.kind == "more"]
-        # Exactly one footer at depth 0 (the outer footer)
-        assert len(more_lines) == 1, (
-            f"expected only 1 outer footer; got {[ln.label for ln in more_lines]}"
+        # Exactly two footers: one for the play (depth 2) and one for the playbook (depth 0)
+        assert len(more_lines) == 2, (
+            f"expected 2 footers (play + outer); got {[ln.label for ln in more_lines]}"
         )
-        assert more_lines[0].depth == 0
-        # 10 (play 1) + 3000 (play 2) = 3010 total. Visible tasks = 5 (tasks 0..4).
-        # Remaining = 3010 - 5 = 3005.
-        assert more_lines[0].label == "… and 3005 more tasks"
+        play_footer = more_lines[0]
+        outer_footer = more_lines[1]
+
+        assert play_footer.depth == 2
+        # Play 1 has 10 tasks total, 5 visible. Remaining in Play 1 = 10 - 5 = 5.
+        assert play_footer.label == "… and 5 more tasks"
+
+        assert outer_footer.depth == 0
+        # 10 (play 1) + 3000 (play 2) = 3010 total. Visible tasks = 5.
+        # Remaining across all plays = 3010 - 5 = 3005.
+        assert outer_footer.label == "… and 3005 more tasks"

@@ -666,6 +666,7 @@ class TreeProjection:
     _role_total_preflight: dict[frozenset[str] | None, tuple[dict[str, int], set[str]]] = field(
         default_factory=dict, init=False, repr=False
     )
+    _play_total_preflight: dict[str, int] = field(default_factory=dict, init=False, repr=False)
     _total_unique_tasks: int | None = field(default=None, init=False, repr=False)
     # Per-render memo for ``_play_running_and_pending`` — reset at the top of
     # each ``_tree_lines_unbounded`` call. The active play's items are needed
@@ -757,6 +758,7 @@ class TreeProjection:
         self._pending_play_lines.clear()
         self._runtime_play_preflight_roles.clear()
         self._role_total_preflight.clear()
+        self._play_total_preflight.clear()
         self._total_unique_tasks = None
 
     @staticmethod
@@ -1308,6 +1310,54 @@ class TreeProjection:
                     role_completed[role] = role_completed.get(role, 0) + 1
         return role_completed, total_completed
 
+    def _build_play_total_tasks(self) -> dict[str, int]:
+        """Build play_name -> total task count from preflight + runtime state."""
+        self._refresh_tree_cache()
+        if not self._play_total_preflight:
+            for play_def in self._state.definitions:
+                count = sum(
+                    1 for entry, _ in iter_preflight_task_defs(play_def.tasks) if not entry.children
+                )
+                self._play_total_preflight[play_def.name] = count
+
+        play_totals: dict[str, int] = dict(self._play_total_preflight)
+        for play in self._state.plays.values():
+            for def_name, count in self._play_total_preflight.items():
+                if self._play_def_matches_visible(def_name, {play.name}):
+                    play_totals[play.name] = max(play_totals.get(play.name, 0), count)
+
+        for play in self._state.plays.values():
+            preflight_count = play_totals.get(play.name, 0)
+            if preflight_count == 0 or len(play.tasks) > preflight_count:
+                play_totals[play.name] = len(play.tasks)
+        return play_totals
+
+    def _count_completed_tasks_per_play(self) -> dict[str, int]:
+        """Count completed tasks per play."""
+        play_completed: dict[str, int] = {}
+        for play in self._state.plays.values():
+            completed = 0
+            for task in play.tasks.values():
+                is_completed = task.status == Status.COMPLETED or (
+                    bool(task.hosts)
+                    and all(hs.status != Status.RUNNING for hs in task.hosts.values())
+                )
+                if is_completed:
+                    completed += 1
+            play_completed[play.name] = completed
+        return play_completed
+
+    def _count_visible_tasks_per_play(self, lines: list[TreeLine]) -> dict[str, int]:
+        """Count visible tasks per play in lines."""
+        play_visible: dict[str, int] = {}
+        current_play: str | None = None
+        for ln in lines:
+            if ln.kind == "play" and ln.label.startswith("play: "):
+                current_play = ln.label[len("play: ") :]
+            elif ln.kind == "task" and current_play is not None:
+                play_visible[current_play] = play_visible.get(current_play, 0) + 1
+        return play_visible
+
     def _recompute_inner_footer_count(self, lines: list[TreeLine]) -> list[TreeLine]:
         """Replace the inner footer(s) with per-role subtree remaining counts.
 
@@ -1475,20 +1525,51 @@ class TreeProjection:
 
         if inner_idx is not None:
             replacements: list[TreeLine] = []
-            for role in reversed(role_chain):
-                total = role_total_tasks.get(role, 0)
-                completed = role_completed_tasks.get(role, 0)
-                visible = role_visible_tasks.get(role, 0)
-                remaining = total - completed - visible
-                if remaining <= 0:
-                    continue
-                role_depth: int | None = None
+            if role_chain:
+                for role in reversed(role_chain):
+                    total = role_total_tasks.get(role, 0)
+                    completed = role_completed_tasks.get(role, 0)
+                    visible = role_visible_tasks.get(role, 0)
+                    remaining = total - completed - visible
+                    if remaining <= 0:
+                        continue
+                    role_depth: int | None = None
+                    for j in range(inner_idx - 1, -1, -1):
+                        if lines[j].kind == "role" and lines[j].identity == role:
+                            role_depth = lines[j].depth
+                            break
+                    assert role_depth is not None
+                    replacements.append(_more_footer(depth=role_depth + 1, count=remaining))
+            else:
+                # Direct tasks under a play (no role).
+                play_totals = self._build_play_total_tasks()
+                play_completed_tasks = self._count_completed_tasks_per_play()
+                play_visible_tasks = self._count_visible_tasks_per_play(lines)
+                play_name: str | None = None
+                play_depth = 1
                 for j in range(inner_idx - 1, -1, -1):
-                    if lines[j].kind == "role" and lines[j].identity == role:
-                        role_depth = lines[j].depth
+                    if lines[j].kind == "play":
+                        if lines[j].label.startswith("play: "):
+                            play_name = lines[j].label[len("play: ") :]
+                        play_depth = lines[j].depth
                         break
-                assert role_depth is not None
-                replacements.append(_more_footer(depth=role_depth + 1, count=remaining))
+                if play_name is not None:
+                    total = play_totals.get(play_name, 0)
+                    if total == 0:
+                        for pname, cnt in play_totals.items():
+                            if self._play_def_matches_visible(pname, {play_name}):
+                                total = cnt
+                                break
+                    completed = play_completed_tasks.get(play_name, 0)
+                    if completed == 0:
+                        for pname, cnt in play_completed_tasks.items():
+                            if self._play_def_matches_visible(pname, {play_name}):
+                                completed = cnt
+                                break
+                    visible = play_visible_tasks.get(play_name, 0)
+                    remaining = total - completed - visible
+                    if remaining > 0:
+                        replacements.append(_more_footer(depth=play_depth + 1, count=remaining))
             # The inner footer was at ``inner_idx`` in the
             # original ``lines``. Head footers inserted before
             # that position shift it right, so compute the
