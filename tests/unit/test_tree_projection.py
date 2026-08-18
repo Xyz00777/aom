@@ -4163,120 +4163,197 @@ class TestMultiPlayTruncationWithRoleFooters:
         assert m, f"label must match '… and N more tasks'; got {ln.label!r}"
         return int(m.group(1))
 
-    def test_inner_footer_for_role_in_head_when_cut_lands_in_later_play(self) -> None:
-        """Bug 1: the angie role (in the head, before the outer cut) has
-        127 remaining tasks. The truncation must emit an inner footer
-        for angie at depth role_depth + 1 after her last visible task.
+    def _multi_play_with_pending_roles_state(self) -> RunState:
+        """Build a multi-play state where roles have pending tasks that are truncated.
 
-        State: play 1 has angie with 127 remaining (129 total - 2 visible);
-        play 2 has 2816 tasks. Budget=13 keeps play 1's visible tasks
-        plus a couple of play 2's tasks; the outer cut lands at play 2's
-        boundary. The angie role's remaining must surface as an inner
-        footer in the head.
+        Play 1: podman (289 direct + 129 angie = 418 total).
+        100 podman direct completed, 1 running (visible), 188 pending (truncated).
+        100 angie completed, 2 pending (visible), 27 pending (truncated).
+        Podman total remaining = 188 + 27 = 215.
+        Angie total remaining = 27.
+
+        Play 2: 2816 pending tasks (2 visible, 2814 truncated).
         """
+        podman_direct = [
+            TaskDefinition(
+                name=f"podman direct task {i}",
+                role="podman",
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=i,
+            )
+            for i in range(289)
+        ]
+        angie_tasks = [
+            TaskDefinition(
+                name=f"angie_ssl_terminator : task {i}",
+                role="angie_ssl_terminator",
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=289 + i,
+            )
+            for i in range(129)
+        ]
+        angie_role = RoleGroupDefinition(
+            role="angie_ssl_terminator", tasks=angie_tasks, parent="podman"
+        )
+        podman_role = RoleGroupDefinition(role="podman", tasks=podman_direct + [angie_role])
+        play2_tasks = [
+            TaskDefinition(
+                name=f"play2 task {i}",
+                role=None,
+                tags=[],
+                play_id="p2",
+                play_order=1,
+                task_order=i,
+            )
+            for i in range(2816)
+        ]
+        state = RunState(playbook="main.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Setup rootless Podman",
+                hosts="all",
+                resolved_hosts=["ds9"],
+                tasks=[podman_role],
+            ),
+            PlayDefinition(
+                id="p2",
+                name="Deploy Scrutiny web server and InfluxDB containers",
+                hosts="all",
+                resolved_hosts=["ds9"],
+                tasks=play2_tasks,
+            ),
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-06-24T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-06-24T10:00:01Z",
+                "play": {"id": "p1", "name": "Setup rootless Podman"},
+            }
+        )
+        # 289 podman direct tasks completed
+        for i in range(289):
+            state.handle_event(
+                {
+                    "_event": "v2_playbook_on_task_start",
+                    "_timestamp": "2026-06-24T10:00:02Z",
+                    "task": {"id": f"t{i}", "name": f"podman direct task {i}"},
+                    "play": {"id": "p1"},
+                }
+            )
+            state.handle_event(
+                {
+                    "_event": "runner_on_ok",
+                    "_timestamp": "2026-06-24T10:00:03Z",
+                    "host": "ds9",
+                    "task": {"id": f"t{i}", "name": f"podman direct task {i}"},
+                    "play": {"id": "p1"},
+                    "res": {"changed": False},
+                }
+            )
+        # 100 angie tasks completed
+        for i in range(100):
+            state.handle_event(
+                {
+                    "_event": "v2_playbook_on_task_start",
+                    "_timestamp": "2026-06-24T10:00:04Z",
+                    "task": {"id": f"at{i}", "name": f"angie_ssl_terminator : task {i}"},
+                    "play": {"id": "p1"},
+                }
+            )
+            state.handle_event(
+                {
+                    "_event": "runner_on_ok",
+                    "_timestamp": "2026-06-24T10:00:05Z",
+                    "host": "ds9",
+                    "task": {"id": f"at{i}", "name": f"angie_ssl_terminator : task {i}"},
+                    "play": {"id": "p1"},
+                    "res": {"changed": False},
+                }
+            )
+        # 1 angie task RUNNING (visible)
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-06-24T10:04:00Z",
+                "task": {"id": "at100", "name": "angie_ssl_terminator : task 100"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-06-24T10:04:01Z",
+                "host": "ds9",
+                "task": {"id": "at100", "name": "angie_ssl_terminator : task 100"},
+                "play": {"id": "p1"},
+            }
+        )
+        return state
+
+    def test_no_inner_footer_when_completed_tasks_leave_all_remaining_visible(self) -> None:
+        """When earlier tasks completed and all remaining tasks are visible,
+        no inner footer is emitted for completed tasks."""
         state = self._multi_play_completed_state()
         projection = TreeProjection.from_run_state(state)
-        # budget=13 fits the head + 2 play-2 tasks + 2 footers.
+        # budget=13 fits play 1's visible items + 2 play-2 tasks + 2 footers.
         lines = projection.tree_lines(budget=13)
 
-        # Locate angie's role line.
+        # Neither angie nor podman has hidden remaining tasks, so neither
+        # should have an inner footer in the head.
         angie_role_line = next(
             ln for ln in lines if ln.kind == "role" and ln.identity == "angie_ssl_terminator"
         )
-        angie_role_depth = angie_role_line.depth
-
-        # The inner footer for angie must exist at depth role_depth + 1
-        # — angie's role line is at depth 3, her task list at depth 4.
+        podman_role_line = next(ln for ln in lines if ln.kind == "role" and ln.identity == "podman")
         angie_footer = self._find_more_at(
-            lines, depth=angie_role_depth + 1, label_pattern=r"127 more tasks"
+            lines, depth=angie_role_line.depth + 1, label_pattern=r"more tasks"
         )
-        assert angie_footer is not None, (
-            f"must emit an inner footer for angie (role_depth={angie_role_depth}) "
-            f"with count=127 in the head; got lines:\n"
-            + "\n".join(
-                f"  [{i}] depth={ln.depth} {ln.kind}: {ln.label[:60]}" for i, ln in enumerate(lines)
-            )
+        podman_footer = self._find_more_at(
+            lines, depth=podman_role_line.depth + 1, label_pattern=r"more tasks"
         )
-        assert self._extract_more_count(angie_footer) == 127, (
-            f"angie's inner footer count must be exactly 127 "
-            f"(role_total=129, visible=2); got {angie_footer.label!r}"
-        )
+        assert angie_footer is None, f"angie should have no inner footer; got {angie_footer}"
+        assert podman_footer is None, f"podman should have no inner footer; got {podman_footer}"
 
-        # The footer must be inserted AFTER angie's last visible task in
-        # the line list — i.e. between angie's tasks and the next outer
-        # structure (podman closing or the play boundary).
-        footer_idx = lines.index(angie_footer)
-        # The line just before the footer must be angie-related (a task
-        # at her depth, another inner footer for a deeper sibling, or
-        # the angie role line itself if no tasks were visible). In the
-        # user's scenario angie's last visible task is "task 128".
-        previous = lines[footer_idx - 1]
-        assert previous.kind in ("task", "host", "more"), (
-            f"line before angie's footer must be a task/host/footer; "
-            f"got {previous.kind!r} ({previous.label!r})"
-        )
-
-    def test_inner_footers_for_nested_roles_in_head(self) -> None:
-        """Bug 2: with nested roles (podman > angie) both roles in the
-        head have remaining tasks (415 and 127 respectively). Two
-        inner footers must be emitted, deepest-first: angie's at
-        depth 4, podman's at depth 3.
-        """
-        state = self._multi_play_completed_state()
+    def test_inner_footers_for_nested_roles_when_pending_tasks_are_truncated(self) -> None:
+        """When roles in the head have pending tasks that are truncated,
+        inner footers report the true remaining (total - completed - visible)."""
+        state = self._multi_play_with_pending_roles_state()
         projection = TreeProjection.from_run_state(state)
+        # budget=13 fits play 1 head + 2 play-2 tasks + footers.
         lines = projection.tree_lines(budget=13)
 
-        # Find both inner footers in the head by identity.
         angie_role_line = next(
             ln for ln in lines if ln.kind == "role" and ln.identity == "angie_ssl_terminator"
         )
         podman_role_line = next(ln for ln in lines if ln.kind == "role" and ln.identity == "podman")
 
+        # Angie has 129 - 100 completed - 6 visible = 23 remaining
         angie_footer = self._find_more_at(
-            lines, depth=angie_role_line.depth + 1, label_pattern=r"127 more tasks"
+            lines, depth=angie_role_line.depth + 1, label_pattern=r"23 more tasks"
         )
+        # Podman has 418 - 389 completed - 6 visible = 23 remaining
         podman_footer = self._find_more_at(
-            lines, depth=podman_role_line.depth + 1, label_pattern=r"415 more tasks"
+            lines, depth=podman_role_line.depth + 1, label_pattern=r"23 more tasks"
         )
 
-        assert angie_footer is not None, (
-            f"must emit angie's inner footer (depth={angie_role_line.depth + 1}, "
-            f"count=127); got lines:\n"
-            + "\n".join(
-                f"  [{i}] depth={ln.depth} {ln.kind}: {ln.label[:60]}" for i, ln in enumerate(lines)
-            )
-        )
-        assert podman_footer is not None, (
-            f"must emit podman's inner footer (depth={podman_role_line.depth + 1}, "
-            f"count=415); got lines:\n"
-            + "\n".join(
-                f"  [{i}] depth={ln.depth} {ln.kind}: {ln.label[:60]}" for i, ln in enumerate(lines)
-            )
-        )
+        assert angie_footer is not None, "must emit angie's inner footer with count=23"
+        assert podman_footer is not None, "must emit podman's inner footer with count=23"
+        assert self._extract_more_count(angie_footer) == 23
+        assert self._extract_more_count(podman_footer) == 23
 
-        # Ordering: angie's footer (deeper) must appear BEFORE podman's
-        # footer (shallower) in the line list — same deepest-first
-        # ordering used by the existing nested-cut logic.
+        # Ordering: angie's footer (deeper) must appear BEFORE podman's footer
         angie_idx = lines.index(angie_footer)
         podman_idx = lines.index(podman_footer)
-        assert angie_idx < podman_idx, (
-            f"angie's footer (idx={angie_idx}) must appear before "
-            f"podman's footer (idx={podman_idx}); deepest-first ordering"
-        )
+        assert angie_idx < podman_idx
 
     def test_outer_footer_count_is_total_remaining_across_all_plays(self) -> None:
-        """Bug 3: the outer footer must report the TOTAL remaining tasks
-        across ALL plays, not just the dropped tail after the inner cut.
-
-        In the user's scenario:
-        - Play 1: 418 unique tasks, 3 visible (1 podman running + 2
-          angie pending). Remaining in play 1 = 415.
-        - Play 2: 2816 unique tasks, 2 visible (budget=13). Remaining
-          in play 2 = 2814.
-        - Total remaining = 415 + 2814 = 3229.
-
-        The outer footer (depth=0, last line) must read 3229, not 2814.
-        """
+        """The outer footer reports the TOTAL remaining (uncompleted & hidden)
+        tasks across ALL plays, subtracting completed tasks."""
         state = self._multi_play_completed_state()
         projection = TreeProjection.from_run_state(state)
         lines = projection.tree_lines(budget=13)
@@ -4288,13 +4365,12 @@ class TestMultiPlayTruncationWithRoleFooters:
         )
         outer_count = self._extract_more_count(outer)
         # Total unique tasks = 418 (play 1) + 2816 (play 2) = 3234.
-        # Visible tasks in the kept tree at budget=13 = 3 (play 1) +
-        # 2 (play 2, 2 tasks fit before the outer footer) = 5.
-        # Total remaining = 3234 - 5 = 3229.
-        assert outer_count == 3229, (
+        # Completed tasks = 415.
+        # Visible tasks in the kept tree = 5.
+        # Total remaining hidden = 3234 - 415 - 5 = 2814.
+        assert outer_count == 2814, (
             f"outer footer count must equal total remaining across ALL "
-            f"plays (415 + 2814 = 3229), not just the count of dropped "
-            f"task-domain entities in the tail; got {outer_count}"
+            f"plays (3234 - 415 - 5 = 2814); got {outer_count}"
         )
 
     def test_no_inner_footer_when_role_has_no_remaining(self) -> None:
