@@ -4445,3 +4445,85 @@ class TestMultiPlayTruncationWithRoleFooters:
             f"no footers should be emitted when every task is visible; "
             f"got {[ln.label for ln in more_lines]}"
         )
+
+    def test_no_inner_footer_when_cut_lands_in_play_tasks_without_role(self) -> None:
+        """When a budget cut truncates tasks directly under a play (no role),
+        only the outer footer at depth 0 is emitted. No bogus inner footer
+        counting tasks from subsequent plays should be emitted."""
+        play1_tasks = [
+            TaskDefinition(
+                name=f"play1 direct task {i}",
+                role=None,
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=i,
+            )
+            for i in range(10)
+        ]
+        play2_tasks = [
+            TaskDefinition(
+                name=f"play2 direct task {i}",
+                role=None,
+                tags=[],
+                play_id="p2",
+                play_order=1,
+                task_order=i,
+            )
+            for i in range(3000)
+        ]
+        state = RunState(playbook="main.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Create nfs share",
+                hosts="all",
+                resolved_hosts=["ds9"],
+                tasks=play1_tasks,
+            ),
+            PlayDefinition(
+                id="p2",
+                name="Later play",
+                hosts="all",
+                resolved_hosts=["ds9"],
+                tasks=play2_tasks,
+            ),
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-06-24T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-06-24T10:00:01Z",
+                "play": {"id": "p1", "name": "Create nfs share"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-06-24T10:04:00Z",
+                "task": {"id": "t0", "name": "play1 direct task 0"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-06-24T10:04:01Z",
+                "host": "ds9",
+                "task": {"id": "t0", "name": "play1 direct task 0"},
+                "play": {"id": "p1"},
+            }
+        )
+        # Budget=10 fits playbook (1) + play 1 (1) + 5 tasks + host + outer footer = 9 lines.
+        projection = TreeProjection.from_run_state(state)
+        lines = projection.tree_lines(budget=10)
+
+        more_lines = [ln for ln in lines if ln.kind == "more"]
+        # Exactly one footer at depth 0 (the outer footer)
+        assert len(more_lines) == 1, (
+            f"expected only 1 outer footer; got {[ln.label for ln in more_lines]}"
+        )
+        assert more_lines[0].depth == 0
+        # 10 (play 1) + 3000 (play 2) = 3010 total. Visible tasks = 5 (tasks 0..4).
+        # Remaining = 3010 - 5 = 3005.
+        assert more_lines[0].label == "… and 3005 more tasks"

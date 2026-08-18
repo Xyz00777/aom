@@ -1473,7 +1473,7 @@ class TreeProjection:
             result.insert(insert_after + 1 + offset, footer)
             offset_at_position[insert_after] = offset + 1
 
-        if inner_idx is not None and role_chain:
+        if inner_idx is not None:
             replacements: list[TreeLine] = []
             for role in reversed(role_chain):
                 total = role_total_tasks.get(role, 0)
@@ -1489,24 +1489,23 @@ class TreeProjection:
                         break
                 assert role_depth is not None
                 replacements.append(_more_footer(depth=role_depth + 1, count=remaining))
-            if replacements:
-                # The inner footer was at ``inner_idx`` in the
-                # original ``lines``. Head footers inserted before
-                # that position shift it right, so compute the
-                # adjusted index rather than searching for the
-                # first ``more`` line with ``depth > 0`` (which
-                # would incorrectly match a head footer instead of
-                # the inner footer).
-                shift = 0
-                local_offsets: dict[int, int] = {}
-                for insert_after, _ in head_footers:
-                    off = local_offsets.get(insert_after, 0)
-                    insert_pos = insert_after + 1 + off
-                    if insert_pos <= inner_idx + shift:
-                        shift += 1
-                    local_offsets[insert_after] = off + 1
-                cur_inner_idx = inner_idx + shift
-                result = result[:cur_inner_idx] + replacements + result[cur_inner_idx + 1 :]
+            # The inner footer was at ``inner_idx`` in the
+            # original ``lines``. Head footers inserted before
+            # that position shift it right, so compute the
+            # adjusted index rather than searching for the
+            # first ``more`` line with ``depth > 0`` (which
+            # would incorrectly match a head footer instead of
+            # the inner footer).
+            shift = 0
+            local_offsets: dict[int, int] = {}
+            for insert_after, _ in head_footers:
+                off = local_offsets.get(insert_after, 0)
+                insert_pos = insert_after + 1 + off
+                if insert_pos <= inner_idx + shift:
+                    shift += 1
+                local_offsets[insert_after] = off + 1
+            cur_inner_idx = inner_idx + shift
+            result = result[:cur_inner_idx] + replacements + result[cur_inner_idx + 1 :]
 
         outer_idx: int | None = None
         for j, ln in enumerate(result):
