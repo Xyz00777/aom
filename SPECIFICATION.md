@@ -182,6 +182,7 @@ from typing import Literal
 
 RenderMode = Literal["compact", "tui", "json"]
 
+
 def create_renderer(
     mode: RenderMode | None = None,
     is_tty: bool = True,
@@ -195,11 +196,14 @@ def create_renderer(
     """
     if mode == "tui":
         from ansible_aom.tui.app import AOMApp
+
         return AOMApp()
     if mode == "json":
         from ansible_aom.formats.json import JsonRenderer
+
         return JsonRenderer()
     from ansible_aom.compact.renderer import CompactRenderer
+
     return CompactRenderer(is_tty=is_tty, hide_states=hide_states or [])
 ```
 
@@ -394,17 +398,17 @@ The "pass-through" pattern — pause rendering, let user interact with terminal,
 def _handle_password_prompt(self, child: pexpect.spawn):
     # 1. Stop the live rendering
     self.live.stop()
-    
+
     # 2. Show any buffered prompt text from pexpect
     sys.stdout.write(child.before)
     sys.stdout.flush()
-    
+
     # 3. Let getpass handle input (reads from /dev/tty, handles masking)
-    password = getpass.getpass('')
-    
+    password = getpass.getpass("")
+
     # 4. Send password to the PTY subprocess
     child.sendline(password)
-    
+
     # 5. Resume rendering
     self.live.start()
 ```
@@ -821,22 +825,21 @@ Before execution, AOM runs TWO discovery commands in parallel:
 
 import asyncio
 
+
 async def pre_parse(playbook: Path, inventory_args: list[str]) -> PreParseResult:
     """Run --list-tasks and --list-hosts in parallel."""
-    base_cmd = ['ansible-playbook', str(playbook)] + inventory_args
-    
+    base_cmd = ["ansible-playbook", str(playbook)] + inventory_args
+
     tasks_proc = await asyncio.create_subprocess_exec(
-        *base_cmd, '--list-tasks',
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        *base_cmd, "--list-tasks", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
     hosts_proc = await asyncio.create_subprocess_exec(
-        *base_cmd, '--list-hosts',
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        *base_cmd, "--list-hosts", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
-    
+
     tasks_out, _ = await tasks_proc.communicate()
     hosts_out, _ = await hosts_proc.communicate()
-    
+
     return PreParseResult(
         plays=parse_list_tasks(tasks_out.decode()),
         play_hosts=parse_list_hosts(hosts_out.decode()),
@@ -878,7 +881,7 @@ if not matched_definition:
         play_id=parent_task.play_id,
         play_order=parent_task.play_order,
         task_order=-1,  # Sentinel for dynamic tasks
-        is_dynamic=True
+        is_dynamic=True,
     )
     parent_task.children.append(dynamic_task)
 ```
@@ -916,46 +919,49 @@ playbook: deploy.yml
 ```python
 import re
 
-LIST_HOSTS_PLAY_PATTERN = re.compile(
-    r'^  play #(\d+) \(([^)]+)\): ([^\t]+)\tTAGS: \[([^\]]*)\]'
-)
+LIST_HOSTS_PLAY_PATTERN = re.compile(r"^  play #(\d+) \(([^)]+)\): ([^\t]+)\tTAGS: \[([^\]]*)\]")
+
 
 def parse_list_hosts(output: str) -> dict[int, list[str]]:
     """Parse --list-hosts output into {play_number: [hostnames]}.
-    
+
     Returns a mapping of play sequence number to list of resolved hostnames.
     """
     result: dict[int, list[str]] = {}
     current_play: int | None = None
     current_hosts: list[str] = []
     past_header = False
-    
+
     for line in output.splitlines():
         if match := LIST_HOSTS_PLAY_PATTERN.match(line):
             # Save previous play's hosts
             if current_play is not None:
                 result[current_play] = current_hosts
-            
+
             current_play = int(match.group(1))
             current_hosts = []
             past_header = True
-            
+
         elif past_header and current_play is not None:
             stripped = line.strip()
             # Skip 'pattern:', 'hosts (N):', and 'tasks:' lines
-            if stripped.startswith('pattern:') or stripped.startswith('hosts') or stripped.startswith('tasks:'):
+            if (
+                stripped.startswith("pattern:")
+                or stripped.startswith("hosts")
+                or stripped.startswith("tasks:")
+            ):
                 continue
             # Skip blank lines
             if not stripped:
                 continue
             # Hostname line (6-space indent)
-            if line.startswith('      ') and not line.strip().startswith('#'):
+            if line.startswith("      ") and not line.strip().startswith("#"):
                 current_hosts.append(stripped)
-    
+
     # Save last play
     if current_play is not None:
         result[current_play] = current_hosts
-    
+
     return result
 ```
 
@@ -1032,29 +1038,28 @@ The `ansible-playbook --list-tasks` command has specific output characteristics 
 import re
 
 # Play pattern: 2-space indent, "play #N", hosts in parens, name, TAB, TAGS
-PLAY_PATTERN = re.compile(
-    r'^  play #(\d+) \(([^)]+)\): ([^\t]+)\tTAGS: \[([^\]]*)\]'
-)
+PLAY_PATTERN = re.compile(r"^  play #(\d+) \(([^)]+)\): ([^\t]+)\tTAGS: \[([^\]]*)\]")
 
 # Task pattern: 6-space indent, optional role prefix, task name, TAB, TAGS
-TASK_PATTERN = re.compile(
-    r'^      (?:([^ ]+) : )?([^\t]+)\tTAGS: \[([^\]]*)\]'
-)
+TASK_PATTERN = re.compile(r"^      (?:([^ ]+) : )?([^\t]+)\tTAGS: \[([^\]]*)\]")
+
 
 def parse_list_tasks(output: str) -> list[PlayDefinition]:
     """Parse --list-tasks output into structured format."""
     plays = []
     for line in output.splitlines():
-        if line.startswith('playbook:'):
+        if line.startswith("playbook:"):
             continue  # Skip header
         if match := PLAY_PATTERN.match(line):
-            plays.append(PlayDefinition(
-                id=match.group(1),
-                hosts=match.group(2),
-                name=match.group(3).strip(),
-                tags=parse_tags(match.group(4)),
-                tasks=[]
-            ))
+            plays.append(
+                PlayDefinition(
+                    id=match.group(1),
+                    hosts=match.group(2),
+                    name=match.group(3).strip(),
+                    tags=parse_tags(match.group(4)),
+                    tasks=[],
+                )
+            )
         elif match := TASK_PATTERN.match(line):
             role = match.group(1)  # None if no role prefix
             task_name = match.group(2).strip()
@@ -1087,23 +1092,23 @@ When 5+ consecutive tasks share the same role, group them:
 @work(thread=True, exclusive=True)
 def run_playbook(self, playbook: Path) -> None:
     worker = get_current_worker()
-    
+
     child = pexpect.spawn(
-        'ansible-playbook',
+        "ansible-playbook",
         [str(playbook)],
-        encoding='utf-8',
+        encoding="utf-8",
         timeout=300,
-        env={'ANSIBLE_STDOUT_CALLBACK': 'ansible.posix.jsonl', **os.environ}
+        env={"ANSIBLE_STDOUT_CALLBACK": "ansible.posix.jsonl", **os.environ},
     )
-    
+
     while True:
         if worker.is_cancelled:
             child.sendintr()
             child.close()
             return
-        
+
         try:
-            index = child.expect([pexpect.EOF, '\n'], timeout=0.1)
+            index = child.expect([pexpect.EOF, "\n"], timeout=0.1)
             if index == 0:  # EOF
                 break
             line = child.before.strip()
@@ -1137,10 +1142,12 @@ The PTY stream from `ansible-playbook` has three temporal phases that require di
 ```python
 from enum import Enum, auto
 
+
 class StreamPhase(Enum):
     PRE_RUN_PROMPTS = auto()  # Before v2_playbook_on_start
-    EXECUTION = auto()       # JSONL events flowing
+    EXECUTION = auto()  # JSONL events flowing
     POST_RUN_RECAP = auto()  # After v2_playbook_on_stats
+
 
 class PtyStreamParser:
     def __init__(self):
@@ -1151,11 +1158,11 @@ class PtyStreamParser:
         self._warnings: list[WarningEntry] = []
         self._plaintext_lines: list[str] = []
         self._current_timestamp: datetime | None = None  # Updated on each event
-    
+
     def feed_line(self, line: str) -> list[dict]:
         """Parse a line and return zero or more events."""
         events = []
-        
+
         if self.phase == StreamPhase.PRE_RUN_PROMPTS:
             if self._is_jsonl_start_event(line):
                 self.phase = StreamPhase.EXECUTION
@@ -1163,7 +1170,7 @@ class PtyStreamParser:
             else:
                 # Buffer non-JSON (password prompts, warnings)
                 self._handle_plaintext(line)
-        
+
         elif self.phase == StreamPhase.EXECUTION:
             if self._is_jsonl_stats_event(line):
                 events.append(self._parse_json(line))
@@ -1173,33 +1180,33 @@ class PtyStreamParser:
             else:
                 # Interleaved plaintext
                 self._handle_plaintext(line)
-        
+
         elif self.phase == StreamPhase.POST_RUN_RECAP:
             # Plaintext PLAY RECAP or process exit
             self._handle_recap_output(line)
-        
+
         return events
 
     # Plaintext classification patterns
     PASSWORD_PATTERNS = [
-        r'Vault password: ',
-        r'Vault password \([^)]+\): ',
-        r'SSH password: ',
-        r'BECOME password: ',
-        r'BECOME password\[defaults to SSH password\]: ',
-        r'New Vault password: ',
-        r'Confirm New Vault password: ',
+        r"Vault password: ",
+        r"Vault password \([^)]+\): ",
+        r"SSH password: ",
+        r"BECOME password: ",
+        r"BECOME password\[defaults to SSH password\]: ",
+        r"New Vault password: ",
+        r"Confirm New Vault password: ",
     ]
-    RECAP_PATTERN = re.compile(r'^PLAY RECAP \*{5,}')
+    RECAP_PATTERN = re.compile(r"^PLAY RECAP \*{5,}")
     WARNING_PATTERNS = [
-        r'^\[WARNING\]:',
-        r'^\[DEPRECATION WARNING\]:',
-        r'^\[DEPRECATED\]:',
+        r"^\[WARNING\]:",
+        r"^\[DEPRECATION WARNING\]:",
+        r"^\[DEPRECATED\]:",
     ]
-    
+
     def _handle_plaintext(self, line: str) -> None:
         """Classify and handle non-JSON lines from PTY stream.
-        
+
         Lines are classified into:
         - Password prompts: Routed to password handler
         - PLAY RECAP: Collected separately (Phase 3)
@@ -1210,29 +1217,31 @@ class PtyStreamParser:
         if any(re.search(p, line) for p in self.PASSWORD_PATTERNS):
             self._pending_password_prompt = line
             return
-        
+
         # Check for PLAY RECAP
         if self.RECAP_PATTERN.match(line):
             self._in_recap = True
-        
+
         if self._in_recap:
             self._recap_lines.append(line)
             return
-        
+
         # Check for warnings and classify type
         if any(re.search(p, line) for p in self.WARNING_PATTERNS):
             # Determine if this is a deprecation or regular warning
             is_deprecation = bool(
-                re.search(r'^\[DEPRECATION WARNING\]:', line) or
-                re.search(r'^\[DEPRECATED\]:', line)
+                re.search(r"^\[DEPRECATION WARNING\]:", line)
+                or re.search(r"^\[DEPRECATED\]:", line)
             )
-            self._warnings.append(WarningEntry(
-                type=WarningType.DEPRECATION if is_deprecation else WarningType.WARNING,
-                message=line,
-                timestamp=self._current_timestamp,
-                source="controller",  # PTY stream warnings come from controller
-            ))
-        
+            self._warnings.append(
+                WarningEntry(
+                    type=WarningType.DEPRECATION if is_deprecation else WarningType.WARNING,
+                    message=line,
+                    timestamp=self._current_timestamp,
+                    source="controller",  # PTY stream warnings come from controller
+                )
+            )
+
         # All other plaintext: emit to log
         self._plaintext_lines.append(line)
 ```
@@ -1248,13 +1257,13 @@ class PtyStreamParser:
 **Password Prompt Patterns:**
 ```python
 PASSWORD_PATTERNS = [
-    r'Vault password: ',
-    r'Vault password \([^)]+\): ',     # vault_id variant
-    r'SSH password: ',
-    r'BECOME password: ',
-    r'BECOME password\[defaults to SSH password\]: ',
-    r'New Vault password: ',
-    r'Confirm New Vault password: ',
+    r"Vault password: ",
+    r"Vault password \([^)]+\): ",  # vault_id variant
+    r"SSH password: ",
+    r"BECOME password: ",
+    r"BECOME password\[defaults to SSH password\]: ",
+    r"New Vault password: ",
+    r"Confirm New Vault password: ",
 ]
 ```
 
@@ -1275,20 +1284,20 @@ The compact mode handles password prompts differently from TUI mode, using termi
 def handle_password_prompt(self, prompt_text: str, child: pexpect.spawn) -> str:
     # 1. Stop the Rich Live display
     self.live.stop()
-    
+
     # 2. Move cursor to bottom of screen for prompt
-    sys.stdout.write('\033[999;0H')  # Move to bottom
+    sys.stdout.write("\033[999;0H")  # Move to bottom
     sys.stdout.flush()
-    
+
     # 3. Let pexpect handle the prompt (reads from PTY)
-    child.sendline('')  # Trigger prompt display
-    
+    child.sendline("")  # Trigger prompt display
+
     # 4. Wait for password entry (getpass handles masking)
     # pexpect will capture the input
-    
+
     # 5. Resume Rich Live display
     self.live.start()
-    
+
     return password
 ```
 
@@ -1317,7 +1326,7 @@ if detected_password_prompt:
     result = {}
     self.app.call_from_thread(self.show_password_modal, prompt, event, result)
     event.wait(timeout=60)  # Block until user responds
-    password = result.get('password', '')
+    password = result.get("password", "")
     child.sendline(password)
 ```
 
@@ -1394,15 +1403,15 @@ If `res._ansible_no_log == True` in a JSONL event, AOM replaces the entire resul
 
 ```python
 # In event processor:
-if result.get('_ansible_no_log', False):
-    event['res'] = {'censored': '(no_log)'}
+if result.get("_ansible_no_log", False):
+    event["res"] = {"censored": "(no_log)"}
 ```
 
 Loop items are checked individually:
 ```python
-for i, item in enumerate(result.get('results', [])):
-    if isinstance(item, dict) and item.get('_ansible_no_log', False):
-        result['results'][i] = {'censored': '(no_log)'}
+for i, item in enumerate(result.get("results", [])):
+    if isinstance(item, dict) and item.get("_ansible_no_log", False):
+        result["results"][i] = {"censored": "(no_log)"}
 ```
 
 #### Layer 2: Pattern-Match Password Fields
@@ -1414,23 +1423,35 @@ import re
 
 # Ansible's password detection regex (from ansible.module_utils.basic)
 PASSWORD_MATCH = re.compile(
-    r'^(?:.+[-_\s])?pass(?:[-_\s]?(?:word|phrase|wrd|wd)?)(?:[-_\s].+)?$',
-    re.IGNORECASE
+    r"^(?:.+[-_\s])?pass(?:[-_\s]?(?:word|phrase|wrd|wd)?)(?:[-_\s].+)?$", re.IGNORECASE
 )
 
 # Known Ansible connection password fields
-ANSIBLE_PASSWORD_FIELDS = frozenset({
-    'ansible_ssh_pass', 'ansible_password',
-    'ansible_become_pass', 'ansible_become_password',
-    'ansible_vault_password',
-})
+ANSIBLE_PASSWORD_FIELDS = frozenset(
+    {
+        "ansible_ssh_pass",
+        "ansible_password",
+        "ansible_become_pass",
+        "ansible_become_password",
+        "ansible_vault_password",
+    }
+)
 
 # Common generic secret field names
-GENERIC_SECRET_FIELDS = frozenset({
-    'api_key', 'api_token', 'secret', 'secret_key',
-    'token', 'auth_token', 'access_token', 'private_key',
-    'credential', 'credentials',
-})
+GENERIC_SECRET_FIELDS = frozenset(
+    {
+        "api_key",
+        "api_token",
+        "secret",
+        "secret_key",
+        "token",
+        "auth_token",
+        "access_token",
+        "private_key",
+        "credential",
+        "credentials",
+    }
+)
 ```
 
 When a JSONL result event contains a dict with a key matching these patterns:
@@ -1438,7 +1459,8 @@ When a JSONL result event contains a dict with a key matching these patterns:
 - This applies recursively to nested dicts and lists
 
 ```python
-REDACTED = '********'
+REDACTED = "********"
+
 
 def redact_dict(data: dict, depth: int = 0) -> dict:
     """Recursively redact password fields in a dictionary."""
@@ -1447,9 +1469,11 @@ def redact_dict(data: dict, depth: int = 0) -> dict:
     result = {}
     for key, value in data.items():
         key_lower = key.lower()
-        if (key_lower in ANSIBLE_PASSWORD_FIELDS
+        if (
+            key_lower in ANSIBLE_PASSWORD_FIELDS
             or key_lower in GENERIC_SECRET_FIELDS
-            or PASSWORD_MATCH.match(key_lower)):
+            or PASSWORD_MATCH.match(key_lower)
+        ):
             result[key] = REDACTED
         elif isinstance(value, dict):
             result[key] = redact_dict(value, depth + 1)
@@ -1466,18 +1490,28 @@ Ansible's regex is broad (`pass` matches `passenger_version`, `bypass`, etc.). A
 
 ```python
 # Default whitelist — field names containing "pass" that are NOT passwords
-PASSWORD_WHITELIST = frozenset({
-    'passenger_version', 'passenger_pool', 'bypass', 'overpass',
-    'compass', 'underpass', 'passport_number',
-})
+PASSWORD_WHITELIST = frozenset(
+    {
+        "passenger_version",
+        "passenger_pool",
+        "bypass",
+        "overpass",
+        "compass",
+        "underpass",
+        "passport_number",
+    }
+)
+
 
 def should_redact(key: str) -> bool:
     key_lower = key.lower()
     if key_lower in PASSWORD_WHITELIST or key_lower in config.redaction.whitelist:
         return False
-    return (key_lower in ANSIBLE_PASSWORD_FIELDS
-            or key_lower in GENERIC_SECRET_FIELDS
-            or PASSWORD_MATCH.match(key_lower) is not None)
+    return (
+        key_lower in ANSIBLE_PASSWORD_FIELDS
+        or key_lower in GENERIC_SECRET_FIELDS
+        or PASSWORD_MATCH.match(key_lower) is not None
+    )
 ```
 
 #### Layer 3: Sanitize Command Strings
@@ -1487,19 +1521,20 @@ Commands and output strings may contain inline credentials. AOM applies regex sa
 ```python
 # URL-style credentials: protocol://user:password@host
 URL_CRED_PATTERN = re.compile(
-    r'([a-zA-Z]+://[^:]+:)([^@]+)(@)',
+    r"([a-zA-Z]+://[^:]+:)([^@]+)(@)",
 )
 
 # CLI --password=xxx, --token=xxx, --secret=xxx
 CLI_CRED_PATTERN = re.compile(
-    r'(--(?:password|pass|pwd|token|secret|key|api-key)\s*[=: ]+)\S+',
+    r"(--(?:password|pass|pwd|token|secret|key|api-key)\s*[=: ]+)\S+",
     re.IGNORECASE,
 )
 
+
 def sanitize_string(s: str) -> str:
     """Sanitize credentials in command/output strings."""
-    s = URL_CRED_PATTERN.sub(r'\1********\3', s)
-    s = CLI_CRED_PATTERN.sub(r'\1********', s)
+    s = URL_CRED_PATTERN.sub(r"\1********\3", s)
+    s = CLI_CRED_PATTERN.sub(r"\1********", s)
     return s
 ```
 
@@ -1510,8 +1545,8 @@ Applied to: `res.cmd`, `res.stdout`, `res.stderr`, `res.msg` fields.
 At `-vvv` verbosity, Ansible includes `invocation.module_args` in result events. AOM redacts this recursively:
 
 ```python
-if 'invocation' in result and 'module_args' in result['invocation']:
-    result['invocation']['module_args'] = redact_dict(result['invocation']['module_args'])
+if "invocation" in result and "module_args" in result["invocation"]:
+    result["invocation"]["module_args"] = redact_dict(result["invocation"]["module_args"])
 ```
 
 #### Redaction Scope (Where It Applies)
@@ -1552,6 +1587,7 @@ class RedactionConfig(BaseModel):
     custom_fields: list[str] = Field(default_factory=list)
     custom_patterns: list[dict[str, str]] = Field(default_factory=list)
 
+
 class AppConfig(BaseSettings):
     # ... existing fields ...
     redaction: RedactionConfig = Field(default_factory=RedactionConfig)
@@ -1589,16 +1625,19 @@ When JSONL events arrive, AOM matches them to `TaskDefinition` nodes via three p
 @dataclass
 class TaskDefinition:
     """Static task info from --list-tasks."""
+
     name: str
     role: str | None
     tags: list[str]
     play_id: str
-    play_order: int      # 0-indexed play position (for sequential matching)
-    task_order: int      # 0-indexed task position within play, or -1 for dynamic tasks
+    play_order: int  # 0-indexed play position (for sequential matching)
+    task_order: int  # 0-indexed task position within play, or -1 for dynamic tasks
     is_dynamic: bool = False  # True if created at runtime from include_tasks expansion
     uuid: str | None = None  # Task UUID from JSONL events (available after matching)
     path: str | None = None  # Task path in file:line format (available after matching)
-    children: list[TaskDefinition] = field(default_factory=list)  # Dynamic child tasks from include_tasks
+    children: list[TaskDefinition] = field(
+        default_factory=list
+    )  # Dynamic child tasks from include_tasks
 ```
 
 @dataclass
@@ -1991,7 +2030,7 @@ tree depth.
 **Content Handling:**
 ```python
 def append_line(self, line: str):
-    if line.strip().startswith('{'):
+    if line.strip().startswith("{"):
         try:
             event = json.loads(line)
             self._write_event(event)
@@ -2381,17 +2420,18 @@ async def test_app_renders():
 @pytest.fixture
 def mock_ansible_playbook(monkeypatch):
     """Mock pexpect.spawn for unit tests."""
+
     class MockSpawn:
         def __init__(self, *args, **kwargs):
             self.before = '{"_event": "v2_playbook_on_start", ...}'
             self.is_alive = False
-        
+
         def expect(self, patterns, timeout=None):
             return 0  # EOF
-        
+
         def close(self):
             pass
-    
+
     monkeypatch.setattr(pexpect, "spawn", MockSpawn)
 ```
 
@@ -2421,14 +2461,15 @@ Compact mode testing requires different strategies than TUI testing since there'
 from rich.console import Console
 from rich.text import Text
 
+
 def test_task_status_rendering():
     """Test that task states render correctly."""
     console = Console(width=80)
-    
+
     with console.capture() as capture:
         console.print("[green]●[/] Install nginx")
         console.print("[yellow]◐[/] Configure firewall")
-    
+
     output = capture.get()
     assert "Install nginx" in output
     assert "Configure firewall" in output
@@ -2466,7 +2507,7 @@ Diff output snapshot tests should capture the default view (all tasks shown, inc
 def test_diff_snapshot_all_tasks():
     """Test diff output shows all tasks by default."""
     diff_output = generate_diff(old_session, new_session)
-    
+
     # Default shows all tasks including unchanged
     assert diff_output == snapshot("""\
 ┌─ Task Diff: baseline → current ──────────────────────────────────┐
@@ -2479,10 +2520,11 @@ def test_diff_snapshot_all_tasks():
 └─────────────────────────────────────────────────────────────────────┘
 """)
 
+
 def test_diff_snapshot_changes_only():
     """Test --changes-only flag filters to show only changed tasks."""
     diff_output = generate_diff(old_session, new_session, changes_only=True)
-    
+
     # Filtered view hides unchanged tasks
     assert diff_output == snapshot("""\
 ┌─ Task Diff: baseline → current ──────────────────────────────────┐
@@ -2518,6 +2560,7 @@ def test_non_tty_output():
 import pexpect
 from unittest.mock import patch, MagicMock
 
+
 def test_renderer_handles_jsonl_stream():
     """Test renderer processes mock JSONL events."""
     events = [
@@ -2525,14 +2568,14 @@ def test_renderer_handles_jsonl_stream():
         {"_event": "v2_playbook_on_play_start", "play": {"name": "Setup"}},
         {"_event": "v2_runner_on_ok", "task": {"name": "Ping"}, "hosts": {"web1": {"ok": True}}},
     ]
-    
+
     mock_child = MagicMock()
     mock_child.before = "\n".join(json.dumps(e) for e in events)
-    
+
     renderer = CompactRenderer()
     for event in events:
         renderer.update_state(event)
-    
+
     # Verify state updates
     assert renderer.state.status == Status.COMPLETED
 ```
