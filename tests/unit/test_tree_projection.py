@@ -2223,20 +2223,22 @@ class TestTwoLevelTruncation:
         assert outer.kind == "more", f"last line must be outer footer; got {outer.kind}"
         assert outer.depth == 0, f"outer footer must be at depth=0; got {outer.depth}"
 
-        inner = lines[-2]
-        assert inner.kind == "more", f"second-to-last line must be inner footer; got {inner.kind}"
-        # Inner footer's depth equals the depth of the deepest visible
-        # non-footer line (could be a task, host, or role line). The
-        # algorithm uses the depth of the last line of the inner
-        # section verbatim — not the depth of a task specifically.
-        non_footer_lines = [ln for ln in lines if ln.kind != "more"]
-        deepest_visible_depth = max(ln.depth for ln in non_footer_lines)
-        assert inner.depth == deepest_visible_depth, (
-            f"inner footer depth ({inner.depth}) must match deepest visible "
-            f"line depth ({deepest_visible_depth})"
+        more_lines = [ln for ln in lines if ln.kind == "more"]
+        assert len(more_lines) == 3, (
+            f"must emit role, play, and outer footers; got {len(more_lines)}"
         )
 
-        above_inner = lines[-3]
+        role_inner = more_lines[0]
+        play_inner = more_lines[1]
+        non_footer_lines = [ln for ln in lines if ln.kind != "more"]
+        deepest_visible_depth = max(ln.depth for ln in non_footer_lines)
+        assert role_inner.depth == deepest_visible_depth, (
+            f"role inner footer depth ({role_inner.depth}) must match deepest visible "
+            f"line depth ({deepest_visible_depth})"
+        )
+        assert play_inner.depth == 2, f"play inner footer depth must be 2; got {play_inner.depth}"
+
+        above_inner = non_footer_lines[-1]
         assert above_inner.has_tail_after is True, (
             f"line above inner footer must have has_tail_after=True; got "
             f"has_tail_after={above_inner.has_tail_after} on "
@@ -2244,12 +2246,10 @@ class TestTwoLevelTruncation:
             f"label={above_inner.label!r})"
         )
 
-        # Inner footer's count is some non-zero positive number that
-        # reflects the dropped tail. T2 uses raw line-list delta.
         import re
 
-        m = re.match(r"… and (\d+) more tasks", inner.label)
-        assert m, f"inner footer label must match '… and N more tasks'; got {inner.label!r}"
+        m = re.match(r"… and (\d+) more tasks", role_inner.label)
+        assert m, f"inner footer label must match '… and N more tasks'; got {role_inner.label!r}"
         inner_count = int(m.group(1))
         assert inner_count > 0, f"inner footer count must be positive; got {inner_count}"
 
@@ -2513,8 +2513,8 @@ class TestTwoLevelTruncation:
         # sibling test ``test_inner_footer_emitted_when_cut_inside_role``
         # covers the layout contract.
         more_lines = [ln for ln in lines if ln.kind == "more"]
-        assert len(more_lines) == 2, (
-            f"sanity: cut-inside-role must emit both inner + outer footers; "
+        assert len(more_lines) == 3, (
+            f"sanity: cut-inside-role must emit role + play + outer footers; "
             f"got {len(more_lines)} footers in: "
             f"{[(ln.kind, ln.depth, ln.label) for ln in lines]}"
         )
@@ -3877,9 +3877,17 @@ class TestMultiLevelInnerFooters:
                     role_visible[role] = role_visible.get(role, 0) + 1
 
         # For each inner footer (deepest first), find the closest role
-        # ancestor in the line list — that's the role it reports for.
+        # or play ancestor in the line list — that's what it reports for.
         for footer in inner_footers:
             footer_idx = lines.index(footer)
+            if footer.depth == 2:
+                # Play-level inner footer
+                m = re.match(r"… and (\d+) more tasks", footer.label)
+                assert m
+                footer_count = int(m.group(1))
+                assert footer_count == 34
+                continue
+
             closest_role = None
             for j in range(footer_idx - 1, -1, -1):
                 if (
@@ -3908,8 +3916,8 @@ class TestMultiLevelInnerFooters:
             )
 
     def test_single_level_role_one_inner_footer(self) -> None:
-        """Regression guard: a single-level role cut still emits
-        exactly ONE inner footer (only one role ancestor exists).
+        """A single-level role cut emits one role footer at depth 3 and
+        one play footer at depth 2.
         """
 
         from ansible_aom.core.models import (
@@ -3974,8 +3982,8 @@ class TestMultiLevelInnerFooters:
 
         more_lines = [ln for ln in lines if ln.kind == "more"]
         inner_footers = [ln for ln in more_lines if ln.depth > 0]
-        assert len(inner_footers) == 1, (
-            f"single-role cut must emit exactly 1 inner footer; got "
+        assert len(inner_footers) == 2, (
+            f"single-role cut must emit role footer (depth 3) and play footer (depth 2); got "
             f"{len(inner_footers)}: "
             f"{[(ln.depth, ln.label) for ln in inner_footers]}"
         )
@@ -4535,3 +4543,114 @@ class TestMultiPlayTruncationWithRoleFooters:
         # 10 (play 1) + 3000 (play 2) = 3010 total. Visible tasks = 5.
         # Remaining across all plays = 3010 - 5 = 3005.
         assert outer_footer.label == "… and 3005 more tasks"
+
+    def test_all_hierarchy_levels_emitted_when_cut_inside_nested_role(self) -> None:
+        """When a cut lands inside a nested role (podman > angie > play),
+        all hierarchical levels emit their remaining footers:
+        - Level 3 (podman): depth 4
+        - Level 2 (angie): depth 3
+        - Level 1 (play): depth 2
+        - Level 0 (playbook): depth 0
+        """
+        podman_tasks = [
+            TaskDefinition(
+                name=f"podman task {i}",
+                role="podman",
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=i,
+            )
+            for i in range(31)
+        ]
+        podman_role = RoleGroupDefinition(
+            role="podman", tasks=podman_tasks, parent="angie_ssl_terminator"
+        )
+        angie_direct = [
+            TaskDefinition(
+                name=f"angie task {i}",
+                role="angie_ssl_terminator",
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=31 + i,
+            )
+            for i in range(7)
+        ]
+        angie_role = RoleGroupDefinition(
+            role="angie_ssl_terminator", tasks=[podman_role] + angie_direct
+        )
+        play2_tasks = [
+            TaskDefinition(
+                name=f"play2 task {i}",
+                role=None,
+                tags=[],
+                play_id="p2",
+                play_order=1,
+                task_order=i,
+            )
+            for i in range(3000)
+        ]
+
+        state = RunState(playbook="main.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy Keepalived for Proxmox VIP",
+                hosts="all",
+                resolved_hosts=["ds5"],
+                tasks=[angie_role],
+            ),
+            PlayDefinition(
+                id="p2",
+                name="Later play",
+                hosts="all",
+                resolved_hosts=["ds5"],
+                tasks=play2_tasks,
+            ),
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-06-24T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-06-24T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy Keepalived for Proxmox VIP"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-06-24T10:04:00Z",
+                "task": {"id": "t0", "name": "podman task 0"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-06-24T10:04:01Z",
+                "host": "ds5",
+                "task": {"id": "t0", "name": "podman task 0"},
+                "play": {"id": "p1"},
+            }
+        )
+
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=10)
+
+        more_lines = [ln for ln in lines if ln.kind == "more"]
+        # Expected: podman (depth 4), angie (depth 3), play (depth 2), playbook (depth 0)
+        assert len(more_lines) == 4, (
+            f"expected 4 footers (depths 4, 3, 2, 0); got {[ln.label for ln in more_lines]}"
+        )
+        assert more_lines[0].depth == 4
+        assert more_lines[0].label == "… and 28 more tasks"
+
+        assert more_lines[1].depth == 3
+        assert more_lines[1].label == "… and 35 more tasks"
+
+        assert more_lines[2].depth == 2
+        assert more_lines[2].label == "… and 35 more tasks"
+
+        assert more_lines[3].depth == 0
+        assert more_lines[3].label == "… and 3035 more tasks"

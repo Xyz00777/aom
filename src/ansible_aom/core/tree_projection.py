@@ -1540,36 +1540,37 @@ class TreeProjection:
                             break
                     assert role_depth is not None
                     replacements.append(_more_footer(depth=role_depth + 1, count=remaining))
-            else:
-                # Direct tasks under a play (no role).
-                play_totals = self._build_play_total_tasks()
-                play_completed_tasks = self._count_completed_tasks_per_play()
-                play_visible_tasks = self._count_visible_tasks_per_play(lines)
-                play_name: str | None = None
-                play_depth = 1
-                for j in range(inner_idx - 1, -1, -1):
-                    if lines[j].kind == "play":
-                        if lines[j].label.startswith("play: "):
-                            play_name = lines[j].label[len("play: ") :]
-                        play_depth = lines[j].depth
-                        break
-                if play_name is not None:
-                    total = play_totals.get(play_name, 0)
-                    if total == 0:
-                        for pname, cnt in play_totals.items():
-                            if self._play_def_matches_visible(pname, {play_name}):
-                                total = cnt
-                                break
-                    completed = play_completed_tasks.get(play_name, 0)
-                    if completed == 0:
-                        for pname, cnt in play_completed_tasks.items():
-                            if self._play_def_matches_visible(pname, {play_name}):
-                                completed = cnt
-                                break
-                    visible = play_visible_tasks.get(play_name, 0)
-                    remaining = total - completed - visible
-                    if remaining > 0:
-                        replacements.append(_more_footer(depth=play_depth + 1, count=remaining))
+
+            # Enclosing play footer at play_depth + 1
+            play_totals = self._build_play_total_tasks()
+            play_completed_tasks = self._count_completed_tasks_per_play()
+            play_visible_tasks = self._count_visible_tasks_per_play(lines)
+            play_name: str | None = None
+            play_depth = 1
+            for j in range(inner_idx - 1, -1, -1):
+                if lines[j].kind == "play":
+                    if lines[j].label.startswith("play: "):
+                        play_name = lines[j].label[len("play: ") :]
+                    play_depth = lines[j].depth
+                    break
+            if play_name is not None:
+                total = play_totals.get(play_name, 0)
+                if total == 0:
+                    for pname, cnt in play_totals.items():
+                        if self._play_def_matches_visible(pname, {play_name}):
+                            total = cnt
+                            break
+                completed = play_completed_tasks.get(play_name, 0)
+                if completed == 0:
+                    for pname, cnt in play_completed_tasks.items():
+                        if self._play_def_matches_visible(pname, {play_name}):
+                            completed = cnt
+                            break
+                visible = play_visible_tasks.get(play_name, 0)
+                remaining = total - completed - visible
+                if remaining > 0:
+                    replacements.append(_more_footer(depth=play_depth + 1, count=remaining))
+
             # The inner footer was at ``inner_idx`` in the
             # original ``lines``. Head footers inserted before
             # that position shift it right, so compute the
