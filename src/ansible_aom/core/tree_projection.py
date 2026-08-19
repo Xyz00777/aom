@@ -2338,6 +2338,11 @@ class TreeProjection:
                 return "running" if runtime.status == Status.RUNNING else "pending"
             if any(hs.status == Status.RUNNING for hs in runtime.hosts.values()):
                 return "running"
+            # In multi-host runs (e.g. strategy: free or serial/throttle), keep the task
+            # in-progress if some targeted hosts are still trailing behind and have
+            # not yet reached or passed this task.
+            if runtime.task_id and not task_complete_on_all_targets(self._state, runtime.task_id):
+                return "running"
             # A task with at least one FAILED or UNREACHABLE host stays visible
             # in the tree while no further task has started or is running,
             # so the user can see the failure summary during the gap (TC-329).

@@ -4840,3 +4840,218 @@ class TestMultiPlayTruncationWithRoleFooters:
         # Real pending tasks SHOULD appear
         assert any("Gather facts" in lbl for lbl in labels)
         assert any("Install software" in lbl for lbl in labels)
+
+    def test_free_strategy_task_stays_visible_while_trailing_hosts_pending(self) -> None:
+        """Under strategy: free, when host1 finishes Task 1 and moves to Task 2,
+        Task 1 must stay visible in the live tree as (1 ok, 1 pending) as long
+        as host2 has not yet reached Task 1."""
+        tasks = [
+            TaskDefinition(
+                name="Task 1",
+                role=None,
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=0,
+            ),
+            TaskDefinition(
+                name="Task 2",
+                role=None,
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=1,
+            ),
+            TaskDefinition(
+                name="Task 3",
+                role=None,
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=2,
+            ),
+        ]
+        state = RunState(playbook="main.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Free Play",
+                hosts="all",
+                resolved_hosts=["host1", "host2"],
+                tasks=tasks,
+            ),
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-06-24T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-06-24T10:00:01Z",
+                "play": {"id": "p1", "name": "Free Play"},
+            }
+        )
+        # host1 runs Task 1 and finishes it
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-06-24T10:00:02Z",
+                "task": {"id": "t1", "name": "Task 1"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-06-24T10:00:03Z",
+                "host": "host1",
+                "task": {"id": "t1", "name": "Task 1"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-06-24T10:00:04Z",
+                "host": "host1",
+                "task": {"id": "t1", "name": "Task 1"},
+                "play": {"id": "p1"},
+            }
+        )
+        # host1 advances to Task 2 (currently running)
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-06-24T10:00:05Z",
+                "task": {"id": "t2", "name": "Task 2"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-06-24T10:00:06Z",
+                "host": "host1",
+                "task": {"id": "t2", "name": "Task 2"},
+                "play": {"id": "p1"},
+            }
+        )
+
+        # host2 has NOT started Task 1 yet.
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=20)
+        labels = [ln.label for ln in lines if ln.kind == "task"]
+
+        # Task 1 must stay visible because host2 has not executed it yet!
+        assert any("Task 1" in lbl for lbl in labels), f"Task 1 should be visible, got {labels}"
+        # Task 2 is running on host1
+        assert any("Task 2" in lbl for lbl in labels), f"Task 2 should be visible, got {labels}"
+        # Task 3 is pending
+        assert any("Task 3" in lbl for lbl in labels), f"Task 3 should be visible, got {labels}"
+
+    def test_free_strategy_run_once_task_retires_when_all_hosts_pass(self) -> None:
+        """When all active hosts in the play have reached or passed a task's index,
+        a single-host/run_once task retires even if not all play targets ran it."""
+        tasks = [
+            TaskDefinition(
+                name="Task 1",
+                role=None,
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=0,
+            ),
+            TaskDefinition(
+                name="Task 2 Run Once",
+                role=None,
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=1,
+            ),
+            TaskDefinition(
+                name="Task 3",
+                role=None,
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=2,
+            ),
+        ]
+        state = RunState(playbook="main.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Free Play",
+                hosts="all",
+                resolved_hosts=["host1", "host2"],
+                tasks=tasks,
+            ),
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-06-24T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-06-24T10:00:01Z",
+                "play": {"id": "p1", "name": "Free Play"},
+            }
+        )
+        # host1 and host2 both finish Task 1
+        for h in ["host1", "host2"]:
+            state.handle_event(
+                {
+                    "_event": "v2_runner_on_start",
+                    "_timestamp": "2026-06-24T10:00:02Z",
+                    "host": h,
+                    "task": {"id": "t1", "name": "Task 1"},
+                    "play": {"id": "p1"},
+                }
+            )
+            state.handle_event(
+                {
+                    "_event": "v2_runner_on_ok",
+                    "_timestamp": "2026-06-24T10:00:03Z",
+                    "hosts": {h: {}},
+                    "task": {"id": "t1", "name": "Task 1"},
+                    "play": {"id": "p1"},
+                }
+            )
+        # host1 runs Task 2 (run_once) and finishes it
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-06-24T10:00:04Z",
+                "host": "host1",
+                "task": {"id": "t2", "name": "Task 2 Run Once"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-06-24T10:00:05Z",
+                "hosts": {"host1": {}},
+                "task": {"id": "t2", "name": "Task 2 Run Once"},
+                "play": {"id": "p1"},
+            }
+        )
+        # Now BOTH host1 and host2 start Task 3 (index 2 > 1)
+        for h in ["host1", "host2"]:
+            state.handle_event(
+                {
+                    "_event": "v2_runner_on_start",
+                    "_timestamp": "2026-06-24T10:00:06Z",
+                    "host": h,
+                    "task": {"id": "t3", "name": "Task 3"},
+                    "play": {"id": "p1"},
+                }
+            )
+
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=20)
+        labels = [ln.label for ln in lines if ln.kind == "task"]
+
+        # Task 2 Run Once should be completed/retired because all hosts passed index 1!
+        assert not any("Task 2 Run Once" in lbl for lbl in labels), (
+            f"Task 2 Run Once should be retired, got {labels}"
+        )
+        # Task 3 should be visible
+        assert any("Task 3" in lbl for lbl in labels)
