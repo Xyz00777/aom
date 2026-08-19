@@ -151,3 +151,186 @@ def format_diagnostics_section(record: dict[str, Any] | None) -> str:
         lines.append(f"Session recording disabled mid-run: {reason}")
 
     return "\n".join(lines) + "\n"
+
+
+def format_changes_section(
+    records: list[Any],
+    *,
+    session_id: str | None = None,
+    show_diff: bool = False,
+) -> str:
+    """Format TaskChangeRecords as human-readable plain text."""
+    lines: list[str] = []
+    if session_id:
+        lines.append(f"Session: {session_id}")
+    lines.append(f"Changed Tasks ({len(records)}):")
+    if not records:
+        lines.append("  No tasks reported changed status.")
+        return "\n".join(lines) + "\n"
+
+    for idx, rec in enumerate(records, 1):
+        lines.append("")
+        lines.append(f"[{idx}] {rec.task_name}")
+        lines.append(f"    Play:     {rec.play_name}")
+        if rec.role:
+            lines.append(f"    Role:     {rec.role}")
+        if rec.file_line:
+            lines.append(f"    File:     {rec.file_line}")
+        if rec.action:
+            lines.append(f"    Action:   {rec.action}")
+        lines.append(f"    Host:     {rec.host}")
+
+        if rec.cmd:
+            lines.append(f"    Command:  {rec.cmd}")
+        if rec.msg:
+            lines.append(f"    Message:  {rec.msg}")
+        if rec.details:
+            det_parts = [f"{k}={v}" for k, v in sorted(rec.details.items())]
+            lines.append(f"    Details:  {' '.join(det_parts)}")
+
+        if rec.changed_items:
+            lines.append(f"    Changed items ({len(rec.changed_items)}):")
+            for item in rec.changed_items:
+                lines.append(f"      • {item.label}")
+                if item.msg:
+                    lines.append(f"          msg: {item.msg}")
+
+        if rec.stdout:
+            lines.append("    Stdout:")
+            for line in rec.stdout.splitlines():
+                lines.append(f"      {line}")
+        if rec.stderr:
+            lines.append("    Stderr:")
+            for line in rec.stderr.splitlines():
+                lines.append(f"      {line}")
+
+        if show_diff and rec.diff:
+            lines.append("    Diff:")
+            if isinstance(rec.diff, list):
+                for d in rec.diff:
+                    if isinstance(d, dict):
+                        b_hdr = d.get("before_header") or d.get("before")
+                        a_hdr = d.get("after_header") or d.get("after")
+                        if "before" in d and "after" in d:
+                            lines.append(f"      --- before: {b_hdr}")
+                            lines.append(f"      +++ after:  {a_hdr}")
+                            for line_str in str(d["before"]).splitlines():
+                                lines.append(f"      - {line_str}")
+                            for line_str in str(d["after"]).splitlines():
+                                lines.append(f"      + {line_str}")
+                        elif "prepared" in d:
+                            for line_str in str(d["prepared"]).splitlines():
+                                lines.append(f"      {line_str}")
+                    else:
+                        lines.append(f"      {d}")
+            elif isinstance(rec.diff, dict):
+                if "prepared" in rec.diff:
+                    for line_str in str(rec.diff["prepared"]).splitlines():
+                        lines.append(f"      {line_str}")
+                elif "before" in rec.diff and "after" in rec.diff:
+                    lines.append("      --- before")
+                    lines.append("      +++ after")
+                    for line_str in str(rec.diff["before"]).splitlines():
+                        lines.append(f"      - {line_str}")
+                    for line_str in str(rec.diff["after"]).splitlines():
+                        lines.append(f"      + {line_str}")
+            elif isinstance(rec.diff, str):
+                for line_str in rec.diff.splitlines():
+                    lines.append(f"      {line_str}")
+
+    return "\n".join(lines) + "\n"
+
+
+def format_changes_json(
+    records: list[Any],
+    *,
+    session_id: str | None = None,
+) -> dict[str, Any]:
+    """Serialize TaskChangeRecords to a dictionary for JSON output."""
+    changes: list[dict[str, Any]] = []
+    for r in records:
+        changes.append(
+            {
+                "play_name": r.play_name,
+                "role": r.role,
+                "task_name": r.task_name,
+                "file_line": r.file_line,
+                "action": r.action,
+                "host": r.host,
+                "duration_seconds": r.duration.total_seconds() if r.duration else None,
+                "cmd": r.cmd,
+                "msg": r.msg,
+                "stdout": r.stdout,
+                "stderr": r.stderr,
+                "diff": r.diff,
+                "changed_items": [
+                    {"label": it.label, "msg": it.msg, "stderr": it.stderr}
+                    for it in r.changed_items
+                ],
+                "details": r.details,
+            }
+        )
+    return {
+        "session_id": session_id,
+        "total_changes": len(records),
+        "changes": changes,
+    }
+
+
+def format_warnings_section(
+    records: list[Any],
+    *,
+    session_id: str | None = None,
+) -> str:
+    """Format WarningRecords as human-readable plain text."""
+    lines: list[str] = []
+    if session_id:
+        lines.append(f"Session: {session_id}")
+    lines.append(f"Warnings & Deprecations ({len(records)}):")
+    if not records:
+        lines.append("  No warnings or deprecations recorded.")
+        return "\n".join(lines) + "\n"
+
+    for idx, rec in enumerate(records, 1):
+        tag = "[DEPRECATION]" if rec.warning_type == "deprecation" else "[WARNING]"
+        lines.append("")
+        lines.append(f"[{idx}] {tag}")
+        if rec.task_name:
+            lines.append(f"    Task:     {rec.task_name}")
+        if rec.play_name:
+            lines.append(f"    Play:     {rec.play_name}")
+        if rec.role:
+            lines.append(f"    Role:     {rec.role}")
+        if rec.file_line:
+            lines.append(f"    File:     {rec.file_line}")
+        if rec.host:
+            lines.append(f"    Host:     {rec.host}")
+        lines.append(f"    Message:  {rec.message}")
+
+    return "\n".join(lines) + "\n"
+
+
+def format_warnings_json(
+    records: list[Any],
+    *,
+    session_id: str | None = None,
+) -> dict[str, Any]:
+    """Serialize WarningRecords to a dictionary for JSON output."""
+    warnings: list[dict[str, Any]] = []
+    for r in records:
+        warnings.append(
+            {
+                "warning_type": r.warning_type,
+                "message": r.message,
+                "play_name": r.play_name,
+                "role": r.role,
+                "task_name": r.task_name,
+                "file_line": r.file_line,
+                "host": r.host,
+            }
+        )
+    return {
+        "session_id": session_id,
+        "total_warnings": len(records),
+        "warnings": warnings,
+    }

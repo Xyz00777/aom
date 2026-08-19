@@ -1134,3 +1134,326 @@ def build_verbose_lines(
         task_id=task_id,
         host=host,
     )
+
+
+@dataclass(frozen=True)
+class TaskChangeRecord:
+    """Structured record of a task change on a specific host."""
+
+    play_name: str
+    role: str | None
+    task_name: str
+    file_line: str | None
+    action: str | None
+    host: str
+    duration: timedelta | None
+    cmd: str | None
+    msg: str | None
+    stdout: str | None
+    stderr: str | None
+    diff: str | dict | list | None
+    changed_items: tuple[LoopItem, ...]
+    details: dict[str, str]
+
+
+@dataclass(frozen=True)
+class WarningRecord:
+    """Structured record of a warning or deprecation notice."""
+
+    message: str
+    warning_type: Literal["warning", "deprecation"]
+    play_name: str | None
+    role: str | None
+    task_name: str | None
+    file_line: str | None
+    host: str | None
+
+
+def extract_changes(
+    session: dict | list[dict],
+    *,
+    host: str | None = None,
+    play_name: str | None = None,
+    task_name: str | None = None,
+) -> list[TaskChangeRecord]:
+    """Extract all task change records from a session dict or events list."""
+    events = session.get("events", []) if isinstance(session, dict) else session
+    records: list[TaskChangeRecord] = []
+
+    current_play_name = ""
+    task_starts: dict[str, dict] = {}
+
+    for event in events:
+        et = event.get("_event", "")
+        if et == "v2_playbook_on_play_start":
+            play = event.get("play") or {}
+            current_play_name = str(play.get("name", "unnamed play"))
+            continue
+
+        if et == "v2_playbook_on_task_start":
+            t_data = event.get("task")
+            if isinstance(t_data, dict):
+                tid = str(t_data.get("id", ""))
+                if tid:
+                    task_starts[tid] = {
+                        "name": str(t_data.get("name") or "unnamed task"),
+                        "path": t_data.get("path"),
+                        "role": t_data.get("role")
+                        or (_group_key(t_data) if _group_key(t_data) != "_root" else None),
+                        "start_ts": _parse_iso(event.get("_timestamp")),
+                        "play_name": current_play_name,
+                    }
+            continue
+
+        runner_et = _runner_event_type(event)
+        if not runner_et:
+            continue
+
+        task_data = event.get("task") or {}
+        tid = str(task_data.get("id", "")) if isinstance(task_data, dict) else ""
+        start_info = task_starts.get(tid, {})
+
+        t_name = str(
+            (task_data.get("name") if isinstance(task_data, dict) else None)
+            or start_info.get("name")
+            or "unnamed task"
+        )
+        t_path = (task_data.get("path") if isinstance(task_data, dict) else None) or start_info.get(
+            "path"
+        )
+        t_role = (task_data.get("role") if isinstance(task_data, dict) else None) or start_info.get(
+            "role"
+        )
+        if not t_role and isinstance(task_data, dict):
+            grp = _group_key(task_data)
+            if grp != "_root":
+                t_role = grp
+        p_name = start_info.get("play_name") or current_play_name
+
+        if play_name and p_name != play_name:
+            continue
+        if task_name and t_name != task_name:
+            continue
+
+        event_ts = _parse_iso(event.get("_timestamp"))
+        start_ts = start_info.get("start_ts")
+        duration = (
+            (event_ts - start_ts) if (event_ts and start_ts and event_ts >= start_ts) else None
+        )
+
+        hosts_data = event.get("hosts") or {}
+        for h_name, host_res in hosts_data.items():
+            if host and h_name != host:
+                continue
+            if not isinstance(host_res, dict):
+                continue
+            if not host_res.get("changed", False):
+                continue
+
+            action = (
+                host_res.get("action")
+                or host_res.get("_ansible_module_name")
+                or (task_data.get("action") if isinstance(task_data, dict) else None)
+            )
+            raw_cmd = host_res.get("cmd")
+            if isinstance(raw_cmd, list):
+                cmd_str = " ".join(str(c) for c in raw_cmd)
+            elif isinstance(raw_cmd, str):
+                cmd_str = raw_cmd
+            else:
+                cmd_str = None
+
+            msg = host_res.get("msg")
+            if isinstance(msg, list):
+                msg_str = "\n".join(str(m) for m in msg)
+            elif msg is not None:
+                msg_str = str(msg)
+            else:
+                msg_str = None
+
+            stdout = host_res.get("stdout")
+            if (
+                not stdout
+                and "stdout_lines" in host_res
+                and isinstance(host_res["stdout_lines"], list)
+            ):
+                stdout = "\n".join(str(line) for line in host_res["stdout_lines"])
+
+            stderr = host_res.get("stderr")
+            if (
+                not stderr
+                and "stderr_lines" in host_res
+                and isinstance(host_res["stderr_lines"], list)
+            ):
+                stderr = "\n".join(str(line) for line in host_res["stderr_lines"])
+
+            diff = host_res.get("diff")
+
+            results_arr = host_res.get("results")
+            changed_items: list[LoopItem] = []
+            if isinstance(results_arr, list):
+                for r in results_arr:
+                    if isinstance(r, dict) and r.get("changed"):
+                        changed_items.append(_make_loop_item(r))
+
+            details: dict[str, str] = {}
+            for k in ("dest", "path", "state", "mode", "owner", "group", "src", "before", "after"):
+                if k in host_res and host_res[k] is not None:
+                    details[k] = str(host_res[k])
+
+            records.append(
+                TaskChangeRecord(
+                    play_name=p_name,
+                    role=t_role,
+                    task_name=t_name,
+                    file_line=t_path,
+                    action=action,
+                    host=h_name,
+                    duration=duration,
+                    cmd=cmd_str,
+                    msg=msg_str,
+                    stdout=stdout,
+                    stderr=stderr,
+                    diff=diff,
+                    changed_items=tuple(changed_items),
+                    details=details,
+                )
+            )
+
+    return records
+
+
+def extract_warnings(
+    session: dict | list[dict],
+    *,
+    host: str | None = None,
+    play_name: str | None = None,
+    task_name: str | None = None,
+) -> list[WarningRecord]:
+    """Extract all warnings and deprecations from a session dict or events list."""
+    events = session.get("events", []) if isinstance(session, dict) else session
+    records: list[WarningRecord] = []
+
+    current_play_name = ""
+    task_starts: dict[str, dict] = {}
+
+    for event in events:
+        et = event.get("_event", "")
+        if et == "v2_playbook_on_play_start":
+            play = event.get("play") or {}
+            current_play_name = str(play.get("name", "unnamed play"))
+            continue
+
+        if et == "v2_playbook_on_task_start":
+            t_data = event.get("task")
+            if isinstance(t_data, dict):
+                tid = str(t_data.get("id", ""))
+                if tid:
+                    task_starts[tid] = {
+                        "name": str(t_data.get("name") or "unnamed task"),
+                        "path": t_data.get("path"),
+                        "role": t_data.get("role")
+                        or (_group_key(t_data) if _group_key(t_data) != "_root" else None),
+                        "play_name": current_play_name,
+                    }
+            continue
+
+        if et == "aom_stderr_line":
+            line = str(event.get("line") or "").strip()
+            if not line:
+                continue
+            w_type: Literal["warning", "deprecation"] | None = None
+            msg = line
+            if line.startswith("[DEPRECATION WARNING]"):
+                w_type = "deprecation"
+                msg = line.removeprefix("[DEPRECATION WARNING]").lstrip(": ").strip()
+            elif line.startswith("[WARNING]"):
+                w_type = "warning"
+                msg = line.removeprefix("[WARNING]").lstrip(": ").strip()
+
+            if w_type:
+                records.append(
+                    WarningRecord(
+                        message=msg,
+                        warning_type=w_type,
+                        play_name=current_play_name or None,
+                        role=None,
+                        task_name=None,
+                        file_line=None,
+                        host=None,
+                    )
+                )
+            continue
+
+        runner_et = _runner_event_type(event)
+        if not runner_et:
+            continue
+
+        task_data = event.get("task") or {}
+        tid = str(task_data.get("id", "")) if isinstance(task_data, dict) else ""
+        start_info = task_starts.get(tid, {})
+
+        t_name = str(
+            (task_data.get("name") if isinstance(task_data, dict) else None)
+            or start_info.get("name")
+            or "unnamed task"
+        )
+        t_path = (task_data.get("path") if isinstance(task_data, dict) else None) or start_info.get(
+            "path"
+        )
+        t_role = (task_data.get("role") if isinstance(task_data, dict) else None) or start_info.get(
+            "role"
+        )
+        if not t_role and isinstance(task_data, dict):
+            grp = _group_key(task_data)
+            if grp != "_root":
+                t_role = grp
+        p_name = start_info.get("play_name") or current_play_name
+
+        if play_name and p_name != play_name:
+            continue
+        if task_name and t_name != task_name:
+            continue
+
+        hosts_data = event.get("hosts") or {}
+        for h_name, host_res in hosts_data.items():
+            if host and h_name != host:
+                continue
+            if not isinstance(host_res, dict):
+                continue
+
+            for w in host_res.get("warnings") or []:
+                w_str = str(w).strip()
+                if w_str:
+                    records.append(
+                        WarningRecord(
+                            message=w_str,
+                            warning_type="warning",
+                            play_name=p_name or None,
+                            role=t_role,
+                            task_name=t_name,
+                            file_line=t_path,
+                            host=h_name,
+                        )
+                    )
+
+            for d in host_res.get("deprecations") or []:
+                if isinstance(d, dict):
+                    d_msg = d.get("msg") or str(d)
+                else:
+                    d_msg = str(d)
+                d_str = d_msg.strip()
+                if d_str:
+                    records.append(
+                        WarningRecord(
+                            message=d_str,
+                            warning_type="deprecation",
+                            play_name=p_name or None,
+                            role=t_role,
+                            task_name=t_name,
+                            file_line=t_path,
+                            host=h_name,
+                        )
+                    )
+
+    return records

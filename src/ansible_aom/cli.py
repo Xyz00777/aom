@@ -229,6 +229,9 @@ Examples:
   aom playbook.yml -vvv --tags=deploy   …including ansible-playbook's own -v / -vv / -vvv
   aom inspect                           Launch the Textual session viewer
   aom inspect --text                    Dump the most recent run as plain text
+  aom inspect --changes                 Show tasks that changed with details (idempotency check)
+  aom inspect --changes --diff          Show changed tasks with before/after diffs
+  aom inspect --warnings                Show all warnings and deprecations with file locations
   aom inspect prune --days 30           Delete sessions older than N days
   aom replay <session-id>               Replay a recorded session at original pace
   aom replay <session-id> --speed 10    Replay 10x faster

@@ -23,7 +23,14 @@ import argparse
 import sys
 from pathlib import Path
 
-from ansible_aom.inspect.formatters import format_diagnostics_section
+from ansible_aom.core.inspect_model import extract_changes, extract_warnings
+from ansible_aom.inspect.formatters import (
+    format_changes_json,
+    format_changes_section,
+    format_diagnostics_section,
+    format_warnings_json,
+    format_warnings_section,
+)
 from ansible_aom.inspect.text import render_session, render_session_from_index
 from ansible_aom.session.index import ensure_index, prewarm_parallel_pool
 from ansible_aom.session.store import (
@@ -43,6 +50,80 @@ def _stdout_is_tty() -> bool:
         return sys.stdout.isatty()
     except AttributeError, ValueError:
         return False
+
+
+def inspect_changes(
+    state_dir: Path,
+    session_id: str | None = None,
+    *,
+    host: str | None = None,
+    play_name: str | None = None,
+    task_name: str | None = None,
+    show_diff: bool = False,
+    as_json: bool = False,
+) -> int:
+    """Print tasks that changed in the session. Return exit code."""
+    target = session_id or find_latest_session(state_dir)
+    if target is None:
+        if as_json:
+            import json as _json
+
+            print(_json.dumps({"error": f"No sessions found in {state_dir}"}))
+        else:
+            print(f"No sessions found in {state_dir}")
+        return 0
+
+    session = load_session(target, state_dir)
+    if session is None:
+        print(f"Session not found: {target}", file=sys.stderr)
+        return 1
+
+    records = extract_changes(session, host=host, play_name=play_name, task_name=task_name)
+    if as_json:
+        import json as _json
+
+        print(_json.dumps(format_changes_json(records, session_id=target), indent=2))
+    else:
+        print(
+            format_changes_section(records, session_id=target, show_diff=show_diff),
+            end="",
+        )
+    return 0
+
+
+def inspect_warnings(
+    state_dir: Path,
+    session_id: str | None = None,
+    *,
+    host: str | None = None,
+    play_name: str | None = None,
+    task_name: str | None = None,
+    as_json: bool = False,
+) -> int:
+    """Print warnings and deprecations emitted during the session. Return exit code."""
+    target = session_id or find_latest_session(state_dir)
+    if target is None:
+        if as_json:
+            import json as _json
+
+            print(_json.dumps({"error": f"No sessions found in {state_dir}"}))
+        else:
+            print(f"No sessions found in {state_dir}")
+        return 0
+
+    session = load_session(target, state_dir)
+    if session is None:
+        print(f"Session not found: {target}", file=sys.stderr)
+        return 1
+
+    records = extract_warnings(session, host=host, play_name=play_name, task_name=task_name)
+    if as_json:
+        import json as _json
+
+        print(_json.dumps(format_warnings_json(records, session_id=target), indent=2))
+    else:
+        print(format_warnings_section(records, session_id=target), end="")
+    return 0
 
 
 def inspect_text(
@@ -160,16 +241,37 @@ def _build_parser() -> argparse.ArgumentParser:
         "(also implied when stdout is not a TTY).",
     )
     parser.add_argument(
+        "--changes",
+        action="store_true",
+        help="Print all tasks that reported changed status with their command and details.",
+    )
+    parser.add_argument(
+        "--diff",
+        action="store_true",
+        help="With --changes, include before/after diffs in the output.",
+    )
+    parser.add_argument(
+        "--warnings",
+        action="store_true",
+        help="Print all warnings and deprecations emitted during the session.",
+    )
+    parser.add_argument(
+        "--host",
+        dest="host",
+        default=None,
+        help="Filter changes, warnings, or verbose output to the named host.",
+    )
+    parser.add_argument(
         "--play",
         dest="play_name",
         default=None,
-        help="With --text, scope verbose output to the named play.",
+        help="With --text, --changes, or --warnings, scope output to the named play.",
     )
     parser.add_argument(
         "--task",
         dest="task_name",
         default=None,
-        help="With --text, scope verbose output to the named task.",
+        help="With --text, --changes, or --warnings, scope output to the named task.",
     )
     parser.add_argument(
         "--debug",
@@ -181,14 +283,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "--json",
         dest="as_json",
         action="store_true",
-        help="With --debug, emit the raw diagnostics.json record on stdout "
-        "instead of the human-readable summary (for jq pipelines).",
+        help="With --debug, --changes, or --warnings, emit output as JSON on stdout.",
     )
     parser.add_argument(
         "--session",
         dest="session_id",
         default=None,
-        help="Specific session ID (default: most recent). Used with --debug.",
+        help="Specific session ID (default: most recent).",
     )
     sub = parser.add_subparsers(dest="command", help="Subcommand")
 
@@ -211,6 +312,27 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.debug:
         return inspect_debug(args.state_dir, args.session_id, as_json=args.as_json)
+
+    if args.changes:
+        return inspect_changes(
+            args.state_dir,
+            args.session_id,
+            host=args.host,
+            play_name=args.play_name,
+            task_name=args.task_name,
+            show_diff=args.diff,
+            as_json=args.as_json,
+        )
+
+    if args.warnings:
+        return inspect_warnings(
+            args.state_dir,
+            args.session_id,
+            host=args.host,
+            play_name=args.play_name,
+            task_name=args.task_name,
+            as_json=args.as_json,
+        )
 
     use_text = args.text or not _stdout_is_tty()
     if use_text:
