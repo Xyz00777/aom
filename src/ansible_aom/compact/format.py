@@ -303,12 +303,12 @@ def format_status_bar(
         parts.append(mode_label)
     parts.extend([_wrap(playbook, _DIM, colorize), hosts_seg])
 
-    if tasks_total > 0:
-        # A loose-match prior-run estimate is marked with `~` so the total
-        # reads as projected rather than preflight-certain.
-        total_str = f"~{tasks_total}" if estimated_total else str(tasks_total)
+    if tasks_total > 0 or tasks_completed > 0:
+        effective_total = max(tasks_total, tasks_completed)
+        show_tilde = estimated_total and effective_total > tasks_completed
+        total_str = f"~{effective_total}" if show_tilde else str(effective_total)
         tasks_seg = f"{tasks_completed}/{total_str} tasks"
-        if tasks_completed == tasks_total:
+        if tasks_completed == effective_total:
             tasks_seg = _wrap(tasks_seg, _GREEN, colorize)
         parts.append(tasks_seg)
 
@@ -846,7 +846,8 @@ def count_total_tasks_seen(definitions: list[PlayDefinition], state: RunState) -
     """
     runtime = sum(len(play.tasks) for play in state.plays.values())
     cached = sum(entry.task_count for entry in state._include_cache.values())
-    return max(count_total_tasks(definitions), runtime, cached)
+    completed = count_completed_tasks(state)
+    return max(count_total_tasks(definitions), runtime, cached, completed)
 
 
 def count_completed_tasks(state: RunState) -> int:

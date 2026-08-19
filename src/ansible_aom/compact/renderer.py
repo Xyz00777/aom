@@ -364,6 +364,7 @@ class CompactRenderer:
         self._tasks_seen: int = 0
         self._tasks_completed: int = 0
         self._completed_task_ids: set[str] = _BoundedSet(_COMPLETED_TASK_IDS_CAP)
+        self._seen_task_ids: set[str] = _BoundedSet(_ANNOUNCED_TASK_UUIDS_CAP)
         # Live run-duration estimate. ``_estimate`` is the matching prior
         # run's result-segmented per-task wall profile (built in
         # ``set_prior_run``); ``_progress`` accumulates covered prior work as
@@ -429,6 +430,7 @@ class CompactRenderer:
         self._tasks_seen = 0
         self._tasks_completed = 0
         self._completed_task_ids = _BoundedSet(_COMPLETED_TASK_IDS_CAP)
+        self._seen_task_ids = _BoundedSet(_ANNOUNCED_TASK_UUIDS_CAP)
         self._announced_task_uuids = _BoundedSet(_ANNOUNCED_TASK_UUIDS_CAP)
         self._play_dead_cache = {}
         self._current_play_id = ""
@@ -597,9 +599,15 @@ class CompactRenderer:
         """
         if self._state is None:
             return
+        task_id = self._task_dict(event).get("id", "")
+        if task_id and task_id not in self._seen_task_ids:
+            self._seen_task_ids.add(task_id)
+            self._tasks_seen = max(self._tasks_seen, len(self._seen_task_ids))
+
         event_type = event.get("_event", "")
         if event_type == "v2_playbook_on_task_start":
-            self._tasks_seen += 1
+            if not task_id:
+                self._tasks_seen += 1
             self._record_running_start(event)
             # Under linear, RunState's task_start handler force-completes
             # the previous task in place (flipping its RUNNING hosts to
@@ -696,6 +704,7 @@ class CompactRenderer:
         """
         self._completed_task_ids.add(task_id)
         self._tasks_completed += 1
+        self._tasks_seen = max(self._tasks_seen, self._tasks_completed)
         start = self._running_task_starts.pop(task_id, None)
         if self._estimate is not None:
             prior_wall = self._estimate.task_wall_s.get(path)
@@ -756,8 +765,9 @@ class CompactRenderer:
         """
         prior = self._prior_run
         prior_total = prior.observed_task_count if prior else 0
-        total = max(base_total, prior_total)
-        estimated = prior is not None and not prior.exact_match and prior_total > base_total
+        effective_base = max(base_total, self._tasks_completed)
+        total = max(effective_base, prior_total)
+        estimated = prior is not None and not prior.exact_match and prior_total > effective_base
         return total, estimated
 
     def _cached_count_total_tasks(self) -> int:
@@ -874,7 +884,11 @@ class CompactRenderer:
             for path, start in self._running_task_starts.values():
                 add_in_flight(self._estimate, progress, path, now_wall - start)
             remaining_seconds = project_remaining(self._estimate, progress)
-        base_total = max(self._cached_count_total_tasks(), self._tasks_seen)
+        base_total = max(
+            self._cached_count_total_tasks(),
+            self._tasks_seen,
+            self._tasks_completed,
+        )
         tasks_total, estimated_total = self._task_total_with_prior(base_total)
         status_bar = format_status_bar(
             playbook=self._playbook,
@@ -1120,8 +1134,10 @@ class CompactRenderer:
             if self._state
             else count_total_tasks(self._definitions)
         )
+        base_total = max(base_total, self._tasks_seen, self._tasks_completed)
         tasks_total, estimated_total = self._task_total_with_prior(base_total)
         tasks_completed = count_completed_tasks(self._state) if self._state else 0
+        tasks_completed = max(tasks_completed, self._tasks_completed)
 
         # Format final status bar
         status_bar = format_status_bar(

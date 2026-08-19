@@ -133,6 +133,7 @@ def _mine_task_wall(
     totals: dict[str, float] = {}
     counts: dict[str, int] = {}
     variable: set[str] = set()
+    seen_tasks: set[str] = set()
     prev_path: str | None = None
     prev_ts: datetime | None = None
     grand_total = 0.0
@@ -159,6 +160,11 @@ def _mine_task_wall(
                     event = json.loads(line)
                 except json.JSONDecodeError:
                     continue
+                task_dict = event.get("task")
+                if isinstance(task_dict, dict):
+                    tid = task_dict.get("id") or task_dict.get("uuid")
+                    if tid:
+                        seen_tasks.add(str(tid))
                 kind = event.get("_event")
                 if kind == "v2_playbook_on_task_start":
                     task_starts += 1
@@ -186,7 +192,8 @@ def _mine_task_wall(
 
     averages = {path: totals[path] / counts[path] for path in totals}
     variable_total = sum(totals[path] for path in variable if path in totals)
-    return averages, grand_total, frozenset(variable), variable_total, task_starts
+    observed_task_count = max(task_starts, len(seen_tasks))
+    return averages, grand_total, frozenset(variable), variable_total, observed_task_count
 
 
 def _parse_iso(value: str | None) -> datetime | None:
