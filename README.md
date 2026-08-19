@@ -83,17 +83,15 @@ Anything after the playbook path is forwarded verbatim to
 ### Inspect past runs
 
 ```bash
-aom inspect list                      # all recorded sessions, newest first
-aom inspect <session-id>              # human summary of one run
-aom inspect <session-id> --tree       # ASCII tree of plays/tasks/hosts
-aom inspect <session-id> --failed     # only failed tasks
-aom inspect <session-id> --host web1  # only events for one host
-aom inspect diff <id1> <id2>          # what changed between two runs
+aom inspect                           # launch interactive TUI session viewer
+aom inspect --text                    # plain-text summary of latest run
+aom inspect --changes                 # list all tasks that reported changed status
+aom inspect --changes --diff          # include before/after diffs for changed tasks
+aom inspect --warnings                # list all warnings & deprecations with file locations
+aom inspect --changes --host web1     # filter changes to a specific host
+aom inspect --changes --json          # JSON output for CI / jq pipelines
 aom inspect prune --days 30           # delete sessions older than N days
 ```
-
-`--json` / `--jsonl` is available on `list` / `show` for piping into
-`jq` and friends.
 
 ### Replay past runs
 

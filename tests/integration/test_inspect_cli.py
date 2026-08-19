@@ -124,3 +124,45 @@ def test_text_mode_with_play_and_task_flags(state_dir: Path, capsys):
     assert exit_code == 0
     captured = capsys.readouterr()
     assert "019e4520" in captured.out
+
+
+def test_inspect_changes_cli(state_dir: Path, capsys):
+    from ansible_aom.inspect.cli import main
+
+    exit_code = main(["--changes", "--state-dir", str(state_dir)])
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "Changed Tasks" in out
+
+
+def test_inspect_changes_json_cli(state_dir: Path, capsys):
+    import json
+
+    from ansible_aom.inspect.cli import main
+
+    exit_code = main(["--changes", "--json", "--state-dir", str(state_dir)])
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert "total_changes" in payload
+    assert "changes" in payload
+
+
+def test_inspect_warnings_cli(state_dir: Path, capsys):
+    from ansible_aom.inspect.cli import main
+
+    exit_code = main(["--warnings", "--state-dir", str(state_dir)])
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "Warnings & Deprecations" in out
+
+
+def test_inspect_warnings_json_cli(state_dir: Path, capsys):
+    import json
+
+    from ansible_aom.inspect.cli import main
+
+    exit_code = main(["--warnings", "--json", "--state-dir", str(state_dir)])
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert "total_warnings" in payload
+    assert "warnings" in payload
