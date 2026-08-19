@@ -127,3 +127,46 @@ class CallbackModule(jsonl.CallbackModule):
             "hosts": {host.name: item_result},
         }
         self._write_event(name, envelope)
+
+    def v2_runner_retry(self, result):
+        host = result._host
+        task = result._task
+        res = result._result or {}
+        retries = res.get("retries", 0)
+        attempts = res.get("attempts", 0)
+        retries_left = retries - attempts
+        task_result = self._find_result_task(host, task)
+        task_info = (
+            task_result["task"]
+            if task_result and "task" in task_result
+            else {"id": getattr(task, "_uuid", ""), "name": getattr(task, "name", "")}
+        )
+        envelope = {
+            "task": task_info,
+            "host": host.get_name(),
+            "retries": retries,
+            "attempts": attempts,
+            "retries_left": retries_left,
+        }
+        self._write_event("v2_runner_retry", envelope)
+
+    def v2_runner_on_async_poll(self, result):
+        host = result._host
+        task = result._task
+        res = result._result or {}
+        attempts = res.get("attempts", 0)
+        remaining = res.get("remaining")
+        task_result = self._find_result_task(host, task)
+        task_info = (
+            task_result["task"]
+            if task_result and "task" in task_result
+            else {"id": getattr(task, "_uuid", ""), "name": getattr(task, "name", "")}
+        )
+        envelope = {
+            "task": task_info,
+            "host": host.get_name(),
+            "attempts": attempts,
+            "remaining": remaining,
+            "ansible_job_id": res.get("ansible_job_id"),
+        }
+        self._write_event("v2_runner_on_async_poll", envelope)

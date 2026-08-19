@@ -1027,3 +1027,246 @@ class TestTaskLabelStripsRolePrefixAndPendingVisible:
             assert any(ch.isdigit() for ch in label), (
                 f"trailing indicator must report the count of dropped tasks; got {label!r}"
             )
+
+
+class TestConcurrentFreeStrategyRoleClustering:
+    """When free strategy executes tasks out of order on different hosts,
+    tasks from a parent role and a sub-role must not fracture into
+    repeatedly opened and closed role headers.
+    """
+
+    def test_interleaved_parent_and_sub_role_tasks_cluster_contiguous(self) -> None:
+        state = RunState(playbook="main.yml")
+        state.definitions = [
+            _play_def(
+                "p1",
+                "Deploy Keepalived for Proxmox VIP",
+                [
+                    RoleGroupDefinition(
+                        role="angie_ssl_terminator",
+                        tasks=[
+                            TaskDefinition(
+                                name="Create angie config directories",
+                                role="angie_ssl_terminator",
+                                tags=[],
+                                play_id="p1",
+                                play_order=0,
+                                task_order=0,
+                            ),
+                            RoleGroupDefinition(
+                                role="podman",
+                                tasks=[
+                                    TaskDefinition(
+                                        name="podman : Pre-pull Angie image",
+                                        role="podman",
+                                        tags=[],
+                                        play_id="p1",
+                                        play_order=0,
+                                        task_order=1,
+                                    ),
+                                    TaskDefinition(
+                                        name="podman : Apply iptables fix",
+                                        role="podman",
+                                        tags=[],
+                                        play_id="p1",
+                                        play_order=0,
+                                        task_order=2,
+                                    ),
+                                ],
+                            ),
+                            TaskDefinition(
+                                name="Deploy TLS certificates for sidecar",
+                                role="angie_ssl_terminator",
+                                tags=[],
+                                play_id="p1",
+                                play_order=0,
+                                task_order=3,
+                            ),
+                        ],
+                    ),
+                ],
+            )
+        ]
+        _fire_startup(state, play_id="play-1", play_name="Deploy Keepalived for Proxmox VIP")
+
+        # ds5 is running the sub-role task (Pre-pull Angie image)
+        _fire_running_task(
+            state, "t-sub", "angie_ssl_terminator : podman : Pre-pull Angie image", host="ds5"
+        )
+        # ds9 is running the parent role task (Create angie config directories)
+        _fire_running_task(
+            state, "t-parent", "angie_ssl_terminator : Create angie config directories", host="ds9"
+        )
+
+        lines = TreeProjection.from_run_state(state).tree_lines(budget=80)
+        seq = _line_summary(lines)
+
+        angie_headers = [lbl for d, k, lbl in seq if k == "role" and "angie_ssl_terminator" in lbl]
+        podman_headers = [lbl for d, k, lbl in seq if k == "role" and "podman" in lbl]
+
+        assert len(angie_headers) == 1, (
+            f"angie_ssl_terminator header must appear exactly once, got: {angie_headers}"
+        )
+        assert len(podman_headers) == 1, (
+            f"podman header must appear exactly once, got: {podman_headers}"
+        )
+
+
+class TestNestedSubroleDynamicRuntimeTaskClustering:
+    """When a sub-role task arrives at runtime with a bare single-segment role prefix
+
+    (e.g. ``podman : Wait for host after lingering reboot``), but the play
+    only has ``podman`` as a sub-role under ``angie_ssl_terminator``, it must
+    resolve to the nested role path ``('angie_ssl_terminator', 'podman')`` and
+    NOT create a duplicate top-level ``role: podman`` header.
+    """
+
+    def test_dynamic_subrole_task_clusters_into_parent_nested_role(self) -> None:
+        state = RunState("main.yml")
+        play_def = PlayDefinition(
+            id="p1",
+            name="Deploy Keepalived for Proxmox VIP",
+            hosts="all",
+            resolved_hosts=["ds5", "ds9"],
+            tasks=[
+                RoleGroupDefinition(
+                    role="angie_ssl_terminator",
+                    tasks=[
+                        RoleGroupDefinition(
+                            role="podman",
+                            tasks=[
+                                TaskDefinition(
+                                    name="podman : Ensure Podman API service is started directly",
+                                    role="podman",
+                                    tags=[],
+                                    play_id="p1",
+                                    play_order=0,
+                                    task_order=0,
+                                ),
+                                TaskDefinition(
+                                    name="podman : Apply iptables cold-boot fix",
+                                    role="podman",
+                                    tags=[],
+                                    play_id="p1",
+                                    play_order=0,
+                                    task_order=1,
+                                ),
+                            ],
+                        ),
+                        TaskDefinition(
+                            name="Deploy TLS certificates for sidecar",
+                            role="angie_ssl_terminator",
+                            tags=[],
+                            play_id="p1",
+                            play_order=0,
+                            task_order=2,
+                        ),
+                    ],
+                ),
+                TaskDefinition(
+                    name="Install keepalived",
+                    role=None,
+                    tags=[],
+                    play_id="p1",
+                    play_order=0,
+                    task_order=3,
+                ),
+            ],
+        )
+        state.definitions = [play_def]
+        _fire_startup(state, play_id="play-1", play_name="Deploy Keepalived for Proxmox VIP")
+
+        # ds5 is running preflight-matched sub-role task
+        _fire_running_task(
+            state,
+            "t-ds5",
+            "angie_ssl_terminator : podman : Ensure Podman API service is started directly",
+            host="ds5",
+            play_id="play-1",
+        )
+        # ds9 is running dynamic/unmatched sub-role task with bare "podman : " prefix
+        _fire_running_task(
+            state,
+            "t-ds9",
+            "podman : Wait for host after lingering reboot",
+            host="ds9",
+            play_id="play-1",
+        )
+
+        lines = TreeProjection.from_run_state(state).tree_lines(budget=80)
+        seq = _line_summary(lines)
+
+        podman_headers = [(d, lbl) for d, k, lbl in seq if k == "role" and "podman" in lbl]
+        assert len(podman_headers) == 1, (
+            f"Expected exactly 1 podman role header, got {len(podman_headers)}: {podman_headers}"
+        )
+        # Ensure podman is nested under angie_ssl_terminator (depth 3)
+        assert podman_headers[0][0] == 3, f"Expected podman at depth 3, got: {podman_headers[0]}"
+
+    def test_active_subrole_rendered_before_parent_pending_tasks(self) -> None:
+        """TC-ACTIVE-SUBROLE: When a nested sub-role is actively running, it must be rendered
+        BEFORE the parent role's pending tasks, reflecting actual execution order."""
+        state = RunState(playbook="site.yml")
+        play_def = _play_def(
+            "p1",
+            "Deploy SSL Terminator for Jellyfin",
+            [
+                RoleGroupDefinition(
+                    role="angie_ssl_terminator",
+                    tasks=[
+                        RoleGroupDefinition(
+                            role="podman",
+                            tasks=[
+                                TaskDefinition(
+                                    name="Restart if lingering get activated",
+                                    role="podman",
+                                    tags=[],
+                                    play_id="p1",
+                                    play_order=0,
+                                    task_order=0,
+                                ),
+                            ],
+                        ),
+                        TaskDefinition(
+                            name="Deploy TLS certificates for sidecar",
+                            role="angie_ssl_terminator",
+                            tags=[],
+                            play_id="p1",
+                            play_order=0,
+                            task_order=1,
+                        ),
+                        TaskDefinition(
+                            name="Reload systemd daemon for user",
+                            role="angie_ssl_terminator",
+                            tags=[],
+                            play_id="p1",
+                            play_order=0,
+                            task_order=2,
+                        ),
+                    ],
+                ),
+            ],
+        )
+        state.definitions = [play_def]
+        _fire_startup(state, play_id="play-1", play_name="Deploy SSL Terminator for Jellyfin")
+
+        _fire_running_task(
+            state,
+            "t-podman",
+            "Restart if lingering get activated",
+            host="jellyfinai",
+            play_id="play-1",
+        )
+
+        lines = TreeProjection.from_run_state(state).tree_lines(budget=80)
+        labels = [ln.label for ln in lines]
+
+        # Verify podman role comes BEFORE parent pending tasks
+        podman_idx = next(i for i, lbl in enumerate(labels) if "role: podman" in lbl)
+        parent_pending_idx = next(
+            i for i, lbl in enumerate(labels) if "Deploy TLS certificates" in lbl
+        )
+        assert podman_idx < parent_pending_idx, (
+            f"Active sub-role 'podman' (idx {podman_idx}) should appear before "
+            f"parent pending task (idx {parent_pending_idx}). Full labels: {labels}"
+        )

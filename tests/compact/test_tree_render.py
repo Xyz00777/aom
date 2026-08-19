@@ -895,10 +895,10 @@ def test_format_tree_block_renders_two_level_truncation(monkeypatch) -> None:
     block = format_tree_block(projection, budget=15, width=120, ascii_mode=False, colorize=False)
     joined = "\n".join(block)
 
-    # Both footers must render.
+    # All footers (role, play, outer) must render.
     more_lines = [ln for ln in block if "more tasks" in ln]
-    assert len(more_lines) == 2, (
-        f"expected exactly 2 'more tasks' footers (inner + outer); got {len(more_lines)} in:\n{joined}"
+    assert len(more_lines) == 3, (
+        f"expected exactly 3 'more tasks' footers (role + play + outer); got {len(more_lines)} in:\n{joined}"
     )
     # Both footers carry the PENDING icon □ (T4 Edit 3) and have no
     # branch glyph (T4 Edit 1).

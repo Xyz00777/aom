@@ -190,6 +190,29 @@ def test_single_instance_keeps_old_semantics() -> None:
     assert task_complete_on_all_targets(s, "u1", fan_out_groups=groups) is False
 
 
+def test_subset_task_completes_when_other_hosts_advance() -> None:
+    s = _state(["ds5", "ds9", "jellyfinai"])
+    s.plays["p1"].detected_strategy = "free"
+
+    # T1 runs on all
+    _ran_ok(s, "t1", "ds5")
+    _ran_ok(s, "t1", "ds9")
+    _ran_ok(s, "t1", "jellyfinai")
+    assert task_complete_on_all_targets(s, "t1") is True
+
+    # T2 runs on jellyfinai only
+    _ran_ok(s, "t2", "jellyfinai")
+    # Before other hosts advance past t2, t2 is waiting
+    assert task_complete_on_all_targets(s, "t2") is False
+
+    # ds5 and ds9 advance to T3 (bypassing T2)
+    _ran_ok(s, "t3", "ds5")
+    _ran_ok(s, "t3", "ds9")
+
+    # Now that ds5 and ds9 have moved past T2, T2 is complete!
+    assert task_complete_on_all_targets(s, "t2") is True
+
+
 def _ran_ok_with_meta(s: RunState, task_id: str, host: str, path: str) -> None:
     s.handle_event(_runner_start(task_id, host, task_path=path))
     s.handle_event(_ok(task_id, host))

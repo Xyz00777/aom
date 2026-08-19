@@ -396,6 +396,8 @@ class RunState:
             "v2_runner_item_on_ok": self._handle_v2_runner_item_on,
             "v2_runner_item_on_failed": self._handle_v2_runner_item_on,
             "v2_runner_item_on_skipped": self._handle_v2_runner_item_on,
+            "v2_runner_retry": self._handle_v2_runner_retry,
+            "v2_runner_on_async_poll": self._handle_v2_runner_on_async_poll,
             "v2_playbook_on_stats": self._handle_v2_playbook_on_stats,
             "aom_stderr_line": self._handle_internal_event,
             "aom_connection_acquired": self._handle_internal_event,
@@ -1092,19 +1094,6 @@ class RunState:
         # overwrite each host entry as the events arrive.
         resolved_hosts = self._resolve_play_hosts(play)
         if not resolved_hosts and play.detected_strategy == "linear":
-            # No preflight match (preflight failed, or the play name in
-            # --list-tasks output differs from the JSONL play name).
-            # Under linear every host runs every task in lockstep, so
-            # the hosts seen on earlier tasks of this play are the task's
-            # host set too. Without this, the task keeps an empty hosts
-            # map and the tree falls back to rendering every play target
-            # as RUNNING forever, contradicting the streamed results.
-            # Not applicable under free strategy, where per-host
-            # v2_runner_on_start is the start signal.
-            #
-            # Hosts whose latest result is FAILED or UNREACHABLE are
-            # excluded: ansible removes them from the play, so later
-            # tasks never run on them.
             last_status: dict[str, Status] = {}
             for other_task in play.tasks.values():
                 if other_task.task_id == task_id:
@@ -1214,24 +1203,25 @@ class RunState:
             self.plays[play_id].detected_strategy = "free"
         elif self.plays[play_id].detected_strategy == "linear":
             # A v2_runner_on_start event means the playbook is NOT
-            # running with lockstep enabled (the JSONL callback
-            # guards runner_on_start behind `if self._is_lockstep:
-            # return`). Flip to free — the earlier linear detection
-            # by task_start was premature. Any still-RUNNING host
-            # entries synthesised under that premature assumption are
-            # guesses about hosts that may not have started the task;
-            # drop them and let the per-host start events rebuild the
-            # map. Entries with real terminal results were replaced
-            # wholesale by the terminal handlers and survive.
+            # running with lockstep enabled. Flip to free.
             self.plays[play_id].detected_strategy = "free"
-            for task in self.plays[play_id].tasks.values():
+            for t in self.plays[play_id].tasks.values():
                 stale = [
                     stale_host
-                    for stale_host, hs in task.hosts.items()
+                    for stale_host, hs in t.hosts.items()
                     if hs.synthesised and hs.status == Status.RUNNING
                 ]
                 for stale_host in stale:
-                    del task.hosts[stale_host]
+                    del t.hosts[stale_host]
+        elif self.plays[play_id].detected_strategy == "free":
+            if task_id in self.plays[play_id].tasks:
+                stale = [
+                    stale_host
+                    for stale_host, hs in self.plays[play_id].tasks[task_id].hosts.items()
+                    if hs.synthesised and hs.status == Status.RUNNING
+                ]
+                for stale_host in stale:
+                    del self.plays[play_id].tasks[task_id].hosts[stale_host]
 
         play = self.plays[play_id]
 
@@ -1319,6 +1309,100 @@ class RunState:
                 host = new_hs
                 task.hosts[hostname] = host
             host.loop_items_done += 1
+
+    def _handle_v2_runner_retry(self, event: JsonlEvent, ts: datetime) -> None:
+        """Handle v2_runner_retry event: updates poll_hint on the active host."""
+        host_name = event.get("host", "")
+        task_data = self._task_dict(event)
+        task_id = task_data.get("id", "")
+        play_id = self._resolve_play_id(event)
+
+        play = self.plays.get(play_id)
+        task: TaskRunState | None = None
+        if play and task_id in play.tasks:
+            task = play.tasks[task_id]
+        elif task_id:
+            owner_id = self._resolve_play_for_task(task_id)
+            if owner_id:
+                task = self.plays[owner_id].tasks.get(task_id)
+
+        if task is None:
+            task = self._resolve_runner_task(event)
+
+        if task is not None and host_name:
+            retries_left = event.get("retries_left")
+            retries = event.get("retries")
+            attempts = event.get("attempts")
+
+            hint: str = ""
+            if isinstance(retries_left, int) and retries_left >= 0:
+                hint = f"{retries_left} retries left"
+            elif (
+                isinstance(retries, int)
+                and isinstance(attempts, int)
+                and retries > 0
+                and attempts > 0
+            ):
+                hint = f"attempt {attempts}/{retries}"
+            elif isinstance(attempts, int) and attempts > 0:
+                hint = f"attempt {attempts}"
+
+            if hint:
+                if host_name in task.hosts:
+                    task.hosts[host_name].poll_hint = hint
+                else:
+                    new_hs = HostRunState(
+                        hostname=host_name,
+                        status=Status.RUNNING,
+                        start_time=ts,
+                        poll_hint=hint,
+                    )
+                    task.hosts[host_name] = new_hs
+                self._bump_tree_revision()
+
+    def _handle_v2_runner_on_async_poll(self, event: JsonlEvent, ts: datetime) -> None:
+        """Handle v2_runner_on_async_poll event: updates poll_hint on the active host."""
+        host_name = event.get("host", "")
+        task_data = self._task_dict(event)
+        task_id = task_data.get("id", "")
+        play_id = self._resolve_play_id(event)
+
+        play = self.plays.get(play_id)
+        task: TaskRunState | None = None
+        if play and task_id in play.tasks:
+            task = play.tasks[task_id]
+        elif task_id:
+            owner_id = self._resolve_play_for_task(task_id)
+            if owner_id:
+                task = self.plays[owner_id].tasks.get(task_id)
+
+        if task is None:
+            task = self._resolve_runner_task(event)
+
+        if task is not None and host_name:
+            attempts = event.get("attempts")
+            remaining = event.get("remaining")
+
+            hint: str = ""
+            if isinstance(remaining, (int, float)):
+                hint = f"{int(remaining)}s remaining"
+            elif isinstance(attempts, int) and attempts > 0:
+                hint = f"poll attempt {attempts}"
+            else:
+                hint = "polling"
+
+            if hint:
+                if host_name in task.hosts:
+                    task.hosts[host_name].poll_hint = hint
+                else:
+                    new_hs = HostRunState(
+                        hostname=host_name,
+                        status=Status.RUNNING,
+                        start_time=ts,
+                        poll_hint=hint,
+                    )
+                    task.hosts[host_name] = new_hs
+                self._bump_tree_revision()
 
     def _task_dict(self, event: JsonlEvent) -> JsonlTask:
         """Extract the ``task`` field as a dict.

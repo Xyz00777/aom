@@ -3,9 +3,9 @@ PLAY [Configure web tier] **************************************************
 
 TASK [Install nginx] **************************************************
 changed: [web1] (3.0s)
+[10:00:05] Install nginx — (5.0s)  (1 changed)
 
 PLAY [Configure db tier] **************************************************
-[10:00:07] Install nginx — (7.0s)  (1 changed)
 
 TASK [Install postgres] **************************************************
 ok: [db1] (5.0s)

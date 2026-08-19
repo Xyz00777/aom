@@ -239,6 +239,9 @@ class HostRunState:
     # Terminal handlers replace the entry wholesale, so the flag never
     # survives a real result.
     synthesised: bool = False
+    # Live polling or retry hint (e.g. "18 retries left", "poll attempt 3/10",
+    # "120s remaining"). Cleared when the task or host reaches a terminal state.
+    poll_hint: str | None = None
 
 
 @dataclass
