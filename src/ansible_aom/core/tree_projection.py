@@ -497,12 +497,31 @@ def task_complete_on_all_targets(
 
 
 def _is_meta_task(task_name: str) -> bool:
-    """Return True for explicit ``meta: ...`` tasks.
+    """Return True for explicit ``meta: ...`` or named meta tasks.
 
-    This is a narrow projection-only heuristic: only meta tasks skip
-    synthetic host-leaf fallback when their runtime host map is empty.
+    Ansible's callback engine does not emit ``v2_playbook_on_task_start``
+    events for ``meta:`` actions (e.g. ``reset_connection``, ``flush_handlers``).
     """
-    return strip_role_prefix(task_name).startswith("meta:")
+    stripped = strip_role_prefix(task_name).strip().lower()
+    if stripped.startswith("meta:") or stripped.startswith("meta :"):
+        return True
+    meta_prefixes = (
+        "reset connection",
+        "reset_connection",
+        "flush handlers",
+        "flush_handlers",
+        "refresh inventory",
+        "refresh_inventory",
+        "clear facts",
+        "clear_facts",
+        "clear host errors",
+        "clear_host_errors",
+        "end host",
+        "end_host",
+        "end play",
+        "end_play",
+    )
+    return any(stripped.startswith(prefix) for prefix in meta_prefixes)
 
 
 def _more_footer(depth: int, count: int) -> TreeLine:
@@ -2496,8 +2515,7 @@ class TreeProjection:
                     for tid in (_task_identity(t) for t in runtime_by_name.get(entry.name, []))
                 ):
                     continue
-                if kind != "completed":
-                    items.append((kind, entry.name, full_role_path, runtime))
+                raw_preflight_items.append((kind, entry.name, full_role_path, runtime))
 
                 if entry.children:
                     _emit_preflight_entries(
@@ -2508,8 +2526,27 @@ class TreeProjection:
                     )
 
         if play_def is not None:
+            raw_preflight_items: list[tuple[str, str, tuple[str, ...], TaskRunState | None]] = []
             matched_runtime_task_ids: set[str] = set()
             _emit_preflight_entries(play_def.tasks, (), None, matched_runtime_task_ids)
+
+            # Find the latest preflight entry index that matched a runtime task
+            # or started in this play. Any preflight task appearing BEFORE this
+            # index that never matched a runtime task was passed by Ansible's
+            # sequential execution (e.g. meta actions like reset_connection or
+            # flush_handlers that emit no callback events). It will never run
+            # in the future and should not be emitted as a pending ghost task.
+            max_started_idx = -1
+            for idx, (kind, _name, _role_path, runtime) in enumerate(raw_preflight_items):
+                if runtime is not None or kind == "running":
+                    max_started_idx = max(max_started_idx, idx)
+
+            for idx, (kind, name, full_role_path, runtime) in enumerate(raw_preflight_items):
+                if kind == "completed":
+                    continue
+                if kind == "pending" and runtime is None and _is_meta_task(name):
+                    continue
+                items.append((kind, name, full_role_path, runtime))
 
         # Runtime-only tasks (dynamic include_tasks, or no preflight at all).
         # When preflight entries were emitted above, treat the runtime

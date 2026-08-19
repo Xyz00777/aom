@@ -4745,3 +4745,98 @@ class TestMultiPlayTruncationWithRoleFooters:
                     f"play remaining ({counts_by_depth[2]}) must be <= "
                     f"outer remaining ({counts_by_depth[0]}) at budget={budget}"
                 )
+
+    def test_meta_tasks_without_runtime_events_not_emitted_as_pending(self) -> None:
+        """Ansible's callback engine does not emit task start events for meta actions
+        (e.g. reset_connection, flush_handlers). Such tasks must not be emitted
+        as pending ghost tasks that take up budget and hide real upcoming tasks."""
+        tasks = [
+            TaskDefinition(
+                name="Bootstrap python3-dnf on dnf-based systems",
+                role=None,
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=0,
+            ),
+            TaskDefinition(
+                name="Reset connection after python3-dnf bootstrap",
+                role=None,
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=1,
+            ),
+            TaskDefinition(
+                name="Gather facts for conditional logic",
+                role=None,
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=2,
+            ),
+            TaskDefinition(
+                name="Reset connection after installing software updates",
+                role=None,
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=3,
+            ),
+            TaskDefinition(
+                name="Install software",
+                role=None,
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=4,
+            ),
+        ]
+        state = RunState(playbook="main.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Install default software",
+                hosts="all",
+                resolved_hosts=["host1"],
+                tasks=tasks,
+            ),
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-06-24T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-06-24T10:00:01Z",
+                "play": {"id": "p1", "name": "Install default software"},
+            }
+        )
+        # Task 0 started and running
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-06-24T10:04:00Z",
+                "task": {"id": "t0", "name": "Bootstrap python3-dnf on dnf-based systems"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-06-24T10:04:01Z",
+                "host": "host1",
+                "task": {"id": "t0", "name": "Bootstrap python3-dnf on dnf-based systems"},
+                "play": {"id": "p1"},
+            }
+        )
+
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=20)
+        labels = [ln.label for ln in lines if ln.kind == "task"]
+
+        # Meta tasks should NOT appear in pending labels
+        assert not any("Reset connection" in lbl for lbl in labels), (
+            f"meta reset_connection tasks should not be emitted as pending; got {labels}"
+        )
+        # Real pending tasks SHOULD appear
+        assert any("Gather facts" in lbl for lbl in labels)
+        assert any("Install software" in lbl for lbl in labels)
