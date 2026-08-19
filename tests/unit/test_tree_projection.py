@@ -4654,3 +4654,94 @@ class TestMultiPlayTruncationWithRoleFooters:
 
         assert more_lines[3].depth == 0
         assert more_lines[3].label == "… and 3035 more tasks"
+
+    def test_footers_monotonic_hierarchy_invariant(self) -> None:
+        """A role footer's remaining task count can never exceed the enclosing
+        play's remaining task count, nor can a play's footer exceed the outer
+        playbook footer. The hierarchy is monotonically non-decreasing."""
+        role_tasks = [
+            TaskDefinition(
+                name=f"fail2ban task {i}",
+                role="fail2ban",
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=i,
+            )
+            for i in range(44)
+        ]
+        role_group = RoleGroupDefinition(role="fail2ban", tasks=role_tasks)
+        direct_tasks = [
+            TaskDefinition(
+                name=f"direct task {i}",
+                role=None,
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=44 + i,
+            )
+            for i in range(10)
+        ]
+        state = RunState(playbook="main.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy Redis active/passive for fail2ban",
+                hosts="all",
+                resolved_hosts=["host1"],
+                tasks=[role_group] + direct_tasks,
+            ),
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-06-24T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-06-24T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy Redis active/passive for fail2ban"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-06-24T10:04:00Z",
+                "task": {"id": "t0", "name": "fail2ban task 0"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-06-24T10:04:01Z",
+                "host": "host1",
+                "task": {"id": "t0", "name": "fail2ban task 0"},
+                "play": {"id": "p1"},
+            }
+        )
+
+        proj = TreeProjection.from_run_state(state)
+        # Try various budgets: in all cases, role remaining <= play remaining <= outer remaining
+        import re
+
+        for budget in range(5, 30):
+            lines = proj.tree_lines(budget=budget)
+            more_lines = [ln for ln in lines if ln.kind == "more"]
+            if not more_lines:
+                continue
+            counts_by_depth: dict[int, int] = {}
+            for ln in more_lines:
+                m = re.search(r"… and (\d+) more tasks", ln.label)
+                if m:
+                    counts_by_depth[ln.depth] = int(m.group(1))
+
+            # If both role (depth 3) and play (depth 2) footers exist:
+            if 3 in counts_by_depth and 2 in counts_by_depth:
+                assert counts_by_depth[3] <= counts_by_depth[2], (
+                    f"role remaining ({counts_by_depth[3]}) must be <= "
+                    f"play remaining ({counts_by_depth[2]}) at budget={budget}"
+                )
+            # If play (depth 2) and outer (depth 0) footers exist:
+            if 2 in counts_by_depth and 0 in counts_by_depth:
+                assert counts_by_depth[2] <= counts_by_depth[0], (
+                    f"play remaining ({counts_by_depth[2]}) must be <= "
+                    f"outer remaining ({counts_by_depth[0]}) at budget={budget}"
+                )

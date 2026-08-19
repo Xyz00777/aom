@@ -1468,12 +1468,21 @@ class TreeProjection:
         # role's already-assigned footer position (so the outer role's
         # footer lands BELOW the inner role's footer at the same site).
         head_footer_insert_idx: dict[str, int] = {}
+        head_role_remaining: dict[str, int] = {}
         for role_name in head_role_names:
             total = role_total_tasks[role_name]
             completed = role_completed_tasks.get(role_name, 0)
-            remaining = total - completed - role_visible_tasks.get(role_name, 0)
+            remaining = max(0, total - completed - role_visible_tasks.get(role_name, 0))
+            inner_remaining = [
+                head_role_remaining[other]
+                for other in head_role_remaining
+                if depth_by_role.get(other, 0) > depth_by_role.get(role_name, 0)
+            ]
+            if inner_remaining:
+                remaining = max(remaining, max(inner_remaining))
             if remaining <= 0:
                 continue
+            head_role_remaining[role_name] = remaining
             role_line_idx: int | None = next(
                 (j for j, ln in enumerate(lines) if ln.kind == "role" and ln.identity == role_name),
                 None,
@@ -1503,9 +1512,7 @@ class TreeProjection:
                 insert_after,
                 _more_footer(
                     depth=depth_by_role[r] + 1,
-                    count=role_total_tasks[r]
-                    - role_completed_tasks.get(r, 0)
-                    - role_visible_tasks.get(r, 0),
+                    count=head_role_remaining[r],
                 ),
             )
             for r, insert_after in head_footer_insert_idx.items()
@@ -1523,15 +1530,24 @@ class TreeProjection:
             result.insert(insert_after + 1 + offset, footer)
             offset_at_position[insert_after] = offset + 1
 
+        last_inner_remaining = 0
         if inner_idx is not None:
             replacements: list[TreeLine] = []
             if role_chain:
+                running_role_remaining = 0
+                role_remaining_map: dict[str, int] = {}
                 for role in reversed(role_chain):
                     total = role_total_tasks.get(role, 0)
                     completed = role_completed_tasks.get(role, 0)
                     visible = role_visible_tasks.get(role, 0)
-                    remaining = total - completed - visible
-                    if remaining <= 0:
+                    rem = max(0, total - completed - visible)
+                    rem = max(rem, running_role_remaining)
+                    running_role_remaining = rem
+                    role_remaining_map[role] = rem
+
+                for role in reversed(role_chain):
+                    rem = role_remaining_map[role]
+                    if rem <= 0:
                         continue
                     role_depth: int | None = None
                     for j in range(inner_idx - 1, -1, -1):
@@ -1539,7 +1555,8 @@ class TreeProjection:
                             role_depth = lines[j].depth
                             break
                     assert role_depth is not None
-                    replacements.append(_more_footer(depth=role_depth + 1, count=remaining))
+                    replacements.append(_more_footer(depth=role_depth + 1, count=rem))
+                last_inner_remaining = running_role_remaining
 
             # Enclosing play footer at play_depth + 1
             play_totals = self._build_play_total_tasks()
@@ -1567,9 +1584,11 @@ class TreeProjection:
                             completed = cnt
                             break
                 visible = play_visible_tasks.get(play_name, 0)
-                remaining = total - completed - visible
-                if remaining > 0:
-                    replacements.append(_more_footer(depth=play_depth + 1, count=remaining))
+                rem = max(0, total - completed - visible)
+                rem = max(rem, last_inner_remaining)
+                if rem > 0:
+                    replacements.append(_more_footer(depth=play_depth + 1, count=rem))
+                    last_inner_remaining = rem
 
             # The inner footer was at ``inner_idx`` in the
             # original ``lines``. Head footers inserted before
@@ -1616,6 +1635,7 @@ class TreeProjection:
             _, global_completed_tasks = self._count_completed_tasks_per_role(play_names=None)
             total_bound = max(self._total_unique_tasks, global_completed_tasks + visible_task_count)
             outer_remaining = max(0, total_bound - global_completed_tasks - visible_task_count)
+            outer_remaining = max(outer_remaining, last_inner_remaining)
             result[outer_idx] = _more_footer(depth=0, count=outer_remaining)
 
         return result
