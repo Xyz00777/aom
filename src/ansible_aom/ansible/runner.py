@@ -690,7 +690,7 @@ def _drive(
         try:
             idx = child.expect(patterns, timeout=read_timeout)
         except pexpect.exceptions.EOF:
-            _flush_pending(child, parser, state, renderer, sink)
+            _flush_pending(child, parser, state, renderer, sink, diag=diag)
             break
 
         if idx == newline_idx:
@@ -737,11 +737,11 @@ def _drive(
             # dropped — the previous ordering broke the loop on the
             # last batch and lost events 7/8 in the fixture.
             if not child.isalive():
-                _flush_pending(child, parser, state, renderer, sink)
+                _flush_pending(child, parser, state, renderer, sink, diag=diag)
                 break
         elif idx == eof_idx:
             _trace("eof", leftover=(child.before or "")[:200])
-            _flush_pending(child, parser, state, renderer, sink)
+            _flush_pending(child, parser, state, renderer, sink, diag=diag)
             break
         elif idx == timeout_idx:
             # R8: post-stats timeout = EOF watchdog fired. The child
@@ -756,7 +756,7 @@ def _drive(
                 )
                 logger.warning(warning)
                 renderer.print_log(f"[aom] {warning}")
-                _flush_pending(child, parser, state, renderer, sink)
+                _flush_pending(child, parser, state, renderer, sink, diag=diag)
                 break
             # Pre-stats timeout: same liveness / prompt heuristics as
             # before — the watchdog doesn't apply yet.
@@ -981,6 +981,8 @@ def _flush_pending(
     state: RunState,
     renderer: Renderer,
     sink: _SessionSink | _NullSink,
+    *,
+    diag: diagnostics.RunDiagnostics | None = None,
 ) -> None:
     """Drain any final bytes left in the buffer when the subprocess ends.
 
@@ -1005,7 +1007,7 @@ def _flush_pending(
         return
     for sub_line in leftover.splitlines():
         if sub_line:
-            _feed(sub_line, parser, state, renderer, sink)
+            _feed(sub_line, parser, state, renderer, sink, diag=diag)
 
 
 def _feed(

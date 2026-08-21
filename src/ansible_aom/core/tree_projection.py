@@ -1110,7 +1110,7 @@ class TreeProjection:
                 continue
             for entry, role_path in iter_preflight_task_defs(play_def.tasks):
                 emitted_preflight_names.add(entry.name)
-                if entry.children:
+                if entry.children or _is_meta_task(entry.name):
                     continue
                 collapsed_path = _collapse_role_path_aggressive(role_path)
                 if not collapsed_path:
@@ -1335,7 +1335,9 @@ class TreeProjection:
         if not self._play_total_preflight:
             for play_def in self._state.definitions:
                 count = sum(
-                    1 for entry, _ in iter_preflight_task_defs(play_def.tasks) if not entry.children
+                    1
+                    for entry, _ in iter_preflight_task_defs(play_def.tasks)
+                    if not entry.children and not _is_meta_task(entry.name)
                 )
                 self._play_total_preflight[play_def.name] = count
 
@@ -1377,57 +1379,56 @@ class TreeProjection:
                 play_visible[current_play] = play_visible.get(current_play, 0) + 1
         return play_visible
 
+    def _ordered_plays(self) -> list[tuple[PlayRunState | None, "PlayDefinition | None"]]:
+        """Match preflight definitions to runtime plays in playbook order."""
+        runtime_by_id: dict[str, PlayRunState] = {}
+        runtime_by_name: dict[str, list[PlayRunState]] = defaultdict(list)
+        for runtime_play in self._state.plays.values():
+            if runtime_play.play_id:
+                runtime_by_id.setdefault(runtime_play.play_id, runtime_play)
+            runtime_by_name[runtime_play.name].append(runtime_play)
+        seen_runtime_ids: set[str] = set()
+        seen_runtime_objects: set[int] = set()
+
+        ordered_plays: list[tuple[PlayRunState | None, "PlayDefinition | None"]] = []
+        for preflight_play_def in self._state.definitions:
+            runtime = None
+            if preflight_play_def.id:
+                runtime = runtime_by_id.get(preflight_play_def.id)
+                if runtime is not None:
+                    seen_runtime_ids.add(preflight_play_def.id)
+            if runtime is None:
+                for candidate in runtime_by_name.get(preflight_play_def.name, []):
+                    if id(candidate) in seen_runtime_objects:
+                        continue
+                    runtime = candidate
+                    break
+            if runtime is None:
+                for candidate in self._state.plays.values():
+                    if id(candidate) in seen_runtime_objects:
+                        continue
+                    if self._play_def_matches_visible(preflight_play_def.name, {candidate.name}):
+                        runtime = candidate
+                        break
+            if runtime is not None:
+                seen_runtime_objects.add(id(runtime))
+            ordered_plays.append((runtime, preflight_play_def))
+
+        for runtime_play in self._state.plays.values():
+            if runtime_play.play_id and runtime_play.play_id in seen_runtime_ids:
+                continue
+            if id(runtime_play) in seen_runtime_objects:
+                continue
+            ordered_plays.append((runtime_play, None))
+
+        return ordered_plays
+
     def _recompute_inner_footer_count(self, lines: list[TreeLine]) -> list[TreeLine]:
-        """Replace the inner footer(s) with per-role subtree remaining counts.
-
-        ``_truncate_two_level`` emits one inner footer with a count of
-        *all* task-domain entities (tasks + roles + plays) in the
-        dropped tail — which includes upcoming plays' tasks. The user
-        expects the inner footer to report only the tasks remaining in
-        each open role's branch, derived from
-        ``role_total - role_completed - role_visible``.
-
-        For nested roles (e.g. ``role: podman > role:
-        angie_ssl_terminator`` with the cut inside angie), this method
-        emits ONE inner footer per open role ancestor — angie reports
-        its own subtree remaining, podman reports its subtree remaining
-        (which includes angie's tasks transitively). Footers are
-        emitted deepest-first so the innermost role's footer is
-        closest to its task list, matching the visual mental model.
-
-        The "depth" of each inner footer equals the role's task-list
-        depth (= role's line depth + 1) so it hangs in line with where
-        this role's tasks would sit. The renderer suppresses branch
-        glyphs on ``kind="more"`` lines, so multiple footers at
-        different depths render as siblings of the deepest visible
-        task without breaking the parent spine.
-
-        Single-role cases preserve the existing single-footer
-        behavior: exactly one footer at the deepest visible line
-        depth, count = role_total - role_completed - role_visible.
-
-        For roles in the **head** (lines before the inner section or
-        before the outer cut when no inner section exists), this
-        method also inserts per-role inner footers at the role's
-        task-list depth when uncompleted tasks remain hidden under that role.
-        Footers are inserted immediately after the role's last visible task
-        in the line list, deepest-first (innermost role's footer
-        first), matching the multi-level cut-inside-role logic.
-
-        The **outer footer** count is always recomputed to equal
-        ``total_unique_tasks_across_all_plays - total_completed_tasks - visible_task_count``.
-        This keeps the outer footer's number and the inner footers' numbers
-        consistent — they all derive from ``total - completed - visible``.
-
-        No-op when no inner footer exists in the inner section AND
-        no role in the head has remaining > 0 (degenerate — fall
-        back to whatever count the truncation produced).
-        """
+        """Replace the inner footer(s) with per-role subtree remaining counts."""
         play_names = self._visible_play_names(lines)
         role_total_tasks = self._build_role_total_tasks(play_names=play_names)
         role_visible_tasks = self._count_visible_tasks_per_role(lines)
         role_completed_tasks, _ = self._count_completed_tasks_per_role(play_names=play_names)
-        visible_task_count = sum(1 for ln in lines if ln.kind == "task")
 
         inner_idx: int | None = None
         for i, ln in enumerate(lines):
@@ -1455,11 +1456,6 @@ class TreeProjection:
         last_task_in_stack_role: dict[str, int] = {}
         for j, ln in enumerate(lines):
             if ln.kind == "role" and ln.identity is not None:
-                # Pop siblings at the same depth so tasks under the new
-                # sibling role don't get credited to the previous sibling
-                # in ``last_task_in_stack_role`` (Bug A: sibling roles
-                # at the same depth must close out the previous sibling's
-                # contribution to footer placement).
                 while role_stack and role_stack[-1][0] >= ln.depth:
                     role_stack.pop()
                 role_stack.append((ln.depth, ln.identity))
@@ -1473,19 +1469,11 @@ class TreeProjection:
             ln.identity: ln.depth for ln in lines if ln.kind == "role" and ln.identity is not None
         }
 
-        # Process head roles innermost-first so an outer role's
-        # footer is placed after the inner role's footer (matching
-        # the deepest-first ordering used by the inner-section logic).
         head_role_names = sorted(
             (r for r in role_total_tasks if r not in inner_section_roles),
             key=lambda r: -depth_by_role.get(r, 0),
         )
 
-        # Map from role name to its assigned footer insertion index.
-        # The insertion point is the max of: the role line's own
-        # index, the role's last visible task index, and any inner
-        # role's already-assigned footer position (so the outer role's
-        # footer lands BELOW the inner role's footer at the same site).
         head_footer_insert_idx: dict[str, int] = {}
         head_role_remaining: dict[str, int] = {}
         for role_name in head_role_names:
@@ -1536,10 +1524,6 @@ class TreeProjection:
             )
             for r, insert_after in head_footer_insert_idx.items()
         ]
-        # Sort by insert position ascending, depth descending within
-        # the same position. The depth-descending tiebreaker keeps
-        # the innermost role's footer first so the outer role's
-        # footer lands right below it.
         head_footers.sort(key=lambda pair: (pair[0], -pair[1].depth))
 
         result: list[TreeLine] = list(lines)
@@ -1609,13 +1593,6 @@ class TreeProjection:
                     replacements.append(_more_footer(depth=play_depth + 1, count=rem))
                     last_inner_remaining = rem
 
-            # The inner footer was at ``inner_idx`` in the
-            # original ``lines``. Head footers inserted before
-            # that position shift it right, so compute the
-            # adjusted index rather than searching for the
-            # first ``more`` line with ``depth > 0`` (which
-            # would incorrectly match a head footer instead of
-            # the inner footer).
             shift = 0
             local_offsets: dict[int, int] = {}
             for insert_after, _ in head_footers:
@@ -1633,29 +1610,49 @@ class TreeProjection:
                 outer_idx = j
                 break
         if outer_idx is not None:
-            # ``iter_preflight_task_defs`` yields parent stubs as well as
-            # their children. Parent stubs are ``include_tasks`` containers,
-            # not leaves — counting them would double-count the leaves in
-            # their subtree. Skip them so the outer footer's drop count
-            # matches the visible/inner math (same rule as
-            # ``_count_tasks`` in ``format.py``).
-            # Whole-run leaf-task count is a pure function of the definitions;
-            # memoise it (invalidated on revision) instead of re-walking every
-            # play's preflight tree on each render.
-            if self._total_unique_tasks is None:
-                self._total_unique_tasks = sum(
-                    sum(
+            play_visible_tasks = self._count_visible_tasks_per_play(result)
+            outer_remaining = 0
+            for runtime, play_def in self._ordered_plays():
+                if (
+                    runtime is None
+                    and play_def is not None
+                    and play_def.resolved_hosts == []
+                    and self._state.definitions
+                    and any(bool(p.resolved_hosts) for p in self._state.definitions)
+                ):
+                    continue
+                preflight_count = 0
+                if play_def is not None:
+                    preflight_count = sum(
                         1
-                        for tdef, _ in iter_preflight_task_defs(play_def.tasks)
-                        if not tdef.children
+                        for entry, _ in iter_preflight_task_defs(play_def.tasks)
+                        if not entry.children and not _is_meta_task(entry.name)
                     )
-                    for play_def in self._state.definitions
-                )
-            _, global_completed_tasks = self._count_completed_tasks_per_role(play_names=None)
-            total_bound = max(self._total_unique_tasks, global_completed_tasks + visible_task_count)
-            outer_remaining = max(0, total_bound - global_completed_tasks - visible_task_count)
+                runtime_count = len(runtime.tasks) if runtime is not None else 0
+                total = max(preflight_count, runtime_count)
+                completed = 0
+                visible = 0
+                if runtime is not None:
+                    completed = sum(
+                        1
+                        for task in runtime.tasks.values()
+                        if task.status == Status.COMPLETED
+                        or (
+                            bool(task.hosts)
+                            and all(hs.status != Status.RUNNING for hs in task.hosts.values())
+                        )
+                    )
+                    visible = play_visible_tasks.get(runtime.name, 0)
+                elif play_def is not None:
+                    visible = play_visible_tasks.get(play_def.name, 0)
+                rem = max(0, total - completed - visible)
+                outer_remaining += rem
+
             outer_remaining = max(outer_remaining, last_inner_remaining)
-            result[outer_idx] = _more_footer(depth=0, count=outer_remaining)
+            if outer_remaining <= 0:
+                result.pop(outer_idx)
+            else:
+                result[outer_idx] = _more_footer(depth=0, count=outer_remaining)
 
         return result
 
@@ -1747,40 +1744,7 @@ class TreeProjection:
         # Iterate preflight plays in declared order so upcoming plays
         # land in the visual position the user will encounter them.
         # Runtime plays drive their own task projection; preflight-only
-        # plays render their entire task list as pending. Any runtime
-        # play whose name isn't in preflight (defensive: unusual but
-        # possible) gets appended at the end.
-        runtime_by_id: dict[str, PlayRunState] = {}
-        runtime_by_name: dict[str, list[PlayRunState]] = defaultdict(list)
-        for runtime_play in self._state.plays.values():
-            if runtime_play.play_id:
-                runtime_by_id.setdefault(runtime_play.play_id, runtime_play)
-            runtime_by_name[runtime_play.name].append(runtime_play)
-        seen_runtime_ids: set[str] = set()
-        seen_runtime_objects: set[int] = set()
-
-        ordered_plays: list[tuple[PlayRunState | None, "PlayDefinition | None"]] = []
-        for preflight_play_def in self._state.definitions:
-            runtime = None
-            if preflight_play_def.id:
-                runtime = runtime_by_id.get(preflight_play_def.id)
-                if runtime is not None:
-                    seen_runtime_ids.add(preflight_play_def.id)
-            if runtime is None:
-                for candidate in runtime_by_name.get(preflight_play_def.name, []):
-                    if id(candidate) in seen_runtime_objects:
-                        continue
-                    runtime = candidate
-                    break
-            if runtime is not None:
-                seen_runtime_objects.add(id(runtime))
-            ordered_plays.append((runtime, preflight_play_def))
-        for runtime_play in self._state.plays.values():
-            if runtime_play.play_id and runtime_play.play_id in seen_runtime_ids:
-                continue
-            if id(runtime_play) in seen_runtime_objects:
-                continue
-            ordered_plays.append((runtime_play, None))
+        ordered_plays = self._ordered_plays()
 
         # Build the runtime-play → definition mapping so _play_def_for
         # can resolve duplicate-named plays correctly (Issue #11).
@@ -1909,6 +1873,14 @@ class TreeProjection:
             lines.extend(cached)
             return
 
+        if (
+            play_def.resolved_hosts == []
+            and self._state.definitions
+            and any(bool(p.resolved_hosts) for p in self._state.definitions)
+        ):
+            self._pending_play_lines[id(play_def)] = []
+            return
+
         emitted: list[TreeLine] = [
             TreeLine(
                 depth=1,
@@ -1929,12 +1901,24 @@ class TreeProjection:
         # cannot catch.
         role_counts: dict[str | None, int] = {}
         for _entry, role_path in iter_preflight_task_defs(play_def.tasks):
+            # Skip parent stubs (include_tasks containers) — only their
+            # children are leaves. Matches ``_count_tasks`` in format.py
+            # and ``_role_total_preflight_for``. Also skip meta tasks
+            # (e.g. ``meta: flush_handlers``) which never emit callback
+            # events and should not inflate pending counts.
+            if _entry.children or _is_meta_task(_entry.name):
+                continue
             collapsed_path = _collapse_role_path_aggressive(role_path)
             innermost = collapsed_path[-1] if collapsed_path else None
             role_counts[innermost] = role_counts.get(innermost, 0) + 1
 
         current_role_path: list[str] = []
         for tdef, role_path in iter_preflight_task_defs(play_def.tasks):
+            # Skip parent stubs (include_tasks containers whose children
+            # are the real leaf tasks) and meta tasks (no callback events).
+            # Matches the active play's filtering in _play_running_and_pending.
+            if tdef.children or _is_meta_task(tdef.name):
+                continue
             # ``_collapse_role_path_aggressive`` collapses the
             # ``(X, X)`` path produced when ``TaskDefinition.role``
             # matches the enclosing ``RoleGroupDefinition.role``, so
@@ -1976,6 +1960,10 @@ class TreeProjection:
                     elapsed_s=None,
                 )
             )
+
+        if not any(ln.kind == "task" for ln in emitted):
+            self._pending_play_lines[id(play_def)] = []
+            return
 
         self._pending_play_lines[id(play_def)] = emitted
         lines.extend(emitted)

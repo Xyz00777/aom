@@ -5055,3 +5055,390 @@ class TestMultiPlayTruncationWithRoleFooters:
         )
         # Task 3 should be visible
         assert any("Task 3" in lbl for lbl in labels)
+
+
+class TestPendingPlayFiltering:
+    """Pending (upcoming) plays must filter include_tasks parent stubs and meta
+    tasks so the tree's pending-line count stays consistent with the status
+    bar's task denominator (``count_total_tasks``).
+
+    _emit_pending_play iterates ``iter_preflight_task_defs`` which yields both
+    parent stubs and their children. Without filtering:
+    - Parent stubs with ``.children`` inflate the pending count by +1 per stub.
+    - Meta tasks (e.g. ``meta: flush_handlers``) appear as pending lines even
+      though Ansible never emits callback events for them.
+    """
+
+    @staticmethod
+    def _state_with_upcoming_play(
+        upcoming_tasks: list[TaskDefinition | RoleGroupDefinition],
+    ) -> RunState:
+        """Build a RunState with one active play (to anchor the tree) and one
+        upcoming play whose task list is ``upcoming_tasks``."""
+        defs = [
+            PlayDefinition(
+                id="p1",
+                name="Active",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="Running task",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                ],
+            ),
+            PlayDefinition(
+                id="p2",
+                name="Upcoming",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=upcoming_tasks,
+            ),
+        ]
+        state = RunState(playbook="site.yml", definitions=defs)
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-24T10:00:00Z",
+                "play": {"id": "p1", "name": "Active"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-24T10:00:01Z",
+                "task": {"id": "t1", "name": "Running task"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-24T10:00:02Z",
+                "task": {"id": "t1", "name": "Running task"},
+                "host": "web1",
+            }
+        )
+        return state
+
+    def test_include_stub_hidden_in_pending_play(self):
+        """Parent stub with grafted children must NOT appear as a pending task;
+        only the children should be emitted. Mirrors TestIncludeStubHiding for
+        the _emit_pending_play code path."""
+        child_a = TaskDefinition(
+            name="Inner Alpha",
+            role="podman",
+            tags=[],
+            play_id="p2",
+            play_order=1,
+            task_order=0,
+        )
+        child_b = TaskDefinition(
+            name="Inner Beta",
+            role="podman",
+            tags=[],
+            play_id="p2",
+            play_order=1,
+            task_order=1,
+        )
+        stub = TaskDefinition(
+            name="Include site",
+            role="podman",
+            tags=[],
+            play_id="p2",
+            play_order=1,
+            task_order=2,
+            children=[child_a, child_b],
+        )
+        regular = TaskDefinition(
+            name="Final task",
+            role=None,
+            tags=[],
+            play_id="p2",
+            play_order=1,
+            task_order=3,
+        )
+        state = self._state_with_upcoming_play([stub, regular])
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=30)
+
+        pending_labels = [
+            ln.label for ln in lines if ln.kind == "task" and ln.status == Status.PENDING
+        ]
+        # Parent stub must be hidden
+        assert not any("Include site" in lbl for lbl in pending_labels), (
+            f"include_tasks stub should be hidden in pending play, got {pending_labels!r}"
+        )
+        # Children must be visible
+        assert any("Inner Alpha" in lbl for lbl in pending_labels)
+        assert any("Inner Beta" in lbl for lbl in pending_labels)
+        # Regular task must be visible
+        assert any("Final task" in lbl for lbl in pending_labels)
+        # Total pending tasks should be 3, not 4
+        assert len(pending_labels) == 3, (
+            f"expected 3 pending tasks (2 children + 1 regular), "
+            f"got {len(pending_labels)}: {pending_labels!r}"
+        )
+
+    def test_meta_task_hidden_in_pending_play(self):
+        """Meta tasks must NOT appear as pending task lines in upcoming plays,
+        matching the active play's filtering in _play_running_and_pending."""
+        tasks = [
+            TaskDefinition(
+                name="Real task",
+                role=None,
+                tags=[],
+                play_id="p2",
+                play_order=1,
+                task_order=0,
+            ),
+            TaskDefinition(
+                name="meta: flush_handlers",
+                role=None,
+                tags=[],
+                play_id="p2",
+                play_order=1,
+                task_order=1,
+            ),
+            TaskDefinition(
+                name="Another task",
+                role=None,
+                tags=[],
+                play_id="p2",
+                play_order=1,
+                task_order=2,
+            ),
+        ]
+        state = self._state_with_upcoming_play(tasks)
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=30)
+
+        pending_labels = [
+            ln.label for ln in lines if ln.kind == "task" and ln.status == Status.PENDING
+        ]
+        assert not any("flush_handlers" in lbl for lbl in pending_labels), (
+            f"meta task should be hidden in pending play, got {pending_labels!r}"
+        )
+        assert len(pending_labels) == 2, (
+            f"expected 2 pending tasks, got {len(pending_labels)}: {pending_labels!r}"
+        )
+
+    def test_meta_task_hidden_in_pending_play_role_count(self):
+        """Role label task count in pending play should exclude meta tasks."""
+        tasks = [
+            RoleGroupDefinition(
+                role="webserver",
+                tasks=[
+                    TaskDefinition(
+                        name="webserver : Install nginx",
+                        role="webserver",
+                        tags=[],
+                        play_id="p2",
+                        play_order=1,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="meta: flush_handlers",
+                        role="webserver",
+                        tags=[],
+                        play_id="p2",
+                        play_order=1,
+                        task_order=1,
+                    ),
+                    TaskDefinition(
+                        name="webserver : Configure nginx",
+                        role="webserver",
+                        tags=[],
+                        play_id="p2",
+                        play_order=1,
+                        task_order=2,
+                    ),
+                ],
+            ),
+        ]
+        state = self._state_with_upcoming_play(tasks)
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=30)
+
+        role_line = next(ln for ln in lines if ln.kind == "role")
+        # Role count should be 2 (Install + Configure), NOT 3
+        assert "(2 tasks)" in role_line.label, (
+            f"role label should count 2 leaf tasks excluding meta, got {role_line.label!r}"
+        )
+
+    def test_empty_upcoming_play_skipped(self):
+        """Upcoming plays with 0 tasks should NOT be emitted as bare empty play headers."""
+        state = self._state_with_upcoming_play([])
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=30)
+
+        play_labels = [ln.label for ln in lines if ln.kind == "play"]
+        assert "play: Upcoming" not in play_labels, (
+            f"empty upcoming play should not be emitted, got play labels {play_labels!r}"
+        )
+
+    def test_zero_more_tasks_footer_never_emitted(self):
+        """When 0 tasks remain in the outer tail, a '... and 0 more tasks' footer
+        must NEVER be emitted."""
+        defs = [
+            PlayDefinition(
+                id="p1",
+                name="Play 1",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="t1",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                    TaskDefinition(
+                        name="t2",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=1,
+                    ),
+                ],
+            ),
+            PlayDefinition(
+                id="p2",
+                name="Play 2",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name=f"p2_t{i}",
+                        role=None,
+                        tags=[],
+                        play_id="p2",
+                        play_order=1,
+                        task_order=i,
+                    )
+                    for i in range(10)
+                ],
+            ),
+        ]
+        state = RunState(playbook="site.yml", definitions=defs)
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-24T10:00:00Z",
+                "play": {"id": "p1", "name": "Play 1"},
+            }
+        )
+        # Dynamically run 15 tasks that complete
+        for i in range(15):
+            state.handle_event(
+                {
+                    "_event": "v2_playbook_on_task_start",
+                    "_timestamp": f"2026-05-24T10:00:{i:02d}Z",
+                    "task": {"id": f"dyn_{i}", "name": f"dynamic {i}"},
+                    "play": {"id": "p1"},
+                }
+            )
+            state.handle_event(
+                {
+                    "_event": "v2_runner_on_ok",
+                    "_timestamp": f"2026-05-24T10:00:{i:02d}Z",
+                    "task": {"id": f"dyn_{i}", "name": f"dynamic {i}"},
+                    "host": "web1",
+                    "res": {},
+                }
+            )
+        # Now 1 running task
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-24T10:01:00Z",
+                "task": {"id": "t_run", "name": "running now"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-24T10:01:01Z",
+                "task": {"id": "t_run", "name": "running now"},
+                "host": "web1",
+            }
+        )
+
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=5)
+        for ln in lines:
+            if ln.kind == "more":
+                assert ln.label != "… and 0 more tasks", (
+                    f"footer must never show '0 more tasks', got {ln.label!r}"
+                )
+        # The outer footer should correctly report the upcoming tasks from Play 2 (10 tasks)
+        outer_footers = [ln for ln in lines if ln.kind == "more" and ln.depth == 0]
+        assert outer_footers, "outer footer should exist for dropped Play 2 tasks"
+        assert outer_footers[0].label == "… and 10 more tasks"
+
+    def test_skipped_play_with_empty_resolved_hosts_skipped(self):
+        """When preflight host resolution ran and found 0 matching hosts for a play,
+        that play will never be executed and should not be projected as pending."""
+        defs = [
+            PlayDefinition(
+                id="p1",
+                name="Active Play",
+                hosts="web",
+                resolved_hosts=["web1"],
+                tasks=[
+                    TaskDefinition(
+                        name="t1", role=None, tags=[], play_id="p1", play_order=0, task_order=0
+                    ),
+                ],
+            ),
+            PlayDefinition(
+                id="p2",
+                name="Skipped Play (0 hosts)",
+                hosts="db",
+                resolved_hosts=[],
+                tasks=[
+                    TaskDefinition(
+                        name="t2", role=None, tags=[], play_id="p2", play_order=1, task_order=0
+                    ),
+                ],
+            ),
+        ]
+        state = RunState(playbook="site.yml", definitions=defs)
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-24T10:00:00Z",
+                "play": {"id": "p1", "name": "Active Play"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-24T10:00:01Z",
+                "task": {"id": "t1", "name": "t1"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-24T10:00:02Z",
+                "task": {"id": "t1", "name": "t1"},
+                "host": "web1",
+            }
+        )
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=20)
+        play_labels = [ln.label for ln in lines if ln.kind == "play"]
+        assert "play: Skipped Play (0 hosts)" not in play_labels, (
+            f"play with 0 resolved hosts should be skipped, got {play_labels!r}"
+        )
