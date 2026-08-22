@@ -146,61 +146,29 @@ def _cluster_items_by_role_path(
 ) -> list[tuple[str, str, tuple[str, ...], TaskRunState | None]]:
     """Group items so tasks sharing the same role branch stay contiguous,
     preventing multi-host concurrency from repeatedly opening and closing
-    role headers.
+    role headers, while preserving sequential order within each branch.
     """
     if not items:
         return items
 
-    by_path: dict[tuple[str, ...], list[tuple[str, str, tuple[str, ...], TaskRunState | None]]] = (
+    # Group items by their root role branch (or None for play-level tasks)
+    # in order of first appearance, consolidating any disjoint occurrences
+    # of the same root role branch while preserving relative sequence order.
+    by_root: dict[str | None, list[tuple[str, str, tuple[str, ...], TaskRunState | None]]] = (
         defaultdict(list)
     )
-    path_order: list[tuple[str, ...]] = []
+    root_order: list[str | None] = []
+
     for item in items:
         rpath = item[2]
-        if rpath not in by_path:
-            path_order.append(rpath)
-        by_path[rpath].append(item)
+        root = rpath[0] if rpath else None
+        if root not in by_root:
+            root_order.append(root)
+        by_root[root].append(item)
 
     clustered: list[tuple[str, str, tuple[str, ...], TaskRunState | None]] = []
-    emitted_paths: set[tuple[str, ...]] = set()
-
-    def _emit_path_and_descendants(target_path: tuple[str, ...]) -> None:
-        if target_path in emitted_paths:
-            return
-        emitted_paths.add(target_path)
-
-        # Check if any descendant has running items
-        descendants = [
-            p
-            for p in path_order
-            if p not in emitted_paths
-            and len(p) > len(target_path)
-            and p[: len(target_path)] == target_path
-        ]
-        running_descendants = [
-            p for p in descendants if any(it[0] == "running" for it in by_path[p])
-        ]
-        pending_descendants = [p for p in descendants if p not in running_descendants]
-
-        # 1. Emit running descendants first so active work is visible at the top
-        for p in running_descendants:
-            _emit_path_and_descendants(p)
-
-        # 2. Emit target path items
-        if target_path in by_path:
-            clustered.extend(by_path[target_path])
-
-        # 3. Emit remaining pending descendants
-        for p in pending_descendants:
-            _emit_path_and_descendants(p)
-
-    for p in path_order:
-        if p not in emitted_paths:
-            root = (p[0],) if p else ()
-            if root not in emitted_paths and root in by_path:
-                _emit_path_and_descendants(root)
-            else:
-                _emit_path_and_descendants(p)
+    for root in root_order:
+        clustered.extend(by_root[root])
 
     return clustered
 
@@ -2003,15 +1971,12 @@ class TreeProjection:
         if not play_items:
             return
 
-        running_items = [(k, n, rp, rt) for k, n, rp, rt in play_items if k == "running"]
-        pending_items = [(k, n, rp, rt) for k, n, rp, rt in play_items if k != "running"]
+        running_items = [it for it in play_items if it[0] == "running"]
+        pending_items = [it for it in play_items if it[0] != "running"]
 
         if not running_items and not pending_items:
             return
 
-        # Render running tasks and pending tasks clustered by their hierarchical
-        # role path so that multi-host concurrency does not interleave tasks
-        # and repeatedly open/close role headers.
         play_items = _cluster_items_by_role_path(running_items + pending_items)
 
         lines.append(
@@ -2304,6 +2269,18 @@ class TreeProjection:
             or (not t.hosts and t.status == Status.RUNNING)
             for t in play.tasks.values()
         )
+        # A play is superseded when a later play has already started
+        # running tasks.  Once the playbook moves past this play, the
+        # TC-329 failure-retention rule should no longer pin tasks here.
+        play_is_superseded = False
+        play_ids = list(self._state.plays)
+        try:
+            play_pos = play_ids.index(play.play_id)
+            play_is_superseded = any(
+                self._state.plays[pid].tasks for pid in play_ids[play_pos + 1 :]
+            )
+        except ValueError:
+            pass
 
         def _classify(runtime: TaskRunState | None) -> str:
             """Return ``"running"`` / ``"pending"`` / ``"completed"``.
@@ -2334,8 +2311,12 @@ class TreeProjection:
             # A task with at least one FAILED or UNREACHABLE host stays visible
             # in the tree while no further task has started or is running,
             # so the user can see the failure summary during the gap (TC-329).
-            # Once the next task starts, it drops off.
-            if not has_running_tasks and _task_identity(runtime) == latest_task_id:
+            # Once the next task starts — or a later play begins — it drops off.
+            if (
+                not has_running_tasks
+                and not play_is_superseded
+                and _task_identity(runtime) == latest_task_id
+            ):
                 if any(
                     _effective_status(hs) in (Status.FAILED, Status.UNREACHABLE)
                     for hs in runtime.hosts.values()
@@ -2564,7 +2545,29 @@ class TreeProjection:
             runtime_name_chain = _name_role_chain(task.name)
             full_role_path = _extend_role_path(last_emitted_role_path, (), task, runtime_name_chain)
 
-            items.append((kind, task.name, full_role_path, task))
+            item_entry = (kind, task.name, full_role_path, task)
+            last_match_idx = -1
+            for i, it in enumerate(items):
+                it_path = it[2]
+                if it_path == full_role_path:
+                    last_match_idx = i
+                elif last_match_idx == -1 and (
+                    (
+                        len(it_path) >= len(full_role_path)
+                        and it_path[: len(full_role_path)] == full_role_path
+                    )
+                    or (
+                        len(full_role_path) >= len(it_path)
+                        and full_role_path[: len(it_path)] == it_path
+                    )
+                ):
+                    last_match_idx = i
+
+            if last_match_idx != -1:
+                items.insert(last_match_idx + 1, item_entry)
+            else:
+                items.append(item_entry)
+
             emitted_names.add(task.name)
             emitted_task_ids.add(task_identity)
             stripped = strip_role_prefix(task.name)

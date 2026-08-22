@@ -2188,3 +2188,122 @@ class TestFailedTaskRemainsVisible:
             f"Install nginx (with unreachable web1) must remain in tree; "
             f"got task labels: {task_labels}"
         )
+
+    def test_failed_task_drops_when_later_play_starts(self) -> None:
+        """A failed task from a prior play must NOT stay pinned once a
+        subsequent play has started running tasks.  The playbook moved on;
+        the TC-329 retention is only for the intra-play gap."""
+        from datetime import datetime, timezone
+
+        defs = [
+            PlayDefinition(
+                id="p1",
+                name="Align hostname",
+                hosts="all",
+                resolved_hosts=["h1", "h2"],
+                tasks=[
+                    TaskDefinition(
+                        name="Set hostname",
+                        role=None,
+                        tags=[],
+                        play_id="p1",
+                        play_order=0,
+                        task_order=0,
+                    ),
+                ],
+            ),
+            PlayDefinition(
+                id="p2",
+                name="Deploy AIDE",
+                hosts="all",
+                resolved_hosts=["h1", "h2"],
+                tasks=[
+                    TaskDefinition(
+                        name="Update AIDE",
+                        role=None,
+                        tags=[],
+                        play_id="p2",
+                        play_order=1,
+                        task_order=0,
+                    ),
+                ],
+            ),
+        ]
+        state = RunState(playbook="test.yml", definitions=defs)
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-05-22T10:00:00Z"})
+        # Play 1 starts, task fails on h1, ok on h2.
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:01Z",
+                "play": {"id": "p1", "name": "Align hostname"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:02Z",
+                "task": {"id": "t1", "name": "Set hostname"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_failed",
+                "_timestamp": "2026-05-22T10:00:05Z",
+                "task": {"id": "t1"},
+                "hosts": {"h1": {"msg": "error", "failed": True}},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-05-22T10:00:06Z",
+                "task": {"id": "t1"},
+                "hosts": {"h2": {"ok": True, "changed": False}},
+            }
+        )
+        # Play 2 starts — the playbook has moved past Play 1.
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-22T10:00:07Z",
+                "play": {"id": "p2", "name": "Deploy AIDE"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-22T10:00:08Z",
+                "task": {"id": "t2", "name": "Update AIDE"},
+                "play": {"id": "p2"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-22T10:00:09Z",
+                "task": {"id": "t2"},
+                "hosts": {"h2": {}},
+            }
+        )
+
+        p = TreeProjection.from_run_state(state)
+        now = datetime(2026, 5, 22, 10, 0, 10, tzinfo=timezone.utc)
+        lines = p.tree_lines(budget=25, now=now)
+        play_labels = [ln.label for ln in lines if ln.kind == "play"]
+        task_labels = [ln.label for ln in lines if ln.kind == "task"]
+        # Play 1's failed task must NOT be pinned; Play 2 is active.
+        assert "play: Align hostname" not in play_labels, (
+            f"Prior play with only a completed-failed task should drop "
+            f"once a later play starts; got plays: {play_labels}"
+        )
+        assert not any("Set hostname" in lbl for lbl in task_labels), (
+            f"Set hostname (failed in prior play) must not remain in "
+            f"tree once the playbook moved to a later play; "
+            f"got task labels: {task_labels}"
+        )
+        # Play 2 must be visible.
+        assert any("Deploy AIDE" in lbl for lbl in play_labels), (
+            f"Active play 'Deploy AIDE' must be visible; got: {play_labels}"
+        )
