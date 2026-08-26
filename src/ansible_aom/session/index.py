@@ -133,17 +133,18 @@ _STDERR_BATCH_SIZE = 10_000
 
 def build_index(session_path: Path) -> bool:
     """Stream events.jsonl into a fresh index.db. Returns False when the
-    session has no events file; sqlite/OS errors also return False (the
-    index is an optimization — callers fall back to the slow path).
+    session has no events file, the log changes during the build, or a
+    sqlite/OS error occurs. The index is an optimization, so callers fall
+    back to the slow path.
 
     stderr rows go straight into sqlite in batches as the file streams
     (``collect_stderr=False``), so peak memory is bounded by tasks×hosts
     even for verbose runs with hundreds of thousands of stderr lines.
     """
     events_path = _events_path(session_path)
-    # Stat BEFORE parsing: if the file grows while we read (running
-    # session), the recorded size is smaller than reality and the index
-    # correctly reads as stale on the next freshness check.
+    # Stat BEFORE parsing, then compare again before publishing: a log that
+    # changes while we read (for example, a running session) must not install
+    # an index that is already known to be stale.
     stat = events_stat(session_path)
     if stat is None:
         return False
@@ -177,7 +178,7 @@ def build_index(session_path: Path) -> bool:
                     if stripped:
                         try:
                             event = json.loads(stripped)
-                        except json.JSONDecodeError:
+                        except json.JSONDecodeError, UnicodeDecodeError:
                             malformed += 1
                         else:
                             if not isinstance(event, dict):
@@ -207,6 +208,9 @@ def build_index(session_path: Path) -> bool:
             _write_index_db(conn, acc.finish(), events_stat=stat, malformed=malformed)
         finally:
             conn.close()
+        if events_stat(session_path) != stat:
+            tmp_path.unlink(missing_ok=True)
+            return False
         os.replace(tmp_path, index_path(session_path))
     except (OSError, sqlite3.Error) as exc:
         logger.debug("index build failed for %s: %s", session_path, exc)
@@ -660,6 +664,6 @@ def read_event(session_path: Path, ref: EventRef) -> dict | None:
         return None
     try:
         event = json.loads(data)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError, UnicodeDecodeError:
         return None
     return event if isinstance(event, dict) else None

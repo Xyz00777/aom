@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 
 from ansible_aom.core.inspect_model import (
+    EventRef,
     build_run_summary,
     build_task_tree,
     build_verbose_lines,
@@ -293,6 +294,71 @@ def test_build_index_returns_false_without_events(tmp_path: Path) -> None:
     session_path.mkdir()
     assert build_index(session_path) is False
     assert not index_is_fresh(session_path)
+
+
+def test_build_index_rejects_log_that_changes_during_build(tmp_path: Path, monkeypatch) -> None:
+    session_path = _write_session(tmp_path)
+    import ansible_aom.session.index as index_mod
+
+    original_events_stat = index_mod.events_stat
+    calls = 0
+
+    def changing_events_stat(path: Path) -> tuple[int, int] | None:
+        nonlocal calls
+        calls += 1
+        stat = original_events_stat(path)
+        if calls == 1 or stat is None:
+            return stat
+        return (stat[0] + 1, stat[1])
+
+    monkeypatch.setattr(index_mod, "events_stat", changing_events_stat)
+
+    assert build_index(session_path) is False
+    assert not index_path(session_path).exists()
+    assert list(session_path.glob("index.tmp-*.db")) == []
+
+
+def test_load_session_skips_non_object_json_records(tmp_path: Path) -> None:
+    session_path = _write_session(tmp_path)
+    with open(session_path / "events.jsonl", "a", encoding="utf-8") as events_file:
+        events_file.write("[1, 2, 3]\n")
+        events_file.write('"not an event"\n')
+
+    session = load_session(session_path.name, tmp_path)
+
+    assert session is not None
+    assert session["malformed_lines"] == 2
+    assert all(isinstance(event, dict) for event in session["events"])
+
+
+def test_load_session_skips_invalid_utf8_record(tmp_path: Path) -> None:
+    session_path = _write_session(tmp_path)
+    with open(session_path / "events.jsonl", "ab") as events_file:
+        events_file.write(b'"\xff"\n')
+
+    session = load_session(session_path.name, tmp_path)
+
+    assert session is not None
+    assert session["malformed_lines"] == 1
+    assert all(isinstance(event, dict) for event in session["events"])
+
+
+def test_build_index_skips_invalid_utf8_record(tmp_path: Path) -> None:
+    session_path = _write_session(tmp_path)
+    with open(session_path / "events.jsonl", "ab") as events_file:
+        events_file.write(b'"\xff"\n')
+
+    assert build_index(session_path) is True
+    assert index_is_fresh(session_path)
+
+
+def test_read_event_returns_none_for_invalid_utf8(tmp_path: Path) -> None:
+    session_path = tmp_path / "invalid-utf8"
+    session_path.mkdir()
+    payload = b'"\xff"\n'
+    (session_path / "events.jsonl").write_bytes(payload)
+
+    assert read_event(session_path, EventRef(offset=0, length=len(payload))) is None
 
 
 def _write_second_session(first: Path) -> Path:
