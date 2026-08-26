@@ -135,6 +135,39 @@ class _BufferedChild:
         pass
 
 
+class _ExitedWithTrailingOutputChild:
+    def __init__(self, blob: str) -> None:
+        first, trailing = blob.split("\r\n", 1)
+        self._first = first
+        self._trailing = trailing
+        self._calls = 0
+        self.before = ""
+        self.after = ""
+        self.buffer = ""
+        self.exitstatus: int | None = 0
+        self.signalstatus: int | None = None
+        self.pid = 0
+        self.closed = False
+
+    def expect(self, patterns, timeout=-1, **kw):  # noqa: ARG002
+        self._calls += 1
+        if self._calls == 1:
+            self.before = self._first
+            self.after = "\r\n"
+            return 0
+        if self._calls == 2:
+            self.before = self._trailing
+            self.after = ""
+            return 1
+        raise AssertionError("unexpected expect call after EOF")
+
+    def isalive(self) -> bool:
+        return False
+
+    def close(self, force: bool = False) -> None:  # noqa: ARG002
+        self.closed = True
+
+
 class _NullSink:
     """Stand-in for the runner's session sink — records calls for assertions."""
 
@@ -193,6 +226,28 @@ def test_drive_feeds_each_event_when_pexpect_returns_multi_event_blob() -> None:
     assert recorded == [e["_event"] for e in events], (
         f"expected all 8 events recorded, got {len(sink.events)}: {recorded!r}"
     )
+
+
+def test_drive_drains_trailing_pty_output_after_process_exits() -> None:
+    from ansible_aom.ansible.runner import _drive
+    from ansible_aom.core.parser import PtyStreamParser
+    from ansible_aom.core.run_state import RunState
+
+    events = _events_fixture()
+    blob = "".join(json.dumps(event) + "\r\n" for event in events)
+    child = _ExitedWithTrailingOutputChild(blob)
+    sink = _NullSink()
+
+    _drive(
+        child,
+        PtyStreamParser(),
+        RunState(playbook="x"),
+        MagicMock(),
+        timeout=0.5,
+        sink=sink,  # type: ignore[arg-type]
+    )
+
+    assert [event.get("_event") for event in sink.events] == [event["_event"] for event in events]
 
 
 def test_run_playbook_writes_all_events_to_disk(tmp_path: Path) -> None:
