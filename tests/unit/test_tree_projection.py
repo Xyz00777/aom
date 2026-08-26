@@ -3440,6 +3440,119 @@ class TestIncludeStubHiding:
             f"stub with no children should still render, got labels={labels!r}"
         )
 
+    def test_include_stub_skipped_children_not_pending(self):
+        """TC-094l: when a stub's runtime task is terminal-skipped (all hosts
+        SKIPPED), its grafted children must NOT render as pending ghost tasks.
+
+        The stub row itself is already dropped by ``_classify`` returning
+        "completed"; this pins that the children recursion is also skipped so
+        they don't inflate the pending count or take tree budget.
+        """
+        child_a = TaskDefinition(
+            name="Inner Alpha",
+            role="podman",
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=0,
+        )
+        child_b = TaskDefinition(
+            name="Inner Beta",
+            role="podman",
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=1,
+        )
+        stub = TaskDefinition(
+            name="Include site",
+            role="podman",
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=2,
+            children=[child_a, child_b],
+        )
+        regular = TaskDefinition(
+            name="Final task",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=3,
+        )
+        defs = [
+            PlayDefinition(
+                id="p1",
+                name="Test",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[stub, regular],
+            )
+        ]
+        state = RunState(playbook="site.yml", definitions=defs)
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-05-24T10:00:00Z",
+                "play": {"id": "p1", "name": "Test"},
+            }
+        )
+        # Stub fires, then is skipped on host1.
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-24T10:00:01Z",
+                "task": {"id": "t-stub", "name": stub.name},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_skipped",
+                "_timestamp": "2026-05-24T10:00:02Z",
+                "task": {"id": "t-stub", "name": stub.name},
+                "play": {"id": "p1"},
+                "hosts": {"web1": {"skipped": True}},
+            }
+        )
+        # Next real task starts and runs.
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-05-24T10:00:03Z",
+                "task": {"id": "t-final", "name": regular.name},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-05-24T10:00:04Z",
+                "task": {"id": "t-final", "name": regular.name},
+                "host": "web1",
+            }
+        )
+
+        projection = TreeProjection.from_run_state(state)
+        labels = [ln.label for ln in projection.tree_lines(budget=25)]
+
+        # The running task must be present.
+        assert any("Final task" in lbl for lbl in labels), (
+            f"running task should appear, got labels={labels!r}"
+        )
+        # The skipped stub's grafted children must NOT appear as pending ghosts.
+        assert not any("Inner Alpha" in lbl for lbl in labels), (
+            f"skipped stub child 'Inner Alpha' should be hidden, got labels={labels!r}"
+        )
+        assert not any("Inner Beta" in lbl for lbl in labels), (
+            f"skipped stub child 'Inner Beta' should be hidden, got labels={labels!r}"
+        )
+        # The stub itself stays hidden (already covered by TC-094j).
+        assert not any("Include site" in lbl for lbl in labels), (
+            f"stub name should be hidden, got labels={labels!r}"
+        )
+
 
 class TestSubtreeRoleCounting:
     """Subtree semantics for ``_build_role_total_tasks`` and

@@ -2498,7 +2498,22 @@ class TreeProjection:
                     continue
                 raw_preflight_items.append((kind, entry.name, full_role_path, runtime))
 
-                if entry.children:
+                # A stub whose runtime task was terminal-skipped on every host
+                # (e.g. ``when: false``) never ran its body, so its grafted
+                # children must not render as pending ghost tasks. The stub row
+                # itself is already dropped by ``_classify`` returning
+                # "completed"; this skips the children recursion so they don't
+                # inflate the pending count or take tree budget. A stub with no
+                # hosts but COMPLETED status (linear force-completion) is NOT
+                # treated as skipped — only explicit all-hosts-SKIPPED evidence
+                # retracts children.
+                if entry.children and not (
+                    runtime is not None
+                    and runtime.hosts
+                    and all(
+                        _effective_status(hs) == Status.SKIPPED for hs in runtime.hosts.values()
+                    )
+                ):
                     _emit_preflight_entries(
                         entry.children,
                         full_role_path,
