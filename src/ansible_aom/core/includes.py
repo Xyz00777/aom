@@ -795,45 +795,117 @@ def _graft_section_dfs(
                     visited_files=visited_files,
                 )
         target = _lookup_directive(task, "include_tasks")
-        if not (isinstance(target, str) and "{{" not in target):
-            continue
-        resolved = (base_dir / target).resolve()
-        cache_key = str(resolved)
-        if cache_key in visited_files:
-            continue
-        visited_files.add(cache_key)
+        if isinstance(target, str) and "{{" not in target:
+            resolved = (base_dir / target).resolve()
+            cache_key = str(resolved)
+            if cache_key not in visited_files:
+                visited_files.add(cache_key)
+                cache_entry = cache.get(cache_key)
+                if cache_entry is not None:
+                    yaml_name = str(task.get("name") or "")
+                    stub = name_index.get(yaml_name)
+                    if stub is None and yaml_name:
+                        for k, v in name_index.items():
+                            if strip_role_prefix(k) == yaml_name or k.endswith(f" : {yaml_name}"):
+                                stub = v
+                                break
+                    if stub is None and not yaml_name:
+                        stub = _find_stub_by_role(name_index)
+                    if stub is not None:
+                        _graft_children(stub, cache_entry)
+                        nested_tasks = _load_task_list(resolved)
+                        if nested_tasks:
+                            child_index: dict[str, TaskDefinition] = {
+                                c.name: c for c in stub.children if c.name
+                            }
+                            _graft_section_dfs(
+                                nested_tasks,
+                                base_dir=resolved.parent,
+                                cache=cache,
+                                name_index=child_index,
+                                visited_files=visited_files,
+                            )
 
-        cache_entry = cache.get(cache_key)
-        if cache_entry is None:
-            continue
-        yaml_name = str(task.get("name") or "")
-        stub = name_index.get(yaml_name)
-        if stub is None and yaml_name:
-            for k, v in name_index.items():
-                if strip_role_prefix(k) == yaml_name or k.endswith(f" : {yaml_name}"):
-                    stub = v
-                    break
-        if stub is None and not yaml_name:
-            stub = _find_stub_by_role(name_index)
-        if stub is None:
-            continue
+        # Check include_role / import_role
+        role_name = None
+        for directive in _ROLE_DIRECTIVE_KEYS:
+            role_name = _extract_role_name(_lookup_directive(task, directive))
+            if role_name:
+                break
 
-        _graft_children(stub, cache_entry)
+        if role_name:
+            role_dir = _resolve_role_dir(role_name, base_dir=base_dir)
+            if role_dir is not None:
+                tasks_file = role_dir / "tasks" / "main.yml"
+                if not tasks_file.is_file():
+                    tasks_file = role_dir / "tasks" / "main.yaml"
+                cache_key = f"role:{role_name.lower().strip()}"
+                if cache_key not in visited_files and tasks_file.is_file():
+                    visited_files.add(cache_key)
+                    task_names = parse_role_tasks(role_dir)
+                    if task_names:
+                        yaml_name = str(task.get("name") or "")
+                        stub = name_index.get(yaml_name)
+                        if stub is None and yaml_name:
+                            for k, v in name_index.items():
+                                if strip_role_prefix(k) == yaml_name or k.endswith(
+                                    f" : {yaml_name}"
+                                ):
+                                    stub = v
+                                    break
+                        if stub is None:
+                            for k, v in name_index.items():
+                                if role_name in k:
+                                    stub = v
+                                    break
+                        if stub is None and not yaml_name:
+                            stub = _find_stub_by_role(name_index)
+                        if stub is not None:
+                            base_idx = len(stub.children)
+                            existing_names = {c.name for c in stub.children}
+                            for offset, name in enumerate(task_names):
+                                if name in existing_names:
+                                    continue
+                                child = TaskDefinition(
+                                    name=name,
+                                    role=role_name,
+                                    tags=[],
+                                    play_id=stub.play_id,
+                                    play_order=stub.play_order,
+                                    task_order=base_idx + offset,
+                                    is_dynamic=False,
+                                    parent_role=stub.parent_role or stub.role,
+                                )
+                                stub.children.append(child)
 
-        # Recurse into the just-grafted children so any nested
-        # include_tasks inside the included file is grafted too.
-        # The file's own YAML walk uses its directory as base_dir
-        # so includes inside it resolve relative to that file.
-        nested_tasks = _load_task_list(resolved)
-        if nested_tasks:
-            child_index: dict[str, TaskDefinition] = {c.name: c for c in stub.children if c.name}
-            _graft_section_dfs(
-                nested_tasks,
-                base_dir=resolved.parent,
-                cache=cache,
-                name_index=child_index,
-                visited_files=visited_files,
-            )
+                            nested_tasks = _load_task_list(tasks_file)
+                            if nested_tasks:
+                                child_index = {c.name: c for c in stub.children if c.name}
+                                _graft_section_dfs(
+                                    nested_tasks,
+                                    base_dir=role_dir / "tasks",
+                                    cache=cache,
+                                    name_index=child_index,
+                                    visited_files=visited_files,
+                                )
+
+
+def _resolve_role_dir(role_name: str, base_dir: Path) -> Path | None:
+    """Find the directory for *role_name* relative to *base_dir* or its ancestors."""
+    candidates = [
+        base_dir / "roles" / role_name,
+        base_dir / role_name,
+        base_dir.parent / "roles" / role_name,
+        base_dir.parent / role_name,
+    ]
+    if len(base_dir.parents) > 1:
+        candidates.append(base_dir.parents[1] / "roles" / role_name)
+    for candidate in candidates:
+        if (candidate / "tasks" / "main.yml").is_file() or (
+            candidate / "tasks" / "main.yaml"
+        ).is_file():
+            return candidate
+    return None
 
 
 def _find_stub_by_role(
@@ -856,7 +928,10 @@ def _find_stub_by_role(
 def _graft_children(stub: TaskDefinition, cache_entry: IncludeCacheEntry) -> None:
     """Append cached task names as children of *stub*."""
     base_idx = len(stub.children)
+    existing_names = {c.name for c in stub.children}
     for offset, name in enumerate(cache_entry.task_names):
+        if name in existing_names:
+            continue
         child = TaskDefinition(
             name=name,
             role=stub.role,

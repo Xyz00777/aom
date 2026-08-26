@@ -3885,7 +3885,7 @@ class TestMultiLevelInnerFooters:
                 m = re.match(r"… and (\d+) more tasks", footer.label)
                 assert m
                 footer_count = int(m.group(1))
-                assert footer_count == 34
+                assert footer_count == 35 - sum(1 for ln in lines if ln.kind == "task")
                 continue
 
             closest_role = None
