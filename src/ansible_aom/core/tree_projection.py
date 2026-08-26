@@ -2338,6 +2338,20 @@ class TreeProjection:
             task_path: str | None = None,
         ) -> TaskRunState | None:
             def _pick_best(candidates: list[TaskRunState]) -> TaskRunState | None:
+                def _is_running(candidate: TaskRunState) -> bool:
+                    return candidate.status == Status.RUNNING or any(
+                        hs.status == Status.RUNNING for hs in candidate.hosts.values()
+                    )
+
+                # Prefer RUNNING candidates over completed ones when names tie.
+                # For a looped include, the same preflight child name matches
+                # both the completed iteration-1 task and the RUNNING
+                # iteration-2 task; the live one must win so the tree shows the
+                # current iteration, not a stale completed row.
+                running = [c for c in candidates if _is_running(c)]
+                if running:
+                    candidates = running
+
                 best: TaskRunState | None = None
                 best_score = -1
 
@@ -2405,12 +2419,17 @@ class TreeProjection:
             inherited_role_path: tuple[str, ...],
             preferred_hosts: set[str] | None,
             matched_runtime_task_ids: set[str],
+            stub_loop_total: int | None = None,
         ) -> None:
             for entry in entries:
                 if isinstance(entry, RoleGroupDefinition):
                     child_path = inherited_role_path + (entry.role,)
                     _emit_preflight_entries(
-                        entry.tasks, child_path, preferred_hosts, matched_runtime_task_ids
+                        entry.tasks,
+                        child_path,
+                        preferred_hosts,
+                        matched_runtime_task_ids,
+                        stub_loop_total,
                     )
                     continue
 
@@ -2461,6 +2480,18 @@ class TreeProjection:
                     preflight_path, preflight_name_chain, runtime, runtime_name_chain
                 )
                 kind = _classify(runtime)
+                # For a looped include, a child whose matched runtime task is
+                # completed but which will run again this loop (its runtime-task
+                # count is less than the stub's loop_total) is re-emitted as
+                # PENDING so the upcoming iteration stays visible mid-loop.
+                if (
+                    kind == "completed"
+                    and stub_loop_total is not None
+                    and runtime is not None
+                    and len(runtime_by_name.get(entry.name, [])) < stub_loop_total
+                ):
+                    kind = "pending"
+                    runtime = None
                 emitted_names.add(entry.name)
                 next_preferred_hosts = preferred_hosts
                 if runtime is not None:
@@ -2514,11 +2545,13 @@ class TreeProjection:
                         _effective_status(hs) == Status.SKIPPED for hs in runtime.hosts.values()
                     )
                 ):
+                    child_loop_total = runtime.loop_total if runtime is not None else None
                     _emit_preflight_entries(
                         entry.children,
                         full_role_path,
                         next_preferred_hosts,
                         matched_runtime_task_ids,
+                        child_loop_total,
                     )
 
         if play_def is not None:

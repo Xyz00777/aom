@@ -1436,6 +1436,20 @@ class RunState:
         prior = task.hosts.get(hostname)
         return prior.start_time if prior is not None else None
 
+    @staticmethod
+    def _capture_loop_total(task: TaskRunState, hosts_data: dict[str, JsonlHostResult]) -> None:
+        """Record the loop iteration count from a terminal event's results.
+
+        A looped include_tasks/include_role emits the loop items as a
+        ``results`` list on the stub's terminal runner event. The projection
+        uses ``loop_total`` to re-emit a completed child as pending when it
+        will run again this loop. Repeated events keep the largest count.
+        """
+        for host_result in hosts_data.values():
+            results = host_result.get("results")
+            if isinstance(results, list):
+                task.loop_total = max(task.loop_total or 0, len(results))
+
     def _handle_v2_runner_on_ok(self, event: JsonlEvent, ts: datetime) -> None:
         """Handle v2_runner_on_ok event."""
         hosts_data = self._hosts_dict(event)
@@ -1443,6 +1457,8 @@ class RunState:
         if task is None:
             self._note_unmatched(event)
             return
+
+        self._capture_loop_total(task, hosts_data)
 
         for hostname, host_result in hosts_data.items():
             changed = host_result.get("changed", False)
@@ -1472,6 +1488,8 @@ class RunState:
         if task is None:
             self._note_unmatched(event)
             return
+
+        self._capture_loop_total(task, hosts_data)
 
         for hostname, host_result in hosts_data.items():
             # Ansible passes ``ignore_errors`` as a parameter to the
@@ -1525,6 +1543,8 @@ class RunState:
             self._note_unmatched(event)
             return
 
+        self._capture_loop_total(task, hosts_data)
+
         for hostname in hosts_data:
             new_hs = HostRunState(
                 hostname=hostname,
@@ -1548,6 +1568,8 @@ class RunState:
         if task is None:
             self._note_unmatched(event)
             return
+
+        self._capture_loop_total(task, hosts_data)
 
         for hostname, host_result in hosts_data.items():
             msg = host_result.get("msg", "")

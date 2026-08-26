@@ -278,6 +278,127 @@ class TestDynamicExpansion:
         assert state.definitions == []
 
 
+class TestLoopIncludeLoopTotal:
+    """TC-094o: loop_total is captured from the results list on terminal events."""
+
+    def _state_with_task(self) -> RunState:
+        state = RunState(playbook="test.yml")
+        state.handle_event(_play_start())
+        state.handle_event(_task_start("t-stub", "Include site"))
+        return state
+
+    def test_loop_total_stored_from_results(self) -> None:
+        """runner_on_ok with a results list sets task.loop_total."""
+        state = self._state_with_task()
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "hosts": {
+                    "web1": {
+                        "ok": True,
+                        "results": [{"item": "one"}, {"item": "two"}],
+                    }
+                },
+                "task": {"id": "t-stub", "name": "Include site"},
+                "play": {"id": "play-uuid-1"},
+            }
+        )
+        task = state.plays["play-uuid-1"].tasks["t-stub"]
+        assert task.loop_total == 2
+
+    def test_loop_total_none_without_results(self) -> None:
+        """A terminal event with no results list leaves loop_total None."""
+        state = self._state_with_task()
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "hosts": {"web1": {"ok": True}},
+                "task": {"id": "t-stub", "name": "Include site"},
+                "play": {"id": "play-uuid-1"},
+            }
+        )
+        task = state.plays["play-uuid-1"].tasks["t-stub"]
+        assert task.loop_total is None
+
+    def test_loop_total_takes_max_across_events(self) -> None:
+        """Repeated terminal events keep the largest results length."""
+        state = self._state_with_task()
+        for results in ([{"item": "one"}], [{"item": "one"}, {"item": "two"}]):
+            state.handle_event(
+                {
+                    "_event": "v2_runner_on_ok",
+                    "_timestamp": "2026-04-20T10:00:01Z",
+                    "hosts": {"web1": {"ok": True, "results": results}},
+                    "task": {"id": "t-stub", "name": "Include site"},
+                    "play": {"id": "play-uuid-1"},
+                }
+            )
+        task = state.plays["play-uuid-1"].tasks["t-stub"]
+        assert task.loop_total == 2
+
+
+class TestPickRuntimePrefersRunning:
+    """TC-094p: _pick_best prefers RUNNING candidates over completed ones."""
+
+    def test_pick_runtime_prefers_running(self) -> None:
+        """Same-name completed + running candidates → running wins."""
+        from ansible_aom.core.models import Status
+        from ansible_aom.core.tree_projection import TreeProjection
+
+        child_a = TaskDefinition(
+            name="Inner Alpha",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=0,
+        )
+        stub = TaskDefinition(
+            name="Include site",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=1,
+            children=[child_a],
+        )
+        defs = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy",
+                hosts="all",
+                resolved_hosts=["host1"],
+                tasks=[stub],
+            )
+        ]
+        state = RunState(playbook="site.yml", definitions=defs)
+        state.handle_event(_play_start("p1", "Deploy"))
+        # Iteration 1: Alpha completes.
+        state.handle_event(_task_start("t-a-1", "Inner Alpha", "p1"))
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-04-20T10:00:01Z",
+                "hosts": {"host1": {"ok": True}},
+                "task": {"id": "t-a-1", "name": "Inner Alpha"},
+                "play": {"id": "p1"},
+            }
+        )
+        # Iteration 2: Alpha RUNNING.
+        state.handle_event(_task_start("t-a-2", "Inner Alpha", "p1"))
+        state.handle_event(_runner_start("t-a-2", "Inner Alpha", "host1"))
+
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=30)
+        alpha = [ln for ln in lines if "Inner Alpha" in ln.label]
+        assert any(ln.status == Status.RUNNING for ln in alpha), (
+            f"Inner Alpha should match the RUNNING iteration-2 task, "
+            f"got {[ln.status for ln in alpha]}"
+        )
+
+
 class TestRuntimeIncludeDiscovery:
     """TC-094h / TC-094i: runtime include cache discovery from task.path."""
 

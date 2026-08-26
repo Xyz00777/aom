@@ -3553,6 +3553,205 @@ class TestIncludeStubHiding:
             f"stub name should be hidden, got labels={labels!r}"
         )
 
+    def _loop_state(self, *, complete_iter2: bool) -> RunState:
+        """Build a RunState for a looped include with 2 iterations.
+
+        Iteration 1 completes fully (stub + Alpha + Beta). Iteration 2 fires
+        the stub (with ``results`` setting loop_total=2) and starts Alpha
+        (RUNNING); Beta is not yet started unless ``complete_iter2``.
+        """
+        child_a = TaskDefinition(
+            name="Inner Alpha",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=0,
+        )
+        child_b = TaskDefinition(
+            name="Inner Beta",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=1,
+        )
+        stub = TaskDefinition(
+            name="Include site",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=2,
+            children=[child_a, child_b],
+        )
+        defs = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy",
+                hosts="all",
+                resolved_hosts=["host1"],
+                tasks=[stub],
+            )
+        ]
+        state = RunState(playbook="site.yml", definitions=defs)
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-06-24T10:00:00Z",
+                "play": {"id": "p1", "name": "Deploy"},
+            }
+        )
+        # The stub fires ONCE with the full results list (loop_total=2).
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-06-24T10:00:01Z",
+                "task": {"id": "t-stub", "name": "Include site"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-06-24T10:00:01Z",
+                "hosts": {
+                    "host1": {
+                        "ok": True,
+                        "results": [{"item": "one"}, {"item": "two"}],
+                    }
+                },
+                "task": {"id": "t-stub", "name": "Include site"},
+                "play": {"id": "p1"},
+            }
+        )
+        # Iteration 1 completes fully.
+        for tid, name, ts in [
+            ("t-a-1", "Inner Alpha", "10:00:02"),
+            ("t-b-1", "Inner Beta", "10:00:04"),
+        ]:
+            state.handle_event(
+                {
+                    "_event": "v2_playbook_on_task_start",
+                    "_timestamp": f"2026-06-24T{ts}Z",
+                    "task": {"id": tid, "name": name},
+                    "play": {"id": "p1"},
+                }
+            )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-06-24T10:00:03Z",
+                "hosts": {"host1": {"ok": True}},
+                "task": {"id": "t-a-1", "name": "Inner Alpha"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": "2026-06-24T10:00:05Z",
+                "hosts": {"host1": {"ok": True}},
+                "task": {"id": "t-b-1", "name": "Inner Beta"},
+                "play": {"id": "p1"},
+            }
+        )
+        # Iteration 2: Alpha RUNNING, Beta not yet started.
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-06-24T10:00:07Z",
+                "task": {"id": "t-a-2", "name": "Inner Alpha"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-06-24T10:00:08Z",
+                "host": "host1",
+                "task": {"id": "t-a-2", "name": "Inner Alpha"},
+                "play": {"id": "p1"},
+            }
+        )
+        if complete_iter2:
+            state.handle_event(
+                {
+                    "_event": "v2_runner_on_ok",
+                    "_timestamp": "2026-06-24T10:00:09Z",
+                    "hosts": {"host1": {"ok": True}},
+                    "task": {"id": "t-a-2", "name": "Inner Alpha"},
+                    "play": {"id": "p1"},
+                }
+            )
+            state.handle_event(
+                {
+                    "_event": "v2_playbook_on_task_start",
+                    "_timestamp": "2026-06-24T10:00:10Z",
+                    "task": {"id": "t-b-2", "name": "Inner Beta"},
+                    "play": {"id": "p1"},
+                }
+            )
+            state.handle_event(
+                {
+                    "_event": "v2_runner_on_ok",
+                    "_timestamp": "2026-06-24T10:00:11Z",
+                    "hosts": {"host1": {"ok": True}},
+                    "task": {"id": "t-b-2", "name": "Inner Beta"},
+                    "play": {"id": "p1"},
+                }
+            )
+        return state
+
+    def test_loop_include_pending_tail_mid_loop(self):
+        """TC-094m: mid-loop, the pending tail of the current iteration shows."""
+        state = self._loop_state(complete_iter2=False)
+        projection = TreeProjection.from_run_state(state)
+        lines = projection.tree_lines(budget=30)
+
+        alpha = [ln for ln in lines if "Inner Alpha" in ln.label]
+        beta = [ln for ln in lines if "Inner Beta" in ln.label]
+        assert any(ln.status == Status.RUNNING for ln in alpha), (
+            f"Inner Alpha should be RUNNING, got {[ln.status for ln in alpha]}"
+        )
+        assert any(ln.status == Status.PENDING for ln in beta), (
+            f"Inner Beta should be PENDING (will run again this loop), "
+            f"got {[ln.status for ln in beta]}"
+        )
+
+    def test_loop_include_all_done_no_pending(self):
+        """TC-094n: when the loop fully completes, no ghost children remain."""
+        state = self._loop_state(complete_iter2=True)
+        projection = TreeProjection.from_run_state(state)
+        lines = projection.tree_lines(budget=30)
+
+        beta = [ln for ln in lines if "Inner Beta" in ln.label]
+        assert not any(ln.status == Status.PENDING for ln in beta), (
+            f"Inner Beta should not be pending after loop completes, "
+            f"got {[ln.status for ln in beta]}"
+        )
+
+    def test_non_loop_include_unchanged(self):
+        """TC-094q: a non-loop include (no results) behaves exactly as today."""
+        state = self._loop_state(complete_iter2=False)
+        # Clear loop_total so the stub is a plain non-loop include.
+        for task in state.plays["p1"].tasks.values():
+            task.loop_total = None
+        projection = TreeProjection.from_run_state(state)
+        lines = projection.tree_lines(budget=30)
+
+        alpha = [ln for ln in lines if "Inner Alpha" in ln.label]
+        beta = [ln for ln in lines if "Inner Beta" in ln.label]
+        # Alpha RUNNING (iteration-2 running task matched), Beta dropped as
+        # completed (no loop_total → no pending re-emission).
+        assert any(ln.status == Status.RUNNING for ln in alpha), (
+            f"Inner Alpha should be RUNNING, got {[ln.status for ln in alpha]}"
+        )
+        assert not any(ln.status == Status.PENDING for ln in beta), (
+            f"Inner Beta should not be pending for a non-loop include, "
+            f"got {[ln.status for ln in beta]}"
+        )
+
 
 class TestSubtreeRoleCounting:
     """Subtree semantics for ``_build_role_total_tasks`` and

@@ -261,6 +261,11 @@ class TaskRunState:
     # the preflight role assignment, so the projection can render a
     # sub-branch under the right role.
     parent_role: str | None = None
+    # The number of loop iterations for a looped include_tasks/include_role,
+    # captured from the ``results`` list length on terminal runner events.
+    # ``None`` for non-loop tasks. Lets the projection re-emit a completed
+    # child as pending when it will run again this loop.
+    loop_total: int | None = None
 
 
 @dataclass
