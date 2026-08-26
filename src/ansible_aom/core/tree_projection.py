@@ -654,6 +654,7 @@ class TreeProjection:
         default_factory=dict, init=False, repr=False
     )
     _play_total_preflight: dict[str, int] = field(default_factory=dict, init=False, repr=False)
+    _preflight_task_counts: dict[int, int] = field(default_factory=dict, init=False, repr=False)
     _total_unique_tasks: int | None = field(default=None, init=False, repr=False)
     # Per-render memo for ``_play_running_and_pending`` — reset at the top of
     # each ``_tree_lines_unbounded`` call. The active play's items are needed
@@ -746,6 +747,7 @@ class TreeProjection:
         self._runtime_play_preflight_roles.clear()
         self._role_total_preflight.clear()
         self._play_total_preflight.clear()
+        self._preflight_task_counts.clear()
         self._total_unique_tasks = None
 
     @staticmethod
@@ -1297,16 +1299,25 @@ class TreeProjection:
                     role_completed[role] = role_completed.get(role, 0) + 1
         return role_completed, total_completed
 
+    def _preflight_task_count(self, play_def: "PlayDefinition") -> int:
+        self._refresh_tree_cache()
+        key = id(play_def)
+        cached = self._preflight_task_counts.get(key)
+        if cached is None:
+            cached = sum(
+                1
+                for entry, _ in iter_preflight_task_defs(play_def.tasks)
+                if not entry.children and not _is_meta_task(entry.name)
+            )
+            self._preflight_task_counts[key] = cached
+        return cached
+
     def _build_play_total_tasks(self) -> dict[str, int]:
         """Build play_name -> total task count from preflight + runtime state."""
         self._refresh_tree_cache()
         if not self._play_total_preflight:
             for play_def in self._state.definitions:
-                count = sum(
-                    1
-                    for entry, _ in iter_preflight_task_defs(play_def.tasks)
-                    if not entry.children and not _is_meta_task(entry.name)
-                )
+                count = self._preflight_task_count(play_def)
                 self._play_total_preflight[play_def.name] = count
 
         play_totals: dict[str, int] = dict(self._play_total_preflight)
@@ -1591,11 +1602,7 @@ class TreeProjection:
                     continue
                 preflight_count = 0
                 if play_def is not None:
-                    preflight_count = sum(
-                        1
-                        for entry, _ in iter_preflight_task_defs(play_def.tasks)
-                        if not entry.children and not _is_meta_task(entry.name)
-                    )
+                    preflight_count = self._preflight_task_count(play_def)
                 runtime_count = len(runtime.tasks) if runtime is not None else 0
                 total = max(preflight_count, runtime_count)
                 completed = 0
