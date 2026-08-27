@@ -199,6 +199,45 @@ def parse_role_tasks(role_dir: Path) -> list[str]:
     return names
 
 
+def parse_role_tasks_nested(role_dir: Path) -> list[tuple[str, list[str], bool]]:
+    """Read ``role_dir/tasks/main.yml``; return ``(name, nested, run_once)`` per entry.
+
+    ``nested`` holds the names of tasks nested under a ``block:`` /
+    ``rescue:`` / ``always:`` container (recursively, so a nested task that
+    itself has a block contributes its own nested names). ``run_once`` is
+    ``True`` only for a literal YAML ``run_once: true``. ``role : `` prefixes
+    are stripped from every name. Returns ``[]`` on any error or when the
+    file does not exist.
+    """
+    tasks_file = role_dir / "tasks" / "main.yml"
+    if not tasks_file.is_file():
+        return []
+    tasks = _load_task_list(tasks_file)
+    result: list[tuple[str, list[str], bool]] = []
+    for entry in tasks:
+        if not isinstance(entry, dict) or "name" not in entry:
+            continue
+        name = strip_role_prefix(str(entry["name"]))
+        nested = _nested_task_names(entry)
+        result.append((name, nested, entry.get("run_once") is True))
+    return result
+
+
+def _nested_task_names(entry: dict) -> list[str]:
+    """Collect names from ``block:``/``rescue:``/``always:`` sub-lists (recursively)."""
+    names: list[str] = []
+    for sub_key in ("block", "rescue", "always"):
+        sub = entry.get(sub_key)
+        if not isinstance(sub, list):
+            continue
+        for sub_entry in sub:
+            if not isinstance(sub_entry, dict) or "name" not in sub_entry:
+                continue
+            names.append(strip_role_prefix(str(sub_entry["name"])))
+            names.extend(_nested_task_names(sub_entry))
+    return names
+
+
 def _find_nested_role_includes(role_dir: Path) -> list[str]:
     """Return names of roles included from this role's ``tasks/main.yml``.
 
@@ -1126,8 +1165,8 @@ def _graft_section_dfs(
                 cache_key = f"role:{role_name.lower().strip()}"
                 if cache_key not in visited_files and tasks_file.is_file():
                     visited_files.add(cache_key)
-                    task_names, task_run_once = parse_role_tasks_with_flags(role_dir)
-                    if task_names:
+                    role_entries = parse_role_tasks_nested(role_dir)
+                    if role_entries:
                         yaml_name = str(task.get("name") or "")
                         stub = name_index.get(yaml_name)
                         if stub is None and yaml_name:
@@ -1147,7 +1186,7 @@ def _graft_section_dfs(
                         if stub is not None:
                             base_idx = len(stub.children)
                             existing_names = {c.name for c in stub.children}
-                            for offset, name in enumerate(task_names):
+                            for offset, (name, nested, run_once) in enumerate(role_entries):
                                 if name in existing_names:
                                     continue
                                 child = TaskDefinition(
@@ -1159,8 +1198,22 @@ def _graft_section_dfs(
                                     task_order=base_idx + offset,
                                     is_dynamic=False,
                                     parent_role=stub.parent_role or stub.role,
-                                    run_once=task_run_once.get(name, False),
+                                    run_once=run_once,
+                                    is_block=bool(nested),
                                 )
+                                for n_offset, nested_name in enumerate(nested):
+                                    child.children.append(
+                                        TaskDefinition(
+                                            name=nested_name,
+                                            role=role_name,
+                                            tags=[],
+                                            play_id=stub.play_id,
+                                            play_order=stub.play_order,
+                                            task_order=n_offset,
+                                            is_dynamic=False,
+                                            parent_role=stub.parent_role or stub.role,
+                                        )
+                                    )
                                 stub.children.append(child)
 
                             nested_tasks = _load_task_list(tasks_file)

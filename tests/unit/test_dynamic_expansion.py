@@ -932,3 +932,84 @@ class TestIncludeRoleStubInsideOuterRole:
             f"Play 2 task must have 1 grafted child, got {p2_t1.children}"
         )
         assert p2_t1.children[0].name == "Reload systemd daemon for user"
+
+
+class TestRoleBlockNestedRuntimeGraft:
+    """Block-nested role tasks match preflight nested leaves at runtime.
+
+    Once preflight nests a role's ``block:`` tasks (is_block=True with
+    children), a runtime ``task_start`` for a nested task must match the
+    nested leaf — not graft under the preceding plain task.
+    """
+
+    def _make_state(self, tmp_path: Path) -> tuple[RunState, TaskDefinition]:
+        role_dir = tmp_path / "roles" / "myrole" / "tasks"
+        role_dir.mkdir(parents=True)
+        (role_dir / "main.yml").write_text(
+            "- name: Plain one\n  debug:\n    msg: 1\n"
+            "- name: Block task\n  block:\n"
+            "    - name: Nested one\n      debug:\n        msg: n1\n"
+            "    - name: Nested two\n      debug:\n        msg: n2\n"
+            "- name: Plain two\n  debug:\n    msg: 2\n"
+        )
+        playbook = tmp_path / "play.yml"
+        playbook.write_text(
+            "- hosts: localhost\n  tasks:\n"
+            "    - name: Include myrole\n      include_role:\n        name: myrole\n"
+        )
+        stub = TaskDefinition(
+            name="Include myrole",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        defs = [
+            PlayDefinition(
+                id="1",
+                name="Test play",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[stub],
+            )
+        ]
+        from ansible_aom.core.includes import graft_include_children
+
+        graft_include_children(playbook_path=str(playbook), definitions=defs, cache={})
+        state = RunState(playbook=str(playbook), definitions=defs)
+        return state, stub
+
+    def test_role_block_nested_task_matches_runtime_leaf(self, tmp_path: Path) -> None:
+        """A runtime task_start for a block-nested task matches the nested leaf."""
+        state, stub = self._make_state(tmp_path)
+        state.handle_event(_play_start())
+        state.handle_event(_task_start("uuid-stub", "Include myrole"))
+        # Fire the first plain task, then the first block-nested task.
+        state.handle_event(_task_start("uuid-1", "Plain one"))
+        state.handle_event(_task_start("uuid-2", "Nested one"))
+
+        # The nested task must have matched the preflight nested leaf, so
+        # _last_matched_task_def points at it — a subsequent unknown task
+        # grafts under the nested leaf, not under "Plain one".
+        state.handle_event(_task_start("uuid-3", "Unknown after nested"))
+        block = stub.children[1]
+        nested_one = block.children[0]
+        assert [c.name for c in nested_one.children] == ["Unknown after nested"]
+        assert stub.children[0].children == []
+
+    def test_role_pending_siblings_skip_nested_names(self, tmp_path: Path) -> None:
+        """Firing the first role task must not re-graft nested names as flat siblings."""
+        state, stub = self._make_state(tmp_path)
+        state.handle_event(_play_start())
+        state.handle_event(_task_start("uuid-stub", "Include myrole"))
+        # First role task fires with the role prefix — triggers the sibling graft.
+        state.handle_event(_task_start("uuid-1", "myrole : Plain one"))
+
+        # The sibling graft must not add "Nested one"/"Nested two" as flat
+        # siblings under the stub (they already live under the block task).
+        flat_names = [c.name for c in stub.children]
+        assert "Nested one" not in flat_names
+        assert "Nested two" not in flat_names
+        block = next(c for c in stub.children if c.is_block)
+        assert [c.name for c in block.children] == ["Nested one", "Nested two"]

@@ -128,6 +128,19 @@ def _iter_leaf_task_defs(plays: list[PlayDefinition]) -> list[TaskDefinition]:
     return leaves
 
 
+def _subtree_names(task_def: TaskDefinition) -> set[str]:
+    """Collect every task name in *task_def*'s subtree (recursively).
+
+    Used by the sibling graft to dedupe against the full subtree of the
+    parent — not just its direct children — so block-nested role tasks
+    aren't re-grafted as flat siblings under the include_role stub.
+    """
+    names = {task_def.name}
+    for child in task_def.children:
+        names.update(_subtree_names(child))
+    return names
+
+
 def _leaves_of_role_group(group: RoleGroupDefinition) -> list[TaskDefinition]:
     """Return leaf TaskDefinitions reachable from a possibly-nested role group."""
     leaves: list[TaskDefinition] = []
@@ -989,8 +1002,10 @@ class RunState:
         # current task (which ``_graft_or_match_task`` just added)
         # and any earlier siblings from a previous task_start. The
         # existing ``children`` list is the source of truth for
-        # what's already known about this subtree.
-        existing_names = {child.name for child in parent.children}
+        # what's already known about this subtree. Collect names from
+        # the FULL subtree (recursively) so block-nested role tasks
+        # aren't re-grafted as flat siblings under the stub.
+        existing_names = _subtree_names(parent)
 
         # Also skip names already started at runtime under the same
         # play — their ``TaskRunState`` entries mean they've already

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from typing import Literal
@@ -142,8 +142,8 @@ def _play_target_hostnames(play: "PlayRunState", play_def: "PlayDefinition | Non
 
 
 def _cluster_items_by_role_path(
-    items: list[tuple[str, str, tuple[str, ...], TaskRunState | None]],
-) -> list[tuple[str, str, tuple[str, ...], TaskRunState | None]]:
+    items: list[tuple[str, str, tuple[str, ...], TaskRunState | None, int]],
+) -> list[tuple[str, str, tuple[str, ...], TaskRunState | None, int]]:
     """Group items so tasks sharing the same role branch stay contiguous,
     preventing multi-host concurrency from repeatedly opening and closing
     role headers, while preserving sequential order within each branch.
@@ -154,7 +154,7 @@ def _cluster_items_by_role_path(
     # Group items by their root role branch (or None for play-level tasks)
     # in order of first appearance, consolidating any disjoint occurrences
     # of the same root role branch while preserving relative sequence order.
-    by_root: dict[str | None, list[tuple[str, str, tuple[str, ...], TaskRunState | None]]] = (
+    by_root: dict[str | None, list[tuple[str, str, tuple[str, ...], TaskRunState | None, int]]] = (
         defaultdict(list)
     )
     root_order: list[str | None] = []
@@ -166,7 +166,7 @@ def _cluster_items_by_role_path(
             root_order.append(root)
         by_root[root].append(item)
 
-    clustered: list[tuple[str, str, tuple[str, ...], TaskRunState | None]] = []
+    clustered: list[tuple[str, str, tuple[str, ...], TaskRunState | None, int]] = []
     for root in root_order:
         clustered.extend(by_root[root])
 
@@ -661,9 +661,9 @@ class TreeProjection:
     # by both the "find the latest running play" pre-pass and the emission
     # loop; without this memo the O(preflight × runtime-match) walk runs twice
     # per render. Keyed by ``id(play)``.
-    _prp_render_memo: dict[int, list[tuple[str, str, tuple[str, ...], "TaskRunState | None"]]] = (
-        field(default_factory=dict, init=False, repr=False)
-    )
+    _prp_render_memo: dict[
+        int, list[tuple[str, str, tuple[str, ...], "TaskRunState | None", int]]
+    ] = field(default_factory=dict, init=False, repr=False)
     _row_leases: dict[tuple[str, str], _RowLease] = field(
         default_factory=dict, init=False, repr=False
     )
@@ -1733,7 +1733,7 @@ class TreeProjection:
         for runtime, _ in ordered_plays:
             if runtime is not None:
                 items = self._play_running_and_pending(runtime, include_cross_play=False)
-                if any(k == "running" for k, _, _, _ in items):
+                if any(k == "running" for k, _, _, _, _ in items):
                     fresh_found = runtime  # don't break — find latest
 
         if fresh_found is not None:
@@ -1796,7 +1796,7 @@ class TreeProjection:
                         # If an active play has already started after this play,
                         # and this prior play has no running tasks, it is completed.
                         if active_play_index is not None and idx < active_play_index:
-                            if not any(k == "running" for k, _, _, _ in items):
+                            if not any(k == "running" for k, _, _, _, _ in items):
                                 continue
                         # Hide plays whose every task is finished: no
                         # running, no pending, only ``runtime.tasks``
@@ -1888,53 +1888,67 @@ class TreeProjection:
             role_counts[innermost] = role_counts.get(innermost, 0) + 1
 
         current_role_path: list[str] = []
-        for tdef, role_path in iter_preflight_task_defs(play_def.tasks):
-            # Skip parent stubs (include_tasks containers whose children
-            # are the real leaf tasks) and meta tasks (no callback events).
-            # Matches the active play's filtering in _play_running_and_pending.
-            if tdef.children or _is_meta_task(tdef.name):
-                continue
-            # ``_collapse_role_path_aggressive`` collapses the
-            # ``(X, X)`` path produced when ``TaskDefinition.role``
-            # matches the enclosing ``RoleGroupDefinition.role``, so
-            # the renderer sees one role path element per unique
-            # nesting level instead of two for the duplicate case.
-            role_path_list = list(_collapse_role_path_aggressive(role_path))
-            if role_path_list != current_role_path:
-                common = 0
-                for a, b in zip(current_role_path, role_path_list):
-                    if a == b:
-                        common += 1
-                    else:
-                        break
-                for depth_idx in range(common, len(role_path_list)):
-                    role = role_path_list[depth_idx]
-                    n = role_counts.get(role, 0)
-                    task_count = f" ({n} task{'s' if n != 1 else ''})" if n > 0 else ""
-                    role_depth = 2 + depth_idx
-                    emitted.append(
-                        TreeLine(
-                            depth=role_depth,
-                            kind="role",
-                            label=f"role: {role}{task_count}",
-                            glyph=None,
-                            status=None,
-                            elapsed_s=None,
-                            identity=role,
+
+        def _emit_entries(
+            entries: Sequence[TaskDefinition | RoleGroupDefinition],
+            role_path: tuple[str, ...],
+            block_depth: int,
+        ) -> None:
+            for entry in entries:
+                if isinstance(entry, RoleGroupDefinition):
+                    _emit_entries(entry.tasks, role_path + (entry.role,), block_depth)
+                    continue
+                if _is_meta_task(entry.name):
+                    continue
+                if entry.children and not entry.is_block:
+                    # include_tasks stub: children render at the stub's depth.
+                    _emit_entries(entry.children, role_path, block_depth)
+                    continue
+                # ``_collapse_role_path_aggressive`` collapses the
+                # ``(X, X)`` path produced when ``TaskDefinition.role``
+                # matches the enclosing ``RoleGroupDefinition.role``, so
+                # the renderer sees one role path element per unique
+                # nesting level instead of two for the duplicate case.
+                role_path_list = list(_collapse_role_path_aggressive(role_path))
+                if role_path_list != current_role_path:
+                    common = 0
+                    for a, b in zip(current_role_path, role_path_list):
+                        if a == b:
+                            common += 1
+                        else:
+                            break
+                    for depth_idx in range(common, len(role_path_list)):
+                        role = role_path_list[depth_idx]
+                        n = role_counts.get(role, 0)
+                        task_count = f" ({n} task{'s' if n != 1 else ''})" if n > 0 else ""
+                        role_depth = 2 + depth_idx
+                        emitted.append(
+                            TreeLine(
+                                depth=role_depth,
+                                kind="role",
+                                label=f"role: {role}{task_count}",
+                                glyph=None,
+                                status=None,
+                                elapsed_s=None,
+                                identity=role,
+                            )
                         )
+                    current_role_path[:] = role_path_list
+                task_depth = 2 + len(current_role_path) + block_depth
+                emitted.append(
+                    TreeLine(
+                        depth=task_depth,
+                        kind="task",
+                        label=strip_role_prefix(entry.name),
+                        glyph=None,
+                        status=Status.PENDING,
+                        elapsed_s=None,
                     )
-                current_role_path = role_path_list
-            task_depth = 2 + len(current_role_path) if current_role_path else 2
-            emitted.append(
-                TreeLine(
-                    depth=task_depth,
-                    kind="task",
-                    label=strip_role_prefix(tdef.name),
-                    glyph=None,
-                    status=Status.PENDING,
-                    elapsed_s=None,
                 )
-            )
+                if entry.children and entry.is_block:
+                    _emit_entries(entry.children, role_path, block_depth + 1)
+
+        _emit_entries(play_def.tasks, (), 0)
 
         if not any(ln.kind == "task" for ln in emitted):
             self._pending_play_lines[id(play_def)] = []
@@ -2040,7 +2054,7 @@ class TreeProjection:
                 role_total_tasks[task_role] = role_total_tasks.get(task_role, 0) + 1
 
         current_role_path: list[str] = []
-        for item_kind, name, role_path, runtime in play_items:
+        for item_kind, name, role_path, runtime, depth_offset in play_items:
             role_path_list = list(role_path)
             # No prefix-guard here: ``_play_running_and_pending`` yields
             # exactly one combined item per preflight task (it merges the
@@ -2083,8 +2097,9 @@ class TreeProjection:
                     )
                     self._touch_role_lease(role, now)
                 current_role_path = role_path_list
-            task_depth = 2 + len(current_role_path) if current_role_path else 2
-
+            task_depth = (
+                2 + len(current_role_path) + depth_offset if current_role_path else 2 + depth_offset
+            )
             if item_kind == "running" and runtime is not None:
                 lines.append(
                     self._task_line(
@@ -2155,9 +2170,9 @@ class TreeProjection:
 
     def _play_running_and_pending(
         self, play: "PlayRunState", include_cross_play: bool = True
-    ) -> list[tuple[str, str, tuple[str, ...], TaskRunState | None]]:
-        """Enumerate (kind, name, role_path, runtime) for a play's running and
-        pending tasks, in execution order.
+    ) -> list[tuple[str, str, tuple[str, ...], TaskRunState | None, int]]:
+        """Enumerate (kind, name, role_path, runtime, depth_offset) for a play's
+        running and pending tasks, in execution order.
 
         ``kind`` is ``"running"`` (task has at least one RUNNING host) or
         ``"pending"`` (task hasn't started, or runtime has no hosts yet).
@@ -2167,6 +2182,11 @@ class TreeProjection:
         ``role_path`` is the full role path from outermost to innermost
         (e.g. ``("podman", "angie_ssl_terminator")``). An empty tuple
         means the task sits directly under a play with no role context.
+
+        ``depth_offset`` is the number of extra nesting levels contributed by
+        enclosing ``block:``/``rescue:``/``always:`` containers (0 for a
+        top-level task, +1 per enclosing block). The renderer adds it to the
+        role-path-derived depth so block children render one level deeper.
 
         The preflight side supplies the *outer* portion of the path via
         the matched ``TaskDefinition``'s ``role_path`` (built by
@@ -2212,7 +2232,7 @@ class TreeProjection:
         if play_def is not None:
             _, _, preflight_known_role_paths = self._runtime_play_preflight_roles_for(play_def)
 
-        items: list[tuple[str, str, tuple[str, ...], TaskRunState | None]] = []
+        items: list[tuple[str, str, tuple[str, ...], TaskRunState | None, int]] = []
         emitted_names: set[str] = set()
         emitted_task_ids: set[str] = set()
 
@@ -2420,6 +2440,7 @@ class TreeProjection:
             preferred_hosts: set[str] | None,
             matched_runtime_task_ids: set[str],
             stub_loop_total: int | None = None,
+            depth_offset: int = 0,
         ) -> None:
             for entry in entries:
                 if isinstance(entry, RoleGroupDefinition):
@@ -2430,6 +2451,7 @@ class TreeProjection:
                         preferred_hosts,
                         matched_runtime_task_ids,
                         stub_loop_total,
+                        depth_offset,
                     )
                     continue
 
@@ -2527,7 +2549,9 @@ class TreeProjection:
                     for tid in (_task_identity(t) for t in runtime_by_name.get(entry.name, []))
                 ):
                     continue
-                raw_preflight_items.append((kind, entry.name, full_role_path, runtime))
+                raw_preflight_items.append(
+                    (kind, entry.name, full_role_path, runtime, depth_offset)
+                )
 
                 # A stub whose runtime task was terminal-skipped on every host
                 # (e.g. ``when: false``) never ran its body, so its grafted
@@ -2546,16 +2570,22 @@ class TreeProjection:
                     )
                 ):
                     child_loop_total = runtime.loop_total if runtime is not None else None
+                    # Block children nest one level deeper; include_tasks stub
+                    # children render at the stub's depth.
+                    child_depth_offset = depth_offset + (1 if entry.is_block else 0)
                     _emit_preflight_entries(
                         entry.children,
                         full_role_path,
                         next_preferred_hosts,
                         matched_runtime_task_ids,
                         child_loop_total,
+                        child_depth_offset,
                     )
 
         if play_def is not None:
-            raw_preflight_items: list[tuple[str, str, tuple[str, ...], TaskRunState | None]] = []
+            raw_preflight_items: list[
+                tuple[str, str, tuple[str, ...], TaskRunState | None, int]
+            ] = []
             matched_runtime_task_ids: set[str] = set()
             _emit_preflight_entries(play_def.tasks, (), None, matched_runtime_task_ids)
 
@@ -2566,16 +2596,20 @@ class TreeProjection:
             # flush_handlers that emit no callback events). It will never run
             # in the future and should not be emitted as a pending ghost task.
             max_started_idx = -1
-            for idx, (kind, _name, _role_path, runtime) in enumerate(raw_preflight_items):
+            for idx, (kind, _name, _role_path, runtime, _depth_offset) in enumerate(
+                raw_preflight_items
+            ):
                 if runtime is not None or kind == "running":
                     max_started_idx = max(max_started_idx, idx)
 
-            for idx, (kind, name, full_role_path, runtime) in enumerate(raw_preflight_items):
+            for idx, (kind, name, full_role_path, runtime, depth_offset) in enumerate(
+                raw_preflight_items
+            ):
                 if kind == "completed":
                     continue
                 if kind == "pending" and runtime is None and _is_meta_task(name):
                     continue
-                items.append((kind, name, full_role_path, runtime))
+                items.append((kind, name, full_role_path, runtime, depth_offset))
 
         # Runtime-only tasks (dynamic include_tasks, or no preflight at all).
         # When preflight entries were emitted above, treat the runtime
@@ -2600,7 +2634,7 @@ class TreeProjection:
             runtime_name_chain = _name_role_chain(task.name)
             full_role_path = _extend_role_path(last_emitted_role_path, (), task, runtime_name_chain)
 
-            item_entry = (kind, task.name, full_role_path, task)
+            item_entry = (kind, task.name, full_role_path, task, 0)
             last_match_idx = -1
             for i, it in enumerate(items):
                 it_path = it[2]

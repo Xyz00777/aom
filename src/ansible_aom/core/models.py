@@ -137,6 +137,11 @@ class TaskDefinition:
     # the one delegated host. Preflight stamps this from the playbook /
     # include / role YAML; Task 2 (run_state.py) consumes it.
     run_once: bool = False
+    # True when this task is a ``block:``/``rescue:``/``always:`` container
+    # whose nested tasks live in ``children``. Preflight role graft sets this
+    # so the projection can render the block as a collapsible group rather
+    # than a flat leaf.
+    is_block: bool = False
     # The parent role name when this task is nested inside another role
     # (e.g. an ``include_role`` inside a role's ``tasks/main.yml``).
     # ``None`` for top-level play tasks and for tasks whose enclosing role

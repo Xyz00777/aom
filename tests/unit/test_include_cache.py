@@ -1477,6 +1477,75 @@ class TestGraftIncludeChildren:
 
         assert [c.name for c in stub.children] == ["Role task A", "Role task B"]
 
+    def test_role_block_tasks_graft_nested(self, tmp_path: Path) -> None:
+        """TC-094k: block/rescue/always tasks in a role graft as nested children.
+
+        A role's ``block:`` task (is_block=True) gets its nested tasks as
+        children instead of being grafted flat under the preceding task.
+        """
+        (tmp_path / "roles" / "myrole" / "tasks").mkdir(parents=True)
+        (tmp_path / "roles" / "myrole" / "tasks" / "main.yml").write_text(
+            "- name: Plain one\n  debug:\n    msg: 1\n"
+            "- name: Block task\n  block:\n"
+            "    - name: Nested one\n      debug:\n        msg: n1\n"
+            "    - name: Nested two\n      debug:\n        msg: n2\n"
+            "- name: Plain two\n  debug:\n    msg: 2\n"
+        )
+        playbook = tmp_path / "play.yml"
+        playbook.write_text(
+            "- hosts: localhost\n  tasks:\n"
+            "    - name: Include myrole\n      include_role:\n        name: myrole\n"
+        )
+        stub = _include_stub("Include myrole", role=None)
+        play = _make_play([stub])
+
+        graft_include_children(
+            playbook_path=str(playbook),
+            definitions=[play],
+            cache={},
+        )
+
+        assert [c.name for c in stub.children] == ["Plain one", "Block task", "Plain two"]
+        block = stub.children[1]
+        assert block.is_block is True
+        assert [c.name for c in block.children] == ["Nested one", "Nested two"]
+        assert all(c.is_block is False for c in block.children)
+        assert all(c.is_dynamic is False for c in block.children)
+
+    def test_rescue_always_sections_expand(self, tmp_path: Path) -> None:
+        """TC-094l: block with rescue/always sub-lists grafts all nested names."""
+        (tmp_path / "roles" / "myrole" / "tasks").mkdir(parents=True)
+        (tmp_path / "roles" / "myrole" / "tasks" / "main.yml").write_text(
+            "- name: Block task\n  block:\n"
+            "    - name: Main nested\n      debug:\n        msg: m\n"
+            "  rescue:\n"
+            "    - name: Rescue nested\n      debug:\n        msg: r\n"
+            "  always:\n"
+            "    - name: Always nested\n      debug:\n        msg: a\n"
+        )
+        playbook = tmp_path / "play.yml"
+        playbook.write_text(
+            "- hosts: localhost\n  tasks:\n"
+            "    - name: Include myrole\n      include_role:\n        name: myrole\n"
+        )
+        stub = _include_stub("Include myrole", role=None)
+        play = _make_play([stub])
+
+        graft_include_children(
+            playbook_path=str(playbook),
+            definitions=[play],
+            cache={},
+        )
+
+        assert len(stub.children) == 1
+        block = stub.children[0]
+        assert block.is_block is True
+        assert [c.name for c in block.children] == [
+            "Main nested",
+            "Rescue nested",
+            "Always nested",
+        ]
+
 
 # ---------------------------------------------------------------------------
 # run_once stamping

@@ -1816,7 +1816,7 @@ class TestTreeLinesDelegatedTaskIdentity:
         projection = TreeProjection.from_run_state(state)
         items = projection._play_running_and_pending(state.plays["p1"])
 
-        assert [(kind, getattr(runtime, "path", None)) for kind, _, _, runtime in items] == [
+        assert [(kind, getattr(runtime, "path", None)) for kind, _, _, runtime, _ in items] == [
             ("running", delegated_path),
             ("running", normal_path),
         ]
@@ -5753,4 +5753,204 @@ class TestPendingPlayFiltering:
         play_labels = [ln.label for ln in lines if ln.kind == "play"]
         assert "play: Skipped Play (0 hosts)" not in play_labels, (
             f"play with 0 resolved hosts should be skipped, got {play_labels!r}"
+        )
+
+
+class TestBlockTaskProjection:
+    """TC-094r..u: block:/rescue:/always: containers render as visible rows with
+    their nested children one level deeper, unlike include_tasks stubs which are
+    hidden."""
+
+    @staticmethod
+    def _block_fixture() -> tuple[TaskDefinition, TaskDefinition, TaskDefinition]:
+        nested1 = TaskDefinition(
+            name="Ensure IPA servers are resolvable",
+            role=None,
+            tags=[],
+            play_id="p2",
+            play_order=1,
+            task_order=0,
+        )
+        nested2 = TaskDefinition(
+            name="Wait for first IPA server",
+            role=None,
+            tags=[],
+            play_id="p2",
+            play_order=1,
+            task_order=1,
+        )
+        block = TaskDefinition(
+            name="Enroll in FreeIPA",
+            role=None,
+            tags=[],
+            play_id="p2",
+            play_order=1,
+            task_order=2,
+            is_block=True,
+            children=[nested1, nested2],
+        )
+        return block, nested1, nested2
+
+    def test_block_task_visible_with_nested_children_in_pending_play(self):
+        """A block task renders as a PENDING row with its children PENDING at
+        depth+1 in an upcoming play."""
+        block, nested1, nested2 = self._block_fixture()
+        regular = TaskDefinition(
+            name="Final task",
+            role=None,
+            tags=[],
+            play_id="p2",
+            play_order=1,
+            task_order=3,
+        )
+        state = TestPendingPlayFiltering._state_with_upcoming_play([block, regular])
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=30)
+
+        block_lines = [ln for ln in lines if ln.label == "Enroll in FreeIPA"]
+        assert len(block_lines) == 1, f"block row should appear once, got {block_lines!r}"
+        assert block_lines[0].status == Status.PENDING
+        assert block_lines[0].depth == 2, (
+            f"block row should be at depth 2, got {block_lines[0].depth}"
+        )
+
+        nested_lines = [
+            ln
+            for ln in lines
+            if ln.label in ("Ensure IPA servers are resolvable", "Wait for first IPA server")
+        ]
+        assert len(nested_lines) == 2, f"both nested children should appear, got {nested_lines!r}"
+        assert all(ln.status == Status.PENDING for ln in nested_lines)
+        assert all(ln.depth == 3 for ln in nested_lines), (
+            f"nested children should be at depth 3, got {[ln.depth for ln in nested_lines]}"
+        )
+
+    def test_block_task_children_nested_one_level_deeper(self):
+        """Each nested child sits exactly one level deeper than its block row."""
+        block, nested1, nested2 = self._block_fixture()
+        state = TestPendingPlayFiltering._state_with_upcoming_play([block])
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=30)
+
+        block_depth = next(ln.depth for ln in lines if ln.label == "Enroll in FreeIPA")
+        for child in (nested1, nested2):
+            child_depth = next(ln.depth for ln in lines if ln.label == child.name)
+            assert child_depth == block_depth + 1, (
+                f"child {child.name!r} should be at depth {block_depth + 1}, got {child_depth}"
+            )
+
+    def test_include_stub_still_hidden(self):
+        """Regression: a non-block stub with children stays hidden in pending plays."""
+        child_a = TaskDefinition(
+            name="Inner Alpha",
+            role="podman",
+            tags=[],
+            play_id="p2",
+            play_order=1,
+            task_order=0,
+        )
+        child_b = TaskDefinition(
+            name="Inner Beta",
+            role="podman",
+            tags=[],
+            play_id="p2",
+            play_order=1,
+            task_order=1,
+        )
+        stub = TaskDefinition(
+            name="Include site",
+            role="podman",
+            tags=[],
+            play_id="p2",
+            play_order=1,
+            task_order=2,
+            children=[child_a, child_b],
+        )
+        state = TestPendingPlayFiltering._state_with_upcoming_play([stub])
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=30)
+
+        pending_labels = [
+            ln.label for ln in lines if ln.kind == "task" and ln.status == Status.PENDING
+        ]
+        assert not any("Include site" in lbl for lbl in pending_labels), (
+            f"non-block stub should stay hidden, got {pending_labels!r}"
+        )
+        assert any("Inner Alpha" in lbl for lbl in pending_labels)
+        assert any("Inner Beta" in lbl for lbl in pending_labels)
+
+    def test_block_task_running_with_children(self):
+        """In an active play, a fired block renders RUNNING with its children
+        PENDING at depth+1."""
+        nested1 = TaskDefinition(
+            name="Ensure IPA servers are resolvable",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=0,
+        )
+        nested2 = TaskDefinition(
+            name="Wait for first IPA server",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=1,
+        )
+        block = TaskDefinition(
+            name="Enroll in FreeIPA",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=2,
+            is_block=True,
+            children=[nested1, nested2],
+        )
+        defs = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[block],
+            )
+        ]
+        state = RunState(playbook="site.yml", definitions=defs)
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-06-24T10:00:00Z",
+                "play": {"id": "p1", "name": "Deploy"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-06-24T10:00:01Z",
+                "task": {"id": "t-block", "name": "Enroll in FreeIPA"},
+                "play": {"id": "p1"},
+            }
+        )
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=30)
+
+        block_lines = [ln for ln in lines if "Enroll in FreeIPA" in ln.label]
+        assert len(block_lines) == 1, f"block row should appear once, got {block_lines!r}"
+        assert block_lines[0].status == Status.RUNNING, (
+            f"block should be RUNNING, got {block_lines[0].status}"
+        )
+        block_depth = block_lines[0].depth
+
+        nested_lines = [
+            ln
+            for ln in lines
+            if ln.label in ("Ensure IPA servers are resolvable", "Wait for first IPA server")
+        ]
+        assert len(nested_lines) == 2, f"both nested children should appear, got {nested_lines!r}"
+        assert all(ln.status == Status.PENDING for ln in nested_lines)
+        assert all(ln.depth == block_depth + 1 for ln in nested_lines), (
+            f"nested children should be at depth {block_depth + 1}, "
+            f"got {[ln.depth for ln in nested_lines]}"
         )
