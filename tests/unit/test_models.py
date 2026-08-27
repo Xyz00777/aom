@@ -347,6 +347,31 @@ class TestTaskDefinition:
         assert isinstance(task.path, str) or task.path is None
         assert isinstance(task.children, list)
 
+    def test_task_definition_run_once_defaults_false(self):
+        """run_once defaults to False for ordinary tasks."""
+        task = TaskDefinition(
+            name="Install nginx",
+            role="nginx",
+            tags=["web"],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+        )
+        assert task.run_once is False
+
+    def test_task_definition_run_once_explicit_true(self):
+        """run_once can be set to True for run_once: true tasks."""
+        task = TaskDefinition(
+            name="Create external service DNS records (dynamic)",
+            role="identity",
+            tags=[],
+            play_id="1",
+            play_order=0,
+            task_order=0,
+            run_once=True,
+        )
+        assert task.run_once is True
+
 
 class TestRoleGroupDefinition:
     """Tests for RoleGroupDefinition dataclass - TC-180, TC-181."""

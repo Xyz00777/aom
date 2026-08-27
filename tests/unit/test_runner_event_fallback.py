@@ -26,7 +26,13 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from ansible_aom.core.models import PlayDefinition, RunState, Status, TaskDefinition
+from ansible_aom.core.models import (
+    HostRunState,
+    PlayDefinition,
+    RunState,
+    Status,
+    TaskDefinition,
+)
 from ansible_aom.core.tree_projection import TreeProjection
 
 T0 = "2026-07-14T12:00:00Z"
@@ -418,3 +424,221 @@ class TestTreeReflectsPartialCompletion:
             ln for ln in lines if ln.kind == "task" and "AIDE database (if" in ln.label
         )
         assert "(2 ok, 4 running)" in task_line.label
+
+
+class TestRunOnceHostSynthesis:
+    """run_once + delegate_to tasks emit a terminal event for only the one
+    delegated host. Under linear strategy the task_start synthesis would
+    otherwise mark every preflight resolved_host as phantom-RUNNING. These
+    tests pin the run_once-aware synthesis skip and the sweep flip."""
+
+    def _run_once_state(self, run_once: bool = True) -> RunState:
+        state = RunState(playbook="update_db.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="1",
+                name="deploy",
+                hosts="ipa_hosts",
+                resolved_hosts=["ipa1", "ipa2", "ipa3"],
+                tasks=[
+                    TaskDefinition(
+                        name="Create external service DNS records (dynamic)",
+                        role=None,
+                        tags=[],
+                        play_id="1",
+                        play_order=0,
+                        task_order=0,
+                        path="dns_tasks.yml:2",
+                        run_once=run_once,
+                    )
+                ],
+            )
+        ]
+        return state
+
+    def test_run_once_task_no_synthesis(self):
+        """run_once preflight def: task_start must not synthesise the 3
+        resolved hosts; the single delegated host's terminal event is the
+        only host entry."""
+        state = self._run_once_state(run_once=True)
+        _play_start(state)
+        _task_start(
+            state,
+            task_id="t1",
+            name="Create external service DNS records (dynamic)",
+            path="dns_tasks.yml:2",
+        )
+
+        t1 = state.plays["play-uuid"].tasks["t1"]
+        assert t1.hosts == {}
+
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": T2,
+                "task": {
+                    "id": "t1",
+                    "name": "Create external service DNS records (dynamic)",
+                    "path": "dns_tasks.yml:2",
+                },
+                "hosts": {"ipa1": {"changed": True}},
+            }
+        )
+        assert sorted(t1.hosts) == ["ipa1"]
+        assert t1.hosts["ipa1"].status == Status.CHANGED
+        assert t1.status == Status.COMPLETED
+
+    def test_non_run_once_control_synthesises(self):
+        """Regression guard: with run_once=False the 3 resolved hosts are
+        synthesised as RUNNING exactly as before."""
+        state = self._run_once_state(run_once=False)
+        _play_start(state)
+        _task_start(
+            state,
+            task_id="t1",
+            name="Create external service DNS records (dynamic)",
+            path="dns_tasks.yml:2",
+        )
+
+        t1 = state.plays["play-uuid"].tasks["t1"]
+        assert sorted(t1.hosts) == ["ipa1", "ipa2", "ipa3"]
+        assert all(hs.status == Status.RUNNING for hs in t1.hosts.values())
+
+    def test_runtime_graft_stamps_run_once_from_cache(self, tmp_path):
+        """A dynamically included run_once task (no preflight leaf) is
+        grafted at runtime; the graft must stamp run_once from the include
+        cache so synthesis is skipped."""
+        playbook = tmp_path / "playbook.yml"
+        playbook.write_text(
+            "- hosts: all\n"
+            "  tasks:\n"
+            "    - name: Gathering Facts\n"
+            "      ansible.builtin.setup:\n"
+            "    - name: include dns\n"
+            "      ansible.builtin.include_tasks: dns_tasks.yml\n"
+        )
+        (tmp_path / "dns_tasks.yml").write_text(
+            "- name: Create external service DNS records (dynamic)\n"
+            "  run_once: true\n"
+            "  delegate_to: localhost\n"
+            "  ansible.builtin.debug:\n"
+            "    msg: hi\n"
+        )
+
+        state = RunState(playbook=str(playbook))
+        state.definitions = [
+            PlayDefinition(
+                id="1",
+                name="deploy",
+                hosts="ipa_hosts",
+                resolved_hosts=["ipa1", "ipa2", "ipa3"],
+                tasks=[
+                    TaskDefinition(
+                        name="Gathering Facts",
+                        role=None,
+                        tags=[],
+                        play_id="1",
+                        play_order=0,
+                        task_order=0,
+                    )
+                ],
+            )
+        ]
+        _play_start(state)
+        # First task matches the preflight leaf → sets the graft parent.
+        _task_start(state, task_id="t1", name="Gathering Facts", path=None)
+        # The run_once include task is unknown to preflight → grafted.
+        _task_start(
+            state,
+            task_id="t2",
+            name="Create external service DNS records (dynamic)",
+            path="dns_tasks.yml:2",
+        )
+
+        t2 = state.plays["play-uuid"].tasks["t2"]
+        assert t2.hosts == {}
+
+    def test_sweep_flips_synthesised_run_once_hosts_to_skipped(self):
+        """Detection miss: a run_once task that already has synthesised
+        RUNNING hosts must have them flipped to SKIPPED (not OK) when the
+        next task starts."""
+        state = self._run_once_state(run_once=True)
+        _play_start(state)
+        _task_start(
+            state,
+            task_id="t1",
+            name="Create external service DNS records (dynamic)",
+            path="dns_tasks.yml:2",
+        )
+        t1 = state.plays["play-uuid"].tasks["t1"]
+        # Simulate a detection miss: synthesised RUNNING hosts present.
+        for host in ("ipa1", "ipa2", "ipa3"):
+            t1.hosts[host] = HostRunState(
+                hostname=host,
+                status=Status.RUNNING,
+                start_time=datetime(2026, 7, 14, 12, 0, 1, tzinfo=timezone.utc),
+                synthesised=True,
+            )
+
+        _task_start(state, task_id="t2", name="Next task", path=None)
+
+        assert all(hs.status == Status.SKIPPED for hs in t1.hosts.values())
+        assert t1.status == Status.COMPLETED
+
+    def test_sweep_control_non_run_once_flips_to_ok(self):
+        """Regression guard: non-run_once synthesised hosts keep the OK
+        flip when the next task starts."""
+        state = self._run_once_state(run_once=False)
+        _play_start(state)
+        _task_start(
+            state,
+            task_id="t1",
+            name="Create external service DNS records (dynamic)",
+            path="dns_tasks.yml:2",
+        )
+        t1 = state.plays["play-uuid"].tasks["t1"]
+        # t1 already synthesised 3 RUNNING hosts; add a real loop-item host.
+        t1.hosts["loop-host"] = HostRunState(
+            hostname="loop-host",
+            status=Status.RUNNING,
+            start_time=datetime(2026, 7, 14, 12, 0, 1, tzinfo=timezone.utc),
+            synthesised=False,
+        )
+
+        _task_start(state, task_id="t2", name="Next task", path=None)
+
+        assert all(hs.status == Status.OK for hs in t1.hosts.values())
+        assert t1.status == Status.COMPLETED
+
+    def test_tree_shows_only_delegated_host_after_run_once(self):
+        """After a run_once task completes with only the delegated host,
+        the tree's host lines contain only that host — the phantom
+        non-target hosts never appear."""
+        state = self._run_once_state(run_once=True)
+        _play_start(state)
+        _task_start(
+            state,
+            task_id="t1",
+            name="Create external service DNS records (dynamic)",
+            path="dns_tasks.yml:2",
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_ok",
+                "_timestamp": T2,
+                "task": {
+                    "id": "t1",
+                    "name": "Create external service DNS records (dynamic)",
+                    "path": "dns_tasks.yml:2",
+                },
+                "hosts": {"ipa1": {"changed": True}},
+            }
+        )
+
+        projection = TreeProjection.from_run_state(state)
+        lines = projection.tree_lines(budget=25)
+        host_labels = {ln.label for ln in lines if ln.kind == "host"}
+        # The task is COMPLETED so its host lines drop off the leaf list;
+        # the invariant is that the phantom non-target hosts never appear.
+        assert "ipa2" not in host_labels
+        assert "ipa3" not in host_labels

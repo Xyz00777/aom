@@ -20,7 +20,9 @@ from ansible_aom.core.includes import (
     discover_include_with_runtime_path,
     graft_include_children,
     parse_include_tasks_file,
+    parse_include_tasks_file_with_flags,
     parse_role_tasks,
+    parse_role_tasks_with_flags,
     resolve_includes_from_playbook,
     resolve_role_relative_includes,
 )
@@ -185,6 +187,128 @@ class TestParseRoleTasks:
         main_file.write_text("{{{ broken yaml")
         result = parse_role_tasks(tmp_path)
         assert result == []
+
+
+# ---------------------------------------------------------------------------
+# parse_include_tasks_file_with_flags
+# ---------------------------------------------------------------------------
+
+
+class TestParseIncludeTasksFileWithFlags:
+    """Unit tests for parse_include_tasks_file_with_flags()."""
+
+    def test_flags_marks_literal_run_once_true(self, tmp_path: Path) -> None:
+        """A task with literal run_once: true is flagged in the flags dict."""
+        f = tmp_path / "included.yml"
+        f.write_text("""
+- name: Task A
+  debug:
+    msg: hello
+- name: Task B
+  run_once: true
+  debug:
+    msg: world
+""")
+        names, flags = parse_include_tasks_file_with_flags(f)
+        assert names == ["Task A", "Task B"]
+        assert flags == {"Task B": True}
+
+    def test_flags_ignores_jinja_and_false(self, tmp_path: Path) -> None:
+        """run_once: '{{ var }}' and run_once: false are NOT flagged."""
+        f = tmp_path / "included.yml"
+        f.write_text("""
+- name: Jinja once
+  run_once: "{{ var }}"
+  debug:
+    msg: a
+- name: Explicit false
+  run_once: false
+  debug:
+    msg: b
+- name: Plain
+  debug:
+    msg: c
+""")
+        names, flags = parse_include_tasks_file_with_flags(f)
+        assert names == ["Jinja once", "Explicit false", "Plain"]
+        assert flags == {}
+
+    def test_flags_empty_file(self, tmp_path: Path) -> None:
+        """Empty/missing file yields empty names and empty flags."""
+        f = tmp_path / "empty.yml"
+        f.write_text("[]\n")
+        names, flags = parse_include_tasks_file_with_flags(f)
+        assert names == []
+        assert flags == {}
+
+    def test_flags_missing_file(self, tmp_path: Path) -> None:
+        """Missing file yields empty names and empty flags."""
+        names, flags = parse_include_tasks_file_with_flags(tmp_path / "nope.yml")
+        assert names == []
+        assert flags == {}
+
+    def test_flags_uses_raw_names(self, tmp_path: Path) -> None:
+        """Flags keys use raw names (no role-prefix stripping)."""
+        f = tmp_path / "included.yml"
+        f.write_text("""
+- name: "role : Run once"
+  run_once: true
+  debug:
+    msg: a
+""")
+        names, flags = parse_include_tasks_file_with_flags(f)
+        assert names == ["role : Run once"]
+        assert flags == {"role : Run once": True}
+
+
+# ---------------------------------------------------------------------------
+# parse_role_tasks_with_flags
+# ---------------------------------------------------------------------------
+
+
+class TestParseRoleTasksWithFlags:
+    """Unit tests for parse_role_tasks_with_flags()."""
+
+    def test_flags_marks_literal_run_once_true(self, tmp_path: Path) -> None:
+        """A role task with literal run_once: true is flagged."""
+        tasks_dir = tmp_path / "tasks"
+        tasks_dir.mkdir()
+        (tasks_dir / "main.yml").write_text("""
+- name: "test_role : Install packages"
+  apt:
+    name: nginx
+- name: "test_role : Create DNS records"
+  run_once: true
+  debug:
+    msg: dns
+""")
+        names, flags = parse_role_tasks_with_flags(tmp_path)
+        assert names == ["Install packages", "Create DNS records"]
+        assert flags == {"Create DNS records": True}
+
+    def test_flags_ignores_jinja_and_false(self, tmp_path: Path) -> None:
+        """run_once: '{{ var }}' and run_once: false are NOT flagged."""
+        tasks_dir = tmp_path / "tasks"
+        tasks_dir.mkdir()
+        (tasks_dir / "main.yml").write_text("""
+- name: "test_role : Jinja once"
+  run_once: "{{ var }}"
+  debug:
+    msg: a
+- name: "test_role : Explicit false"
+  run_once: false
+  debug:
+    msg: b
+""")
+        names, flags = parse_role_tasks_with_flags(tmp_path)
+        assert names == ["Jinja once", "Explicit false"]
+        assert flags == {}
+
+    def test_flags_missing_dir(self, tmp_path: Path) -> None:
+        """Missing role dir yields empty names and empty flags."""
+        names, flags = parse_role_tasks_with_flags(tmp_path / "nonexistent_role")
+        assert names == []
+        assert flags == {}
 
 
 # ---------------------------------------------------------------------------
@@ -665,6 +789,41 @@ class TestCacheEntryProperties:
         """Empty task_names yields task_count of 0."""
         entry = RoleCacheEntry(role_name="empty_role", task_names=[])
         assert entry.task_count == 0
+
+    def test_include_cache_entry_task_run_once_defaults_empty(self) -> None:
+        """task_run_once defaults to an empty dict."""
+        entry = IncludeCacheEntry(
+            path="/tmp/test.yml",
+            task_names=["A", "B"],
+            role=None,
+            parsed_at=datetime.now(timezone.utc),
+        )
+        assert entry.task_run_once == {}
+
+    def test_include_cache_entry_task_run_once_can_be_set(self) -> None:
+        """task_run_once can be populated with per-task flags."""
+        entry = IncludeCacheEntry(
+            path="/tmp/test.yml",
+            task_names=["A", "B"],
+            role=None,
+            parsed_at=datetime.now(timezone.utc),
+            task_run_once={"B": True},
+        )
+        assert entry.task_run_once == {"B": True}
+
+    def test_role_cache_entry_task_run_once_defaults_empty(self) -> None:
+        """RoleCacheEntry.task_run_once defaults to an empty dict."""
+        entry = RoleCacheEntry(role_name="test_role", task_names=["A"])
+        assert entry.task_run_once == {}
+
+    def test_role_cache_entry_task_run_once_can_be_set(self) -> None:
+        """RoleCacheEntry.task_run_once can be populated with per-task flags."""
+        entry = RoleCacheEntry(
+            role_name="test_role",
+            task_names=["A", "B"],
+            task_run_once={"B": True},
+        )
+        assert entry.task_run_once == {"B": True}
 
 
 def _make_play(tasks: list[TaskDefinition]) -> PlayDefinition:
@@ -1265,3 +1424,142 @@ class TestGraftIncludeChildren:
         )
 
         assert [c.name for c in stub.children] == ["Child"]
+
+
+# ---------------------------------------------------------------------------
+# run_once stamping
+# ---------------------------------------------------------------------------
+
+
+class TestGraftRunOnceStamping:
+    """run_once flags flow from cache entries into grafted children."""
+
+    def _write_playbook(self, tmp_path: Path, *, include_target: str) -> Path:
+        """Write a one-task playbook that includes *include_target* and return its path."""
+        playbook = tmp_path / "play.yml"
+        playbook.write_text(
+            f"---\n- hosts: localhost\n  tasks:\n    - name: Direct task\n      debug:\n        msg: x\n"
+            f"    - name: Include setup\n      include_tasks: {include_target}\n"
+        )
+        return playbook
+
+    def test_graft_children_stamps_run_once_from_cache(self, tmp_path: Path) -> None:
+        """_graft_children stamps run_once on children from cache_entry.task_run_once."""
+        included = tmp_path / "setup.yml"
+        included.write_text(
+            "- name: Install packages\n  debug:\n    msg: x\n"
+            "- name: Create DNS records\n  run_once: true\n  debug:\n    msg: dns\n"
+        )
+        cache_key = str(included.resolve())
+        cache: dict[str, IncludeCacheEntry] = {
+            cache_key: IncludeCacheEntry(
+                path=cache_key,
+                task_names=["Install packages", "Create DNS records"],
+                role=None,
+                parsed_at=datetime.now(timezone.utc),
+                task_run_once={"Create DNS records": True},
+            )
+        }
+        playbook = self._write_playbook(tmp_path, include_target="setup.yml")
+        stub = _include_stub("Include setup", role="podman")
+        play = _make_play([stub])
+
+        graft_include_children(
+            playbook_path=str(playbook),
+            definitions=[play],
+            cache=cache,
+        )
+
+        assert len(stub.children) == 2
+        by_name = {c.name: c for c in stub.children}
+        assert by_name["Install packages"].run_once is False
+        assert by_name["Create DNS records"].run_once is True
+
+    def test_graft_children_run_once_defaults_false(self, tmp_path: Path) -> None:
+        """Children without a flag in task_run_once default to run_once False."""
+        included = tmp_path / "setup.yml"
+        included.write_text("- name: Plain\n  debug:\n    msg: x\n")
+        cache_key = str(included.resolve())
+        cache: dict[str, IncludeCacheEntry] = {
+            cache_key: IncludeCacheEntry(
+                path=cache_key,
+                task_names=["Plain"],
+                role=None,
+                parsed_at=datetime.now(timezone.utc),
+            )
+        }
+        playbook = self._write_playbook(tmp_path, include_target="setup.yml")
+        stub = _include_stub("Include setup", role="podman")
+        play = _make_play([stub])
+
+        graft_include_children(
+            playbook_path=str(playbook),
+            definitions=[play],
+            cache=cache,
+        )
+
+        assert len(stub.children) == 1
+        assert stub.children[0].run_once is False
+
+    def test_role_graft_stamps_run_once_from_role_flags(self, tmp_path: Path) -> None:
+        """The role-graft branch stamps run_once from the role's task flags."""
+        role_dir = tmp_path / "roles" / "identity"
+        (role_dir / "tasks").mkdir(parents=True)
+        (role_dir / "tasks" / "main.yml").write_text(
+            '- name: "identity : Create external service DNS records (dynamic)"\n'
+            "  run_once: true\n  debug:\n    msg: dns\n"
+            '- name: "identity : Plain task"\n  debug:\n    msg: p\n'
+        )
+        playbook = tmp_path / "play.yml"
+        playbook.write_text(
+            "---\n- hosts: localhost\n  tasks:\n"
+            "    - name: Apply identity role\n      include_role: identity\n"
+        )
+        stub = _include_stub("Apply identity role", role="identity")
+        play = _make_play([stub])
+
+        graft_include_children(
+            playbook_path=str(playbook),
+            definitions=[play],
+            cache={},
+        )
+
+        assert len(stub.children) == 2
+        by_name = {c.name: c for c in stub.children}
+        assert by_name["Create external service DNS records (dynamic)"].run_once is True
+        assert by_name["Plain task"].run_once is False
+
+    def test_inline_play_task_run_once_stamped(self, tmp_path: Path) -> None:
+        """A literal run_once: true inline play task is stamped via name_index."""
+        playbook = tmp_path / "play.yml"
+        playbook.write_text(
+            "---\n- hosts: localhost\n  tasks:\n"
+            "    - name: Create DNS records\n      run_once: true\n      debug:\n        msg: dns\n"
+            "    - name: Plain\n      debug:\n        msg: p\n"
+        )
+        run_once_task = TaskDefinition(
+            name="Create DNS records",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=1,
+            task_order=0,
+        )
+        plain_task = TaskDefinition(
+            name="Plain",
+            role=None,
+            tags=[],
+            play_id="1",
+            play_order=1,
+            task_order=1,
+        )
+        play = _make_play([run_once_task, plain_task])
+
+        graft_include_children(
+            playbook_path=str(playbook),
+            definitions=[play],
+            cache={},
+        )
+
+        assert run_once_task.run_once is True
+        assert plain_task.run_once is False

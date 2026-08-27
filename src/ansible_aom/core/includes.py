@@ -117,6 +117,35 @@ def _load_task_list(path: Path) -> list:
     return tasks
 
 
+def parse_include_tasks_file_with_flags(path: Path) -> tuple[list[str], dict[str, bool]]:
+    """Read a YAML task-list file; return task names and per-task ``run_once`` flags.
+
+    Preserves Jinja2 template expressions (``{{ var }}``) verbatim — no
+    resolution is attempted. The file is expected to be a plain list of
+    task dicts, the same format as a playbook tasks section or a role
+    ``tasks/main.yml``.
+
+    The flags dict maps each task name to ``True`` only when the task has
+    a literal YAML ``run_once: true``. ``run_once: "{{ var }}"`` (Jinja
+    string) and ``run_once: false`` are NOT flagged — they cannot be known
+    statically, so they are treated as False. Keys use the raw task name
+    (no role-prefix stripping), matching the returned ``task_names`` list.
+
+    Returns ``([], {})`` when the file cannot be opened, the YAML is
+    malformed, or no entries are present.
+    """
+    tasks = _load_task_list(path)
+    names: list[str] = []
+    flags: dict[str, bool] = {}
+    for entry in tasks:
+        if isinstance(entry, dict) and "name" in entry:
+            name = str(entry["name"])
+            names.append(name)
+            if entry.get("run_once") is True:
+                flags[name] = True
+    return names, flags
+
+
 def parse_include_tasks_file(path: Path) -> list[str]:
     """Read a YAML task-list file and return the ``name`` of every task.
 
@@ -128,12 +157,34 @@ def parse_include_tasks_file(path: Path) -> list[str]:
     Returns an empty list when the file cannot be opened, the YAML is
     malformed, or no entries are present.
     """
-    tasks = _load_task_list(path)
+    names, _ = parse_include_tasks_file_with_flags(path)
+    return names
+
+
+def parse_role_tasks_with_flags(role_dir: Path) -> tuple[list[str], dict[str, bool]]:
+    """Read ``role_dir/tasks/main.yml``; return task names and ``run_once`` flags.
+
+    ``role : `` prefixes are stripped from every name so the cache matches
+    the convention used by ``tree.py`` (which calls ``strip_role_prefix``
+    during lookups). The flags dict uses the same stripped names and marks
+    a task ``True`` only for a literal YAML ``run_once: true`` (Jinja and
+    ``false`` values are not flagged). Returns ``([], {})`` on any error or
+    when the file does not exist.
+    """
+    tasks_file = role_dir / "tasks" / "main.yml"
+    if not tasks_file.is_file():
+        return [], {}
+    tasks = _load_task_list(tasks_file)
     names: list[str] = []
+    flags: dict[str, bool] = {}
     for entry in tasks:
         if isinstance(entry, dict) and "name" in entry:
-            names.append(str(entry["name"]))
-    return names
+            name = str(entry["name"])
+            stripped = strip_role_prefix(name)
+            names.append(stripped)
+            if entry.get("run_once") is True:
+                flags[stripped] = True
+    return names, flags
 
 
 def parse_role_tasks(role_dir: Path) -> list[str]:
@@ -144,15 +195,7 @@ def parse_role_tasks(role_dir: Path) -> list[str]:
     during lookups). Returns an empty list on any error or when the file
     does not exist.
     """
-    tasks_file = role_dir / "tasks" / "main.yml"
-    if not tasks_file.is_file():
-        return []
-    tasks = _load_task_list(tasks_file)
-    names: list[str] = []
-    for entry in tasks:
-        if isinstance(entry, dict) and "name" in entry:
-            name = str(entry["name"])
-            names.append(strip_role_prefix(name))
+    names, _ = parse_role_tasks_with_flags(role_dir)
     return names
 
 
@@ -243,12 +286,13 @@ def _scan_tasks_for_includes_impl(
             if resolved is not None:
                 cache_key = str(resolved)
                 if cache_key not in cache:
-                    task_names = parse_include_tasks_file(resolved)
+                    task_names, task_run_once = parse_include_tasks_file_with_flags(resolved)
                     cache[cache_key] = IncludeCacheEntry(
                         path=cache_key,
                         task_names=task_names,
                         role=None,
                         parsed_at=datetime.now(timezone.utc),
+                        task_run_once=task_run_once,
                     )
 
         for sub_key in ("block", "rescue", "always"):
@@ -448,15 +492,16 @@ def _discover_include(
     if cached is not None:
         return cached
 
-    task_names = parse_include_tasks_file(resolved)
+    task_names, task_run_once = parse_include_tasks_file_with_flags(resolved)
     if not task_names:
-        return None  # parse_include_tasks_file logged the reason
+        return None  # parse_include_tasks_file_with_flags logged the reason
 
     entry = IncludeCacheEntry(
         path=cache_key,
         task_names=task_names,
         role=parent_role,
         parsed_at=datetime.now(timezone.utc),
+        task_run_once=task_run_once,
     )
     state._include_cache[cache_key] = entry
     return entry
@@ -490,13 +535,14 @@ def _discover_role(
     playbook_dir = Path(state.playbook).parent.resolve()
     role_dir = playbook_dir / "roles" / role_name
 
-    task_names = parse_role_tasks(role_dir)
+    task_names, task_run_once = parse_role_tasks_with_flags(role_dir)
     if not task_names:
-        return None  # parse_role_tasks logged the reason
+        return None  # parse_role_tasks_with_flags logged the reason
 
     entry = RoleCacheEntry(
         role_name=cache_key,
         task_names=task_names,
+        task_run_once=task_run_once,
     )
     state._role_cache[cache_key] = entry
 
@@ -511,11 +557,12 @@ def _discover_role(
         if not nested_key or nested_key in state._role_cache:
             continue
         nested_role_dir = playbook_dir / "roles" / nested_name
-        nested_task_names = parse_role_tasks(nested_role_dir)
+        nested_task_names, nested_task_run_once = parse_role_tasks_with_flags(nested_role_dir)
         state._role_cache[nested_key] = RoleCacheEntry(
             role_name=nested_key,
             task_names=nested_task_names,
             parent_role=cache_key,
+            task_run_once=nested_task_run_once,
         )
 
     return entry
@@ -985,6 +1032,19 @@ def _graft_section_dfs(
     for task in section_tasks:
         if not isinstance(task, dict):
             continue
+        # Stamp literal ``run_once: true`` inline tasks (playbook or role
+        # YAML) onto their preflight stub. Only a literal YAML ``true``
+        # counts; Jinja-templated and ``false`` values are left unstamped.
+        if task.get("run_once") is True:
+            yaml_name = str(task.get("name") or "")
+            stub = name_index.get(yaml_name)
+            if stub is None and yaml_name:
+                for k, v in name_index.items():
+                    if strip_role_prefix(k) == yaml_name or k.endswith(f" : {yaml_name}"):
+                        stub = v
+                        break
+            if stub is not None:
+                stub.run_once = True
         for sub_key in ("block", "rescue", "always"):
             sub = task.get(sub_key)
             if isinstance(sub, list):
@@ -1047,7 +1107,7 @@ def _graft_section_dfs(
                 cache_key = f"role:{role_name.lower().strip()}"
                 if cache_key not in visited_files and tasks_file.is_file():
                     visited_files.add(cache_key)
-                    task_names = parse_role_tasks(role_dir)
+                    task_names, task_run_once = parse_role_tasks_with_flags(role_dir)
                     if task_names:
                         yaml_name = str(task.get("name") or "")
                         stub = name_index.get(yaml_name)
@@ -1080,6 +1140,7 @@ def _graft_section_dfs(
                                     task_order=base_idx + offset,
                                     is_dynamic=False,
                                     parent_role=stub.parent_role or stub.role,
+                                    run_once=task_run_once.get(name, False),
                                 )
                                 stub.children.append(child)
 
@@ -1146,5 +1207,6 @@ def _graft_children(stub: TaskDefinition, cache_entry: IncludeCacheEntry) -> Non
             task_order=base_idx + offset,
             is_dynamic=False,
             parent_role=stub.parent_role or stub.role,
+            run_once=cache_entry.task_run_once.get(name, False),
         )
         stub.children.append(child)
