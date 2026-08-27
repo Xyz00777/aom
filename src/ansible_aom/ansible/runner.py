@@ -658,6 +658,7 @@ def _drive(
     # Cadence chosen so a 0.5s expect-timeout polls roughly every 2s.
     cpu_sample_every = max(1, int(2.0 / max(timeout, 0.05)))
     timeout_count = 0
+    dead_child_drain_pending = False
 
     # R8: post-stats EOF watchdog. The parser flips its phase to
     # POST_RUN_RECAP exactly when it consumes a ``v2_playbook_on_stats``
@@ -681,7 +682,9 @@ def _drive(
         # liveness / prompt heuristics still tick on the normal cadence.
         # R11: once ``v2_playbook_on_stats`` has set the run's
         # ``end_time``, shrink the watchdog to the "quiet" window.
-        if parser.phase == StreamPhase.POST_RUN_RECAP and state.end_time is not None:
+        if dead_child_drain_pending:
+            read_timeout = min(timeout, 0.05)
+        elif parser.phase == StreamPhase.POST_RUN_RECAP and state.end_time is not None:
             read_timeout = _EOF_WATCHDOG_S_QUIET
         else:
             read_timeout = (
@@ -690,7 +693,7 @@ def _drive(
         try:
             idx = child.expect(patterns, timeout=read_timeout)
         except pexpect.exceptions.EOF:
-            _flush_pending(child, parser, state, renderer, sink)
+            _flush_pending(child, parser, state, renderer, sink, diag=diag)
             break
 
         if idx == newline_idx:
@@ -729,21 +732,19 @@ def _drive(
             # ends a silent window, including the "already-handled"
             # window marked by negative stall_count.
             stall_count = 0
-            # R10: the child may have exited between ``expect`` returning
-            # and now (the Python subprocess finished writing its
-            # events and ``sys.exit(0)`` raced with pexpect's match).
-            # Check liveness AFTER feeding the newline payload so the
-            # trailing events from the same PTY read aren't silently
-            # dropped — the previous ordering broke the loop on the
-            # last batch and lost events 7/8 in the fixture.
-            if not child.isalive():
-                _flush_pending(child, parser, state, renderer, sink)
+            if dead_child_drain_pending:
+                _flush_pending(child, parser, state, renderer, sink, diag=diag)
                 break
+            if not child.isalive():
+                dead_child_drain_pending = True
         elif idx == eof_idx:
             _trace("eof", leftover=(child.before or "")[:200])
-            _flush_pending(child, parser, state, renderer, sink)
+            _flush_pending(child, parser, state, renderer, sink, diag=diag)
             break
         elif idx == timeout_idx:
+            if dead_child_drain_pending:
+                _flush_pending(child, parser, state, renderer, sink, diag=diag)
+                break
             # R8: post-stats timeout = EOF watchdog fired. The child
             # refused to close its PTY within ``_EOF_WATCHDOG_S`` of
             # the final stats event — bail out as if EOF had arrived
@@ -756,7 +757,7 @@ def _drive(
                 )
                 logger.warning(warning)
                 renderer.print_log(f"[aom] {warning}")
-                _flush_pending(child, parser, state, renderer, sink)
+                _flush_pending(child, parser, state, renderer, sink, diag=diag)
                 break
             # Pre-stats timeout: same liveness / prompt heuristics as
             # before — the watchdog doesn't apply yet.
@@ -981,6 +982,8 @@ def _flush_pending(
     state: RunState,
     renderer: Renderer,
     sink: _SessionSink | _NullSink,
+    *,
+    diag: diagnostics.RunDiagnostics | None = None,
 ) -> None:
     """Drain any final bytes left in the buffer when the subprocess ends.
 
@@ -1005,7 +1008,7 @@ def _flush_pending(
         return
     for sub_line in leftover.splitlines():
         if sub_line:
-            _feed(sub_line, parser, state, renderer, sink)
+            _feed(sub_line, parser, state, renderer, sink, diag=diag)
 
 
 def _feed(

@@ -131,6 +131,17 @@ class TaskDefinition:
     uuid: str | None = None
     path: str | None = None
     children: list["TaskDefinition"] = field(default_factory=list)
+    # True when the task is declared ``run_once: true`` (literal YAML only).
+    # Lets the linear-strategy host synthesis skip non-target hosts for
+    # run_once + delegate_to tasks, which emit a terminal event for only
+    # the one delegated host. Preflight stamps this from the playbook /
+    # include / role YAML; Task 2 (run_state.py) consumes it.
+    run_once: bool = False
+    # True when this task is a ``block:``/``rescue:``/``always:`` container
+    # whose nested tasks live in ``children``. Preflight role graft sets this
+    # so the projection can render the block as a collapsible group rather
+    # than a flat leaf.
+    is_block: bool = False
     # The parent role name when this task is nested inside another role
     # (e.g. an ``include_role`` inside a role's ``tasks/main.yml``).
     # ``None`` for top-level play tasks and for tasks whose enclosing role
@@ -261,6 +272,11 @@ class TaskRunState:
     # the preflight role assignment, so the projection can render a
     # sub-branch under the right role.
     parent_role: str | None = None
+    # The number of loop iterations for a looped include_tasks/include_role,
+    # captured from the ``results`` list length on terminal runner events.
+    # ``None`` for non-loop tasks. Lets the projection re-emit a completed
+    # child as pending when it will run again this loop.
+    loop_total: int | None = None
 
 
 @dataclass
@@ -290,6 +306,10 @@ class IncludeCacheEntry:
     task_names: list[str]
     role: str | None
     parsed_at: datetime
+    # Per-task ``run_once`` flags keyed by the raw task name (matching
+    # ``task_names``). Only literal YAML ``run_once: true`` is recorded;
+    # Jinja-templated and ``false`` values are absent (treated as False).
+    task_run_once: dict[str, bool] = field(default_factory=dict)
 
     @property
     def task_count(self) -> int:
@@ -317,6 +337,10 @@ class RoleCacheEntry:
     role_name: str
     task_names: list[str]
     parent_role: str | None = None
+    # Per-task ``run_once`` flags keyed by the ``strip_role_prefix``-ed task
+    # name (matching ``task_names``). Only literal YAML ``run_once: true``
+    # is recorded; Jinja-templated and ``false`` values are absent.
+    task_run_once: dict[str, bool] = field(default_factory=dict)
 
     @property
     def task_count(self) -> int:

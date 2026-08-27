@@ -26,6 +26,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, cast
 
 from ansible_aom.core.event_types import JsonlEvent, JsonlHostResult, JsonlPlay, JsonlTask
@@ -125,6 +126,19 @@ def _iter_leaf_task_defs(plays: list[PlayDefinition]) -> list[TaskDefinition]:
             else:
                 leaves.extend(_iter_task_def_tree(entry))
     return leaves
+
+
+def _subtree_names(task_def: TaskDefinition) -> set[str]:
+    """Collect every task name in *task_def*'s subtree (recursively).
+
+    Used by the sibling graft to dedupe against the full subtree of the
+    parent — not just its direct children — so block-nested role tasks
+    aren't re-grafted as flat siblings under the include_role stub.
+    """
+    names = {task_def.name}
+    for child in task_def.children:
+        names.update(_subtree_names(child))
+    return names
 
 
 def _leaves_of_role_group(group: RoleGroupDefinition) -> list[TaskDefinition]:
@@ -660,37 +674,38 @@ class RunState:
             return None
         return entry.parent_role
 
-    def _graft_or_match_task(
-        self,
-        task_id: str,
-        task_name: str,
-        task_path: str | None = None,
-        play_id: str | None = None,
-    ) -> None:
-        """Update the dynamic-expansion cursor for an arriving task.
+    def _play_def_target_for(self, play_id: str | None) -> PlayDefinition | None:
+        """Resolve the preflight PlayDefinition for a runtime play id.
 
-        Matches the runtime task path against preflight TaskDefinitions
-        first, then falls back to the task name. A hit updates the parent
-        cursor — the next unknown task gets grafted as its child. A miss
-        creates a dynamic TaskDefinition under the current parent (the most
-        recently matched preflight task) and marks the UUID so re-arriving
-        events don't duplicate the graft.
-
-        Called from both ``v2_playbook_on_task_start`` (linear strategy)
-        and ``v2_runner_on_start`` (free strategy) so dynamic include_tasks
-        children land regardless of strategy.
+        Preflight assigns ``PlayDefinition.id = str(play_number)`` while
+        runtime events carry an opaque UUID, so the id lookup usually
+        misses; fall back to the runtime play's name. Returns ``None``
+        when no definition matches.
         """
-        if not self.definitions or not task_name or task_id in self._grafted_uuids:
-            return
-
-        leaf: TaskDefinition | None = None
         play_def_target: PlayDefinition | None = None
-
         if play_id:
             if self._play_def_by_id:
                 play_def_target = self._play_def_by_id.get(play_id)
             if play_def_target is None and play_id in self.plays and self._play_def_by_name:
                 play_def_target = self._play_def_by_name.get(self.plays[play_id].name.strip())
+        return play_def_target
+
+    def _match_task_definition(
+        self,
+        task_id: str,
+        task_name: str,
+        task_path: str | None,
+        play_id: str | None,
+    ) -> TaskDefinition | None:
+        """Match a runtime task against preflight TaskDefinitions.
+
+        Pure read — no cursor mutation. Returns the matched leaf
+        ``TaskDefinition`` or ``None``. ``_graft_or_match_task`` uses this
+        to update the dynamic-expansion cursor; the linear sweep uses it to
+        look up a previous task's definition for run_once-aware host flips.
+        """
+        leaf: TaskDefinition | None = None
+        play_def_target = self._play_def_target_for(play_id)
 
         task_name_stripped = strip_role_prefix(task_name)
 
@@ -742,9 +757,47 @@ class RunState:
                             leaf = tdef
                             break
 
+        return leaf
+
+    def _graft_or_match_task(
+        self,
+        task_id: str,
+        task_name: str,
+        task_path: str | None = None,
+        play_id: str | None = None,
+    ) -> TaskDefinition | None:
+        """Update the dynamic-expansion cursor for an arriving task.
+
+        Matches the runtime task path against preflight TaskDefinitions
+        first, then falls back to the task name. A hit updates the parent
+        cursor — the next unknown task gets grafted as its child. A miss
+        creates a dynamic TaskDefinition under the current parent (the most
+        recently matched preflight task) and marks the UUID so re-arriving
+        events don't duplicate the graft.
+
+        Returns the matched or grafted ``TaskDefinition`` (or ``None`` when
+        nothing matched and no graft was possible). Callers may ignore the
+        return value; the cursor side effects are unchanged.
+
+        Called from both ``v2_playbook_on_task_start`` (linear strategy)
+        and ``v2_runner_on_start`` (free strategy) so dynamic include_tasks
+        children land regardless of strategy.
+        """
+        if not self.definitions or not task_name:
+            return None
+
+        leaf = self._match_task_definition(task_id, task_name, task_path, play_id)
+
         if leaf is not None:
             self._last_matched_task_def = leaf
-            return
+            if task_id:
+                self._grafted_uuids.add(task_id)
+            return leaf
+
+        if task_id in self._grafted_uuids:
+            return None
+
+        play_def_target = self._play_def_target_for(play_id)
 
         parent = self._last_matched_task_def
         if parent is not None and play_def_target is not None:
@@ -758,7 +811,7 @@ class RunState:
         if parent is None:
             # No preflight task has matched yet — leave the unknown task as
             # an orphan rather than grafting it onto an arbitrary node.
-            return
+            return None
 
         # Idempotency: when ``_graft_role_pending_siblings`` already
         # grafted the runtime task's siblings (which include the
@@ -787,7 +840,7 @@ class RunState:
             if task_id:
                 self._grafted_uuids.add(task_id)
             self._last_matched_task_def = matched_child
-            return
+            return matched_child
 
         # Grafted task: detect role-in-role via the runtime prefix. When the
         # runtime name carries ``"role : "`` with a different role than the
@@ -845,19 +898,33 @@ class RunState:
             graft_role = parent.role
             graft_parent_role = parent.parent_role
 
-        parent.children.append(
-            TaskDefinition(
-                name=task_name,
-                role=graft_role,
-                parent_role=graft_parent_role,
-                tags=[],
-                play_id=parent.play_id,
-                play_order=parent.play_order,
-                task_order=-1,
-                is_dynamic=True,
-                path=task_path,
-            )
+        grafted = TaskDefinition(
+            name=task_name,
+            role=graft_role,
+            parent_role=graft_parent_role,
+            tags=[],
+            play_id=parent.play_id,
+            play_order=parent.play_order,
+            task_order=-1,
+            is_dynamic=True,
+            path=task_path,
         )
+        # Stamp run_once from the include cache so the linear-strategy
+        # host synthesis can skip non-target hosts for run_once +
+        # delegate_to tasks (they emit a terminal event for only the one
+        # delegated host). The cache is populated by
+        # ``discover_include_with_runtime_path`` when task_path carries a
+        # ``file.yml:line`` shape.
+        if task_path and ":" in task_path:
+            file_path = task_path.rsplit(":", 1)[0]
+            resolved = (Path(self.playbook).parent.resolve() / file_path).resolve()
+            entry = self._include_cache.get(str(resolved))
+            if entry is not None:
+                run_once = entry.task_run_once.get(task_name, False) or entry.task_run_once.get(
+                    strip_role_prefix(task_name), False
+                )
+                grafted.run_once = run_once
+        parent.children.append(grafted)
         if task_id:
             self._grafted_uuids.add(task_id)
         self._bump_tree_revision()
@@ -885,6 +952,8 @@ class RunState:
                 graft_role=graft_role,
                 graft_parent_role=graft_parent_role,
             )
+
+        return grafted
 
     def _graft_role_pending_siblings(
         self,
@@ -933,8 +1002,10 @@ class RunState:
         # current task (which ``_graft_or_match_task`` just added)
         # and any earlier siblings from a previous task_start. The
         # existing ``children`` list is the source of truth for
-        # what's already known about this subtree.
-        existing_names = {child.name for child in parent.children}
+        # what's already known about this subtree. Collect names from
+        # the FULL subtree (recursively) so block-nested role tasks
+        # aren't re-grafted as flat siblings under the stub.
+        existing_names = _subtree_names(parent)
 
         # Also skip names already started at runtime under the same
         # play — their ``TaskRunState`` entries mean they've already
@@ -1044,7 +1115,8 @@ class RunState:
             parent_role = self._parent_role_from_cache(task_name)
             discover_include_with_runtime_path(self, task_path, parent_role)
 
-        self._graft_or_match_task(task_id, task_name, task_path, play_id=play_id)
+        task_def = self._graft_or_match_task(task_id, task_name, task_path, play_id=play_id)
+        is_run_once = task_def is not None and task_def.run_once
 
         if play_missing:
             self.plays[play_id] = PlayRunState(
@@ -1092,27 +1164,33 @@ class RunState:
         # from the matching play's preflight resolved_hosts. Terminal
         # handlers (runner_on_ok/failed/skipped/unreachable) will
         # overwrite each host entry as the events arrive.
-        resolved_hosts = self._resolve_play_hosts(play)
-        if not resolved_hosts and play.detected_strategy == "linear":
-            last_status: dict[str, Status] = {}
-            for other_task in play.tasks.values():
-                if other_task.task_id == task_id:
-                    continue
-                for hostname, hs in other_task.hosts.items():
-                    last_status[hostname] = hs.status
-            resolved_hosts = sorted(
-                hostname
-                for hostname, status in last_status.items()
-                if status not in (Status.FAILED, Status.UNREACHABLE)
-            )
-        for hostname in resolved_hosts:
-            if hostname not in play.tasks[task_id].hosts:
-                play.tasks[task_id].hosts[hostname] = HostRunState(
-                    hostname=hostname,
-                    status=Status.RUNNING,
-                    start_time=ts,
-                    synthesised=True,
+        #
+        # run_once + delegate_to tasks emit a terminal event for only the
+        # one delegated host — the other play targets never get a terminal
+        # event, so synthesising them would leave phantom-RUNNING hosts.
+        # Skip synthesis entirely for run_once tasks.
+        if not is_run_once:
+            resolved_hosts = self._resolve_play_hosts(play)
+            if not resolved_hosts and play.detected_strategy == "linear":
+                last_status: dict[str, Status] = {}
+                for other_task in play.tasks.values():
+                    if other_task.task_id == task_id:
+                        continue
+                    for hostname, hs in other_task.hosts.items():
+                        last_status[hostname] = hs.status
+                resolved_hosts = sorted(
+                    hostname
+                    for hostname, status in last_status.items()
+                    if status not in (Status.FAILED, Status.UNREACHABLE)
                 )
+            for hostname in resolved_hosts:
+                if hostname not in play.tasks[task_id].hosts:
+                    play.tasks[task_id].hosts[hostname] = HostRunState(
+                        hostname=hostname,
+                        status=Status.RUNNING,
+                        start_time=ts,
+                        synthesised=True,
+                    )
 
         # Under linear strategy, tasks execute sequentially. When a new
         # task starts, any previous RUNNING task that is clearly done —
@@ -1130,16 +1208,34 @@ class RunState:
                     if all(hs.status != Status.RUNNING for hs in other_task.hosts.values()):
                         other_task.status = Status.COMPLETED
                     elif p.play_id == play.play_id or play_missing:
+                        prev_def = self._match_task_definition(
+                            other_task.task_id, other_task.name, other_task.path, p.play_id
+                        )
+                        prev_run_once = prev_def is not None and prev_def.run_once
                         for hostname in list(other_task.hosts):
                             hs = other_task.hosts[hostname]
                             if hs.status == Status.RUNNING:
-                                other_task.hosts[hostname] = HostRunState(
-                                    hostname=hostname,
-                                    status=Status.OK,
-                                    changed=False,
-                                    start_time=hs.start_time,
-                                    end_time=ts,
-                                )
+                                # run_once + delegate_to tasks emit a
+                                # terminal event for only the one delegated
+                                # host; any still-RUNNING synthesised hosts
+                                # are phantom (they never ran) and flip to
+                                # SKIPPED. Real RUNNING hosts (loop items)
+                                # keep the OK flip.
+                                if prev_run_once and hs.synthesised:
+                                    other_task.hosts[hostname] = HostRunState(
+                                        hostname=hostname,
+                                        status=Status.SKIPPED,
+                                        start_time=hs.start_time,
+                                        end_time=ts,
+                                    )
+                                else:
+                                    other_task.hosts[hostname] = HostRunState(
+                                        hostname=hostname,
+                                        status=Status.OK,
+                                        changed=False,
+                                        start_time=hs.start_time,
+                                        end_time=ts,
+                                    )
                         other_task.status = Status.COMPLETED
                     else:
                         continue
@@ -1436,6 +1532,20 @@ class RunState:
         prior = task.hosts.get(hostname)
         return prior.start_time if prior is not None else None
 
+    @staticmethod
+    def _capture_loop_total(task: TaskRunState, hosts_data: dict[str, JsonlHostResult]) -> None:
+        """Record the loop iteration count from a terminal event's results.
+
+        A looped include_tasks/include_role emits the loop items as a
+        ``results`` list on the stub's terminal runner event. The projection
+        uses ``loop_total`` to re-emit a completed child as pending when it
+        will run again this loop. Repeated events keep the largest count.
+        """
+        for host_result in hosts_data.values():
+            results = host_result.get("results")
+            if isinstance(results, list):
+                task.loop_total = max(task.loop_total or 0, len(results))
+
     def _handle_v2_runner_on_ok(self, event: JsonlEvent, ts: datetime) -> None:
         """Handle v2_runner_on_ok event."""
         hosts_data = self._hosts_dict(event)
@@ -1443,6 +1553,8 @@ class RunState:
         if task is None:
             self._note_unmatched(event)
             return
+
+        self._capture_loop_total(task, hosts_data)
 
         for hostname, host_result in hosts_data.items():
             changed = host_result.get("changed", False)
@@ -1472,6 +1584,8 @@ class RunState:
         if task is None:
             self._note_unmatched(event)
             return
+
+        self._capture_loop_total(task, hosts_data)
 
         for hostname, host_result in hosts_data.items():
             # Ansible passes ``ignore_errors`` as a parameter to the
@@ -1525,6 +1639,8 @@ class RunState:
             self._note_unmatched(event)
             return
 
+        self._capture_loop_total(task, hosts_data)
+
         for hostname in hosts_data:
             new_hs = HostRunState(
                 hostname=hostname,
@@ -1548,6 +1664,8 @@ class RunState:
         if task is None:
             self._note_unmatched(event)
             return
+
+        self._capture_loop_total(task, hosts_data)
 
         for hostname, host_result in hosts_data.items():
             msg = host_result.get("msg", "")

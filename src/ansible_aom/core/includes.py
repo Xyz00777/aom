@@ -50,6 +50,39 @@ def _lookup_directive(entry: dict, canonical: str) -> object | None:
     return entry.get(f"ansible.builtin.{canonical}")
 
 
+def _include_target_value(entry: dict) -> str | None:
+    """Return the literal ``include_tasks`` target from string or mapping form.
+
+    ``include_tasks: "foo.yml"`` → ``"foo.yml"``
+    ``include_tasks: {file: "foo.yml"}`` → ``"foo.yml"``
+    ``include_tasks: {file: "{{ x }}"}`` → ``None`` (Jinja skipped)
+    """
+    value = _lookup_directive(entry, "include_tasks")
+    if value is None:
+        return None
+    if isinstance(value, str):
+        target = value
+    elif isinstance(value, dict):
+        file_value = value.get("file")
+        if not isinstance(file_value, str):
+            return None
+        target = file_value
+    else:
+        return None
+    if "{{" in target:
+        return None
+    return target
+
+
+def _resolve_include_path(target: str, base_dirs: list[Path]) -> Path | None:
+    """Resolve *target* against the first *base_dirs* entry where it exists."""
+    for base in base_dirs:
+        resolved = (base / target).resolve()
+        if resolved.is_file():
+            return resolved
+    return None
+
+
 def _load_task_list(path: Path) -> list:
     """Read a YAML task-list file and return the top-level list (across documents).
 
@@ -84,6 +117,35 @@ def _load_task_list(path: Path) -> list:
     return tasks
 
 
+def parse_include_tasks_file_with_flags(path: Path) -> tuple[list[str], dict[str, bool]]:
+    """Read a YAML task-list file; return task names and per-task ``run_once`` flags.
+
+    Preserves Jinja2 template expressions (``{{ var }}``) verbatim — no
+    resolution is attempted. The file is expected to be a plain list of
+    task dicts, the same format as a playbook tasks section or a role
+    ``tasks/main.yml``.
+
+    The flags dict maps each task name to ``True`` only when the task has
+    a literal YAML ``run_once: true``. ``run_once: "{{ var }}"`` (Jinja
+    string) and ``run_once: false`` are NOT flagged — they cannot be known
+    statically, so they are treated as False. Keys use the raw task name
+    (no role-prefix stripping), matching the returned ``task_names`` list.
+
+    Returns ``([], {})`` when the file cannot be opened, the YAML is
+    malformed, or no entries are present.
+    """
+    tasks = _load_task_list(path)
+    names: list[str] = []
+    flags: dict[str, bool] = {}
+    for entry in tasks:
+        if isinstance(entry, dict) and "name" in entry:
+            name = str(entry["name"])
+            names.append(name)
+            if entry.get("run_once") is True:
+                flags[name] = True
+    return names, flags
+
+
 def parse_include_tasks_file(path: Path) -> list[str]:
     """Read a YAML task-list file and return the ``name`` of every task.
 
@@ -95,12 +157,34 @@ def parse_include_tasks_file(path: Path) -> list[str]:
     Returns an empty list when the file cannot be opened, the YAML is
     malformed, or no entries are present.
     """
-    tasks = _load_task_list(path)
+    names, _ = parse_include_tasks_file_with_flags(path)
+    return names
+
+
+def parse_role_tasks_with_flags(role_dir: Path) -> tuple[list[str], dict[str, bool]]:
+    """Read ``role_dir/tasks/main.yml``; return task names and ``run_once`` flags.
+
+    ``role : `` prefixes are stripped from every name so the cache matches
+    the convention used by ``tree.py`` (which calls ``strip_role_prefix``
+    during lookups). The flags dict uses the same stripped names and marks
+    a task ``True`` only for a literal YAML ``run_once: true`` (Jinja and
+    ``false`` values are not flagged). Returns ``([], {})`` on any error or
+    when the file does not exist.
+    """
+    tasks_file = role_dir / "tasks" / "main.yml"
+    if not tasks_file.is_file():
+        return [], {}
+    tasks = _load_task_list(tasks_file)
     names: list[str] = []
+    flags: dict[str, bool] = {}
     for entry in tasks:
         if isinstance(entry, dict) and "name" in entry:
-            names.append(str(entry["name"]))
-    return names
+            name = str(entry["name"])
+            stripped = strip_role_prefix(name)
+            names.append(stripped)
+            if entry.get("run_once") is True:
+                flags[stripped] = True
+    return names, flags
 
 
 def parse_role_tasks(role_dir: Path) -> list[str]:
@@ -111,15 +195,46 @@ def parse_role_tasks(role_dir: Path) -> list[str]:
     during lookups). Returns an empty list on any error or when the file
     does not exist.
     """
+    names, _ = parse_role_tasks_with_flags(role_dir)
+    return names
+
+
+def parse_role_tasks_nested(role_dir: Path) -> list[tuple[str, list[str], bool]]:
+    """Read ``role_dir/tasks/main.yml``; return ``(name, nested, run_once)`` per entry.
+
+    ``nested`` holds the names of tasks nested under a ``block:`` /
+    ``rescue:`` / ``always:`` container (recursively, so a nested task that
+    itself has a block contributes its own nested names). ``run_once`` is
+    ``True`` only for a literal YAML ``run_once: true``. ``role : `` prefixes
+    are stripped from every name. Returns ``[]`` on any error or when the
+    file does not exist.
+    """
     tasks_file = role_dir / "tasks" / "main.yml"
     if not tasks_file.is_file():
         return []
     tasks = _load_task_list(tasks_file)
-    names: list[str] = []
+    result: list[tuple[str, list[str], bool]] = []
     for entry in tasks:
-        if isinstance(entry, dict) and "name" in entry:
-            name = str(entry["name"])
-            names.append(strip_role_prefix(name))
+        if not isinstance(entry, dict) or "name" not in entry:
+            continue
+        name = strip_role_prefix(str(entry["name"]))
+        nested = _nested_task_names(entry)
+        result.append((name, nested, entry.get("run_once") is True))
+    return result
+
+
+def _nested_task_names(entry: dict) -> list[str]:
+    """Collect names from ``block:``/``rescue:``/``always:`` sub-lists (recursively)."""
+    names: list[str] = []
+    for sub_key in ("block", "rescue", "always"):
+        sub = entry.get(sub_key)
+        if not isinstance(sub, list):
+            continue
+        for sub_entry in sub:
+            if not isinstance(sub_entry, dict) or "name" not in sub_entry:
+                continue
+            names.append(strip_role_prefix(str(sub_entry["name"])))
+            names.extend(_nested_task_names(sub_entry))
     return names
 
 
@@ -190,33 +305,41 @@ def _scan_tasks_for_includes_impl(
     tasks: list,
     base_dir: Path,
     cache: dict[str, IncludeCacheEntry],
+    fallback_base_dir: Path | None = None,
 ) -> None:
-    """Shared DFS scanner — resolves ``include_tasks`` paths under *base_dir*."""
+    """Shared DFS scanner — resolves ``include_tasks`` paths under *base_dir*.
+
+    When *fallback_base_dir* is given and the primary resolution does not
+    exist on disk, the target is re-resolved against the fallback base.
+    This mirrors ansible's role-relative resolution: a ``../`` include
+    inside a role escapes the role's ``tasks/`` dir up to the roles dir.
+    """
+    base_dirs = [base_dir] if fallback_base_dir is None else [base_dir, fallback_base_dir]
     for task in tasks:
         if not isinstance(task, dict):
             continue
 
-        include_target = _lookup_directive(task, "include_tasks")
-        if (
-            include_target is not None
-            and isinstance(include_target, str)
-            and "{{" not in include_target
-        ):
-            resolved = (base_dir / include_target).resolve()
-            cache_key = str(resolved)
-            if cache_key not in cache:
-                task_names = parse_include_tasks_file(resolved)
-                cache[cache_key] = IncludeCacheEntry(
-                    path=cache_key,
-                    task_names=task_names,
-                    role=None,
-                    parsed_at=datetime.now(timezone.utc),
-                )
+        include_target = _include_target_value(task)
+        if include_target is not None:
+            resolved = _resolve_include_path(include_target, base_dirs)
+            if resolved is not None:
+                cache_key = str(resolved)
+                if cache_key not in cache:
+                    task_names, task_run_once = parse_include_tasks_file_with_flags(resolved)
+                    cache[cache_key] = IncludeCacheEntry(
+                        path=cache_key,
+                        task_names=task_names,
+                        role=None,
+                        parsed_at=datetime.now(timezone.utc),
+                        task_run_once=task_run_once,
+                    )
 
         for sub_key in ("block", "rescue", "always"):
             sub_tasks = task.get(sub_key)
             if isinstance(sub_tasks, list):
-                _scan_tasks_for_includes_impl(sub_tasks, base_dir, cache)
+                _scan_tasks_for_includes_impl(
+                    sub_tasks, base_dir, cache, fallback_base_dir=fallback_base_dir
+                )
 
 
 def resolve_includes_from_playbook(
@@ -353,7 +476,7 @@ def _walk_documents_for_includes(
 
 
 def _extract_role_name(value: object) -> str | None:
-    """Return the bare role name from any of the three ``include_role`` forms."""
+    """Return the bare role name from any of the ``include_role`` forms."""
     if isinstance(value, str):
         first = value.split(None, 1)[0].strip()
         if first.startswith("name=") or first.startswith("name:"):
@@ -363,7 +486,11 @@ def _extract_role_name(value: object) -> str | None:
             return first
         return None
     if isinstance(value, dict):
-        candidate = value.get("name")
+        # ``roles:`` list entries use ``- role: foo``; ``include_role:``
+        # mapping form uses ``name: foo``. Accept either key.
+        candidate = value.get("role")
+        if not isinstance(candidate, str):
+            candidate = value.get("name")
         if isinstance(candidate, str) and candidate and "{{" not in candidate:
             return candidate.strip()
     return None
@@ -404,15 +531,16 @@ def _discover_include(
     if cached is not None:
         return cached
 
-    task_names = parse_include_tasks_file(resolved)
+    task_names, task_run_once = parse_include_tasks_file_with_flags(resolved)
     if not task_names:
-        return None  # parse_include_tasks_file logged the reason
+        return None  # parse_include_tasks_file_with_flags logged the reason
 
     entry = IncludeCacheEntry(
         path=cache_key,
         task_names=task_names,
         role=parent_role,
         parsed_at=datetime.now(timezone.utc),
+        task_run_once=task_run_once,
     )
     state._include_cache[cache_key] = entry
     return entry
@@ -446,13 +574,14 @@ def _discover_role(
     playbook_dir = Path(state.playbook).parent.resolve()
     role_dir = playbook_dir / "roles" / role_name
 
-    task_names = parse_role_tasks(role_dir)
+    task_names, task_run_once = parse_role_tasks_with_flags(role_dir)
     if not task_names:
-        return None  # parse_role_tasks logged the reason
+        return None  # parse_role_tasks_with_flags logged the reason
 
     entry = RoleCacheEntry(
         role_name=cache_key,
         task_names=task_names,
+        task_run_once=task_run_once,
     )
     state._role_cache[cache_key] = entry
 
@@ -467,11 +596,12 @@ def _discover_role(
         if not nested_key or nested_key in state._role_cache:
             continue
         nested_role_dir = playbook_dir / "roles" / nested_name
-        nested_task_names = parse_role_tasks(nested_role_dir)
+        nested_task_names, nested_task_run_once = parse_role_tasks_with_flags(nested_role_dir)
         state._role_cache[nested_key] = RoleCacheEntry(
             role_name=nested_key,
             task_names=nested_task_names,
             parent_role=cache_key,
+            task_run_once=nested_task_run_once,
         )
 
     return entry
@@ -516,7 +646,12 @@ def _scan_role_tasks_for_includes(
     tasks = _load_task_list(tasks_file)
     if not tasks:
         return
-    _scan_tasks_for_includes_impl(tasks, role_dir / "tasks", cache)
+    _scan_tasks_for_includes_impl(
+        tasks,
+        role_dir / "tasks",
+        cache,
+        fallback_base_dir=role_dir.parent,
+    )
 
 
 def resolve_role_relative_includes(
@@ -598,7 +733,12 @@ def graft_include_children(
         logger.warning("Skipping unparseable playbook %s: %s", pb_path, exc)
         return
 
-    play_idx = 0
+    # Shared pairing state: pairs each YAML play (inline or inside an
+    # imported file) with a ``PlayDefinition`` by play name first, falling
+    # back to a positional cursor. ``--list-tasks`` skips plays (tags:
+    # never, false play-level when:), so YAML order != definition order;
+    # name matching is the primary pairing, the cursor is the fallback.
+    state = _GraftState(definitions)
     visited_imports: set[str] = set()
     plays: list = []
     for doc in documents:
@@ -608,40 +748,47 @@ def graft_include_children(
             plays.append(doc)
 
     for entry in plays:
-        if play_idx >= len(definitions):
-            break
-        play_def = definitions[play_idx]
-        play_idx += 1
+        # An inline play (has task sections) consumes the next definition,
+        # unless --list-tasks skips it (tags: never / when: false).
+        if _has_inline_sections(entry) and not _is_skipped_play(entry):
+            play_def = state.next_definition(entry.get("name"))
+            if play_def is None:
+                break
 
-        name_index = _build_name_index(play_def)
+            name_index = _build_name_index(play_def)
 
-        for section in ("pre_tasks", "tasks", "post_tasks", "handlers"):
-            section_tasks = entry.get(section)
-            if isinstance(section_tasks, list):
-                _graft_section_dfs(
-                    section_tasks,
-                    base_dir=playbook_dir,
-                    cache=cache,
-                    name_index=name_index,
-                )
+            for section in ("pre_tasks", "tasks", "post_tasks", "handlers"):
+                section_tasks = entry.get(section)
+                if isinstance(section_tasks, list):
+                    _graft_section_dfs(
+                        section_tasks,
+                        base_dir=playbook_dir,
+                        cache=cache,
+                        name_index=name_index,
+                        roles_base_dir=playbook_dir,
+                    )
 
-        for role_name in _roles_referenced(play_def):
-            role_dir = playbook_dir / "roles" / role_name
-            tasks_file = role_dir / "tasks" / "main.yml"
-            if not tasks_file.is_file():
-                continue
-            tasks = _load_task_list(tasks_file)
-            if tasks:
-                _graft_section_dfs(
-                    tasks,
-                    base_dir=role_dir / "tasks",
-                    cache=cache,
-                    name_index=name_index,
-                )
+            for role_name in _roles_referenced(play_def):
+                role_dir = playbook_dir / "roles" / role_name
+                tasks_file = role_dir / "tasks" / "main.yml"
+                if not tasks_file.is_file():
+                    continue
+                tasks = _load_task_list(tasks_file)
+                if tasks:
+                    _graft_section_dfs(
+                        tasks,
+                        base_dir=role_dir / "tasks",
+                        cache=cache,
+                        name_index=name_index,
+                        fallback_base_dir=role_dir.parent,
+                        roles_base_dir=playbook_dir,
+                    )
 
         # Recurse into imported playbooks so their includes are also
         # grafted. Reuse the import-playbook walker — it knows how to
-        # recurse without infinite loops via the visited set.
+        # recurse without infinite loops via the visited set. The import
+        # play itself consumes no definition; the imported file's plays
+        # consume them via the shared state.
         for directive in _PLAYBOOK_DIRECTIVE_KEYS:
             value = _lookup_directive(entry, directive)
             if not isinstance(value, str) or not value or "{{" in value:
@@ -656,7 +803,56 @@ def graft_include_children(
                 play_defs=definitions,
                 playbook_dir=resolved.parent,
                 visited_imports=visited_imports,
+                state=state,
+                roles_base_dir=playbook_dir,
             )
+
+
+class _GraftState:
+    """Shared pairing state threaded through the graft walk.
+
+    Pairs each YAML play with a ``PlayDefinition`` by play name first
+    (exact, then normalized), falling back to a positional cursor. Tracks
+    consumed definitions so duplicate play names don't double-consume and
+    the cursor skips already-paired definitions.
+    """
+
+    __slots__ = ("_definitions", "_by_exact", "_by_norm", "_consumed", "_cursor")
+
+    def __init__(self, definitions: list[PlayDefinition]) -> None:
+        self._definitions = definitions
+        self._by_exact: dict[str, int] = {}
+        self._by_norm: dict[str, int] = {}
+        for idx, play_def in enumerate(definitions):
+            name = play_def.name
+            if not name:
+                continue
+            self._by_exact.setdefault(name, idx)
+            self._by_norm.setdefault(name.strip().lower(), idx)
+        self._consumed: set[int] = set()
+        self._cursor = 0
+
+    def next_definition(self, name: object | None) -> PlayDefinition | None:
+        """Return the next unconsumed definition for a YAML play.
+
+        Prefers a definition whose name matches *name* (exact, then
+        normalized); otherwise advances the positional cursor past
+        already-consumed definitions.
+        """
+        if isinstance(name, str) and name:
+            idx = self._by_exact.get(name)
+            if idx is None:
+                idx = self._by_norm.get(name.strip().lower())
+            if idx is not None and idx not in self._consumed:
+                self._consumed.add(idx)
+                return self._definitions[idx]
+        while self._cursor < len(self._definitions):
+            idx = self._cursor
+            self._cursor += 1
+            if idx not in self._consumed:
+                self._consumed.add(idx)
+                return self._definitions[idx]
+        return None
 
 
 def _graft_imported_playbook(
@@ -666,16 +862,21 @@ def _graft_imported_playbook(
     play_defs: list,
     playbook_dir: Path,
     visited_imports: set[str],
+    state: _GraftState,
+    roles_base_dir: Path,
 ) -> None:
     """Apply the graft pass to one ``import_playbook:`` file.
 
-    Pairing ``import_playbook:`` targets with preflight definitions
-    is approximate (the imported playbook's play count and order may
-    not line up perfectly with definitions), so this walker is
-    best-effort: it scans for ``include_tasks:`` directives and
-    resolves their cache keys, but does not try to attach to
-    specific definitions. The runtime graft remains authoritative
-    for those cases.
+    Pairs each play in the imported file with a ``PlayDefinition`` via the
+    shared *state* (name-first, cursor fallback), so ``include_tasks``
+    stubs inside the imported file graft onto the definition whose tasks
+    contain them. Nested imports recurse with the same state. Best-effort:
+    stubs with no matching cache entry are left untouched; the runtime
+    graft remains authoritative for those cases.
+
+    *roles_base_dir* is the top-level playbook directory (the one holding
+    ``roles/``), which stays constant across nested imports — role paths
+    resolve against it, not against the imported file's own directory.
     """
     documents: list = []
     try:
@@ -688,8 +889,6 @@ def _graft_imported_playbook(
         logger.warning("Skipping unparseable imported playbook %s: %s", imported_path, exc)
         return
 
-    name_index = _build_name_index(play_defs[0]) if play_defs else {}
-
     plays: list = []
     for doc in documents:
         if isinstance(doc, list):
@@ -698,6 +897,37 @@ def _graft_imported_playbook(
             plays.append(doc)
 
     for entry in plays:
+        if not _has_inline_sections(entry):
+            # An import_playbook entry consumes no definition; its
+            # imported file's plays consume them via the shared state.
+            for directive in _PLAYBOOK_DIRECTIVE_KEYS:
+                value = _lookup_directive(entry, directive)
+                if not isinstance(value, str) or not value or "{{" in value:
+                    continue
+                resolved = (playbook_dir / value).resolve()
+                if str(resolved) in visited_imports:
+                    continue
+                visited_imports.add(str(resolved))
+                _graft_imported_playbook(
+                    resolved,
+                    cache=cache,
+                    play_defs=play_defs,
+                    playbook_dir=resolved.parent,
+                    visited_imports=visited_imports,
+                    state=state,
+                    roles_base_dir=roles_base_dir,
+                )
+            continue
+
+        if _is_skipped_play(entry):
+            continue
+
+        play_def = state.next_definition(entry.get("name"))
+        if play_def is None:
+            break
+
+        name_index = _build_name_index(play_def)
+
         for section in ("pre_tasks", "tasks", "post_tasks", "handlers"):
             section_tasks = entry.get(section)
             if isinstance(section_tasks, list):
@@ -706,7 +936,25 @@ def _graft_imported_playbook(
                     base_dir=playbook_dir,
                     cache=cache,
                     name_index=name_index,
+                    roles_base_dir=roles_base_dir,
                 )
+
+        for role_name in _roles_referenced(play_def):
+            role_dir = roles_base_dir / "roles" / role_name
+            tasks_file = role_dir / "tasks" / "main.yml"
+            if not tasks_file.is_file():
+                continue
+            tasks = _load_task_list(tasks_file)
+            if tasks:
+                _graft_section_dfs(
+                    tasks,
+                    base_dir=role_dir / "tasks",
+                    cache=cache,
+                    name_index=name_index,
+                    fallback_base_dir=role_dir.parent,
+                    roles_base_dir=roles_base_dir,
+                )
+
         for directive in _PLAYBOOK_DIRECTIVE_KEYS:
             value = _lookup_directive(entry, directive)
             if not isinstance(value, str) or not value or "{{" in value:
@@ -721,7 +969,46 @@ def _graft_imported_playbook(
                 play_defs=play_defs,
                 playbook_dir=resolved.parent,
                 visited_imports=visited_imports,
+                state=state,
+                roles_base_dir=roles_base_dir,
             )
+
+
+def _has_inline_sections(entry: dict) -> bool:
+    """True if *entry* is an inline play (has task-bearing sections or roles).
+
+    An ``import_playbook:`` entry has no task sections and consumes no
+    ``PlayDefinition`` — its imported file's plays consume them instead.
+    A play with only a ``roles:`` list still consumes a definition
+    (``--list-tasks`` expands the role's tasks into it), so it counts.
+    """
+    if any(
+        isinstance(entry.get(section), list)
+        for section in ("pre_tasks", "tasks", "post_tasks", "handlers")
+    ):
+        return True
+    return isinstance(entry.get("roles"), list)
+
+
+def _is_skipped_play(entry: dict) -> bool:
+    """True if ``--list-tasks`` would skip *entry* (so it consumes no definition).
+
+    ``--list-tasks`` omits plays tagged ``never`` and plays whose
+    play-level ``when:`` is statically false. Such plays appear in the
+    YAML but not in the definitions list, so they must not consume a
+    ``PlayDefinition`` — otherwise the positional pairing drifts.
+    """
+    tags = entry.get("tags")
+    if isinstance(tags, list) and "never" in tags:
+        return True
+    if isinstance(tags, str) and tags.strip() == "never":
+        return True
+    when = entry.get("when")
+    if when is False:
+        return True
+    if isinstance(when, str) and when.strip().lower() == "false":
+        return True
+    return False
 
 
 def _build_name_index(play_def: PlayDefinition) -> dict[str, TaskDefinition]:
@@ -764,15 +1051,25 @@ def _graft_section_dfs(
     cache: dict[str, IncludeCacheEntry],
     name_index: dict[str, TaskDefinition],
     visited_files: set[str] | None = None,
+    fallback_base_dir: Path | None = None,
+    roles_base_dir: Path | None = None,
 ) -> None:
     """Walk *section_tasks* for literal ``include_tasks`` directives and graft.
 
     For each directive:
-    1. Resolve the cache key from *base_dir*.
+    1. Resolve the cache key from *base_dir* (falling back to
+       *fallback_base_dir* when the primary path does not exist — used for
+       role ``../`` includes that escape the role's ``tasks/`` dir).
     2. Find the matching ``TaskDefinition`` by the directive's ``name:``.
     3. Append the cached task names as children of the stub.
     4. Recurse into the cached file's YAML so any nested
        ``include_tasks:`` is grafted in the same pass.
+
+    *roles_base_dir* is the top-level playbook directory (the one holding
+    ``roles/``). It is used as a fallback for ``include_role:`` resolution
+    when the local walk (``_resolve_role_dir`` from *base_dir*) fails — e.g.
+    an ``include_role:`` inside a deeply-nested imported playbook whose role
+    lives at the repo root.
 
     *visited_files* prevents infinite recursion on cycles (rare but
     possible if an included file includes itself via a non-Jinja path).
@@ -781,9 +1078,23 @@ def _graft_section_dfs(
     """
     if visited_files is None:
         visited_files = set()
+    base_dirs = [base_dir] if fallback_base_dir is None else [base_dir, fallback_base_dir]
     for task in section_tasks:
         if not isinstance(task, dict):
             continue
+        # Stamp literal ``run_once: true`` inline tasks (playbook or role
+        # YAML) onto their preflight stub. Only a literal YAML ``true``
+        # counts; Jinja-templated and ``false`` values are left unstamped.
+        if task.get("run_once") is True:
+            yaml_name = str(task.get("name") or "")
+            stub = name_index.get(yaml_name)
+            if stub is None and yaml_name:
+                for k, v in name_index.items():
+                    if strip_role_prefix(k) == yaml_name or k.endswith(f" : {yaml_name}"):
+                        stub = v
+                        break
+            if stub is not None:
+                stub.run_once = True
         for sub_key in ("block", "rescue", "always"):
             sub = task.get(sub_key)
             if isinstance(sub, list):
@@ -793,47 +1104,147 @@ def _graft_section_dfs(
                     cache=cache,
                     name_index=name_index,
                     visited_files=visited_files,
+                    fallback_base_dir=fallback_base_dir,
+                    roles_base_dir=roles_base_dir,
                 )
-        target = _lookup_directive(task, "include_tasks")
-        if not (isinstance(target, str) and "{{" not in target):
-            continue
-        resolved = (base_dir / target).resolve()
-        cache_key = str(resolved)
-        if cache_key in visited_files:
-            continue
-        visited_files.add(cache_key)
+        target = _include_target_value(task)
+        if target is not None:
+            resolved = _resolve_include_path(target, base_dirs)
+            if resolved is not None:
+                cache_key = str(resolved)
+                if cache_key not in visited_files:
+                    visited_files.add(cache_key)
+                    cache_entry = cache.get(cache_key)
+                    if cache_entry is not None:
+                        yaml_name = str(task.get("name") or "")
+                        stub = name_index.get(yaml_name)
+                        if stub is None and yaml_name:
+                            for k, v in name_index.items():
+                                if strip_role_prefix(k) == yaml_name or k.endswith(
+                                    f" : {yaml_name}"
+                                ):
+                                    stub = v
+                                    break
+                        if stub is None and not yaml_name:
+                            stub = _find_stub_by_role(name_index)
+                        if stub is not None:
+                            _graft_children(stub, cache_entry)
+                            nested_tasks = _load_task_list(resolved)
+                            if nested_tasks:
+                                child_index: dict[str, TaskDefinition] = {
+                                    c.name: c for c in stub.children if c.name
+                                }
+                                _graft_section_dfs(
+                                    nested_tasks,
+                                    base_dir=resolved.parent,
+                                    cache=cache,
+                                    name_index=child_index,
+                                    visited_files=visited_files,
+                                    roles_base_dir=roles_base_dir,
+                                )
 
-        cache_entry = cache.get(cache_key)
-        if cache_entry is None:
-            continue
-        yaml_name = str(task.get("name") or "")
-        stub = name_index.get(yaml_name)
-        if stub is None and yaml_name:
-            for k, v in name_index.items():
-                if strip_role_prefix(k) == yaml_name or k.endswith(f" : {yaml_name}"):
-                    stub = v
-                    break
-        if stub is None and not yaml_name:
-            stub = _find_stub_by_role(name_index)
-        if stub is None:
-            continue
+        # Check include_role / import_role
+        role_name = None
+        for directive in _ROLE_DIRECTIVE_KEYS:
+            role_name = _extract_role_name(_lookup_directive(task, directive))
+            if role_name:
+                break
 
-        _graft_children(stub, cache_entry)
+        if role_name:
+            role_dir = _resolve_role_dir(role_name, base_dir=base_dir)
+            if role_dir is None and roles_base_dir is not None:
+                candidate = roles_base_dir / "roles" / role_name
+                if (candidate / "tasks" / "main.yml").is_file() or (
+                    candidate / "tasks" / "main.yaml"
+                ).is_file():
+                    role_dir = candidate
+            if role_dir is not None:
+                tasks_file = role_dir / "tasks" / "main.yml"
+                if not tasks_file.is_file():
+                    tasks_file = role_dir / "tasks" / "main.yaml"
+                cache_key = f"role:{role_name.lower().strip()}"
+                if cache_key not in visited_files and tasks_file.is_file():
+                    visited_files.add(cache_key)
+                    role_entries = parse_role_tasks_nested(role_dir)
+                    if role_entries:
+                        yaml_name = str(task.get("name") or "")
+                        stub = name_index.get(yaml_name)
+                        if stub is None and yaml_name:
+                            for k, v in name_index.items():
+                                if strip_role_prefix(k) == yaml_name or k.endswith(
+                                    f" : {yaml_name}"
+                                ):
+                                    stub = v
+                                    break
+                        if stub is None:
+                            for k, v in name_index.items():
+                                if role_name in k:
+                                    stub = v
+                                    break
+                        if stub is None and not yaml_name:
+                            stub = _find_stub_by_role(name_index)
+                        if stub is not None:
+                            base_idx = len(stub.children)
+                            existing_names = {c.name for c in stub.children}
+                            for offset, (name, nested, run_once) in enumerate(role_entries):
+                                if name in existing_names:
+                                    continue
+                                child = TaskDefinition(
+                                    name=name,
+                                    role=role_name,
+                                    tags=[],
+                                    play_id=stub.play_id,
+                                    play_order=stub.play_order,
+                                    task_order=base_idx + offset,
+                                    is_dynamic=False,
+                                    parent_role=stub.parent_role or stub.role,
+                                    run_once=run_once,
+                                    is_block=bool(nested),
+                                )
+                                for n_offset, nested_name in enumerate(nested):
+                                    child.children.append(
+                                        TaskDefinition(
+                                            name=nested_name,
+                                            role=role_name,
+                                            tags=[],
+                                            play_id=stub.play_id,
+                                            play_order=stub.play_order,
+                                            task_order=n_offset,
+                                            is_dynamic=False,
+                                            parent_role=stub.parent_role or stub.role,
+                                        )
+                                    )
+                                stub.children.append(child)
 
-        # Recurse into the just-grafted children so any nested
-        # include_tasks inside the included file is grafted too.
-        # The file's own YAML walk uses its directory as base_dir
-        # so includes inside it resolve relative to that file.
-        nested_tasks = _load_task_list(resolved)
-        if nested_tasks:
-            child_index: dict[str, TaskDefinition] = {c.name: c for c in stub.children if c.name}
-            _graft_section_dfs(
-                nested_tasks,
-                base_dir=resolved.parent,
-                cache=cache,
-                name_index=child_index,
-                visited_files=visited_files,
-            )
+                            nested_tasks = _load_task_list(tasks_file)
+                            if nested_tasks:
+                                child_index = {c.name: c for c in stub.children if c.name}
+                                _graft_section_dfs(
+                                    nested_tasks,
+                                    base_dir=role_dir / "tasks",
+                                    cache=cache,
+                                    name_index=child_index,
+                                    visited_files=visited_files,
+                                    roles_base_dir=roles_base_dir,
+                                )
+
+
+def _resolve_role_dir(role_name: str, base_dir: Path) -> Path | None:
+    """Find the directory for *role_name* relative to *base_dir* or its ancestors."""
+    candidates = [
+        base_dir / "roles" / role_name,
+        base_dir / role_name,
+        base_dir.parent / "roles" / role_name,
+        base_dir.parent / role_name,
+    ]
+    if len(base_dir.parents) > 1:
+        candidates.append(base_dir.parents[1] / "roles" / role_name)
+    for candidate in candidates:
+        if (candidate / "tasks" / "main.yml").is_file() or (
+            candidate / "tasks" / "main.yaml"
+        ).is_file():
+            return candidate
+    return None
 
 
 def _find_stub_by_role(
@@ -856,7 +1267,10 @@ def _find_stub_by_role(
 def _graft_children(stub: TaskDefinition, cache_entry: IncludeCacheEntry) -> None:
     """Append cached task names as children of *stub*."""
     base_idx = len(stub.children)
+    existing_names = {c.name for c in stub.children}
     for offset, name in enumerate(cache_entry.task_names):
+        if name in existing_names:
+            continue
         child = TaskDefinition(
             name=name,
             role=stub.role,
@@ -866,5 +1280,6 @@ def _graft_children(stub: TaskDefinition, cache_entry: IncludeCacheEntry) -> Non
             task_order=base_idx + offset,
             is_dynamic=False,
             parent_role=stub.parent_role or stub.role,
+            run_once=cache_entry.task_run_once.get(name, False),
         )
         stub.children.append(child)

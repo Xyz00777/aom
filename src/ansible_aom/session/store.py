@@ -862,15 +862,20 @@ def load_session(session_id: str, session_dir: Path) -> dict[str, Any] | None:
     malformed_lines = 0
 
     if events_file.exists():
-        with open(events_file) as f:
+        with open(events_file, "rb") as f:
             for line in f:
                 line = line.strip()
                 if not line:
                     continue
                 try:
-                    events.append(json.loads(line))
-                except json.JSONDecodeError:
+                    event = json.loads(line)
+                except json.JSONDecodeError, UnicodeDecodeError:
                     malformed_lines += 1
+                    continue
+                if not isinstance(event, dict):
+                    malformed_lines += 1
+                    continue
+                events.append(event)
 
     result["events"] = events
     result["malformed_lines"] = malformed_lines
