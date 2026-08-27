@@ -726,6 +726,7 @@ def graft_include_children(
                         base_dir=playbook_dir,
                         cache=cache,
                         name_index=name_index,
+                        roles_base_dir=playbook_dir,
                     )
 
             for role_name in _roles_referenced(play_def):
@@ -741,6 +742,7 @@ def graft_include_children(
                         cache=cache,
                         name_index=name_index,
                         fallback_base_dir=role_dir.parent,
+                        roles_base_dir=playbook_dir,
                     )
 
         # Recurse into imported playbooks so their includes are also
@@ -895,6 +897,7 @@ def _graft_imported_playbook(
                     base_dir=playbook_dir,
                     cache=cache,
                     name_index=name_index,
+                    roles_base_dir=roles_base_dir,
                 )
 
         for role_name in _roles_referenced(play_def):
@@ -910,6 +913,7 @@ def _graft_imported_playbook(
                     cache=cache,
                     name_index=name_index,
                     fallback_base_dir=role_dir.parent,
+                    roles_base_dir=roles_base_dir,
                 )
 
         for directive in _PLAYBOOK_DIRECTIVE_KEYS:
@@ -1009,6 +1013,7 @@ def _graft_section_dfs(
     name_index: dict[str, TaskDefinition],
     visited_files: set[str] | None = None,
     fallback_base_dir: Path | None = None,
+    roles_base_dir: Path | None = None,
 ) -> None:
     """Walk *section_tasks* for literal ``include_tasks`` directives and graft.
 
@@ -1020,6 +1025,12 @@ def _graft_section_dfs(
     3. Append the cached task names as children of the stub.
     4. Recurse into the cached file's YAML so any nested
        ``include_tasks:`` is grafted in the same pass.
+
+    *roles_base_dir* is the top-level playbook directory (the one holding
+    ``roles/``). It is used as a fallback for ``include_role:`` resolution
+    when the local walk (``_resolve_role_dir`` from *base_dir*) fails — e.g.
+    an ``include_role:`` inside a deeply-nested imported playbook whose role
+    lives at the repo root.
 
     *visited_files* prevents infinite recursion on cycles (rare but
     possible if an included file includes itself via a non-Jinja path).
@@ -1055,6 +1066,7 @@ def _graft_section_dfs(
                     name_index=name_index,
                     visited_files=visited_files,
                     fallback_base_dir=fallback_base_dir,
+                    roles_base_dir=roles_base_dir,
                 )
         target = _include_target_value(task)
         if target is not None:
@@ -1089,6 +1101,7 @@ def _graft_section_dfs(
                                     cache=cache,
                                     name_index=child_index,
                                     visited_files=visited_files,
+                                    roles_base_dir=roles_base_dir,
                                 )
 
         # Check include_role / import_role
@@ -1100,6 +1113,12 @@ def _graft_section_dfs(
 
         if role_name:
             role_dir = _resolve_role_dir(role_name, base_dir=base_dir)
+            if role_dir is None and roles_base_dir is not None:
+                candidate = roles_base_dir / "roles" / role_name
+                if (candidate / "tasks" / "main.yml").is_file() or (
+                    candidate / "tasks" / "main.yaml"
+                ).is_file():
+                    role_dir = candidate
             if role_dir is not None:
                 tasks_file = role_dir / "tasks" / "main.yml"
                 if not tasks_file.is_file():
@@ -1153,6 +1172,7 @@ def _graft_section_dfs(
                                     cache=cache,
                                     name_index=child_index,
                                     visited_files=visited_files,
+                                    roles_base_dir=roles_base_dir,
                                 )
 
 

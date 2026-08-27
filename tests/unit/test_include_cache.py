@@ -1425,6 +1425,58 @@ class TestGraftIncludeChildren:
 
         assert [c.name for c in stub.children] == ["Child"]
 
+    def test_include_role_in_deep_imported_playbook_grafts(self, tmp_path: Path) -> None:
+        """TC-094i: include_role inside a deeply-nested imported playbook grafts.
+
+        The role lives at the top-level playbook dir's ``roles/`` (the repo
+        root), but the imported playbook sits N levels deep. ``_resolve_role_dir``
+        only walks up 2 levels from the imported file's dir, so the graft must
+        fall back to the top-level ``roles_base_dir`` to find the role.
+        """
+        (tmp_path / "roles" / "myrole" / "tasks").mkdir(parents=True)
+        (tmp_path / "roles" / "myrole" / "tasks" / "main.yml").write_text(
+            "- name: Role task A\n  debug:\n    msg: a\n- name: Role task B\n  debug:\n    msg: b\n"
+        )
+        (tmp_path / "sub" / "dir" / "deep").mkdir(parents=True)
+        (tmp_path / "sub" / "dir" / "deep" / "play.yml").write_text(
+            "- hosts: localhost\n  tasks:\n"
+            "    - name: Include myrole\n      include_role:\n        name: myrole\n"
+        )
+        main = tmp_path / "main.yml"
+        main.write_text("- ansible.builtin.import_playbook: sub/dir/deep/play.yml\n")
+        stub = _include_stub("Include myrole", role=None)
+        play = _make_play([stub])
+
+        graft_include_children(
+            playbook_path=str(main),
+            definitions=[play],
+            cache={},
+        )
+
+        assert [c.name for c in stub.children] == ["Role task A", "Role task B"]
+
+    def test_include_role_in_shallow_playbook_still_grafts(self, tmp_path: Path) -> None:
+        """TC-094j: include_role next to the playbook still grafts (regression)."""
+        (tmp_path / "roles" / "myrole" / "tasks").mkdir(parents=True)
+        (tmp_path / "roles" / "myrole" / "tasks" / "main.yml").write_text(
+            "- name: Role task A\n  debug:\n    msg: a\n- name: Role task B\n  debug:\n    msg: b\n"
+        )
+        playbook = tmp_path / "play.yml"
+        playbook.write_text(
+            "- hosts: localhost\n  tasks:\n"
+            "    - name: Include myrole\n      include_role:\n        name: myrole\n"
+        )
+        stub = _include_stub("Include myrole", role=None)
+        play = _make_play([stub])
+
+        graft_include_children(
+            playbook_path=str(playbook),
+            definitions=[play],
+            cache={},
+        )
+
+        assert [c.name for c in stub.children] == ["Role task A", "Role task B"]
+
 
 # ---------------------------------------------------------------------------
 # run_once stamping
