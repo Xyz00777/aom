@@ -5954,3 +5954,179 @@ class TestBlockTaskProjection:
             f"nested children should be at depth {block_depth + 1}, "
             f"got {[ln.depth for ln in nested_lines]}"
         )
+
+    @staticmethod
+    def _block_active_state(
+        block: TaskDefinition, *siblings: TaskDefinition
+    ) -> tuple[RunState, list[dict]]:
+        """Build a RunState where the block's children fire task_start events
+        (the realistic ansible sequence: the block container itself never
+        fires ``v2_playbook_on_task_start`` — only its nested tasks do)."""
+        defs = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[block, *siblings],
+            )
+        ]
+        state = RunState(playbook="site.yml", definitions=defs)
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-06-24T10:00:00Z",
+                "play": {"id": "p1", "name": "Deploy"},
+            }
+        )
+        return state, defs
+
+    def test_block_container_running_above_running_child(self):
+        """Realistic sequence: ansible never fires task_start for the block
+        container, only for its nested children. The container row must still
+        render RUNNING *above* its running child (not PENDING below it), and
+        the child must sit one level deeper."""
+        nested1 = TaskDefinition(
+            name="Ensure IPA servers are resolvable",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=0,
+        )
+        nested2 = TaskDefinition(
+            name="Wait for first IPA server",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=1,
+        )
+        block = TaskDefinition(
+            name="Enroll in FreeIPA",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=2,
+            is_block=True,
+            children=[nested1, nested2],
+        )
+        regular = TaskDefinition(
+            name="Install packages",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=3,
+        )
+        state, _ = self._block_active_state(block, regular)
+        # Only the nested child fires task_start — the container never does.
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-06-24T10:00:01Z",
+                "task": {"id": "t-child1", "name": "Ensure IPA servers are resolvable"},
+                "play": {"id": "p1"},
+            }
+        )
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=30)
+
+        block_lines = [ln for ln in lines if "Enroll in FreeIPA" in ln.label]
+        assert len(block_lines) == 1, f"block row should appear once, got {block_lines!r}"
+        assert block_lines[0].status == Status.RUNNING, (
+            f"block should be RUNNING while a child runs, got {block_lines[0].status}"
+        )
+        block_depth = block_lines[0].depth
+
+        child_lines = [ln for ln in lines if "Ensure IPA servers are resolvable" in ln.label]
+        assert len(child_lines) == 1, f"running child should appear once, got {child_lines!r}"
+        assert child_lines[0].status == Status.RUNNING
+        assert child_lines[0].depth == block_depth + 1, (
+            f"running child should sit one level below the block, "
+            f"got child depth {child_lines[0].depth} vs block depth {block_depth}"
+        )
+        # The container must render ABOVE its running child, not below it.
+        assert lines.index(block_lines[0]) < lines.index(child_lines[0]), (
+            f"block row should precede its running child, got {[ln.label for ln in lines]}"
+        )
+
+    def test_block_container_drops_off_when_children_complete(self):
+        """Once every nested child has completed, the block container row must
+        drop off the tree (it is a container, not a leaf task) — leaving the
+        next sibling as the only pending/running row."""
+        nested1 = TaskDefinition(
+            name="Ensure IPA servers are resolvable",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=0,
+        )
+        nested2 = TaskDefinition(
+            name="Wait for first IPA server",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=1,
+        )
+        block = TaskDefinition(
+            name="Enroll in FreeIPA",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=2,
+            is_block=True,
+            children=[nested1, nested2],
+        )
+        regular = TaskDefinition(
+            name="Install packages",
+            role=None,
+            tags=[],
+            play_id="p1",
+            play_order=0,
+            task_order=3,
+        )
+        state, _ = self._block_active_state(block, regular)
+        for idx, child in enumerate((nested1, nested2)):
+            state.handle_event(
+                {
+                    "_event": "v2_playbook_on_task_start",
+                    "_timestamp": f"2026-06-24T10:00:0{1 + idx}Z",
+                    "task": {"id": f"t-child{idx}", "name": child.name},
+                    "play": {"id": "p1"},
+                }
+            )
+            state.handle_event(
+                {
+                    "_event": "v2_runner_on_ok",
+                    "_timestamp": f"2026-06-24T10:00:0{2 + idx}Z",
+                    "task": {"id": f"t-child{idx}", "name": child.name},
+                    "play": {"id": "p1"},
+                    "host": "web1",
+                }
+            )
+        # Sibling starts after the block finished.
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-06-24T10:00:05Z",
+                "task": {"id": "t-reg", "name": "Install packages"},
+                "play": {"id": "p1"},
+            }
+        )
+        proj = TreeProjection.from_run_state(state)
+        lines = proj.tree_lines(budget=30)
+
+        assert not any("Enroll in FreeIPA" in ln.label for ln in lines), (
+            f"completed block container should drop off, got {[ln.label for ln in lines]}"
+        )
+        sibling_lines = [ln for ln in lines if "Install packages" in ln.label]
+        assert len(sibling_lines) == 1, f"sibling should appear once, got {sibling_lines!r}"
+        assert sibling_lines[0].status == Status.RUNNING
+        assert sibling_lines[0].depth == 2, (
+            f"sibling should render at play level (depth 2), got {sibling_lines[0].depth}"
+        )

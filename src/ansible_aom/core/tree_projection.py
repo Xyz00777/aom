@@ -2145,6 +2145,20 @@ class TreeProjection:
                             )
                         )
                         self._touch_host_lease(hostname, now)
+            elif item_kind == "running":
+                # Block containers never fire events; a RUNNING container
+                # row has no runtime entry and no host leaves of its own.
+                lines.append(
+                    TreeLine(
+                        depth=task_depth,
+                        kind="task",
+                        label=strip_role_prefix(name),
+                        glyph=None,
+                        status=Status.RUNNING,
+                        elapsed_s=None,
+                    )
+                )
+                self._touch_row_lease("task", name, now)
             else:  # pending
                 pending_label = (
                     strip_role_prefix(runtime.name)
@@ -2309,7 +2323,7 @@ class TreeProjection:
         except ValueError:
             pass
 
-        def _classify(runtime: TaskRunState | None) -> str:
+        def _classify(runtime: TaskRunState | None, entry: TaskDefinition | None = None) -> str:
             """Return ``"running"`` / ``"pending"`` / ``"completed"``.
 
             ``"completed"`` is filtered out before items reach the caller,
@@ -2321,8 +2335,24 @@ class TreeProjection:
             ``v2_runner_on_start``) is classified as ``"running"`` so the
             tree shows the correct ◐ icon and makes room for host leaves
             that will appear once runner events arrive.
+
+            A ``block:``/``rescue:``/``always:`` container never fires its
+            own ``v2_playbook_on_task_start`` — ansible emits events only
+            for the nested tasks. With no runtime entry, the container is
+            classified from its children's runtime state: RUNNING while any
+            child is in flight, COMPLETED once every child has reached a
+            terminal state, PENDING otherwise.
             """
             if runtime is None:
+                if entry is not None and entry.is_block and entry.children:
+                    child_states = [
+                        _classify(_pick_runtime(child.name, set(), None, child.path), child)
+                        for child in entry.children
+                    ]
+                    if any(s == "running" for s in child_states):
+                        return "running"
+                    if child_states and all(s == "completed" for s in child_states):
+                        return "completed"
                 return "pending"
             if runtime.status == Status.COMPLETED:
                 return "completed"
@@ -2501,7 +2531,7 @@ class TreeProjection:
                 full_role_path = _extend_role_path(
                     preflight_path, preflight_name_chain, runtime, runtime_name_chain
                 )
-                kind = _classify(runtime)
+                kind = _classify(runtime, entry)
                 # For a looped include, a child whose matched runtime task is
                 # completed but which will run again this loop (its runtime-task
                 # count is less than the stub's loop_total) is re-emitted as
