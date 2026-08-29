@@ -32,6 +32,34 @@ def strip_role_prefix(name: str) -> str:
     return name
 
 
+def _is_meta_task(task_name: str) -> bool:
+    """Return True for explicit ``meta: ...`` or named meta tasks.
+
+    Ansible's callback engine does not emit ``v2_playbook_on_task_start``
+    events for ``meta:`` actions (e.g. ``reset_connection``, ``flush_handlers``).
+    """
+    stripped = strip_role_prefix(task_name).strip().lower()
+    if stripped.startswith("meta:") or stripped.startswith("meta :"):
+        return True
+    meta_prefixes = (
+        "reset connection",
+        "reset_connection",
+        "flush handlers",
+        "flush_handlers",
+        "refresh inventory",
+        "refresh_inventory",
+        "clear facts",
+        "clear_facts",
+        "clear host errors",
+        "clear_host_errors",
+        "end host",
+        "end_host",
+        "end play",
+        "end_play",
+    )
+    return any(stripped.startswith(prefix) for prefix in meta_prefixes)
+
+
 def _is_template_match(preflight_name: str, runtime_name: str) -> bool:
     """Return True if ``runtime_name`` could be a resolved version of
     ``preflight_name`` (which may contain ``{{ ... }}`` templates).

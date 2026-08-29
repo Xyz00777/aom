@@ -29,7 +29,8 @@ from ansible_aom.core.models import (
     PlayDefinition,
     RoleGroupDefinition,
     Status,
-    TaskDefinition,
+    _is_meta_task,
+    iter_preflight_task_defs,
 )
 from ansible_aom.core.run_state import RunState
 from ansible_aom.core.tree import TreeProjection
@@ -770,53 +771,22 @@ def format_tree_block(
     return out
 
 
-def _count_role_group_tasks(group: RoleGroupDefinition) -> int:
-    """Recursively count leaf tasks inside a ``RoleGroupDefinition``.
-
-    ``RoleGroupDefinition.tasks`` may contain nested ``RoleGroupDefinition``
-    entries (for nested roles), so this helper recurses into them.  It
-    also applies the same parent-stub-skipping rule used at the play
-    level: a ``TaskDefinition`` with non-empty ``.children`` is an
-    ``include_tasks`` placeholder, not a leaf — only its children count.
-    Plain leaf ``TaskDefinition`` entries count as 1.
-    """
-    total = 0
-    for entry in group.tasks:
-        if isinstance(entry, RoleGroupDefinition):
-            total += _count_role_group_tasks(entry)
-        elif isinstance(entry, TaskDefinition):
-            if entry.children:
-                total += len(entry.children)
-            else:
-                total += 1
-        else:
-            total += 1
-    return total
-
-
 def _count_tasks(play: PlayDefinition) -> int:
     """Count leaf TaskDefinitions in a play, expanding any RoleGroupDefinition.
 
     Dynamic ``include_tasks`` children are grafted onto their parent
-    ``TaskDefinition`` at runtime via ``TaskDefinition.children``.  Such a
+    ``TaskDefinition`` at runtime via ``TaskDefinition.children``. Such a
     parent stub is a placeholder, not a leaf — only its children count.
-    Regular leaf ``TaskDefinition`` entries count as 1.  Nested
-    ``RoleGroupDefinition`` entries are expanded recursively via
-    ``_count_role_group_tasks`` so the status-bar denominator reflects
-    the true total once dynamic tasks have expanded.
+    Nested ``RoleGroupDefinition`` entries and nested stub children are
+    expanded recursively via ``iter_preflight_task_defs`` so the status-bar
+    denominator reflects the true leaf total once dynamic tasks have
+    expanded. Meta tasks are excluded (they never emit task-start events).
     """
-    total = 0
-    for entry in play.tasks:
-        if isinstance(entry, RoleGroupDefinition):
-            total += _count_role_group_tasks(entry)
-        elif isinstance(entry, TaskDefinition):
-            if entry.children:
-                total += len(entry.children)
-            else:
-                total += 1
-        else:
-            total += 1
-    return total
+    return sum(
+        1
+        for entry, _ in iter_preflight_task_defs(play.tasks)
+        if not entry.children and not _is_meta_task(entry.name)
+    )
 
 
 def count_total_tasks(definitions: list[PlayDefinition]) -> int:

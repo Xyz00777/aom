@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from ansible_aom.core.inspect_model import StatusCounts
-from ansible_aom.core.models import RunState, Status
+from ansible_aom.core.models import RunState, Status, _is_meta_task
 from ansible_aom.core.tree_projection import (
     _ROW_LEASE_LIMIT,
     _ROW_LEASE_TTL,
@@ -34,7 +34,6 @@ from ansible_aom.core.tree_projection import (
     _count_domain_entities,
     _effective_status,
     _host_leaf_label,
-    _is_meta_task,
     _is_template_match,
     _more_footer,
     _name_role_chain,
