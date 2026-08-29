@@ -807,11 +807,14 @@ def test_ancestor_spine_continues_under_tail_after(monkeypatch) -> None:
 def test_format_tree_block_renders_two_level_truncation(monkeypatch) -> None:
     """End-to-end snapshot of the user's sketch shape. Two plays,
     second with a ``podman`` role containing 33 tasks. With
-    ``budget=10`` the truncation algorithm (T2) emits an inner footer
-    at the role's task depth AND an outer footer at depth 0. Both
-    footers must render with the PENDING icon and no branch glyph,
-    and the line immediately above each footer must render with
-    ``├─`` (the spur that keeps the spine connected to the footer).
+    ``budget=15`` the truncation algorithm (T2) emits an inner footer
+    at the role's task depth. The podman role footer claims all 30
+    hidden tasks, so the outer footer is dropped (own-only contract:
+    each hidden task is counted in exactly one footer, and no play
+    footer is emitted). The footer must render with the PENDING icon
+    and no branch glyph, and the line immediately above it must render
+    with ``├─`` (the spur that keeps the spine connected to the
+    footer).
     """
     from ansible_aom.core.models import PlayDefinition, RoleGroupDefinition, TaskDefinition
 
@@ -895,12 +898,13 @@ def test_format_tree_block_renders_two_level_truncation(monkeypatch) -> None:
     block = format_tree_block(projection, budget=15, width=120, ascii_mode=False, colorize=False)
     joined = "\n".join(block)
 
-    # All footers (role, play, outer) must render.
+    # All footers (role + outer) must render. The podman role footer
+    # claims all 30 hidden tasks, so the outer footer is dropped.
     more_lines = [ln for ln in block if "more tasks" in ln]
-    assert len(more_lines) == 3, (
-        f"expected exactly 3 'more tasks' footers (role + play + outer); got {len(more_lines)} in:\n{joined}"
+    assert len(more_lines) == 1, (
+        f"expected exactly 1 'more tasks' footer (role only, outer dropped); got {len(more_lines)} in:\n{joined}"
     )
-    # Both footers carry the PENDING icon □ (T4 Edit 3) and have no
+    # The footer carries the PENDING icon □ (T4 Edit 3) and has no
     # branch glyph (T4 Edit 1).
     for footer in more_lines:
         assert "□" in footer, f"every 'more' footer must carry the PENDING icon; got {footer!r}"

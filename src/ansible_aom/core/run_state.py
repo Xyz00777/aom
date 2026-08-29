@@ -40,8 +40,10 @@ from ansible_aom.core.models import (
     Status,
     TaskDefinition,
     TaskRunState,
+    _is_meta_task,
     _is_template_match,
     _iter_task_def_tree,
+    iter_preflight_task_defs,
     runtime_role_from_task_name,
     strip_role_prefix,
 )
@@ -153,7 +155,14 @@ def _leaves_of_role_group(group: RoleGroupDefinition) -> list[TaskDefinition]:
 
 
 def count_leaf_tasks(plays: list[PlayDefinition]) -> int:
-    """Total number of leaf TaskDefinitions across all preflight plays.
+    """Total number of leaf (non-stub, non-meta) tasks across all preflight plays.
+
+    Counts only tasks that are actual leaves — ``TaskDefinition`` entries
+    with no ``children`` (not ``include_tasks`` stubs) and not meta tasks —
+    fully recursive through ``RoleGroupDefinition`` and nested
+    ``TaskDefinition.children``. This matches the tree's per-play sum
+    (``TreeProjection._preflight_task_count``) and the status-bar
+    denominator, so all three agree on the same total.
 
     Shared by infrastructure callers that need a task count without
     materialising the list (the runner persisting ``preflight_task_count``
@@ -161,7 +170,12 @@ def count_leaf_tasks(plays: list[PlayDefinition]) -> int:
     Lives in ``core/`` so layering rules (no infra-to-infra imports) are
     satisfied with one definition.
     """
-    return len(_iter_leaf_task_defs(plays))
+    return sum(
+        1
+        for play in plays
+        for entry, _ in iter_preflight_task_defs(play.tasks)
+        if not entry.children and not _is_meta_task(entry.name)
+    )
 
 
 class _BoundedSet(set):  # noqa: FURB189 — subclassing set is intentional

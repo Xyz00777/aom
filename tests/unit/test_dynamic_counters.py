@@ -422,3 +422,149 @@ def test_total_tasks_multi_play_with_dynamic_children() -> None:
 
     # Play 1: parent stub skipped, 1 dynamic child = 1.  Play 2: parent stub skipped, 2 children = 2.  Total = 3.
     assert count_total_tasks(defs) == 3
+
+
+# ---------------------------------------------------------------------------
+# Nested include stub: a stub whose children are themselves stubs must
+# recurse into grandchildren (Fix A). The status-bar denominator and
+# count_leaf_tasks must count the grandchildren leaves, not len(direct).
+# ---------------------------------------------------------------------------
+def test_total_tasks_counts_nested_include_stub_grandchildren() -> None:
+    """A stub → child stub → grandchildren chain: count_total_tasks counts
+    the grandchildren leaves, not len(direct children)."""
+    grandchild1 = TaskDefinition(
+        name="Grandchild 1",
+        role=None,
+        tags=[],
+        play_id="1",
+        play_order=0,
+        task_order=-1,
+        is_dynamic=True,
+    )
+    grandchild2 = TaskDefinition(
+        name="Grandchild 2",
+        role=None,
+        tags=[],
+        play_id="1",
+        play_order=0,
+        task_order=-1,
+        is_dynamic=True,
+    )
+    child_stub = TaskDefinition(
+        name="Include podman role for user setup",
+        role=None,
+        tags=[],
+        play_id="1",
+        play_order=0,
+        task_order=-1,
+        is_dynamic=True,
+        children=[grandchild1, grandchild2],
+    )
+    parent_stub = TaskDefinition(
+        name="Include setup tasks",
+        role=None,
+        tags=[],
+        play_id="1",
+        play_order=0,
+        task_order=0,
+        children=[child_stub],
+    )
+    defs = [
+        PlayDefinition(
+            id="1",
+            name="Test",
+            hosts="all",
+            resolved_hosts=["web1"],
+            tasks=[parent_stub],
+        )
+    ]
+    # Both stubs are skipped; the two grandchildren leaves count.
+    assert count_total_tasks(defs) == 2
+
+
+def test_count_leaf_tasks_counts_nested_include_stub_grandchildren() -> None:
+    """count_leaf_tasks counts the grandchildren leaves of a nested include
+    stub chain, matching count_total_tasks and the tree's per-play sum."""
+    from ansible_aom.core.run_state import count_leaf_tasks
+
+    grandchild1 = TaskDefinition(
+        name="Grandchild 1",
+        role=None,
+        tags=[],
+        play_id="1",
+        play_order=0,
+        task_order=-1,
+        is_dynamic=True,
+    )
+    grandchild2 = TaskDefinition(
+        name="Grandchild 2",
+        role=None,
+        tags=[],
+        play_id="1",
+        play_order=0,
+        task_order=-1,
+        is_dynamic=True,
+    )
+    child_stub = TaskDefinition(
+        name="Include podman role for user setup",
+        role=None,
+        tags=[],
+        play_id="1",
+        play_order=0,
+        task_order=-1,
+        is_dynamic=True,
+        children=[grandchild1, grandchild2],
+    )
+    parent_stub = TaskDefinition(
+        name="Include setup tasks",
+        role=None,
+        tags=[],
+        play_id="1",
+        play_order=0,
+        task_order=0,
+        children=[child_stub],
+    )
+    defs = [
+        PlayDefinition(
+            id="1",
+            name="Test",
+            hosts="all",
+            resolved_hosts=["web1"],
+            tasks=[parent_stub],
+        )
+    ]
+    assert count_leaf_tasks(defs) == 2
+
+
+def test_count_leaf_tasks_excludes_meta_tasks() -> None:
+    """count_leaf_tasks excludes meta tasks (they never emit task-start
+    events), matching the tree's per-play sum."""
+    from ansible_aom.core.run_state import count_leaf_tasks
+
+    defs = [
+        PlayDefinition(
+            id="1",
+            name="Test",
+            hosts="all",
+            resolved_hosts=["web1"],
+            tasks=[
+                TaskDefinition(
+                    name="Install nginx",
+                    role=None,
+                    tags=[],
+                    play_id="1",
+                    play_order=0,
+                    task_order=0,
+                ),
+                TaskDefinition(
+                    name="meta: flush_handlers",
+                    role=None,
+                    tags=[],
+                    play_id="1",
+                    play_order=0,
+                    task_order=1,
+                ),
+            ],
+        )
+    ]
+    assert count_leaf_tasks(defs) == 1

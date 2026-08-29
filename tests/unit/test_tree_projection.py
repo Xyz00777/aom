@@ -1262,7 +1262,10 @@ class TestTreeLinesGroupedRoleNestedChildren:
 
         assert state._task_def_index is not None
         assert "theforeman.operations.installer : Poll async status" in state._task_def_index
-        assert count_leaf_tasks(state.definitions) == 4
+        # Leaf-only count: Prepare hosts + Poll async status + Configure
+        # installer = 3. The `install_parent` stub (with children) is
+        # excluded, matching the tree's per-play sum.
+        assert count_leaf_tasks(state.definitions) == 3
 
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=30)
@@ -2203,11 +2206,12 @@ class TestTwoLevelTruncation:
         )
 
     def test_inner_footer_emitted_when_cut_inside_role(self) -> None:
-        """When the budget cut lands inside a role's task list, both an
-        inner footer (at the role's task depth) and an outer footer (at
-        depth 0) are emitted. The line above the inner footer carries
-        ``has_tail_after=True`` so the renderer demotes its glyph and
-        keeps the parent spine running."""
+        """When the budget cut lands inside a role's task list, an inner
+        footer (at the role's task depth) is emitted. The line above the
+        inner footer carries ``has_tail_after=True`` so the renderer
+        demotes its glyph and keeps the parent spine running. No play
+        footer is emitted (own-only contract); the outer footer is
+        dropped when the role footer claims all hidden tasks."""
         # 1 play + 1 role + 20 tasks → 23 unbounded lines. Budget=6
         # forces a cut inside the role's task list.
         state = self._single_play_single_role_state(n_tasks=20)
@@ -2219,24 +2223,19 @@ class TestTwoLevelTruncation:
 
         lines = p.tree_lines(budget=6)
 
-        outer = lines[-1]
-        assert outer.kind == "more", f"last line must be outer footer; got {outer.kind}"
-        assert outer.depth == 0, f"outer footer must be at depth=0; got {outer.depth}"
-
         more_lines = [ln for ln in lines if ln.kind == "more"]
-        assert len(more_lines) == 3, (
-            f"must emit role, play, and outer footers; got {len(more_lines)}"
+        assert len(more_lines) == 1, (
+            f"must emit exactly one role footer (outer dropped, no play "
+            f"footer); got {len(more_lines)}"
         )
 
         role_inner = more_lines[0]
-        play_inner = more_lines[1]
         non_footer_lines = [ln for ln in lines if ln.kind != "more"]
         deepest_visible_depth = max(ln.depth for ln in non_footer_lines)
         assert role_inner.depth == deepest_visible_depth, (
             f"role inner footer depth ({role_inner.depth}) must match deepest visible "
             f"line depth ({deepest_visible_depth})"
         )
-        assert play_inner.depth == 2, f"play inner footer depth must be 2; got {play_inner.depth}"
 
         above_inner = non_footer_lines[-1]
         assert above_inner.has_tail_after is True, (
@@ -2301,7 +2300,7 @@ class TestTwoLevelTruncation:
         p = TreeProjection.from_run_state(state)
         lines = p.tree_lines(budget=6)
 
-        inner = lines[-2]
+        inner = next(ln for ln in lines if ln.kind == "more" and ln.depth > 0)
         assert inner.kind == "more"
 
         # Find the role line and extract its (N tasks) count.
@@ -2513,9 +2512,9 @@ class TestTwoLevelTruncation:
         # sibling test ``test_inner_footer_emitted_when_cut_inside_role``
         # covers the layout contract.
         more_lines = [ln for ln in lines if ln.kind == "more"]
-        assert len(more_lines) == 3, (
-            f"sanity: cut-inside-role must emit role + play + outer footers; "
-            f"got {len(more_lines)} footers in: "
+        assert len(more_lines) == 1, (
+            f"sanity: cut-inside-role must emit exactly one role footer "
+            f"(outer dropped, no play footer); got {len(more_lines)} footers in: "
             f"{[(ln.kind, ln.depth, ln.label) for ln in lines]}"
         )
 
@@ -2540,12 +2539,6 @@ class TestTwoLevelTruncation:
         inner_footer = next(ln for ln in lines if ln.kind == "more" and ln.depth > 0)
         assert inner_footer.has_tail_after is False, (
             "inner footer must not carry has_tail_after (it's the cut marker)"
-        )
-        # The outer footer is at depth 0; it also doesn't carry the flag.
-        outer_footer = lines[-1]
-        assert outer_footer.kind == "more" and outer_footer.depth == 0
-        assert outer_footer.has_tail_after is False, (
-            "outer footer must not carry has_tail_after (it's the cut marker)"
         )
 
 
@@ -4106,60 +4099,43 @@ class TestMultiLevelInnerFooters:
         return state
 
     def test_multi_level_inner_footers_emitted(self) -> None:
-        """Cut inside ``angie_ssl_terminator`` must emit TWO inner
-        footers: one for podman's subtree remaining, one for angie's
-        subtree remaining. Both numbers must be positive and angie's
-        must be ≤ podman's (angie's subtree is a subset of podman's)."""
+        """Cut inside ``angie_ssl_terminator`` must emit angie's OWN
+        footer (its direct hidden tasks) and NOT re-count angie's tasks
+        in podman's footer. Own-only contract: podman's footer counts
+        only podman's direct children, never nested sub-roles' tasks.
+
+        With all 5 podman direct tasks visible, podman's own remaining
+        is 0, so only angie's footer is emitted (count = angie's own
+        hidden = 30)."""
 
         state = self._nested_truncated_state()
         projection = TreeProjection.from_run_state(state)
 
-        # Pick a budget that triggers truncation inside angie's task
-        # list. With 5 podman direct tasks (each with host) visible
-        # at depths 3-4, plus 1 playbook + 1 play + 2 role headers,
-        # the inner cut lands inside angie's task list when budget
-        # is tight enough to show role headers + a few tasks but not
-        # all 30 angie tasks. budget=16 lands the cut right after the
-        # angie role line, putting the inner footer at angie's task
-        # depth (4) and podman's footer at angie's role depth (3).
         lines = projection.tree_lines(budget=16)
 
         more_lines = [ln for ln in lines if ln.kind == "more"]
-        assert len(more_lines) >= 2, (
-            f"nested cut must emit at least 2 footers (outer + at "
-            f"least 1 inner); got {len(more_lines)}: "
-            f"{[(ln.depth, ln.label) for ln in more_lines]}"
-        )
-
         inner_footers = [ln for ln in more_lines if ln.depth > 0]
-        assert len(inner_footers) >= 2, (
-            f"nested cut must emit at least 2 inner footers "
-            f"(podman + angie); got {len(inner_footers)}: "
+        assert len(inner_footers) == 1, (
+            f"nested cut with all podman direct visible must emit exactly "
+            f"one inner footer (angie's own); got {len(inner_footers)}: "
             f"{[(ln.depth, ln.label) for ln in inner_footers]}"
         )
 
         import re
 
-        counts: list[int] = []
-        for footer in inner_footers:
-            m = re.match(r"… and (\d+) more tasks", footer.label)
-            assert m, f"footer label must match '… and N more tasks'; got {footer.label!r}"
-            counts.append(int(m.group(1)))
-
-        assert all(c > 0 for c in counts), f"all inner footer counts must be positive; got {counts}"
-        # Angie's subtree is a strict subset of podman's subtree, so
-        # angie's remaining ≤ podman's remaining. The counts come from
-        # the deepest-first ordering, so the first inner footer is
-        # angie's count and the second is podman's count.
-        assert counts[0] <= counts[1], (
-            f"innermost footer count ({counts[0]}) must be ≤ outer "
-            f"footer count ({counts[1]}); got {counts}"
-        )
+        m = re.match(r"… and (\d+) more tasks", inner_footers[0].label)
+        assert m, f"footer label must match '… and N more tasks'; got {inner_footers[0].label!r}"
+        count = int(m.group(1))
+        # Angie's own hidden tasks = 30 (all angie tasks are below the
+        # cut; none visible). Podman's own remaining is 0 (all 5 direct
+        # tasks visible), so podman's tasks are NOT re-counted here.
+        assert count == 30, f"angie's own footer must count 30; got {count}"
 
     def test_inner_footer_per_role_ancestor_matches_role_label(self) -> None:
         """For each inner footer, the count equals
-        ``role_total - role_visible`` for the corresponding role
-        header — the same formula used by ``_relabel_role_lines``."""
+        ``own_total - own_visible`` for the corresponding role — the
+        own-only counterpart of the subtree formula. A role's footer
+        never includes nested sub-roles' tasks."""
 
         state = self._nested_truncated_state()
         projection = TreeProjection.from_run_state(state)
@@ -4167,16 +4143,14 @@ class TestMultiLevelInnerFooters:
 
         import re
 
-        # Map each inner footer to its corresponding role by walking
-        # backward to find the closest role ancestor (innermost first
-        # because footers are emitted deepest-first).
-        role_totals = projection._build_role_total_tasks()
+        role_own_totals = projection._build_role_own_total_tasks()
 
         more_lines = [ln for ln in lines if ln.kind == "more"]
         inner_footers = [ln for ln in more_lines if ln.depth > 0]
 
-        # Count tasks per role from the kept lines.
-        role_visible: dict[str, int] = {}
+        # Count own-visible tasks per role from the kept lines (each
+        # task credits only its innermost role).
+        role_own_visible: dict[str, int] = {}
         current_role_stack: list[str] = []
         for ln in lines:
             if ln.kind == "role" and ln.identity is not None:
@@ -4185,20 +4159,14 @@ class TestMultiLevelInnerFooters:
             elif ln.kind in ("play", "playbook"):
                 current_role_stack.clear()
             elif ln.kind == "task":
-                for role in current_role_stack:
-                    role_visible[role] = role_visible.get(role, 0) + 1
+                if current_role_stack:
+                    innermost = current_role_stack[-1]
+                    role_own_visible[innermost] = role_own_visible.get(innermost, 0) + 1
 
         # For each inner footer (deepest first), find the closest role
-        # or play ancestor in the line list — that's what it reports for.
+        # ancestor in the line list — that's what it reports for.
         for footer in inner_footers:
             footer_idx = lines.index(footer)
-            if footer.depth == 2:
-                # Play-level inner footer
-                m = re.match(r"… and (\d+) more tasks", footer.label)
-                assert m
-                footer_count = int(m.group(1))
-                assert footer_count == 35 - sum(1 for ln in lines if ln.kind == "task")
-                continue
 
             closest_role = None
             for j in range(footer_idx - 1, -1, -1):
@@ -4218,18 +4186,19 @@ class TestMultiLevelInnerFooters:
             m = re.match(r"… and (\d+) more tasks", footer.label)
             assert m
             footer_count = int(m.group(1))
-            expected = role_totals.get(closest_role, 0) - role_visible.get(closest_role, 0)
+            expected = role_own_totals.get(closest_role, 0) - role_own_visible.get(closest_role, 0)
             assert footer_count == expected, (
                 f"inner footer for role {closest_role!r} must show "
-                f"{expected} (total - visible = "
-                f"{role_totals.get(closest_role, 0)} - "
-                f"{role_visible.get(closest_role, 0)}); got "
+                f"{expected} (own_total - own_visible = "
+                f"{role_own_totals.get(closest_role, 0)} - "
+                f"{role_own_visible.get(closest_role, 0)}); got "
                 f"{footer_count}"
             )
 
     def test_single_level_role_one_inner_footer(self) -> None:
         """A single-level role cut emits one role footer at depth 3 and
-        one play footer at depth 2.
+        no play footer (own-only contract). The outer footer is the
+        catch-all for any remaining hidden tasks.
         """
 
         from ansible_aom.core.models import (
@@ -4294,8 +4263,8 @@ class TestMultiLevelInnerFooters:
 
         more_lines = [ln for ln in lines if ln.kind == "more"]
         inner_footers = [ln for ln in more_lines if ln.depth > 0]
-        assert len(inner_footers) == 2, (
-            f"single-role cut must emit role footer (depth 3) and play footer (depth 2); got "
+        assert len(inner_footers) == 1, (
+            f"single-role cut must emit exactly one role footer (no play footer); got "
             f"{len(inner_footers)}: "
             f"{[(ln.depth, ln.label) for ln in inner_footers]}"
         )
@@ -4641,7 +4610,11 @@ class TestMultiPlayTruncationWithRoleFooters:
 
     def test_inner_footers_for_nested_roles_when_pending_tasks_are_truncated(self) -> None:
         """When roles in the head have pending tasks that are truncated,
-        inner footers report the true remaining (total - completed - visible)."""
+        inner footers report the true own remaining (own_total -
+        own_completed - own_visible). Own-only contract: podman's footer
+        counts only podman's direct children, so with all 289 podman
+        direct tasks completed podman has no footer — only angie's own
+        footer (23) is emitted."""
         state = self._multi_play_with_pending_roles_state()
         projection = TreeProjection.from_run_state(state)
         # budget=13 fits play 1 head + 2 play-2 tasks + footers.
@@ -4652,45 +4625,45 @@ class TestMultiPlayTruncationWithRoleFooters:
         )
         podman_role_line = next(ln for ln in lines if ln.kind == "role" and ln.identity == "podman")
 
-        # Angie has 129 - 100 completed - 6 visible = 23 remaining
+        # Angie has 129 - 100 completed - 6 visible = 23 own remaining
         angie_footer = self._find_more_at(
             lines, depth=angie_role_line.depth + 1, label_pattern=r"23 more tasks"
         )
-        # Podman has 418 - 389 completed - 6 visible = 23 remaining
+        # Podman has 289 - 289 completed - 0 visible = 0 own remaining,
+        # so NO podman footer is emitted (own-only contract).
         podman_footer = self._find_more_at(
-            lines, depth=podman_role_line.depth + 1, label_pattern=r"23 more tasks"
+            lines, depth=podman_role_line.depth + 1, label_pattern=r"more tasks"
         )
 
         assert angie_footer is not None, "must emit angie's inner footer with count=23"
-        assert podman_footer is not None, "must emit podman's inner footer with count=23"
+        assert podman_footer is None, (
+            "podman's own remaining is 0 (all direct tasks completed); "
+            "no podman footer must be emitted"
+        )
         assert self._extract_more_count(angie_footer) == 23
-        assert self._extract_more_count(podman_footer) == 23
-
-        # Ordering: angie's footer (deeper) must appear BEFORE podman's footer
-        angie_idx = lines.index(angie_footer)
-        podman_idx = lines.index(podman_footer)
-        assert angie_idx < podman_idx
 
     def test_outer_footer_count_is_total_remaining_across_all_plays(self) -> None:
         """The outer footer reports the TOTAL remaining (uncompleted & hidden)
-        tasks across ALL plays, subtracting completed tasks."""
+        tasks across ALL plays, subtracting completed tasks, role footers, and
+        play footers. When the play footer claims all remaining hidden tasks,
+        the outer footer is dropped (each hidden task in exactly one footer)."""
         state = self._multi_play_completed_state()
         projection = TreeProjection.from_run_state(state)
         lines = projection.tree_lines(budget=13)
 
-        outer = lines[-1]
-        assert outer.kind == "more" and outer.depth == 0, (
-            f"last line must be the outer footer at depth=0; got "
-            f"depth={outer.depth} kind={outer.kind}"
+        # Play 2 ("Deploy Scrutiny...") has 2816 direct tasks, 2 visible.
+        # Its own footer claims 2814. The outer footer is dropped because
+        # 2814 (total remaining) - 2814 (play footer) = 0.
+        play_footer = lines[-1]
+        assert play_footer.kind == "more" and play_footer.depth == 2, (
+            f"last line must be the play footer at depth=2; got "
+            f"depth={play_footer.depth} kind={play_footer.kind}"
         )
-        outer_count = self._extract_more_count(outer)
-        # Total unique tasks = 418 (play 1) + 2816 (play 2) = 3234.
-        # Completed tasks = 415.
-        # Visible tasks in the kept tree = 5.
-        # Total remaining hidden = 3234 - 415 - 5 = 2814.
-        assert outer_count == 2814, (
-            f"outer footer count must equal total remaining across ALL "
-            f"plays (3234 - 415 - 5 = 2814); got {outer_count}"
+        assert self._extract_more_count(play_footer) == 2814
+        # No outer footer: the play footer claims all remaining hidden.
+        assert not any(ln.kind == "more" and ln.depth == 0 for ln in lines), (
+            f"outer footer must be dropped when play footer claims all hidden; "
+            f"got {[ln.label for ln in lines if ln.kind == 'more']}"
         )
 
     def test_no_inner_footer_when_role_has_no_remaining(self) -> None:
@@ -4770,8 +4743,9 @@ class TestMultiPlayTruncationWithRoleFooters:
         self,
     ) -> None:
         """When a budget cut truncates tasks directly under a play (no role),
-        the play's inner footer reports remaining tasks in THAT play (depth 2),
-        and the outer footer reports remaining tasks across ALL plays (depth 0)."""
+        NO play-level footer is emitted (own-only contract). The play-direct
+        hidden tasks fall into the outer footer, which reports remaining
+        tasks across ALL plays (depth 0)."""
         play1_tasks = [
             TaskDefinition(
                 name=f"play1 direct task {i}",
@@ -4840,7 +4814,8 @@ class TestMultiPlayTruncationWithRoleFooters:
         lines = projection.tree_lines(budget=10)
 
         more_lines = [ln for ln in lines if ln.kind == "more"]
-        # Exactly two footers: one for the play (depth 2) and one for the playbook (depth 0)
+        # Two footers: play 1's own footer (5 direct hidden) + outer
+        # (play 2's 3000 direct hidden).
         assert len(more_lines) == 2, (
             f"expected 2 footers (play + outer); got {[ln.label for ln in more_lines]}"
         )
@@ -4848,21 +4823,22 @@ class TestMultiPlayTruncationWithRoleFooters:
         outer_footer = more_lines[1]
 
         assert play_footer.depth == 2
-        # Play 1 has 10 tasks total, 5 visible. Remaining in Play 1 = 10 - 5 = 5.
+        # Play 1 has 10 direct tasks, 5 visible. Own remaining = 10 - 5 = 5.
         assert play_footer.label == "… and 5 more tasks"
 
         assert outer_footer.depth == 0
         # 10 (play 1) + 3000 (play 2) = 3010 total. Visible tasks = 5.
-        # Remaining across all plays = 3010 - 5 = 3005.
-        assert outer_footer.label == "… and 3005 more tasks"
+        # Remaining across all plays = 3010 - 5 = 3005. Minus play 1's
+        # footer (5) = 3000 (play 2's direct hidden).
+        assert outer_footer.label == "… and 3000 more tasks"
 
     def test_all_hierarchy_levels_emitted_when_cut_inside_nested_role(self) -> None:
         """When a cut lands inside a nested role (podman > angie > play),
-        all hierarchical levels emit their remaining footers:
-        - Level 3 (podman): depth 4
-        - Level 2 (angie): depth 3
-        - Level 1 (play): depth 2
-        - Level 0 (playbook): depth 0
+        each role emits its OWN footer and the outer footer is the
+        catch-all. No play-level footer is emitted (own-only contract):
+        - Level 3 (podman): depth 4 — podman's own hidden (28)
+        - Level 2 (angie): depth 3 — angie's own hidden (7)
+        - Level 0 (playbook): depth 0 — outer catch-all (3000)
         """
         podman_tasks = [
             TaskDefinition(
@@ -4951,26 +4927,26 @@ class TestMultiPlayTruncationWithRoleFooters:
         lines = proj.tree_lines(budget=10)
 
         more_lines = [ln for ln in lines if ln.kind == "more"]
-        # Expected: podman (depth 4), angie (depth 3), play (depth 2), playbook (depth 0)
-        assert len(more_lines) == 4, (
-            f"expected 4 footers (depths 4, 3, 2, 0); got {[ln.label for ln in more_lines]}"
+        # Expected: podman (depth 4), angie (depth 3), outer (depth 0).
+        # No play footer (own-only contract).
+        assert len(more_lines) == 3, (
+            f"expected 3 footers (depths 4, 3, 0); got {[ln.label for ln in more_lines]}"
         )
         assert more_lines[0].depth == 4
         assert more_lines[0].label == "… and 28 more tasks"
 
         assert more_lines[1].depth == 3
-        assert more_lines[1].label == "… and 35 more tasks"
+        assert more_lines[1].label == "… and 7 more tasks"
 
-        assert more_lines[2].depth == 2
-        assert more_lines[2].label == "… and 35 more tasks"
-
-        assert more_lines[3].depth == 0
-        assert more_lines[3].label == "… and 3035 more tasks"
+        assert more_lines[2].depth == 0
+        assert more_lines[2].label == "… and 3000 more tasks"
 
     def test_footers_monotonic_hierarchy_invariant(self) -> None:
-        """A role footer's remaining task count can never exceed the enclosing
-        play's remaining task count, nor can a play's footer exceed the outer
-        playbook footer. The hierarchy is monotonically non-decreasing."""
+        """Own-only contract: the outer footer is the catch-all. Every
+        hidden task is counted in exactly one footer, so
+        ``outer = total_remaining - sum(role footer counts)``. The old
+        monotonic role ≤ play ≤ outer invariant collapses because role
+        footers no longer re-count nested roles' tasks."""
         role_tasks = [
             TaskDefinition(
                 name=f"fail2ban task {i}",
@@ -5031,7 +5007,6 @@ class TestMultiPlayTruncationWithRoleFooters:
         )
 
         proj = TreeProjection.from_run_state(state)
-        # Try various budgets: in all cases, role remaining <= play remaining <= outer remaining
         import re
 
         for budget in range(5, 30):
@@ -5045,17 +5020,22 @@ class TestMultiPlayTruncationWithRoleFooters:
                 if m:
                     counts_by_depth[ln.depth] = int(m.group(1))
 
-            # If both role (depth 3) and play (depth 2) footers exist:
-            if 3 in counts_by_depth and 2 in counts_by_depth:
-                assert counts_by_depth[3] <= counts_by_depth[2], (
-                    f"role remaining ({counts_by_depth[3]}) must be <= "
-                    f"play remaining ({counts_by_depth[2]}) at budget={budget}"
+            # The outer footer (depth 0) is the catch-all: it equals the
+            # total remaining across all plays minus every role footer
+            # count AND every play footer count. Each hidden task is
+            # counted in exactly one footer.
+            if 0 in counts_by_depth:
+                non_outer_footer_sum = sum(
+                    count for depth, count in counts_by_depth.items() if depth != 0
                 )
-            # If play (depth 2) and outer (depth 0) footers exist:
-            if 2 in counts_by_depth and 0 in counts_by_depth:
-                assert counts_by_depth[2] <= counts_by_depth[0], (
-                    f"play remaining ({counts_by_depth[2]}) must be <= "
-                    f"outer remaining ({counts_by_depth[0]}) at budget={budget}"
+                # Total = 44 (fail2ban) + 10 (direct) = 54. Visible tasks
+                # in the kept tree are subtracted from the total remaining.
+                visible = sum(1 for ln in lines if ln.kind == "task")
+                total_remaining = 54 - visible
+                assert counts_by_depth[0] == total_remaining - non_outer_footer_sum, (
+                    f"outer remaining ({counts_by_depth[0]}) must equal "
+                    f"total_remaining ({total_remaining}) - sum(role + play "
+                    f"footers) ({non_outer_footer_sum}) at budget={budget}"
                 )
 
     def test_meta_tasks_without_runtime_events_not_emitted_as_pending(self) -> None:
@@ -5367,6 +5347,470 @@ class TestMultiPlayTruncationWithRoleFooters:
         )
         # Task 3 should be visible
         assert any("Task 3" in lbl for lbl in labels)
+
+
+class TestOwnOnlyFooterSemantics:
+    """Own-only footer contract (user-approved design change).
+
+    Role footers count only the role's OWN hidden tasks — tasks whose
+    INNERMOST role is that role (direct children), never nested
+    sub-roles' tasks. The play footer is removed entirely; the outer
+    footer is the catch-all that absorbs every hidden task not claimed
+    by a role footer. Every hidden task is counted in exactly one
+    footer.
+    """
+
+    def _nested_state(self) -> RunState:
+        """Build the user's exact example: ``podman`` (3 direct D/E/F)
+        with a nested ``angie`` (3 direct A/B/C). Fires A and B so the
+        cut lands inside angie's task list."""
+        from ansible_aom.core.models import (
+            PlayDefinition,
+            RoleGroupDefinition,
+            TaskDefinition,
+        )
+
+        angie_tasks = [
+            TaskDefinition(
+                name=f"angie : task {c}",
+                role="angie",
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=i,
+            )
+            for i, c in enumerate("ABC")
+        ]
+        podman_direct = [
+            TaskDefinition(
+                name=f"podman : task {c}",
+                role="podman",
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=100 + i,
+            )
+            for i, c in enumerate("DEF")
+        ]
+        angie_group = RoleGroupDefinition(role="angie", tasks=angie_tasks, parent="podman")
+        podman_group = RoleGroupDefinition(role="podman", tasks=podman_direct + [angie_group])
+
+        state = RunState(playbook="main.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=[podman_group],
+            )
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-06-25T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-06-25T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy"},
+            }
+        )
+        # Fire A and B (angie's first two tasks) so the cut lands inside
+        # angie's task list.
+        for i, name in enumerate(["angie : task A", "angie : task B"]):
+            state.handle_event(
+                {
+                    "_event": "v2_playbook_on_task_start",
+                    "_timestamp": "2026-06-25T10:00:02Z",
+                    "task": {"id": f"t{i}", "name": name},
+                    "play": {"id": "p1"},
+                }
+            )
+            state.handle_event(
+                {
+                    "_event": "v2_runner_on_start",
+                    "_timestamp": "2026-06-25T10:00:03Z",
+                    "task": {"id": f"t{i}", "name": name},
+                    "host": "web1",
+                }
+            )
+        return state
+
+    def test_nested_roles_own_footers_exclude_nested_tasks(self) -> None:
+        """The user's exact example: angie 3 tasks A/B/C, podman 3 direct
+        D/E/F, cut after A. Angie's own footer = 2 (B+C). Podman's own
+        footer = 3 (D+E+F) — angie's tasks are NOT re-counted in
+        podman's footer (own-only contract)."""
+        import re
+
+        state = self._nested_state()
+        projection = TreeProjection.from_run_state(state)
+        lines = projection.tree_lines(budget=8)
+
+        more_lines = [ln for ln in lines if ln.kind == "more"]
+        inner_footers = [ln for ln in more_lines if ln.depth > 0]
+
+        # angie (depth 3) and podman (depth 2) each emit an own footer.
+        assert len(inner_footers) == 2, (
+            f"expected angie + podman own footers; got {len(inner_footers)}: "
+            f"{[(ln.depth, ln.label) for ln in inner_footers]}"
+        )
+
+        counts_by_depth = {
+            ln.depth: int(re.match(r"… and (\d+) more tasks", ln.label).group(1))
+            for ln in inner_footers
+        }
+        # angie's own hidden = 2 (B+C). podman's own hidden = 3 (D+E+F).
+        assert counts_by_depth[4] == 2, f"angie own footer must be 2; got {counts_by_depth}"
+        assert counts_by_depth[3] == 3, f"podman own footer must be 3; got {counts_by_depth}"
+        # No outer footer: angie (2) + podman (3) claim all 5 hidden
+        # tasks, so the outer catch-all is 0 and dropped.
+        assert not any(ln.depth == 0 for ln in more_lines), (
+            "outer must be dropped when roles claim all hidden; got "
+            f"{[ln.label for ln in more_lines]}"
+        )
+
+    def test_fully_hidden_role_tasks_counted_only_in_outer(self) -> None:
+        """A role whose header is below the cut (fully hidden) has no
+        footer; its tasks are counted ONLY in the outer footer."""
+        import re
+
+        state = self._nested_state()
+        projection = TreeProjection.from_run_state(state)
+        # Tight budget: cut lands before angie's role header, so angie
+        # is fully hidden and its tasks fall to the outer footer.
+        lines = projection.tree_lines(budget=5)
+
+        more_lines = [ln for ln in lines if ln.kind == "more"]
+        # Only podman's own footer (3) + outer catch-all.
+        inner_footers = [ln for ln in more_lines if ln.depth > 0]
+        assert len(inner_footers) == 1, (
+            f"angie fully hidden -> only podman footer; got {len(inner_footers)}: "
+            f"{[(ln.depth, ln.label) for ln in inner_footers]}"
+        )
+        assert int(re.match(r"… and (\d+) more tasks", inner_footers[0].label).group(1)) == 3
+
+        outer = next(ln for ln in more_lines if ln.depth == 0)
+        # Total = 6 (3 angie + 3 podman). No tasks visible (angie fully
+        # hidden). Podman footer claims 3 (D+E+F). Outer = 6 - 3 = 3
+        # (angie's A+B+C all hidden).
+        assert int(re.match(r"… and (\d+) more tasks", outer.label).group(1)) == 3, (
+            f"outer must count angie's hidden A+B+C; got {outer.label!r}"
+        )
+
+    def test_outer_is_catch_all_each_hidden_task_in_exactly_one_footer(self) -> None:
+        """The outer footer equals total remaining minus every role footer
+        count, so each hidden task is counted in exactly one footer."""
+        import re
+
+        state = self._nested_state()
+        projection = TreeProjection.from_run_state(state)
+        lines = projection.tree_lines(budget=8)
+
+        more_lines = [ln for ln in lines if ln.kind == "more"]
+        inner_footers = [ln for ln in more_lines if ln.depth > 0]
+
+        role_footer_sum = sum(
+            int(re.match(r"… and (\d+) more tasks", ln.label).group(1)) for ln in inner_footers
+        )
+        # Total = 6. Visible = 1 (A). Total remaining = 5.
+        # Role footers claim angie (2) + podman (3) = 5. Outer = 0,
+        # so it is dropped — every hidden task is in exactly one footer.
+        assert role_footer_sum == 5, f"role footers must claim all 5 hidden; got {role_footer_sum}"
+        assert not any(ln.depth == 0 for ln in more_lines), (
+            f"outer must be dropped (0 remaining after role footers); got "
+            f"{[ln.label for ln in more_lines]}"
+        )
+
+    def test_no_play_footer_emitted_anywhere(self) -> None:
+        """No play-level footer (depth 2) is ever emitted, regardless of
+        budget."""
+        state = self._nested_state()
+        projection = TreeProjection.from_run_state(state)
+        for budget in range(4, 20):
+            lines = projection.tree_lines(budget=budget)
+            for ln in lines:
+                if ln.kind == "more":
+                    assert ln.depth != 2, (
+                        f"no play footer may be emitted (own-only); got depth 2 "
+                        f"at budget={budget}: {ln.label!r}"
+                    )
+
+    def _play_with_direct_tasks_state(self) -> RunState:
+        """Build a play with direct tasks (no role) plus a role group.
+
+        Play "Deploy Keepalived" has 3 direct tasks (D1, D2, D3) and a
+        role ``angie`` with 3 tasks (A1, A2, A3). Fires D1 so the cut
+        lands inside the direct task list."""
+        from ansible_aom.core.models import (
+            PlayDefinition,
+            RoleGroupDefinition,
+            TaskDefinition,
+        )
+
+        direct = [
+            TaskDefinition(
+                name=f"direct task {c}",
+                role=None,
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=i,
+            )
+            for i, c in enumerate(("D1", "D2", "D3"))
+        ]
+        angie_tasks = [
+            TaskDefinition(
+                name=f"angie : task {c}",
+                role="angie",
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=100 + i,
+            )
+            for i, c in enumerate(("A1", "A2", "A3"))
+        ]
+        angie_group = RoleGroupDefinition(role="angie", tasks=angie_tasks)
+
+        state = RunState(playbook="main.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy Keepalived for Proxmox VIP",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=direct + [angie_group],
+            )
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-06-25T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-06-25T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy Keepalived for Proxmox VIP"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-06-25T10:00:02Z",
+                "task": {"id": "t0", "name": "direct task D1"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-06-25T10:00:03Z",
+                "task": {"id": "t0", "name": "direct task D1"},
+                "host": "web1",
+            }
+        )
+        return state
+
+    def test_play_footer_counts_only_direct_hidden_tasks(self) -> None:
+        """A play with hidden direct tasks emits a play footer counting ONLY
+        those direct tasks; role tasks are covered by their own role footer
+        and NOT re-counted in the play footer."""
+        import re
+
+        state = self._play_with_direct_tasks_state()
+        projection = TreeProjection.from_run_state(state)
+        lines = projection.tree_lines(budget=5)
+
+        more_lines = [ln for ln in lines if ln.kind == "more"]
+        # Play footer (depth 2) counts D2+D3 = 2. The angie role is fully
+        # hidden (below the cut), so its 3 tasks fall to the outer footer.
+        play_footer = next(ln for ln in more_lines if ln.depth == 2)
+        assert int(re.match(r"… and (\d+) more tasks", play_footer.label).group(1)) == 2, (
+            f"play footer must count only direct hidden (D2+D3=2); got {play_footer.label!r}"
+        )
+        outer = next(ln for ln in more_lines if ln.depth == 0)
+        assert int(re.match(r"… and (\d+) more tasks", outer.label).group(1)) == 3, (
+            f"outer must count angie's hidden 3; got {outer.label!r}"
+        )
+
+    def test_play_footer_absent_when_no_direct_hidden(self) -> None:
+        """A play with no hidden direct tasks emits no play footer."""
+        import re
+
+        state = self._nested_state()
+        projection = TreeProjection.from_run_state(state)
+        lines = projection.tree_lines(budget=8)
+        for ln in lines:
+            if ln.kind == "more":
+                assert ln.depth != 2, (
+                    f"no play footer when play has no direct hidden; got {ln.label!r}"
+                )
+
+    def test_outer_subtracts_play_footers(self) -> None:
+        """The outer footer equals total remaining minus every role footer
+        count AND every play footer count. Each hidden task is counted in
+        exactly one footer."""
+        import re
+
+        state = self._play_with_direct_tasks_state()
+        projection = TreeProjection.from_run_state(state)
+        lines = projection.tree_lines(budget=5)
+
+        more_lines = [ln for ln in lines if ln.kind == "more"]
+        non_outer = [ln for ln in more_lines if ln.depth != 0]
+        outer = next(ln for ln in more_lines if ln.depth == 0)
+
+        non_outer_sum = sum(
+            int(re.match(r"… and (\d+) more tasks", ln.label).group(1)) for ln in non_outer
+        )
+        outer_count = int(re.match(r"… and (\d+) more tasks", outer.label).group(1))
+        # Total = 6 (3 direct + 3 angie). Visible = 1 (D1). Total remaining
+        # = 5. Play footer (2) + outer (3) = 5. Each hidden task in exactly
+        # one footer.
+        assert non_outer_sum == 2, f"play footer must claim 2; got {non_outer_sum}"
+        assert outer_count == 3, f"outer must claim angie's 3; got {outer_count}"
+
+    def _play_direct_hidden_state(self) -> RunState:
+        """Build a play whose direct tasks are ALL hidden (below the cut).
+
+        Play "Deploy Keepalived" has 3 direct tasks (D1, D2, D3) and a role
+        ``angie`` with 3 tasks (A1, A2, A3). Fires A1 (a role task) so the
+        visible content is the role subtree; the direct tasks are all
+        hidden. The play footer must be positioned at the END of the play's
+        visible section (after the role footers), not right after the play
+        header."""
+        from ansible_aom.core.models import (
+            PlayDefinition,
+            RoleGroupDefinition,
+            TaskDefinition,
+        )
+
+        direct = [
+            TaskDefinition(
+                name=f"direct task {c}",
+                role=None,
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=i,
+            )
+            for i, c in enumerate(("D1", "D2", "D3"))
+        ]
+        angie_tasks = [
+            TaskDefinition(
+                name=f"angie : task {c}",
+                role="angie",
+                tags=[],
+                play_id="p1",
+                play_order=0,
+                task_order=100 + i,
+            )
+            for i, c in enumerate(("A1", "A2", "A3"))
+        ]
+        angie_group = RoleGroupDefinition(role="angie", tasks=angie_tasks)
+
+        state = RunState(playbook="main.yml")
+        state.definitions = [
+            PlayDefinition(
+                id="p1",
+                name="Deploy Keepalived for Proxmox VIP",
+                hosts="all",
+                resolved_hosts=["web1"],
+                tasks=direct + [angie_group],
+            )
+        ]
+        state.handle_event({"_event": "v2_playbook_on_start", "_timestamp": "2026-06-25T10:00:00Z"})
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_play_start",
+                "_timestamp": "2026-06-25T10:00:01Z",
+                "play": {"id": "p1", "name": "Deploy Keepalived for Proxmox VIP"},
+            }
+        )
+        # Fire A1 (a role task) so the role subtree is the visible content.
+        state.handle_event(
+            {
+                "_event": "v2_playbook_on_task_start",
+                "_timestamp": "2026-06-25T10:00:02Z",
+                "task": {"id": "t0", "name": "angie : task A1"},
+                "play": {"id": "p1"},
+            }
+        )
+        state.handle_event(
+            {
+                "_event": "v2_runner_on_start",
+                "_timestamp": "2026-06-25T10:00:03Z",
+                "task": {"id": "t0", "name": "angie : task A1"},
+                "host": "web1",
+            }
+        )
+        return state
+
+    def test_play_footer_positioned_after_role_footers_when_no_direct_visible(self) -> None:
+        """When a play has no visible direct tasks (all hidden below the cut)
+        and its visible content is a role subtree, the play footer must be
+        positioned at the END of the play's section — AFTER the role footers,
+        never right after the play header."""
+        import re
+
+        state = self._play_direct_hidden_state()
+        projection = TreeProjection.from_run_state(state)
+        lines = projection.tree_lines(budget=8)
+
+        # Find the play footer (depth 2) and the angie role footer (depth 3).
+        play_footer_idx = next(
+            i for i, ln in enumerate(lines) if ln.kind == "more" and ln.depth == 2
+        )
+        angie_footer_idx = next(
+            i for i, ln in enumerate(lines) if ln.kind == "more" and ln.depth == 3
+        )
+        # The play footer must come AFTER the role footer (end of play section).
+        assert play_footer_idx > angie_footer_idx, (
+            f"play footer must be after role footer; play_footer at {play_footer_idx}, "
+            f"angie_footer at {angie_footer_idx}:\n"
+            + "\n".join(f"d{ln.depth} {ln.kind} {ln.label}" for ln in lines)
+        )
+        # The play footer must NOT be immediately after the play header.
+        play_header_idx = next(i for i, ln in enumerate(lines) if ln.kind == "play")
+        assert play_footer_idx > play_header_idx + 1, (
+            f"play footer must not be right after the play header; got at {play_footer_idx}"
+        )
+        # The play footer counts the 3 hidden direct tasks.
+        assert int(re.match(r"… and (\d+) more tasks", lines[play_footer_idx].label).group(1)) == 3
+
+    def test_play_footer_after_last_direct_task_when_direct_visible(self) -> None:
+        """When a play HAS visible direct tasks, the play footer stays
+        positioned after the last visible direct task (existing behavior)."""
+        import re
+
+        state = self._play_with_direct_tasks_state()
+        projection = TreeProjection.from_run_state(state)
+        lines = projection.tree_lines(budget=7)
+
+        play_footer_idx = next(
+            i for i, ln in enumerate(lines) if ln.kind == "more" and ln.depth == 2
+        )
+        # The line before the play footer must be a direct task (D2).
+        prev = lines[play_footer_idx - 1]
+        assert prev.kind == "task", (
+            f"play footer must follow the last visible direct task; got {prev.kind} {prev.label!r}"
+        )
+        assert "direct task" in prev.label, (
+            f"expected a direct task before play footer; got {prev.label!r}"
+        )
+
+    def test_play_footer_and_role_footer_share_insert_after(self) -> None:
+        """When the play footer and a role footer share the same insert
+        position, the role footer (deeper) sorts before the play footer
+        (depth 2), so the play footer lands after the role footer."""
+        import re
+
+        state = self._play_direct_hidden_state()
+        projection = TreeProjection.from_run_state(state)
+        lines = projection.tree_lines(budget=8)
+
+        more_lines = [ln for ln in lines if ln.kind == "more"]
+        depths = [ln.depth for ln in more_lines]
+        # The play footer (depth 2) must appear after the role footer (depth 3)
+        # in the final line order.
+        assert depths.index(2) > depths.index(3), (
+            f"play footer (depth 2) must come after role footer (depth 3); got depths {depths}"
+        )
 
 
 class TestPendingPlayFiltering:
