@@ -29,6 +29,8 @@
             pydantic-settings
             pexpect
             psutil
+            argcomplete
+            orjson
           ];
 
           nativeCheckInputs = with python.pkgs; [
