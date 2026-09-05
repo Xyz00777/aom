@@ -23,6 +23,14 @@ repos:
         pass_filenames: false
         require_serial: true
 
+      - id: version-consistency
+        name: version consistency
+        entry: uv run python scripts/check_version_consistency.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        require_serial: true
+
       # NOTE: pytest is intentionally NOT a pre-commit-framework hook.
       # The framework stashes tracked-but-not-untracked changes around
       # the whole hook run, which races concurrent agent sessions and
