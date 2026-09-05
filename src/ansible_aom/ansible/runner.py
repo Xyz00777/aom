@@ -176,6 +176,15 @@ def _callback_env() -> dict[str, str]:
     return env
 
 
+def _child_environment() -> dict[str, str]:
+    env = os.environ.copy()
+    if getattr(sys, "frozen", False):
+        original = env.get("LD_LIBRARY_PATH_ORIG")
+        if original is not None:
+            env["LD_LIBRARY_PATH"] = original
+    return env
+
+
 def _default_session_dir() -> Path:
     """Spec-standard location for live session directories.
 
@@ -445,7 +454,7 @@ def run_playbook(
     diagnostics.set_last_run_diagnostics(diag)
 
     executable, args = _build_command(playbook, ansible_args)
-    env = os.environ.copy()
+    env = _child_environment()
     env.update(_callback_env())
 
     parser = PtyStreamParser()

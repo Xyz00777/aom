@@ -18,6 +18,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -79,6 +80,10 @@ def _preflight_env() -> dict[str, str]:
     """
     env = os.environ.copy()
     env["ANSIBLE_NOCOLOR"] = "1"
+    if getattr(sys, "frozen", False):
+        original = env.get("LD_LIBRARY_PATH_ORIG")
+        if original is not None:
+            env["LD_LIBRARY_PATH"] = original
     return env
 
 
