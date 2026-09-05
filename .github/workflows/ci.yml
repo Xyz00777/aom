@@ -41,3 +41,16 @@ jobs:
 
       - name: Test (pytest with xdist)
         run: uv run pytest tests/unit tests/compact tests/tui -q -n auto
+
+      - name: Build distributions
+        run: uv build
+
+      - name: Validate distributions
+        run: |
+          uv run --with twine twine check dist/*
+          python -m venv /tmp/aom-ci-smoke
+          /tmp/aom-ci-smoke/bin/python -m pip install dist/*.whl
+          cd /tmp
+          /tmp/aom-ci-smoke/bin/aom --version
+          /tmp/aom-ci-smoke/bin/aom --help >/dev/null
+          /tmp/aom-ci-smoke/bin/python -c 'from pathlib import Path; import ansible_aom.ansible.runner as r; assert (Path(r.__file__).parent / "callback" / "aom_jsonl.py").is_file()'
