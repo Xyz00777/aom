@@ -350,6 +350,9 @@ class SessionManager:
         meta = {
             "playbook": playbook,
             "ansible_args": list(ansible_args),
+            # Relative playbook/args/ansible.cfg resolve against this;
+            # ``aom rerun`` executes from it (issue #17).
+            "cwd": os.getcwd(),
             "start_time": self._start_time.isoformat().replace("+00:00", "Z"),
             "version": "1.2",
             "session_id": session_id,

@@ -411,8 +411,14 @@ class TestCreateParser:
 from ansible_aom.rerun.cli import main as rerun_main  # noqa: E402
 
 
-def _write_session_with_failure(state_dir: Path, session_id: str) -> None:
-    """Helper: write a session with one failed host (web2)."""
+def _write_session_with_failure(
+    state_dir: Path, session_id: str, cwd: str | None = None, *, with_cwd: bool = True
+) -> None:
+    """Helper: write a session with one failed host (web2).
+
+    ``cwd`` defaults to ``state_dir``'s parent (an existing directory);
+    ``with_cwd=False`` omits the field to mimic a legacy session.
+    """
     session_path = state_dir / session_id
     session_path.mkdir(parents=True)
     meta = {
@@ -423,6 +429,8 @@ def _write_session_with_failure(state_dir: Path, session_id: str) -> None:
         "status": "failed",
         "version": "1.1",
     }
+    if with_cwd:
+        meta["cwd"] = cwd if cwd is not None else str(state_dir.parent)
     (session_path / "meta.json").write_text(json.dumps(meta))
     events = [
         {
@@ -486,6 +494,7 @@ class TestMain:
         meta = {
             "playbook": "site.yml",
             "ansible_args": [],
+            "cwd": str(tmp_path),
             "start_time": "2026-05-12T10:00:00Z",
             "session_id": sid,
             "status": "completed",
@@ -575,3 +584,80 @@ class TestMain:
         )
         assert rc == 0
         assert runner_called is False
+
+
+class TestRerunWorkingDirectory:
+    """Issue #17: rerun must execute from the session's recorded cwd."""
+
+    def test_rerun_resolves_relative_inputs_in_recorded_cwd(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+    ):
+        """Regression: identically named files in another directory must not be used."""
+        from ansible_aom.session.store import SessionManager
+
+        project_a, project_b = tmp_path / "project-a", tmp_path / "project-b"
+        for directory, value in [(project_a, "ORIGINAL"), (project_b, "WRONG PROJECT")]:
+            directory.mkdir()
+            (directory / "site.yml").write_text(value)
+            (directory / "inventory.ini").write_text(value)
+        sessions = tmp_path / "sessions"
+
+        monkeypatch.chdir(project_a)
+        mgr = SessionManager(session_dir=sessions)
+        sid = mgr.start_session("site.yml", ["-i", "inventory.ini"])
+        mgr.record_event(
+            sid, {"_event": "v2_runner_on_failed", "hosts": {"web1": {"failed": True}}}
+        )
+        mgr.end_session(sid, "failed")
+
+        seen: dict = {}
+
+        def capture(playbook, args):
+            seen["cwd"] = Path.cwd()
+            seen["playbook"] = Path(playbook).read_text()
+            seen["inventory"] = Path(args[args.index("-i") + 1]).read_text()
+            return 0
+
+        monkeypatch.chdir(project_b)
+        rc = rerun_main([sid, "--state-dir", str(sessions), "--yes"], runner=capture)
+
+        assert rc == 0
+        assert seen == {
+            "cwd": project_a.resolve(),
+            "playbook": "ORIGINAL",
+            "inventory": "ORIGINAL",
+        }
+        # The caller's cwd is restored once the rerun returns.
+        assert Path.cwd() == project_b.resolve()
+        assert str(project_a.resolve()) in capsys.readouterr().out
+
+    def test_missing_recorded_cwd_refuses(self, tmp_path: Path, capsys):
+        state_dir = tmp_path / "sessions"
+        sid = "01971111-1111-7000-8000-000000000001"
+        _write_session_with_failure(state_dir, sid, with_cwd=False)
+
+        def fake_runner(playbook, ansible_args):
+            pytest.fail("runner must not be called")
+
+        rc = rerun_main(argv=["--state-dir", str(state_dir), sid, "--yes"], runner=fake_runner)
+
+        assert rc == 2
+        err = capsys.readouterr().err
+        assert "working directory" in err.lower()
+        assert sid in err
+
+    def test_nonexistent_recorded_cwd_refuses(self, tmp_path: Path, capsys):
+        state_dir = tmp_path / "sessions"
+        sid = "01971111-1111-7000-8000-000000000001"
+        gone = tmp_path / "deleted-project"
+        _write_session_with_failure(state_dir, sid, cwd=str(gone))
+
+        def fake_runner(playbook, ansible_args):
+            pytest.fail("runner must not be called")
+
+        rc = rerun_main(argv=["--state-dir", str(state_dir), sid, "--yes"], runner=fake_runner)
+
+        assert rc == 2
+        err = capsys.readouterr().err
+        assert str(gone) in err
+        assert "no longer exists" in err.lower()

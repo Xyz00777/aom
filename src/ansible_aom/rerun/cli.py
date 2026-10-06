@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from contextlib import chdir
 from pathlib import Path
 from typing import Callable
 
@@ -261,6 +262,42 @@ def _require_ansible_args(session: dict, session_id: str) -> list[str]:
     return list(args)
 
 
+def _require_cwd(session: dict, session_id: str) -> Path:
+    """Return the session's recorded working directory or refuse.
+
+    The recorded playbook path, ``-i`` inventory, ``@extra-vars`` files,
+    vault files and project-local ``ansible.cfg`` are all resolved
+    relative to the directory ``ansible-playbook`` originally ran in.
+    Re-running from anywhere else could execute another project's
+    same-named files (issue #17), so we never guess.
+
+    Raises:
+        SystemExit(2): If ``cwd`` is missing (sessions recorded before
+            it was persisted) or no longer an existing directory.
+    """
+    cwd = session.get("cwd")
+    if cwd is None:
+        print(
+            f"aom rerun: session {session_id} has no recorded working directory "
+            "('cwd' in meta.json); it was recorded by an older AOM. Relative "
+            "playbook, inventory, vars and ansible.cfg paths cannot be resolved "
+            "safely, so it cannot be re-run automatically. Re-record the session "
+            "with the current AOM, or invoke ansible-playbook manually from the "
+            "original project directory with --limit.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    path = Path(cwd)
+    if not path.is_dir():
+        print(
+            f"aom rerun: session {session_id} was recorded in {cwd}, which no "
+            "longer exists. Refusing to resolve its relative inputs elsewhere.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    return path
+
+
 def _create_parser() -> argparse.ArgumentParser:
     """Build the argparse parser for ``aom rerun``.
 
@@ -351,7 +388,8 @@ def main(
         Exit code:
             0 — rerun completed (or was declined cleanly by the user)
             1 — no sessions / no hosts to rerun / unknown session
-            2 — old session missing ``ansible_args`` (schema mismatch)
+            2 — old session missing ``ansible_args`` or ``cwd``, or the
+                recorded ``cwd`` no longer exists
             other — propagated from ``runner``
     """
     from ansible_aom.core import diagnostics
@@ -377,6 +415,7 @@ def main(
     # rather than a propagated exception.
     try:
         ansible_args_recorded = _require_ansible_args(session, session_id)
+        cwd = _require_cwd(session, session_id)
     except SystemExit as exc:
         code = exc.code if isinstance(exc.code, int) else 2
         return code
@@ -401,6 +440,7 @@ def main(
 
     playbook, rerun_args = _build_rerun_command(session, hosts)
 
+    print(f"Working directory: {cwd}")
     if not _confirm(
         playbook=playbook,
         args=rerun_args,
@@ -411,4 +451,8 @@ def main(
         return 0
 
     runner_fn = runner if runner is not None else _default_runner
-    return runner_fn(playbook, rerun_args)
+    # Run (incl. preflight and the spawned ansible-playbook, which inherit
+    # the process cwd) from the original directory so relative inputs and
+    # project-local ansible.cfg resolve exactly as they did when recorded.
+    with chdir(cwd):
+        return runner_fn(playbook, rerun_args)
