@@ -511,7 +511,7 @@ class SessionManager:
 
         # Build the derived sqlite index while the run's data is hot, so
         # the first `aom inspect` never pays the full-log streaming pass.
-        # Best-effort: build_index swallows OSError/sqlite errors and
+        # Best-effort: build_index swallows every failure and
         # returns False — an index failure must not turn a finished run
         # into a crashed one; inspect rebuilds lazily.
         session_index.build_index(session_info["session_path"])
