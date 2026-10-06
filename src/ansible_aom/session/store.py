@@ -664,18 +664,19 @@ class SessionManager:
 
 def cleanup_old_sessions(
     session_dir: Path,
-    keep_count: int = 100,
+    keep_count: int | None = None,
     keep_days: int = 30,
 ) -> int:
     """Remove old sessions based on policy.
 
     Sessions are cleaned up based on:
-    - Count: Keep the most recent N sessions
+    - Count: Keep the most recent N sessions (only when ``keep_count`` is given)
     - Age: Remove sessions older than D days
 
     Args:
         session_dir: Directory containing session directories
-        keep_count: Maximum number of sessions to keep (default 100)
+        keep_count: Maximum number of sessions to keep; ``None`` (default)
+            applies no count cap, so cleanup is age-only
         keep_days: Maximum age in days (default 30)
 
     Returns:
@@ -717,7 +718,7 @@ def cleanup_old_sessions(
 
     to_delete = []
     for i, (session_path, start_time, _, _meta) in enumerate(sessions):
-        if i >= keep_count or start_time < cutoff:
+        if (keep_count is not None and i >= keep_count) or start_time < cutoff:
             to_delete.append(session_path)
 
     deleted = 0
