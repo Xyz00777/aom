@@ -166,3 +166,69 @@ def test_inspect_warnings_json_cli(state_dir: Path, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert "total_warnings" in payload
     assert "warnings" in payload
+
+
+def test_text_mode_with_explicit_older_session(state_dir: Path, capsys):
+    from ansible_aom.inspect.cli import main
+
+    clean_run = _ALIASES["clean_run"]
+    exit_code = main(["--text", "--state-dir", str(state_dir), "--session", clean_run])
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert clean_run in out
+    assert _ALIASES["failed_loop"] not in out
+
+
+def test_text_mode_with_unknown_session_errors(state_dir: Path, capsys):
+    from ansible_aom.inspect.cli import main
+
+    exit_code = main(["--text", "--state-dir", str(state_dir), "--session", "nope"])
+    assert exit_code != 0
+    captured = capsys.readouterr()
+    assert "Session not found: nope" in captured.err
+    assert _ALIASES["failed_loop"] not in captured.out
+
+
+class _FakeInspectApp:
+    launched_with: list[str | None] = []
+
+    def __init__(self, *, state_dir: Path, initial_session_id: str | None = None) -> None:
+        self.initial_session_id = initial_session_id
+
+    def run(self) -> None:
+        _FakeInspectApp.launched_with.append(self.initial_session_id)
+
+
+@pytest.fixture
+def fake_tui(monkeypatch):
+    import ansible_aom.inspect.cli as cli
+    import ansible_aom.tui.screens.inspect as inspect_screen
+
+    _FakeInspectApp.launched_with = []
+    monkeypatch.setattr(cli, "_stdout_is_tty", lambda: True)
+    monkeypatch.setattr(cli, "prewarm_parallel_pool", lambda: None)
+    monkeypatch.setattr(inspect_screen, "InspectApp", _FakeInspectApp)
+    return _FakeInspectApp.launched_with
+
+
+def test_tui_opens_latest_session_by_default(state_dir: Path, fake_tui):
+    from ansible_aom.inspect.cli import main
+
+    assert main(["--state-dir", str(state_dir)]) == 0
+    assert fake_tui == [_ALIASES["failed_loop"]]
+
+
+def test_tui_opens_explicit_session(state_dir: Path, fake_tui):
+    from ansible_aom.inspect.cli import main
+
+    clean_run = _ALIASES["clean_run"]
+    assert main(["--state-dir", str(state_dir), "--session", clean_run]) == 0
+    assert fake_tui == [clean_run]
+
+
+def test_tui_with_unknown_session_errors_without_launching(state_dir: Path, fake_tui, capsys):
+    from ansible_aom.inspect.cli import main
+
+    assert main(["--state-dir", str(state_dir), "--session", "nope"]) != 0
+    assert fake_tui == []
+    assert "Session not found: nope" in capsys.readouterr().err
