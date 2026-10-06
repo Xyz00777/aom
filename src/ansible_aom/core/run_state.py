@@ -1183,20 +1183,28 @@ class RunState:
         # one delegated host — the other play targets never get a terminal
         # event, so synthesising them would leave phantom-RUNNING hosts.
         # Skip synthesis entirely for run_once tasks.
+        #
+        # A host whose latest result in this play is FAILED/UNREACHABLE
+        # has been dropped by ansible and never runs this task — never
+        # synthesise it, or the RUNNING→OK cleanup fabricates a result
+        # (#21). A later real result (rescue, ignore_unreachable,
+        # clear_host_errors) reactivates it; until that result arrives such
+        # a host simply isn't shown RUNNING. "Latest" is task insertion
+        # order. Without preflight hosts, the play's seen hosts are used.
         if not is_run_once:
             resolved_hosts = self._resolve_play_hosts(play)
-            if not resolved_hosts and play.detected_strategy == "linear":
+            if play.detected_strategy == "linear":
                 last_status: dict[str, Status] = {}
                 for other_task in play.tasks.values():
                     if other_task.task_id == task_id:
                         continue
                     for hostname, hs in other_task.hosts.items():
                         last_status[hostname] = hs.status
-                resolved_hosts = sorted(
+                resolved_hosts = [
                     hostname
-                    for hostname, status in last_status.items()
-                    if status not in (Status.FAILED, Status.UNREACHABLE)
-                )
+                    for hostname in resolved_hosts or sorted(last_status)
+                    if last_status.get(hostname) not in (Status.FAILED, Status.UNREACHABLE)
+                ]
             for hostname in resolved_hosts:
                 if hostname not in play.tasks[task_id].hosts:
                     play.tasks[task_id].hosts[hostname] = HostRunState(
