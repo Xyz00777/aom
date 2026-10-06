@@ -1,6 +1,7 @@
 # CI workflow for ansible-aom
 # Runs lint (ruff) → type-check (mypy) → test (pytest with xdist)
-# on push and pull_request to main/master.
+# on push to main/master and on every pull_request (incl. stacked PRs
+# whose base is another feature branch).
 #
 # Uses uv for Python dependency management (matching the project's
 # existing tooling). Python 3.14 only — no matrix builds.
@@ -11,7 +12,6 @@ on:
   push:
     branches: [main, master]
   pull_request:
-    branches: [main, master]
 
 jobs:
   ci:
