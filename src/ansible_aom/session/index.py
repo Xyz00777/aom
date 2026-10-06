@@ -22,9 +22,10 @@ import os
 import sqlite3
 import threading
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from contextlib import suppress
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Iterator, Literal, Mapping
+from typing import Any, Iterable, Iterator, Literal, Mapping
 
 from ansible_aom.core.inspect_model import (
     EventRef,
@@ -41,6 +42,7 @@ from ansible_aom.core.inspect_model import (
     task_ids_by_play,
     tree_from_index,
 )
+from ansible_aom.core.text import replace_surrogates
 
 logger = logging.getLogger(__name__)
 
@@ -131,11 +133,25 @@ def index_is_fresh(session_path: Path) -> bool:
 _STDERR_BATCH_SIZE = 10_000
 
 
+def _text_safe(values: Iterable[Any]) -> tuple[Any, ...]:
+    """Make one row / parameter tuple bindable to sqlite TEXT.
+
+    The runner decodes PTY output with ``surrogateescape``, so any text
+    from the log may carry lone surrogates, which sqlite (UTF-8 only)
+    rejects with ``UnicodeEncodeError``. Every value bound in this module
+    passes through here (``core.text.replace_surrogates``). Lookups are sanitised the same way, so a
+    surrogate-bearing name still matches its indexed row. events.jsonl
+    keeps the original bytes.
+    """
+    # List comprehension, not a generator: ~2x faster on the stderr hot loop.
+    return tuple([replace_surrogates(v) if isinstance(v, str) else v for v in values])
+
+
 def build_index(session_path: Path) -> bool:
     """Stream events.jsonl into a fresh index.db. Returns False when the
-    session has no events file, the log changes during the build, or a
-    sqlite/OS error occurs. The index is an optimization, so callers fall
-    back to the slow path.
+    session has no events file, the log changes during the build, or
+    anything else fails — it never raises. The index is an optimization,
+    so callers fall back to the slow path.
 
     stderr rows go straight into sqlite in batches as the file streams
     (``collect_stderr=False``), so peak memory is bounded by tasks×hosts
@@ -156,9 +172,9 @@ def build_index(session_path: Path) -> bool:
     tmp_path = index_path(session_path).with_suffix(
         f".tmp-{os.getpid()}-{threading.get_ident()}.db"
     )
-    acc = SessionIndexAccumulator(collect_stderr=False)
     malformed = 0
     try:
+        acc = SessionIndexAccumulator(collect_stderr=False)
         tmp_path.unlink(missing_ok=True)
         conn = sqlite3.connect(tmp_path)
         try:
@@ -197,14 +213,17 @@ def build_index(session_path: Path) -> bool:
                                 stderr_seq += 1
                                 if len(stderr_batch) >= _STDERR_BATCH_SIZE:
                                     conn.executemany(
-                                        "INSERT INTO stderr VALUES (?, ?, ?, ?, ?)", stderr_batch
+                                        "INSERT INTO stderr VALUES (?, ?, ?, ?, ?)",
+                                        map(_text_safe, stderr_batch),
                                     )
                                     stderr_batch.clear()
                             else:
                                 acc.feed(event, ref=EventRef(offset=offset, length=length))
                     offset += length
             if stderr_batch:
-                conn.executemany("INSERT INTO stderr VALUES (?, ?, ?, ?, ?)", stderr_batch)
+                conn.executemany(
+                    "INSERT INTO stderr VALUES (?, ?, ?, ?, ?)", map(_text_safe, stderr_batch)
+                )
             _write_index_db(conn, acc.finish(), events_stat=stat, malformed=malformed)
         finally:
             conn.close()
@@ -212,9 +231,13 @@ def build_index(session_path: Path) -> bool:
             tmp_path.unlink(missing_ok=True)
             return False
         os.replace(tmp_path, index_path(session_path))
-    except (OSError, sqlite3.Error) as exc:
-        logger.debug("index build failed for %s: %s", session_path, exc)
-        tmp_path.unlink(missing_ok=True)
+    except Exception:
+        # Deliberately broad: the index is optional and derived, and this
+        # runs inside session finalisation — no failure here may mask the
+        # child's real outcome. Callers fall back to the slow path.
+        logger.debug("index build failed for %s", session_path, exc_info=True)
+        with suppress(OSError):
+            tmp_path.unlink(missing_ok=True)
         return False
     return True
 
@@ -230,25 +253,28 @@ def _write_index_db(
     into an already-schema'd connection, then commit."""
     conn.executemany(
         "INSERT INTO meta VALUES (?, ?)",
-        [
-            ("schema_version", str(INDEX_SCHEMA_VERSION)),
-            ("events_size", str(events_stat[0])),
-            ("events_mtime_ns", str(events_stat[1])),
-            ("failed_task_count", str(index.failed_task_count)),
-            ("fallback_play_name", index.fallback_play_name),
-            ("malformed_lines", str(malformed)),
-        ],
+        map(
+            _text_safe,
+            [
+                ("schema_version", str(INDEX_SCHEMA_VERSION)),
+                ("events_size", str(events_stat[0])),
+                ("events_mtime_ns", str(events_stat[1])),
+                ("failed_task_count", str(index.failed_task_count)),
+                ("fallback_play_name", index.fallback_play_name),
+                ("malformed_lines", str(malformed)),
+            ],
+        ),
     )
     conn.executemany(
         "INSERT INTO host_counts VALUES (?, ?, ?, ?, ?, ?)",
-        [
-            (host, c.ok, c.changed, c.failed, c.skipped, c.unreachable)
+        (
+            _text_safe((host, c.ok, c.changed, c.failed, c.skipped, c.unreachable))
             for host, c in index.host_counts.items()
-        ],
+        ),
     )
     conn.executemany(
         "INSERT INTO plays VALUES (?, ?, ?)",
-        [(seq, p.play_id, p.name) for seq, p in enumerate(index.plays)],
+        (_text_safe((seq, p.play_id, p.name)) for seq, p in enumerate(index.plays)),
     )
     task_rows = []
     task_host_rows = []
@@ -292,12 +318,19 @@ def _write_index_db(
                 )
             )
     conn.executemany(
-        "INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", task_rows
+        "INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        map(_text_safe, task_rows),
     )
-    conn.executemany("INSERT INTO task_hosts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", task_host_rows)
+    conn.executemany(
+        "INSERT INTO task_hosts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        map(_text_safe, task_host_rows),
+    )
     conn.executemany(
         "INSERT INTO connections VALUES (?, ?, ?)",
-        [(conn_id, task_id, host) for conn_id, (task_id, host) in index.connections.items()],
+        (
+            _text_safe((conn_id, task_id, host))
+            for conn_id, (task_id, host) in index.connections.items()
+        ),
     )
     conn.commit()
 
@@ -473,7 +506,7 @@ def load_structure(
             )
             params = included
         hosts_by_task: dict[int, list[TaskHostRow]] = {}
-        for row in conn.execute(host_query + " ORDER BY task_seq, seq", params):
+        for row in conn.execute(host_query + " ORDER BY task_seq, seq", _text_safe(params)):
             hosts_by_task.setdefault(row[0], []).append(
                 TaskHostRow(
                     host=row[1],
@@ -528,7 +561,8 @@ def find_task_id_by_name(session_path: Path, task_name: str) -> str | None:
         return None
     try:
         row = conn.execute(
-            "SELECT task_id FROM tasks WHERE name = ? ORDER BY seq LIMIT 1", (task_name,)
+            "SELECT task_id FROM tasks WHERE name = ? ORDER BY seq LIMIT 1",
+            _text_safe((task_name,)),
         ).fetchone()
     except sqlite3.Error:
         return None
@@ -618,7 +652,7 @@ def query_verbose(
                 found = conn.execute(
                     "SELECT connection_id FROM connections WHERE task_id = ? AND host = ?"
                     " ORDER BY rowid LIMIT 1",
-                    (task_id, host),
+                    _text_safe((task_id, host)),
                 ).fetchone()
                 selected = found[0] if found else None
             cursor = conn.execute(
@@ -627,10 +661,12 @@ def query_verbose(
                 (selected,),
             )
         elif level == "play":
-            play_ids = sorted(task_ids_by_play(tree).get(play_name or "", set()))
+            # The tree comes from this index, so its play names are sanitised.
+            (play_key,) = _text_safe((play_name or "",))
+            play_ids = sorted(task_ids_by_play(tree).get(play_key, set()))
             conn.execute("CREATE TEMP TABLE scope_tasks (task_id TEXT PRIMARY KEY)")
             conn.executemany(
-                "INSERT OR IGNORE INTO scope_tasks VALUES (?)", [(t,) for t in play_ids]
+                "INSERT OR IGNORE INTO scope_tasks VALUES (?)", [_text_safe((t,)) for t in play_ids]
             )
             cursor = conn.execute(
                 "SELECT line, ambiguous FROM stderr"
