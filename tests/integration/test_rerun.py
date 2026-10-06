@@ -21,9 +21,12 @@ def test_aom_rerun_failed_spawns_with_correct_limit(tmp_path: Path) -> None:
     session_path = sessions_dir / session_id
     session_path.mkdir(parents=True)
 
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
     meta = {
         "playbook": "site.yml",
         "ansible_args": ["-i", "inv.ini"],
+        "cwd": str(project_dir),
         "start_time": "2026-05-12T10:00:00Z",
         "session_id": session_id,
         "status": "failed",
@@ -49,9 +52,11 @@ def test_aom_rerun_failed_spawns_with_correct_limit(tmp_path: Path) -> None:
     # a file and exits 0. This mirrors the trick used by
     # tests/integration/test_runner_session_recording.py.
     argv_log = tmp_path / "argv.txt"
+    cwd_log = tmp_path / "cwd.txt"
     code = (
-        "import sys, pathlib; "
+        "import os, sys, pathlib; "
         f"pathlib.Path({str(argv_log)!r}).write_text('\\n'.join(sys.argv[1:])); "
+        f"pathlib.Path({str(cwd_log)!r}).write_text(os.getcwd()); "
         "sys.exit(0)"
     )
     fake_cmd = sys.executable
@@ -78,6 +83,9 @@ def test_aom_rerun_failed_spawns_with_correct_limit(tmp_path: Path) -> None:
         )
     assert rc == 0
 
+    # Issue #17: ansible-playbook runs from the session's recorded cwd.
+    assert Path(cwd_log.read_text()) == project_dir.resolve()
+
     spawned_argv = argv_log.read_text().splitlines()
     # First arg is the playbook path.
     assert spawned_argv[0] == "site.yml"
@@ -100,6 +108,7 @@ def test_aom_rerun_no_failures_exits_1_without_spawning(tmp_path: Path) -> None:
     meta = {
         "playbook": "site.yml",
         "ansible_args": [],
+        "cwd": str(tmp_path),
         "start_time": "2026-05-12T10:00:00Z",
         "session_id": session_id,
         "status": "completed",
