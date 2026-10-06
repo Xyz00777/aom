@@ -128,16 +128,17 @@ def inspect_warnings(
 
 def inspect_text(
     state_dir: Path,
+    session_id: str | None = None,
     *,
     play_name: str | None = None,
     task_name: str | None = None,
 ) -> int:
-    """Print the most-recent session as plain text. Return exit code.
+    """Print ``session_id`` (or the most-recent session) as plain text. Return exit code.
 
     When ``play_name`` or ``task_name`` are given, the verbose section
     is scoped to that play or task.
     """
-    latest = find_latest_session(state_dir)
+    latest = session_id or find_latest_session(state_dir)
     if latest is None:
         print(f"No sessions found in {state_dir}")
         return 0
@@ -165,7 +166,11 @@ def inspect_text(
     return 0
 
 
-def inspect_tui(state_dir: Path) -> int:
+def inspect_tui(state_dir: Path, session_id: str | None = None) -> int:
+    if session_id is not None and load_session_meta(session_id, state_dir) is None:
+        print(f"Session not found: {session_id}", file=sys.stderr)
+        return 1
+
     # Lazy import: keeps `--text` invocation free of Textual cost.
     from ansible_aom.tui.screens.inspect import InspectApp
 
@@ -175,8 +180,8 @@ def inspect_tui(state_dir: Path) -> int:
     # process pool) crash with "bad value(s) in fds_to_keep".
     prewarm_parallel_pool()
 
-    latest = find_latest_session(state_dir)
-    app = InspectApp(state_dir=state_dir, initial_session_id=latest)
+    target = session_id or find_latest_session(state_dir)
+    app = InspectApp(state_dir=state_dir, initial_session_id=target)
     app.run()
     return 0
 
@@ -338,10 +343,11 @@ def main(argv: list[str] | None = None) -> int:
     if use_text:
         return inspect_text(
             args.state_dir,
+            args.session_id,
             play_name=args.play_name,
             task_name=args.task_name,
         )
-    return inspect_tui(args.state_dir)
+    return inspect_tui(args.state_dir, args.session_id)
 
 
 if __name__ == "__main__":
