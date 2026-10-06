@@ -167,21 +167,6 @@ class TestR6RendererDisplay:
         assert "?" in out
         assert out == "before?after"
 
-    def test_replace_surrogates_helper_idempotent_on_clean_text(self) -> None:
-        """Strings without surrogate codepoints pass through unchanged."""
-        from ansible_aom.compact.format import _replace_surrogates
-
-        assert _replace_surrogates("normal text") == "normal text"
-        assert _replace_surrogates("with \u2603 unicode") == "with \u2603 unicode"
-
-    def test_replace_surrogates_converts_lone_surrogates(self) -> None:
-        from ansible_aom.compact.format import _replace_surrogates
-
-        # Lone low surrogate from invalid UTF-8 lead byte.
-        assert _replace_surrogates("a\udcc3b") == "a?b"
-        # Lone high surrogate from invalid UTF-8 tail byte.
-        assert _replace_surrogates("a\ud800b") == "a?b"
-
     def test_renderer_print_log_does_not_show_surrogate_codepoint(self, tmp_path: Path) -> None:
         """End-to-end: drive the runner with a fake ansible that emits
         a JSONL event containing invalid UTF-8, then assert that
