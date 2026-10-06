@@ -11,6 +11,7 @@ accordingly:
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -27,12 +28,23 @@ from bump_version import (  # noqa: E402  — sys.path manipulation above
 )
 
 
+def _isolated_env() -> dict[str, str]:
+    """Environment without GIT_* vars.
+
+    Git hooks export GIT_DIR/GIT_INDEX_FILE etc.; when this suite runs from
+    the pre-push hook, inheriting them would point the fixture's git
+    commands at the real repository instead of the temp one.
+    """
+    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+
+
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["git", "-C", str(repo), *args],
         check=True,
         capture_output=True,
         text=True,
+        env=_isolated_env(),
     )
 
 
@@ -200,8 +212,26 @@ class TestLinkedWorktreeHook:
             check=True,
             capture_output=True,
             text=True,
+            env=_isolated_env(),
         )
 
         assert "skipped" in result.stderr
         assert 'version = "0.1.0"' in (main / "pyproject.toml").read_text()
         assert 'version = "0.1.0"' in (linked / "pyproject.toml").read_text()
+
+
+class TestGitEnvIsolation:
+    def test_fixture_repo_ignores_inherited_git_dir(self, tmp_path: Path, monkeypatch) -> None:
+        """Under a git hook, GIT_DIR points at the real repo; fixtures must not touch it."""
+        decoy = tmp_path / "decoy"
+        decoy.mkdir()
+        subprocess.run(["git", "init", "-q", str(decoy)], check=True, env=_isolated_env())
+        config = decoy / ".git" / "config"
+        before = config.read_text()
+        monkeypatch.setenv("GIT_DIR", str(decoy / ".git"))
+
+        fixture = tmp_path / "fixture"
+        fixture.mkdir()
+        _make_git_repo_with_linked_worktree(fixture)
+
+        assert config.read_text() == before
