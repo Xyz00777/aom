@@ -440,3 +440,151 @@ def test_build_indexes_falls_back_when_pool_unavailable(tmp_path: Path, monkeypa
     assert results == {first: True, second: True}
     assert index_is_fresh(first)
     assert index_is_fresh(second)
+
+
+# --- Issue #19: lone surrogates (PTY output decoded with surrogateescape) ---
+#
+# The runner decodes the PTY with ``codec_errors="surrogateescape"``, so
+# invalid UTF-8 becomes lone-surrogate codepoints. events.jsonl preserves
+# them as ``\udcXX`` escapes (byte-exact round-trip); sqlite TEXT cannot
+# bind them. The index must sanitise every bound TEXT value, and an index
+# failure must never escape session finalisation.
+
+_BAD = b"\xff".decode("utf-8", "surrogateescape")  # "\udcff"
+
+
+def _surrogate_events() -> list[dict]:
+    task = {"id": f"task-{_BAD}", "name": f"Install {_BAD}", "path": f"site{_BAD}.yml:3"}
+    return [
+        {
+            "_event": "v2_playbook_on_play_start",
+            "_timestamp": "2026-07-01T10:00:00Z",
+            "play": {"id": f"play-{_BAD}", "name": f"Play {_BAD}"},
+        },
+        {"_event": "v2_playbook_on_task_start", "_timestamp": "2026-07-01T10:00:01Z", "task": task},
+        {
+            "_event": "aom_connection_acquired",
+            "_timestamp": "2026-07-01T10:00:01Z",
+            "connection_id": f"conn-{_BAD}",
+            "task_id": task["id"],
+            "host": f"web{_BAD}",
+        },
+        {
+            "_event": "aom_stderr_line",
+            "_timestamp": "2026-07-01T10:00:02Z",
+            "line": f"SSH error: {_BAD}",
+            "source": "run_level",
+            "connection_id": None,
+            "attribution_confidence": "unique",
+        },
+        {
+            "_event": "aom_stderr_line",
+            "_timestamp": "2026-07-01T10:00:02Z",
+            "line": f"chatter {_BAD}",
+            "source": "connection",
+            "connection_id": f"conn-{_BAD}",
+            "attribution_confidence": "unique",
+        },
+        {
+            "_event": "v2_runner_on_failed",
+            "_timestamp": "2026-07-01T10:00:03Z",
+            "task": task,
+            "hosts": {f"web{_BAD}": {"changed": False, "msg": f"boom {_BAD}"}},
+        },
+    ]
+
+
+def _write_surrogate_session(tmp_path: Path) -> Path:
+    session_path = tmp_path / "0198cccc-0000-7000-8000-000000000019"
+    session_path.mkdir(parents=True)
+    with open(session_path / "events.jsonl", "w", encoding="utf-8") as f:
+        for event in _surrogate_events():
+            # Default ensure_ascii=True: how the session writer persists
+            # surrogates — as \udcXX escapes, which json.loads restores.
+            f.write(json.dumps(event) + "\n")
+    return session_path
+
+
+def test_build_index_sanitises_surrogates_in_every_text_field(tmp_path: Path) -> None:
+    session_path = _write_surrogate_session(tmp_path)
+    events_before = (session_path / "events.jsonl").read_bytes()
+
+    assert build_index(session_path) is True
+    assert index_is_fresh(session_path)
+    # events.jsonl is the immutable source of truth: untouched.
+    assert (session_path / "events.jsonl").read_bytes() == events_before
+
+    index = load_structure(session_path)
+    assert index is not None
+    assert [p.name for p in index.plays] == ["Play ?"]
+    assert [(t.task_id, t.name, t.path) for t in index.tasks] == [
+        ("task-?", "Install ?", "site?.yml:3")
+    ]
+    assert [h.host for h in index.tasks[0].hosts] == ["web?"]
+    assert list(index.host_counts) == ["web?"]
+
+
+def test_index_lookups_accept_surrogate_bearing_params(tmp_path: Path) -> None:
+    """Surrogate-bearing lookup params match their sanitised rows."""
+    from ansible_aom.session.index import find_task_id_by_name
+
+    session_path = _write_surrogate_session(tmp_path)
+    assert build_index(session_path) is True
+    tree = load_tree(session_path, playbook="site.yml")
+    assert tree is not None
+
+    assert find_task_id_by_name(session_path, f"Install {_BAD}") == "task-?"
+    assert query_verbose(session_path, tree=tree, level="run") == ("SSH error: ?",)
+    assert query_verbose(
+        session_path, tree=tree, level="task", task_id=f"task-{_BAD}", host=f"web{_BAD}"
+    ) == ("SSH error: ?", "chatter ?")
+    assert query_verbose(session_path, tree=tree, level="play", play_name=f"Play {_BAD}") == (
+        "SSH error: ?",
+        "chatter ?",
+    )
+
+
+def test_end_session_with_surrogate_stderr_builds_index(tmp_path: Path) -> None:
+    """Issue #19 reproduction: finalisation must not raise."""
+    from ansible_aom.session.store import SessionManager
+
+    mgr = SessionManager(session_dir=tmp_path)
+    sid = mgr.start_session("site.yml")
+    mgr.record_stderr(sid, b"SSH error: \xff".decode("utf-8", "surrogateescape"))
+    mgr.end_session(sid, "completed")
+
+    session_path = tmp_path / sid
+    assert json.loads((session_path / "meta.json").read_text())["status"] == "completed"
+    assert b"\\udcff" in (session_path / "events.jsonl").read_bytes()
+    assert index_is_fresh(session_path)
+
+
+def test_end_session_survives_unexpected_index_failure(tmp_path: Path, monkeypatch) -> None:
+    """Any index-build failure must not escape finalisation."""
+    import ansible_aom.session.index as index_mod
+    from ansible_aom.session.store import SessionManager
+
+    def explode(*args: object, **kwargs: object) -> None:
+        raise TypeError("unexpected index-writer bug")
+
+    monkeypatch.setattr(index_mod, "_write_index_db", explode)
+
+    mgr = SessionManager(session_dir=tmp_path)
+    sid = mgr.start_session("site.yml")
+    mgr.end_session(sid, "completed")
+
+    session_path = tmp_path / sid
+    assert json.loads((session_path / "meta.json").read_text())["status"] == "completed"
+    assert not index_path(session_path).exists()
+    assert list(session_path.glob("index.tmp-*.db")) == []
+
+
+def test_build_index_returns_false_when_temp_cleanup_fails(tmp_path: Path, monkeypatch) -> None:
+    session_path = _write_session(tmp_path)
+
+    def deny(self: Path, missing_ok: bool = False) -> None:
+        raise PermissionError("denied")
+
+    monkeypatch.setattr(Path, "unlink", deny)
+
+    assert build_index(session_path) is False
