@@ -33,6 +33,7 @@ from ansible_aom.core.models import (
     iter_preflight_task_defs,
 )
 from ansible_aom.core.run_state import RunState
+from ansible_aom.core.text import replace_surrogates
 from ansible_aom.core.tree import TreeProjection
 
 if TYPE_CHECKING:
@@ -131,7 +132,7 @@ def _truncate_msg(msg: str) -> str:
     The suffix includes the original byte length so the user knows how
     much was hidden — important for grep'ing the right session later.
     """
-    msg = _replace_surrogates(msg)
+    msg = replace_surrogates(msg)
     if len(msg) <= _MSG_DISPLAY_CAP:
         return msg
     return f"{msg[:_MSG_DISPLAY_CAP]}…(truncated, {len(msg)} bytes)"
@@ -166,24 +167,6 @@ def _verbose_ok_body(result: dict) -> str | None:
 
         return _truncate_msg(json.dumps(msg, ensure_ascii=False))
     return None
-
-
-def _replace_surrogates(s: str) -> str:
-    """Replace any lone-surrogate codepoints in ``s`` with U+FFFD.
-
-    Pexpect's ``codec_errors="surrogateescape"`` decodes invalid UTF-8
-    bytes into unpaired surrogate codepoints so the bytes round-trip
-    through ``str`` losslessly. The terminal cannot render those
-    surrogates — printing them corrupts the display — so this helper
-    converts them to ``?`` for any string that is about to be written
-    to stdout. The on-disk ``events.jsonl`` is unaffected; only
-    display strings pass through here.
-    """
-    try:
-        s.encode("utf-8")
-    except UnicodeEncodeError:
-        return s.encode("utf-8", "replace").decode("utf-8", "replace")
-    return s
 
 
 # ansible-playbook flags worth surfacing as a status-bar chip. Each

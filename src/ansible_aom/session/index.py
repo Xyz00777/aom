@@ -42,6 +42,7 @@ from ansible_aom.core.inspect_model import (
     task_ids_by_play,
     tree_from_index,
 )
+from ansible_aom.core.text import replace_surrogates
 
 logger = logging.getLogger(__name__)
 
@@ -138,20 +139,12 @@ def _text_safe(values: Iterable[Any]) -> tuple[Any, ...]:
     The runner decodes PTY output with ``surrogateescape``, so any text
     from the log may carry lone surrogates, which sqlite (UTF-8 only)
     rejects with ``UnicodeEncodeError``. Every value bound in this module
-    passes through here, replacing them with ``?`` like the compact
-    display does. Lookups are sanitised the same way, so a
+    passes through here (``core.text.replace_surrogates``). Lookups are sanitised the same way, so a
     surrogate-bearing name still matches its indexed row. events.jsonl
     keeps the original bytes.
     """
     # List comprehension, not a generator: ~2x faster on the stderr hot loop.
-    return tuple(
-        [
-            v.encode("utf-8", "replace").decode("utf-8")
-            if isinstance(v, str) and not v.isascii()
-            else v
-            for v in values
-        ]
-    )
+    return tuple([replace_surrogates(v) if isinstance(v, str) else v for v in values])
 
 
 def build_index(session_path: Path) -> bool:
