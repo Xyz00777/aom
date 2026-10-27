@@ -266,7 +266,13 @@ def _write_index_db(
         ),
     )
     conn.executemany(
-        "INSERT INTO host_counts VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO host_counts VALUES (?, ?, ?, ?, ?, ?)"
+        " ON CONFLICT(host) DO UPDATE SET"
+        " ok = ok + excluded.ok,"
+        " changed = changed + excluded.changed,"
+        " failed = failed + excluded.failed,"
+        " skipped = skipped + excluded.skipped,"
+        " unreachable = unreachable + excluded.unreachable",
         (
             _text_safe((host, c.ok, c.changed, c.failed, c.skipped, c.unreachable))
             for host, c in index.host_counts.items()
@@ -326,7 +332,7 @@ def _write_index_db(
         map(_text_safe, task_host_rows),
     )
     conn.executemany(
-        "INSERT INTO connections VALUES (?, ?, ?)",
+        "INSERT OR IGNORE INTO connections VALUES (?, ?, ?)",
         (
             _text_safe((conn_id, task_id, host))
             for conn_id, (task_id, host) in index.connections.items()

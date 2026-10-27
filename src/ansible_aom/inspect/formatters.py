@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from ansible_aom.core.overhead import OverheadStats
+from ansible_aom.core.text import replace_surrogates
 
 
 def _fmt_seconds(value: float) -> str:
@@ -150,7 +151,7 @@ def format_diagnostics_section(record: dict[str, Any] | None) -> str:
         lines.append("")
         lines.append(f"Session recording disabled mid-run: {reason}")
 
-    return "\n".join(lines) + "\n"
+    return replace_surrogates("\n".join(lines) + "\n")
 
 
 def format_changes_section(
@@ -162,7 +163,7 @@ def format_changes_section(
     """Format TaskChangeRecords as human-readable plain text."""
     lines: list[str] = []
     if session_id:
-        lines.append(f"Session: {session_id}")
+        lines.append(f"Session: {replace_surrogates(session_id)}")
     lines.append(f"Changed Tasks ({len(records)}):")
     if not records:
         lines.append("  No tasks reported changed status.")
@@ -238,7 +239,7 @@ def format_changes_section(
                 for line_str in rec.diff.splitlines():
                     lines.append(f"      {line_str}")
 
-    return "\n".join(lines) + "\n"
+    return replace_surrogates("\n".join(lines) + "\n")
 
 
 def format_changes_json(
@@ -271,7 +272,7 @@ def format_changes_json(
             }
         )
     return {
-        "session_id": session_id,
+        "session_id": replace_surrogates(session_id) if session_id else session_id,
         "total_changes": len(records),
         "changes": changes,
     }
@@ -285,7 +286,7 @@ def format_warnings_section(
     """Format WarningRecords as human-readable plain text."""
     lines: list[str] = []
     if session_id:
-        lines.append(f"Session: {session_id}")
+        lines.append(f"Session: {replace_surrogates(session_id)}")
     lines.append(f"Warnings & Deprecations ({len(records)}):")
     if not records:
         lines.append("  No warnings or deprecations recorded.")
@@ -307,7 +308,7 @@ def format_warnings_section(
             lines.append(f"    Host:     {rec.host}")
         lines.append(f"    Message:  {rec.message}")
 
-    return "\n".join(lines) + "\n"
+    return replace_surrogates("\n".join(lines) + "\n")
 
 
 def format_warnings_json(
@@ -330,7 +331,7 @@ def format_warnings_json(
             }
         )
     return {
-        "session_id": session_id,
+        "session_id": replace_surrogates(session_id) if session_id else session_id,
         "total_warnings": len(records),
         "warnings": warnings,
     }

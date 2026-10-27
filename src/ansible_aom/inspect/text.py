@@ -25,6 +25,7 @@ from ansible_aom.core.inspect_model import (
     task_ids_by_play,
     tree_from_index,
 )
+from ansible_aom.core.text import replace_surrogates
 from ansible_aom.session.index import (
     find_task_id_by_name,
     load_structure,
@@ -173,14 +174,15 @@ def _resolve_verbose_scope(
     run level.
     """
     level: Literal["run", "play", "task"] = "run"
-    play = play_name
+    play = replace_surrogates(play_name) if play_name else None
+    target_task = replace_surrogates(task_name) if task_name else None
     task_id: str | None = None
     host: str | None = None
 
-    if task_name:
+    if target_task:
         level = "task"
         for node in _iter_tree(tree):
-            if node.kind == "task" and node.label == task_name and node.task_id:
+            if node.kind == "task" and node.label == target_task and node.task_id:
                 task_id = node.task_id
                 for child in node.children:
                     if child.kind == "host":
@@ -189,7 +191,7 @@ def _resolve_verbose_scope(
                 break
         if not play:
             play = _play_name_for_task(tree, task_id)
-    elif play_name:
+    elif play:
         level = "play"
 
     return level, play, task_id, host
@@ -201,16 +203,19 @@ def _verbose_section(
     if not lines:
         return []
 
+    safe_play = replace_surrogates(play_name) if play_name else None
+    safe_task = replace_surrogates(task_name) if task_name else None
+
     header = "Verbose"
-    if play_name and not task_name:
-        header = f"Verbose (play: {play_name})"
-    elif task_name:
-        scope = f"task: {task_name}"
-        if play_name:
-            scope = f"play: {play_name}, {scope}"
+    if safe_play and not safe_task:
+        header = f"Verbose (play: {safe_play})"
+    elif safe_task:
+        scope = f"task: {safe_task}"
+        if safe_play:
+            scope = f"play: {safe_play}, {scope}"
         header = f"Verbose ({scope})"
 
-    return ["", header, "─" * len(header)] + [f"  {line}" for line in lines]
+    return ["", header, "─" * len(header)] + [f"  {replace_surrogates(line)}" for line in lines]
 
 
 def _render_verbose(

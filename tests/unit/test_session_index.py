@@ -588,3 +588,214 @@ def test_build_index_returns_false_when_temp_cleanup_fails(tmp_path: Path, monke
     monkeypatch.setattr(Path, "unlink", deny)
 
     assert build_index(session_path) is False
+
+
+def test_build_index_handles_colliding_surrogate_hosts_and_connections(tmp_path: Path) -> None:
+    """Two hosts or connection ids that differ only in invalid UTF-8 bytes
+    both sanitise to the same key; indexing and _write_index_db must merge
+    host_counts and keep first-wins for connections without IntegrityError."""
+    import sqlite3
+
+    from ansible_aom.core.inspect_model import SessionIndex, StatusCounts
+    from ansible_aom.session.index import _SCHEMA, _write_index_db
+
+    bad_fe = b"\xfe".decode("utf-8", "surrogateescape")
+    bad_ff = b"\xff".decode("utf-8", "surrogateescape")
+    task = {"id": "task-1", "name": "Check host", "path": "site.yml:3"}
+    events = [
+        {
+            "_event": "v2_playbook_on_play_start",
+            "_timestamp": "2026-07-01T10:00:00Z",
+            "play": {"id": "play-1", "name": "Play 1"},
+        },
+        {"_event": "v2_playbook_on_task_start", "_timestamp": "2026-07-01T10:00:01Z", "task": task},
+        {
+            "_event": "aom_connection_acquired",
+            "_timestamp": "2026-07-01T10:00:01Z",
+            "connection_id": f"conn-{bad_fe}",
+            "task_id": "task-1",
+            "host": f"web{bad_fe}",
+        },
+        {
+            "_event": "aom_connection_acquired",
+            "_timestamp": "2026-07-01T10:00:01Z",
+            "connection_id": f"conn-{bad_ff}",
+            "task_id": "task-2",
+            "host": f"web{bad_ff}",
+        },
+        {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "2026-07-01T10:00:02Z",
+            "task": task,
+            "hosts": {f"web{bad_fe}": {"changed": False}},
+        },
+        {
+            "_event": "v2_runner_on_failed",
+            "_timestamp": "2026-07-01T10:00:03Z",
+            "task": task,
+            "hosts": {f"web{bad_ff}": {"changed": False, "msg": "failed"}},
+        },
+    ]
+    session_path = tmp_path / "0198cccc-0000-7000-8000-000000000020"
+    session_path.mkdir(parents=True)
+    with open(session_path / "events.jsonl", "w", encoding="utf-8") as f:
+        for evt in events:
+            f.write(json.dumps(evt) + "\n")
+
+    assert build_index(session_path) is True
+    loaded = load_structure(session_path)
+    assert loaded is not None
+    assert loaded.host_counts == {"web?": StatusCounts(ok=1, failed=1)}
+
+    # Also verify _write_index_db directly when handed unsanitised colliding keys.
+    raw_index = SessionIndex(
+        plays=(),
+        tasks=(),
+        host_counts={
+            f"web{bad_fe}": StatusCounts(ok=2),
+            f"web{bad_ff}": StatusCounts(failed=1),
+        },
+        failed_task_count=1,
+        stderr=(),
+        connections={
+            f"conn-{bad_fe}": ("task-1", f"web{bad_fe}"),
+            f"conn-{bad_ff}": ("task-2", f"web{bad_ff}"),
+        },
+        fallback_play_name="",
+    )
+    conn = sqlite3.connect(":memory:")
+    conn.executescript(_SCHEMA)
+    _write_index_db(conn, raw_index, events_stat=(10, 20), malformed=0)
+    assert conn.execute("SELECT host, ok, failed FROM host_counts").fetchall() == [("web?", 2, 1)]
+    assert conn.execute("SELECT connection_id, task_id, host FROM connections").fetchall() == [
+        ("conn-?", "task-1", "web?")
+    ]
+    conn.close()
+
+
+def test_render_session_from_index_and_in_memory_parity_with_surrogates(tmp_path: Path) -> None:
+    """Index-backed and in-memory text rendering must preserve failure details
+    for surrogate-bearing hosts, resolve surrogate-bearing --task/--play scopes,
+    and produce identical UTF-8-encodable text."""
+    from ansible_aom.inspect.text import render_session, render_session_from_index
+    from ansible_aom.session.store import load_session
+
+    session_path = _write_surrogate_session(tmp_path)
+    meta = {
+        "session_id": session_path.name,
+        "playbook": f"site{_BAD}.yml",
+        "status": "failed",
+        "start_time": "2026-07-01T10:00:00Z",
+        "end_time": "2026-07-01T10:00:03Z",
+        "duration_seconds": 3.0,
+    }
+    (session_path / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    assert build_index(session_path) is True
+
+    session = load_session(session_path.name, tmp_path)
+    assert session is not None
+
+    for kwargs in (
+        {},
+        {"play_name": f"Play {_BAD}"},
+        {"task_name": f"Install {_BAD}"},
+    ):
+        from_idx = render_session_from_index(session_path, meta, **kwargs)
+        assert from_idx is not None
+        from_mem = render_session(session, **kwargs)
+        # Must be valid UTF-8 (no lone surrogates left).
+        from_idx.encode("utf-8")
+        from_mem.encode("utf-8")
+        # Failure detail payload must not be lost when host label was sanitised.
+        assert "msg: boom ?" in from_idx
+        assert from_idx == from_mem
+
+    task_scoped = render_session_from_index(session_path, meta, task_name=f"Install {_BAD}")
+    assert task_scoped is not None
+    assert "chatter ?" in task_scoped
+
+
+def test_inspect_cli_outputs_with_surrogates_do_not_raise_on_strict_utf8_stdout(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """inspect_text, inspect_changes, and inspect_warnings must never raise
+    UnicodeEncodeError when writing to a strict UTF-8 stdout stream."""
+    import io
+
+    from ansible_aom.inspect.cli import inspect_changes, inspect_text, inspect_warnings
+
+    session_path = tmp_path / "0198cccc-0000-7000-8000-000000000021"
+    session_path.mkdir(parents=True)
+    meta = {
+        "session_id": session_path.name,
+        "playbook": f"site{_BAD}.yml",
+        "status": "failed",
+    }
+    (session_path / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    events = _surrogate_events() + [
+        {
+            "_event": "v2_runner_on_ok",
+            "_timestamp": "2026-07-01T10:00:04Z",
+            "task": {
+                "id": f"task-chg-{_BAD}",
+                "name": f"Change {_BAD}",
+                "path": f"site{_BAD}.yml:9",
+            },
+            "hosts": {
+                f"web{_BAD}": {
+                    "changed": True,
+                    "cmd": f"echo {_BAD}",
+                    "msg": f"changed {_BAD}",
+                    "stdout": f"out {_BAD}",
+                    "stderr": f"err {_BAD}",
+                    "diff": {"before": f"old {_BAD}\n", "after": f"new {_BAD}\n"},
+                    "dest": f"/etc/{_BAD}.conf",
+                    "warnings": [f"warn {_BAD}"],
+                    "deprecations": [{"msg": f"depr {_BAD}"}],
+                }
+            },
+        },
+        {
+            "_event": "aom_stderr_line",
+            "_timestamp": "2026-07-01T10:00:05Z",
+            "line": f"[WARNING]: stderr warn {_BAD}",
+            "source": "run_level",
+            "connection_id": None,
+            "attribution_confidence": "unique",
+        },
+    ]
+    with open(session_path / "events.jsonl", "w", encoding="utf-8") as f:
+        for evt in events:
+            f.write(json.dumps(evt) + "\n")
+
+    buf = io.BytesIO()
+    strict_stdout = io.TextIOWrapper(buf, encoding="utf-8", errors="strict")
+    monkeypatch.setattr("sys.stdout", strict_stdout)
+
+    assert inspect_text(tmp_path, session_path.name, task_name=f"Install {_BAD}") == 0
+    assert (
+        inspect_changes(
+            tmp_path,
+            session_path.name,
+            host=f"web{_BAD}",
+            play_name=f"Play {_BAD}",
+            task_name=f"Change {_BAD}",
+            show_diff=True,
+        )
+        == 0
+    )
+    assert (
+        inspect_warnings(
+            tmp_path,
+            session_path.name,
+            host=f"web{_BAD}",
+            play_name=f"Play {_BAD}",
+            task_name=f"Change {_BAD}",
+        )
+        == 0
+    )
+    strict_stdout.flush()
+    rendered = buf.getvalue().decode("utf-8")
+    assert "msg: boom ?" in rendered
+    assert "Command:  echo ?" in rendered
+    assert "Message:  warn ?" in rendered
