@@ -272,11 +272,11 @@ def _require_cwd(session: dict, session_id: str) -> Path:
     same-named files (issue #17), so we never guess.
 
     Raises:
-        SystemExit(2): If ``cwd`` is missing (sessions recorded before
-            it was persisted) or no longer an existing directory.
+        SystemExit(2): If ``cwd`` is missing, blank, not a string,
+            relative, or no longer an existing directory.
     """
     cwd = session.get("cwd")
-    if cwd is None:
+    if not isinstance(cwd, str) or not cwd.strip():
         print(
             f"aom rerun: session {session_id} has no recorded working directory "
             "('cwd' in meta.json); it was recorded by an older AOM. Relative "
@@ -288,6 +288,14 @@ def _require_cwd(session: dict, session_id: str) -> Path:
         )
         raise SystemExit(2)
     path = Path(cwd)
+    if not path.is_absolute():
+        print(
+            f"aom rerun: session {session_id} has a non-absolute working directory "
+            f"({cwd!r}) in meta.json. Refusing to resolve its relative inputs "
+            "against the current directory.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
     if not path.is_dir():
         print(
             f"aom rerun: session {session_id} was recorded in {cwd}, which no "

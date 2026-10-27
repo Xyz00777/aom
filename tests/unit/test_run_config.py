@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ansible_aom.core.run_config import RunConfigKey, build_run_config_key
+from ansible_aom.core.run_config import (
+    RunConfigKey,
+    build_run_config_key,
+    resolve_stored_playbook,
+)
 
 
 def test_key_uses_resolved_playbook_path(tmp_path: Path) -> None:
@@ -108,3 +112,32 @@ def test_key_unknown_flag_is_ignored_safely(tmp_path: Path) -> None:
     a = build_run_config_key(playbook=str(pb), ansible_args=[])
     b = build_run_config_key(playbook=str(pb), ansible_args=["--some-future-flag", "value"])
     assert a == b
+
+
+def test_key_resolves_relative_playbook_against_explicit_cwd(tmp_path: Path) -> None:
+    """Relative playbooks resolve against the supplied cwd rather than process cwd."""
+    project_a = tmp_path / "project-a"
+    project_b = tmp_path / "project-b"
+    project_a.mkdir()
+    project_b.mkdir()
+    (project_a / "site.yml").write_text("")
+    (project_b / "site.yml").write_text("")
+
+    key_a = build_run_config_key(playbook="site.yml", ansible_args=[], cwd=project_a)
+    key_b = build_run_config_key(playbook="site.yml", ansible_args=[], cwd=project_b)
+
+    assert key_a.playbook == str((project_a / "site.yml").resolve())
+    assert key_b.playbook == str((project_b / "site.yml").resolve())
+    assert key_a != key_b
+
+
+def test_resolve_stored_playbook_cases(tmp_path: Path) -> None:
+    """Stored playbooks require an absolute path or a valid absolute cwd."""
+    abs_pb = tmp_path / "site.yml"
+    assert resolve_stored_playbook(str(abs_pb), cwd=None) == str(abs_pb.resolve())
+    assert resolve_stored_playbook("site.yml", cwd=str(tmp_path)) == str(abs_pb.resolve())
+    assert resolve_stored_playbook("site.yml", cwd=None) is None
+    assert resolve_stored_playbook("site.yml", cwd="") is None
+    assert resolve_stored_playbook("site.yml", cwd="relative/dir") is None
+    assert resolve_stored_playbook("", cwd=str(tmp_path)) is None
+    assert resolve_stored_playbook(None, cwd=str(tmp_path)) is None

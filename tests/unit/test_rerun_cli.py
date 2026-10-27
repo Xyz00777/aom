@@ -412,7 +412,7 @@ from ansible_aom.rerun.cli import main as rerun_main  # noqa: E402
 
 
 def _write_session_with_failure(
-    state_dir: Path, session_id: str, cwd: str | None = None, *, with_cwd: bool = True
+    state_dir: Path, session_id: str, cwd: object = None, *, with_cwd: bool = True
 ) -> None:
     """Helper: write a session with one failed host (web2).
 
@@ -661,3 +661,43 @@ class TestRerunWorkingDirectory:
         err = capsys.readouterr().err
         assert str(gone) in err
         assert "no longer exists" in err.lower()
+
+    @pytest.mark.parametrize("bad_cwd", ["", "   ", 123, ["not", "a", "str"]])
+    def test_blank_or_non_string_recorded_cwd_refuses(
+        self, tmp_path: Path, capsys, bad_cwd: object
+    ):
+        """Path('') resolves to '.' (an existing dir), so blank/non-str cwd must be rejected."""
+        state_dir = tmp_path / "sessions"
+        sid = "01971111-1111-7000-8000-000000000001"
+        _write_session_with_failure(state_dir, sid, cwd=bad_cwd)
+
+        def fake_runner(playbook, ansible_args):
+            pytest.fail("runner must not be called")
+
+        rc = rerun_main(argv=["--state-dir", str(state_dir), sid, "--yes"], runner=fake_runner)
+
+        assert rc == 2
+        err = capsys.readouterr().err
+        assert "working directory" in err.lower()
+        assert sid in err
+
+    @pytest.mark.parametrize("rel_cwd", [".", "subproject", "./subproject"])
+    def test_relative_recorded_cwd_refuses(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys, rel_cwd: str
+    ):
+        """A relative cwd in meta.json would resolve against caller's cwd and must be refused."""
+        (tmp_path / "subproject").mkdir()
+        monkeypatch.chdir(tmp_path)
+        state_dir = tmp_path / "sessions"
+        sid = "01971111-1111-7000-8000-000000000001"
+        _write_session_with_failure(state_dir, sid, cwd=rel_cwd)
+
+        def fake_runner(playbook, ansible_args):
+            pytest.fail("runner must not be called")
+
+        rc = rerun_main(argv=["--state-dir", str(state_dir), sid, "--yes"], runner=fake_runner)
+
+        assert rc == 2
+        err = capsys.readouterr().err
+        assert "working directory" in err.lower()
+        assert sid in err
