@@ -7,6 +7,9 @@
 
 name: CI
 
+env:
+  UV_LOCKED: "true"
+
 on:
   push:
     branches: [main, master]
@@ -28,29 +31,45 @@ jobs:
           python-version: "3.14"
 
       - name: Install dependencies
-        run: uv sync --all-extras
+        run: uv sync --all-extras --group release
 
       - name: Lint (ruff format check)
-        run: uv run ruff format --check src/
+        run: uv run --no-sync ruff format --check src/
 
       - name: Lint (ruff check)
-        run: uv run ruff check src/
+        run: uv run --no-sync ruff check src/
 
       - name: Type-check (mypy)
-        run: uv run mypy src/ansible_aom
+        run: uv run --no-sync mypy src/ansible_aom
 
       - name: Test (pytest with xdist)
-        run: uv run pytest tests/unit tests/compact tests/tui -q -n auto
+        run: uv run --no-sync pytest tests/unit tests/compact tests/tui -q -n auto
 
       - name: Build distributions
-        run: uv build
+        run: uv build --no-build-isolation
 
       - name: Validate distributions
         run: |
-          uv run --with twine twine check dist/*
+          uv run --no-sync twine check dist/*
           python -m venv /tmp/aom-ci-smoke
           /tmp/aom-ci-smoke/bin/python -m pip install dist/*.whl
           cd /tmp
           /tmp/aom-ci-smoke/bin/aom --version
           /tmp/aom-ci-smoke/bin/aom --help >/dev/null
           /tmp/aom-ci-smoke/bin/python -c 'from pathlib import Path; import ansible_aom.ansible.runner as r; assert (Path(r.__file__).parent / "callback" / "aom_jsonl.py").is_file()'
+
+  nix:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+      - name: Build Nix package
+        run: nix build .#default --no-update-lock-file
+      - name: Validate Nix package
+        run: |
+          ./result/bin/aom --version
+          ./result/bin/aom --help >/dev/null
+      - name: Evaluate development shell
+        run: nix eval --raw .#devShells.x86_64-linux.default.drvPath --no-update-lock-file

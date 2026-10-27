@@ -1,5 +1,8 @@
 name: Release
 
+env:
+  UV_LOCKED: "true"
+
 on:
   push:
     tags:
@@ -15,6 +18,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
+      - uses: astral-sh/setup-uv@v3
       - name: Validate tag and project version
         env:
           RELEASE_TAG: ${{ github.ref_name }}
@@ -33,13 +37,13 @@ jobs:
               raise SystemExit(f"tag {tag} does not match project version {version}")
           print(f"Releasing ansible-aom {version}")
           PY
-      - name: Install build tools
-        run: python -m pip install --upgrade build pyinstaller twine
+      - name: Install locked runtime and release tools
+        run: uv sync --no-default-groups --group release --no-install-project
       - name: Build Python distributions
-        run: python -m build
+        run: uv build --no-build-isolation
       - name: Validate Python distributions
         run: |
-          python -m twine check dist/*
+          uv run --no-sync twine check dist/*
           python -m venv /tmp/aom-wheel-smoke
           /tmp/aom-wheel-smoke/bin/python -m pip install dist/*.whl
           cd /tmp
@@ -48,8 +52,8 @@ jobs:
           /tmp/aom-wheel-smoke/bin/python -c 'from pathlib import Path; import ansible_aom.ansible.runner as r; assert (Path(r.__file__).parent / "callback" / "aom_jsonl.py").is_file()'
       - name: Build Linux standalone bundle
         run: |
-          python -m pip install dist/*.whl
-          pyinstaller --clean --noconfirm --distpath build-dist --workpath build-work packaging/aom.spec
+          uv pip install --no-deps dist/*.whl
+          uv run --no-sync pyinstaller --clean --noconfirm --distpath build-dist --workpath build-work packaging/aom.spec
           test -x build-dist/aom/aom
           tar -C build-dist -czf dist/aom-linux-x86_64.tar.gz aom
       - name: Validate standalone bundle
