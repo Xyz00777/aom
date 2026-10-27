@@ -235,3 +235,43 @@ class TestGitEnvIsolation:
         _make_git_repo_with_linked_worktree(fixture)
 
         assert config.read_text() == before
+
+    def test_pre_push_strips_inherited_git_env_before_running_pytest(self, tmp_path: Path) -> None:
+        """Git exports GIT_DIR/GIT_INDEX_FILE into pre-push; pytest must not inherit them."""
+        hook = _REPO_ROOT / ".githooks" / "pre-push"
+        git = tmp_path / "git"
+        git.write_text(
+            '#!/usr/bin/env bash\nif [[ "$1" == rev-parse ]]; then pwd; fi\n',
+            encoding="utf-8",
+        )
+        git.chmod(0o755)
+        uv = tmp_path / "uv"
+        uv.write_text(
+            "#!/usr/bin/env bash\n"
+            "if env | grep -q '^GIT_'; then\n"
+            "    env | grep '^GIT_' >&2\n"
+            "    exit 99\n"
+            "fi\n"
+            'if [[ " $* " == *" --collect-only "* ]]; then\n'
+            "    printf 'tests/unit/test_example.py::test_example\\n'\n"
+            "fi\n",
+            encoding="utf-8",
+        )
+        uv.chmod(0o755)
+
+        result = subprocess.run(
+            ["bash", str(hook)],
+            cwd=tmp_path,
+            env=os.environ
+            | {
+                "PATH": f"{tmp_path}:{os.environ['PATH']}",
+                "GIT_DIR": str(tmp_path / "leaked.git"),
+                "GIT_INDEX_FILE": str(tmp_path / "leaked.index"),
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert "running 1 affected test(s)" in result.stdout
