@@ -29,7 +29,7 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-PYTEST=(uv run pytest --testmon --no-cov -q)
+PYTEST=(uv run --extra dev --extra integration pytest --testmon --no-cov -q)
 
 # --- phase 1: selection against committed state -----------------------
 stashed=0

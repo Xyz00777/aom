@@ -46,14 +46,49 @@ Every run is recorded to `~/.local/state/aom/sessions/<id>/` so
 
 ## Install
 
+### Published package
+
+Install the latest release without cloning the repository or installing `uv`:
+
 ```bash
-# Recommended: install as a uv tool, isolated env, on $PATH
-uv tool install .
+python3 -m pip install ansible-aom
+# Or: pipx install ansible-aom
+```
 
-# Or with pipx
-pipx install .
+Before running a playbook, install Ansible and the JSONL callback collection:
 
-# Or for development (editable install in a uv-managed venv)
+```bash
+python3 -m pip install ansible-core
+ansible-galaxy collection install ansible.posix
+```
+
+The package provides AOM and its bundled callback plugins. It does not bundle
+`ansible-playbook`, Ansible collections, SSH, inventories, roles, or playbook
+dependencies. `ansible-playbook` must be available on `PATH`.
+
+### Linux standalone bundle
+
+Linux x86_64 users can download `aom-linux-x86_64.tar.gz` from the
+[GitHub Releases](https://github.com/Xyz00777/aom/releases) page, extract it,
+and run `aom/aom`. The bundle includes AOM's Python runtime and dependencies,
+but still requires the external Ansible prerequisites above. It is currently
+the only standalone binary target; macOS and Windows binaries are not shipped.
+
+### Nix
+
+On Nix-supported systems:
+
+```bash
+nix run github:Xyz00777/aom
+```
+
+`nix run` provides AOM, not Ansible or the `ansible.posix` collection.
+
+### Development install
+
+The following commands are for working on the source tree:
+
+```bash
 uv sync --all-extras
 uv run pip install -e .
 ```

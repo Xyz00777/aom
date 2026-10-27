@@ -1,0 +1,101 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Validate tag and project version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import tomllib
+          from pathlib import Path
+
+          tag = os.environ["RELEASE_TAG"]
+          if not re.fullmatch(r"v\d+\.\d+\.\d+", tag):
+              raise SystemExit(f"invalid release tag: {tag!r}; expected vX.Y.Z")
+          version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+          if tag[1:] != version:
+              raise SystemExit(f"tag {tag} does not match project version {version}")
+          print(f"Releasing ansible-aom {version}")
+          PY
+      - name: Install build tools
+        run: python -m pip install --upgrade build pyinstaller twine
+      - name: Build Python distributions
+        run: python -m build
+      - name: Validate Python distributions
+        run: |
+          python -m twine check dist/*
+          python -m venv /tmp/aom-wheel-smoke
+          /tmp/aom-wheel-smoke/bin/python -m pip install dist/*.whl
+          cd /tmp
+          /tmp/aom-wheel-smoke/bin/aom --version
+          /tmp/aom-wheel-smoke/bin/aom --help >/dev/null
+          /tmp/aom-wheel-smoke/bin/python -c 'from pathlib import Path; import ansible_aom.ansible.runner as r; assert (Path(r.__file__).parent / "callback" / "aom_jsonl.py").is_file()'
+      - name: Build Linux standalone bundle
+        run: |
+          python -m pip install dist/*.whl
+          pyinstaller --clean --noconfirm --distpath build-dist --workpath build-work packaging/aom.spec
+          test -x build-dist/aom/aom
+          tar -C build-dist -czf dist/aom-linux-x86_64.tar.gz aom
+      - name: Validate standalone bundle
+        run: |
+          test -f build-dist/aom/aom
+          test -f build-dist/aom/_internal/ansible_aom/ansible/callback/aom_jsonl.py
+          test -f build-dist/aom/_internal/ansible_aom/callbacks/aom_connection.py
+          test -f build-dist/aom/_internal/ansible_aom/core/default_config.yaml
+          build-dist/aom/aom --version
+          build-dist/aom/aom --help >/dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist/
+          if-no-files-found: error
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" dist/* --generate-notes
+
+  pypi:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+    environment:
+      name: pypi
+      url: https://pypi.org/p/ansible-aom
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: dist
+      - name: Keep only Python distributions
+        run: rm dist/aom-linux-x86_64.tar.gz
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
