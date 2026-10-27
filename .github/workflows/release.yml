@@ -64,7 +64,7 @@ jobs:
           test -f build-dist/aom/_internal/ansible_aom/core/default_config.yaml
           build-dist/aom/aom --version
           build-dist/aom/aom --help >/dev/null
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-artifacts
           path: dist/
