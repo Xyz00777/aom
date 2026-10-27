@@ -1410,3 +1410,21 @@ async def test_tasks_tree_handles_task_name_with_brackets_and_jinja(state_dir: P
         task_node = play_node.children[0]
         # Check label plain text contains the full unescaped task name
         assert "Deploy {{ hostvars['db']['ip'] }} [bold]tag[/]" in task_node.label.plain
+
+
+@pytest.mark.asyncio
+async def test_initial_session_id_selects_older_session_in_runs_pane(state_dir: Path):
+    """Passing an older session via ``initial_session_id`` must highlight its
+    row in the Runs list (not row 0) and load that session's task model."""
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    clean_run = _ALIASES["clean_run"]
+    app = InspectApp(state_dir=state_dir, initial_session_id=clean_run)
+    async with app.run_test() as pilot:
+        await _settle(pilot)
+        listview = app.query_one("#runs-list")
+        assert app.selected_session_id == clean_run
+        assert listview.index == 1
+        assert getattr(listview.highlighted_child, "session_id", None) == clean_run
+        assert app._current_session is not None
+        assert app._current_session.get("session_id") == clean_run

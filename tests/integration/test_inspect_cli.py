@@ -232,3 +232,29 @@ def test_tui_with_unknown_session_errors_without_launching(state_dir: Path, fake
     assert main(["--state-dir", str(state_dir), "--session", "nope"]) != 0
     assert fake_tui == []
     assert "Session not found: nope" in capsys.readouterr().err
+
+
+def test_tui_with_empty_session_flag_and_missing_state_dir_launches_empty_tui(
+    tmp_path: Path, fake_tui
+):
+    from ansible_aom.inspect.cli import main
+
+    missing_dir = tmp_path / "does-not-exist"
+    assert main(["--state-dir", str(missing_dir), "--session", ""]) == 0
+    assert fake_tui == [None]
+
+
+@pytest.mark.parametrize("bad_id", [".", "..", "../sessions"])
+def test_text_and_tui_reject_dot_and_traversal_session_ids(
+    state_dir: Path, fake_tui, capsys, bad_id: str
+):
+    from ansible_aom.inspect.cli import main
+
+    assert main(["--text", "--state-dir", str(state_dir), "--session", bad_id]) != 0
+    captured = capsys.readouterr()
+    assert f"Session not found: {bad_id}" in captured.err
+    assert captured.out == ""
+
+    assert main(["--state-dir", str(state_dir), "--session", bad_id]) != 0
+    assert fake_tui == []
+    assert f"Session not found: {bad_id}" in capsys.readouterr().err

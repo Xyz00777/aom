@@ -167,7 +167,7 @@ def inspect_text(
 
 
 def inspect_tui(state_dir: Path, session_id: str | None = None) -> int:
-    if session_id is not None and load_session_meta(session_id, state_dir) is None:
+    if session_id and load_session_meta(session_id, state_dir) is None:
         print(f"Session not found: {session_id}", file=sys.stderr)
         return 1
 
