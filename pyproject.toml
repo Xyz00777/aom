@@ -59,6 +59,13 @@ lint = [
     "ansible-lint>=24.0",
 ]
 
+[dependency-groups]
+release = [
+    "hatchling",
+    "pyinstaller",
+    "twine",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
