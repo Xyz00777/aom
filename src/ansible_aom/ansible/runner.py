@@ -724,6 +724,9 @@ def _drive(
                 if not sub_line:
                     continue
                 _feed(sub_line, parser, state, renderer, sink, diag=diag)
+                # Only actual output rearms prompt detection. Enter's blank
+                # PTY echo leaves the previous plaintext prompt unchanged.
+                stall_count = 0
             # pexpect's ``_before`` StringIO holds the per-match buffer
             # that's exposed as ``child.before`` on the next match.
             # When the post-match ``isalive`` break runs, it calls
@@ -737,10 +740,6 @@ def _drive(
                 child.before = ""
             except AttributeError:
                 pass
-            # Reset to 0 (not max(stall_count, 0)) — a newline always
-            # ends a silent window, including the "already-handled"
-            # window marked by negative stall_count.
-            stall_count = 0
             if dead_child_drain_pending:
                 _flush_pending(child, parser, state, renderer, sink, diag=diag)
                 break
@@ -923,7 +922,7 @@ def _handle_timeout_branch(
     """
     # Sentinel: stall_count<0 means "this silent window already had a
     # prompt fired; don't re-fire". Resets to 0 in the caller when a
-    # newline arrives (the child responded to our sendline).
+    # nonempty output line arrives (not just the PTY echo of Enter).
     if stall_count < 0:
         renderer.tick()
         return stall_count
