@@ -134,6 +134,48 @@ class TestFreeStrategySkippedMetaTask:
         assert "localhost" in meta_task.hosts
         assert meta_task.hosts["localhost"].status == Status.SKIPPED
 
+    def test_diverse_meta_tasks_in_free_and_host_pinned(self, tmp_path: Path) -> None:
+        playbook_content = """\
+- hosts: localhost
+  gather_facts: false
+  strategy: host_pinned
+  tasks:
+    - name: Flush handlers meta
+      ansible.builtin.meta: flush_handlers
+      when: false
+    - name: Clear facts meta
+      ansible.builtin.meta: clear_facts
+      when: false
+    - name: End host meta
+      ansible.builtin.meta: end_host
+      when: false
+"""
+        playbook = tmp_path / "diverse_meta.yml"
+        playbook.write_text(playbook_content)
+        env = os.environ.copy()
+        env["ANSIBLE_CALLBACK_PLUGINS"] = str(CALLBACK_DIR)
+        env["ANSIBLE_STDOUT_CALLBACK"] = "aom_jsonl"
+        result = subprocess.run(
+            ["ansible-playbook", str(playbook), "-i", "localhost,", "-c", "local"],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=60,
+        )
+        assert result.returncode == 0
+        assert "Callback dispatch 'v2_runner_on_skipped' failed" not in result.stderr
+
+        events: list[dict] = []
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if line.startswith("{"):
+                events.append(json.loads(line))
+
+        skipped = [e for e in events if e.get("_event") == "v2_runner_on_skipped"]
+        assert len(skipped) == 3
+        skipped_names = {e["task"]["name"] for e in skipped}
+        assert skipped_names == {"Flush handlers meta", "Clear facts meta", "End host meta"}
+
 
 class TestCallbackModuleDirect:
     """Direct unit tests for CallbackModule handling tasks unstarted in _task_map."""
