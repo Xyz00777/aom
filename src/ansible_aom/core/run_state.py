@@ -649,6 +649,37 @@ class RunState:
         if not candidates and task_name:
             candidates = [t for t in play.tasks.values() if t.name == task_name]
         if not candidates:
+            # Under non-lockstep strategies (free) or for meta tasks executed
+            # inline by Ansible without dispatching a start hook, terminal runner
+            # events (such as v2_runner_on_skipped) can be the first sighting
+            # of the task. Synthesise a TaskRunState so the result is tracked
+            # rather than dropped as unmatched.
+            hosts_data = self._hosts_dict(event)
+            is_meta = any(
+                isinstance(h, dict) and h.get("action") in ("ansible.builtin.meta", "meta")
+                for h in hosts_data.values()
+            )
+            if (play.detected_strategy == "free" or is_meta) and (task_id or task_name):
+                if len(play.tasks) >= MAX_TASKS_PER_PLAY:
+                    self.truncated_events["tasks"] = self.truncated_events.get("tasks", 0) + 1
+                    logger.warning(
+                        "MAX_TASKS_PER_PLAY=%d reached in play %r; dropping task %r",
+                        MAX_TASKS_PER_PLAY,
+                        play.play_id,
+                        task_id,
+                    )
+                    return None
+                resolved_id = task_id or f"synthetic-{len(play.tasks)}"
+                self._graft_or_match_task(resolved_id, task_name, task_path, play_id=play.play_id)
+                new_task = TaskRunState(
+                    task_id=resolved_id,
+                    name=task_name,
+                    status=Status.RUNNING,
+                    path=task_path,
+                    parent_role=self._parent_role_from_cache(task_name),
+                )
+                play.tasks[resolved_id] = new_task
+                return new_task
             return None
         for task in reversed(candidates):
             if task.status == Status.RUNNING:

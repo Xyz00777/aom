@@ -57,14 +57,40 @@ DOCUMENTATION = """
         type: integer
 """
 
+import copy
+
 from ansible_collections.ansible.posix.plugins.callback import jsonl
 
 
 class CallbackModule(jsonl.CallbackModule):
     CALLBACK_NAME = "aom_jsonl"
 
+    def _find_result_task(self, host, task):
+        """Find the task_result dict for a (host, task) pair.
+
+        In lockstep mode (linear, debug), the active task is the last one
+        appended to the current play.
+
+        In non-lockstep mode (free, host_pinned, etc.), tasks are tracked per
+        host in ``self._task_map``. If a task was never queued to a worker
+        (e.g. conditional ``meta`` tasks such as ``flush_handlers`` executed
+        inline via ``_execute_meta``), ``v2_runner_on_start`` was never
+        invoked. In that case, falling back to ``results[-1]['tasks'][-1]``
+        would either raise ``IndexError`` (if tasks is empty) or corrupt the
+        unrelated prior task. Create and return a new task structure instead.
+        """
+        key = (host.get_name(), task._uuid)
+        if key in self._task_map:
+            return self._task_map[key]
+        if self._is_lockstep and self.results and self.results[-1]["tasks"]:
+            return self.results[-1]["tasks"][-1]
+        task_result = self._new_task(task)
+        if self.results:
+            self.results[-1]["tasks"].append(task_result)
+        return task_result
+
     def _record_task_result(self, event_name, on_info, result, **kwargs):
-        """Preserve ``ignore_errors`` in the emitted event.
+        """Record task result, preserve ignore_errors, and safely prune _task_map.
 
         Ansible calls ``v2_runner_on_failed(result, ignore_errors=...)``;
         the parent routes every runner hook through this method with the
@@ -73,10 +99,39 @@ class CallbackModule(jsonl.CallbackModule):
         on the wire from a real failure. Merge the flag into ``on_info`` so
         it lands at the top level of the host result (next to ``failed``),
         where AOM's state machine reads it to classify the task as tolerated.
+
+        Furthermore, in non-lockstep strategies (free), tasks not queued
+        through ``_queue_task`` (such as skipped ``meta`` tasks) never
+        entered ``self._task_map``. Upstream ``ansible.posix.jsonl`` does
+        ``del self._task_map[key]`` unconditionally when ``not self._is_lockstep``,
+        crashing with ``KeyError`` and failing callback dispatch. We use
+        ``self._task_map.pop(key, None)`` to safely clean up.
         """
         if kwargs.get("ignore_errors"):
             on_info = dict(on_info, ignore_errors=True)
-        return super()._record_task_result(event_name, on_info, result, **kwargs)
+
+        host = result._host
+        task = result._task
+
+        result_copy = result._result.copy()
+        result_copy.update(on_info)
+        result_copy["action"] = task.action
+
+        task_result = self._find_result_task(host, task)
+
+        end_time = jsonl.current_time()
+        task_result["task"]["duration"]["end"] = end_time
+        if self.results:
+            self.results[-1]["play"]["duration"]["end"] = end_time
+
+        task_result_copy = copy.deepcopy(task_result)
+        task_result_copy["hosts"][host.name] = result_copy
+
+        if not self._is_lockstep:
+            key = (host.get_name(), task._uuid)
+            self._task_map.pop(key, None)
+
+        self._write_event(event_name, task_result_copy)
 
     def v2_runner_on_start(self, host, task):
         """Emit the per-host start event WITH the host's name.
