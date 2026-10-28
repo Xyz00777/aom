@@ -11,6 +11,7 @@ accordingly:
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -27,12 +28,23 @@ from bump_version import (  # noqa: E402  — sys.path manipulation above
 )
 
 
+def _isolated_env() -> dict[str, str]:
+    """Environment without GIT_* vars.
+
+    Git hooks export GIT_DIR/GIT_INDEX_FILE etc.; when this suite runs from
+    the pre-push hook, inheriting them would point the fixture's git
+    commands at the real repository instead of the temp one.
+    """
+    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+
+
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["git", "-C", str(repo), *args],
         check=True,
         capture_output=True,
         text=True,
+        env=_isolated_env(),
     )
 
 
@@ -200,8 +212,66 @@ class TestLinkedWorktreeHook:
             check=True,
             capture_output=True,
             text=True,
+            env=_isolated_env(),
         )
 
         assert "skipped" in result.stderr
         assert 'version = "0.1.0"' in (main / "pyproject.toml").read_text()
         assert 'version = "0.1.0"' in (linked / "pyproject.toml").read_text()
+
+
+class TestGitEnvIsolation:
+    def test_fixture_repo_ignores_inherited_git_dir(self, tmp_path: Path, monkeypatch) -> None:
+        """Under a git hook, GIT_DIR points at the real repo; fixtures must not touch it."""
+        decoy = tmp_path / "decoy"
+        decoy.mkdir()
+        subprocess.run(["git", "init", "-q", str(decoy)], check=True, env=_isolated_env())
+        config = decoy / ".git" / "config"
+        before = config.read_text()
+        monkeypatch.setenv("GIT_DIR", str(decoy / ".git"))
+
+        fixture = tmp_path / "fixture"
+        fixture.mkdir()
+        _make_git_repo_with_linked_worktree(fixture)
+
+        assert config.read_text() == before
+
+    def test_pre_push_strips_inherited_git_env_before_running_pytest(self, tmp_path: Path) -> None:
+        """Git exports GIT_DIR/GIT_INDEX_FILE into pre-push; pytest must not inherit them."""
+        hook = _REPO_ROOT / ".githooks" / "pre-push"
+        git = tmp_path / "git"
+        git.write_text(
+            '#!/usr/bin/env bash\nif [[ "$1" == rev-parse ]]; then pwd; fi\n',
+            encoding="utf-8",
+        )
+        git.chmod(0o755)
+        uv = tmp_path / "uv"
+        uv.write_text(
+            "#!/usr/bin/env bash\n"
+            "if env | grep -q '^GIT_'; then\n"
+            "    env | grep '^GIT_' >&2\n"
+            "    exit 99\n"
+            "fi\n"
+            'if [[ " $* " == *" --collect-only "* ]]; then\n'
+            "    printf 'tests/unit/test_example.py::test_example\\n'\n"
+            "fi\n",
+            encoding="utf-8",
+        )
+        uv.chmod(0o755)
+
+        result = subprocess.run(
+            ["bash", str(hook)],
+            cwd=tmp_path,
+            env=os.environ
+            | {
+                "PATH": f"{tmp_path}:{os.environ['PATH']}",
+                "GIT_DIR": str(tmp_path / "leaked.git"),
+                "GIT_INDEX_FILE": str(tmp_path / "leaked.index"),
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert "running 1 affected test(s)" in result.stdout

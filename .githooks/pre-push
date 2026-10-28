@@ -49,6 +49,11 @@ restore_tree() {
 }
 trap restore_tree EXIT
 
+# Git exports GIT_DIR / GIT_INDEX_FILE etc. into hook processes; strip them
+# now that we're in the worktree root so pytest fixtures spawning `git` in
+# temp directories cannot accidentally target the real repository.
+unset "${!GIT_@}"
+
 if [[ -n "$(git status --porcelain)" ]]; then
     git stash push --include-untracked --quiet -m "pre-push-test-selection"
     stashed=1
