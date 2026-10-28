@@ -1613,6 +1613,139 @@ class TestMultiLineWarningContinuation:
         assert events[0]["source"] == "unknown"
         assert "red non-warning text" not in parser.warnings[0].message
 
+    def test_drain_warnings_per_line_retains_wrapped_warning_continuations(self):
+        """Draining after every feed_line must not emit until the warning block closes."""
+        parser = PtyStreamParser()
+        parser.feed_line("\x1b[1;35m[WARNING]: Collection example.test does not support\x1b[0m\n")
+        assert parser.drain_warnings() == []
+
+        parser.feed_line("\x1b[1;35mAnsible version 2.20.4; upgrade the collection.\x1b[0m\n")
+        assert parser.drain_warnings() == []
+
+        parser.feed_line('{"_event":"v2_playbook_on_play_start","play":{"id":"p","name":"P"}}\n')
+        drained = [w.message for w in parser.drain_warnings()]
+        assert drained == [
+            "[WARNING]: Collection example.test does not support "
+            "Ansible version 2.20.4; upgrade the collection."
+        ]
+
+    def test_runner_feed_retains_wrapped_warning_continuations(self):
+        """Issue #20 reproduction: _feed per line retains wrapped warning in renderer and sink."""
+        from unittest.mock import Mock, call
+
+        from ansible_aom.ansible.runner import _feed
+        from ansible_aom.core.run_state import RunState
+
+        parser = PtyStreamParser()
+        state = RunState("test.yml")
+        renderer, sink = Mock(), Mock()
+        for line in [
+            "\x1b[1;35m[WARNING]: Collection example.test does not support\x1b[0m",
+            "\x1b[1;35mAnsible version 2.20.4; upgrade the collection.\x1b[0m",
+            '{"_event":"v2_playbook_on_play_start","play":{"id":"p","name":"P"}}',
+        ]:
+            _feed(line, parser, state, renderer, sink)
+
+        expected_msg = (
+            "[WARNING]: Collection example.test does not support "
+            "Ansible version 2.20.4; upgrade the collection."
+        )
+        assert renderer.add_warning.call_args_list == [call(expected_msg, False)]
+        assert sink.record_stderr.call_args_list == [call(expected_msg)]
+
+    def test_runner_feed_retains_wrapped_deprecation_continuations(self):
+        """_feed per line retains wrapped magenta and uncolored deprecation continuations."""
+        from unittest.mock import Mock, call
+
+        from ansible_aom.ansible.runner import _feed
+        from ansible_aom.core.run_state import RunState
+
+        parser = PtyStreamParser()
+        state = RunState("test.yml")
+        renderer, sink = Mock(), Mock()
+        for line in [
+            '[DEPRECATION WARNING]: The internal "vars" dictionary is deprecated.',
+            "14         # tasks/shared                   tasks/shared",
+            "Use the `vars` and `varnames` lookups instead.",
+            '{"_event":"v2_playbook_on_play_start","play":{"id":"p","name":"P"}}',
+            "\x1b[0;35m[DEPRECATION WARNING]: The foo option is\x1b[0m",
+            "\x1b[0;35mdeprecated and will be removed in 2.99.\x1b[0m",
+            "",
+        ]:
+            _feed(line, parser, state, renderer, sink)
+
+        expected_uncolored = (
+            '[DEPRECATION WARNING]: The internal "vars" dictionary is deprecated. '
+            "14         # tasks/shared                   tasks/shared "
+            "Use the `vars` and `varnames` lookups instead."
+        )
+        expected_magenta = (
+            "[DEPRECATION WARNING]: The foo option is deprecated and will be removed in 2.99."
+        )
+        assert renderer.add_warning.call_args_list == [
+            call(expected_uncolored, True),
+            call(expected_magenta, True),
+        ]
+        assert sink.record_stderr.call_args_list == [
+            call(expected_uncolored),
+            call(expected_magenta),
+        ]
+
+    def test_runner_feed_back_to_back_warnings_flush_previous_on_new_header(self):
+        """A new [WARNING] header closes and drains the preceding open warning block."""
+        from unittest.mock import Mock, call
+
+        from ansible_aom.ansible.runner import _feed
+        from ansible_aom.core.run_state import RunState
+
+        parser = PtyStreamParser()
+        state = RunState("test.yml")
+        renderer, sink = Mock(), Mock()
+        _feed("\x1b[1;35m[WARNING]: First warning line 1\x1b[0m", parser, state, renderer, sink)
+        _feed("\x1b[1;35mFirst warning line 2\x1b[0m", parser, state, renderer, sink)
+        assert renderer.add_warning.call_args_list == []
+
+        _feed("\x1b[1;35m[WARNING]: Second warning\x1b[0m", parser, state, renderer, sink)
+        assert renderer.add_warning.call_args_list == [
+            call("[WARNING]: First warning line 1 First warning line 2", False)
+        ]
+
+    def test_flush_pending_flushes_open_warning_at_eof(self):
+        """_flush_pending flushes an open warning block at EOF even when child.before is empty."""
+        from types import SimpleNamespace
+        from unittest.mock import Mock, call
+
+        from ansible_aom.ansible.runner import _feed, _flush_pending
+        from ansible_aom.core.run_state import RunState
+
+        parser = PtyStreamParser()
+        state = RunState("test.yml")
+        renderer, sink = Mock(), Mock()
+        _feed("\x1b[1;35m[WARNING]: Trailing warning part 1\x1b[0m", parser, state, renderer, sink)
+        _feed("\x1b[1;35mTrailing warning part 2\x1b[0m", parser, state, renderer, sink)
+        assert renderer.add_warning.call_args_list == []
+
+        child = SimpleNamespace(before="", buffer="")
+        _flush_pending(child, parser, state, renderer, sink)
+
+        expected = "[WARNING]: Trailing warning part 1 Trailing warning part 2"
+        assert renderer.add_warning.call_args_list == [call(expected, False)]
+        assert sink.record_stderr.call_args_list == [call(expected)]
+
+    def test_classified_stderr_closes_open_uncolored_deprecation_block(self):
+        """A known classified stderr line (e.g. [ERROR]:) closes an open deprecation block."""
+        parser = PtyStreamParser()
+        parser.phase = StreamPhase.EXECUTION
+        parser.feed_line("[DEPRECATION WARNING]: old feature\n")
+        events = parser.feed_line("[ERROR]: Task failed fatally\n")
+
+        assert len(events) == 1
+        assert events[0]["_event"] == "aom_stderr_line"
+        assert events[0]["source"] == "error"
+        drained = parser.drain_warnings()
+        assert len(drained) == 1
+        assert drained[0].message == "[DEPRECATION WARNING]: old feature"
+
 
 # =============================================================================
 # Section 5.6: aom_stderr_line synthetic event emission
