@@ -298,26 +298,25 @@ def _leaf_elapsed_s(hs: HostRunState, now: datetime) -> float:
 
 
 def _pending_host_count(
-    play: "PlayRunState", play_def: "PlayDefinition | None", runtime: TaskRunState
+    play: "PlayRunState",
+    play_def: "PlayDefinition | None",
+    runtime: TaskRunState,
+    run_state: "RunState | None" = None,
 ) -> int:
     """Play-target hosts that have not started ``runtime`` yet.
 
     Under ``throttle``/``serial``/free strategy a task's host map only
     grows as per-host start events arrive; the difference against the
-    play's target set is the "not yet started" tail. Hosts that went
-    FAILED/UNREACHABLE earlier in the play are excluded — ansible
-    removes them from the play, so they will never start this task.
-    Returns 0 when no target information is available.
+    play's target set is the "not yet started" tail. Hosts whose latest
+    status up through the play is FAILED/UNREACHABLE are excluded —
+    ansible removes them from the play, so they will never start this
+    task unless reactivated by a rescue/recovery result. Returns 0 when
+    no target information is available.
     """
     targets = _play_target_hostnames(play, play_def)
     if not targets:
         return 0
-    dead = {
-        hostname
-        for task in play.tasks.values()
-        for hostname, hs in task.hosts.items()
-        if hs.status in (Status.FAILED, Status.UNREACHABLE)
-    }
+    dead = play_dead_hosts(play, run_state)
     return len(targets - set(runtime.hosts) - dead)
 
 
@@ -339,18 +338,36 @@ def _play_def_for_state(run_state: "RunState", play: "PlayRunState") -> "PlayDef
     return None
 
 
-def play_dead_hosts(play: "PlayRunState") -> set[str]:
-    """Hosts that went FAILED/UNREACHABLE anywhere in ``play``.
+def play_dead_hosts(play: "PlayRunState", run_state: "RunState | None" = None) -> set[str]:
+    """Hosts whose latest status up through ``play`` is FAILED/UNREACHABLE.
 
-    Ansible drops these hosts from the play, so they never reach later
-    tasks. O(tasks × hosts) — callers on hot paths should memoise (see
-    the ``dead_by_play`` parameter of ``task_complete_on_all_targets``).
+    Ansible drops these hosts from the play (and subsequent plays), so
+    they never reach later tasks unless reactivated by a rescue or
+    recovery result. O(tasks × hosts) — callers on hot paths should
+    memoise (see the ``dead_by_play`` parameter of
+    ``task_complete_on_all_targets``).
     """
+    plays: Iterable[PlayRunState]
+    if run_state is not None and play.play_id in run_state.plays:
+        prior_and_current: list[PlayRunState] = []
+        for pid, p in run_state.plays.items():
+            prior_and_current.append(p)
+            if pid == play.play_id:
+                break
+        plays = prior_and_current
+    else:
+        plays = (play,)
+
+    last_status: dict[str, Status] = {}
+    for p in plays:
+        for t in p.tasks.values():
+            for hostname, hs in t.hosts.items():
+                if hs.status != Status.RUNNING or not hs.synthesised:
+                    last_status[hostname] = hs.status
     return {
         hostname
-        for t in play.tasks.values()
-        for hostname, hs in t.hosts.items()
-        if hs.status in (Status.FAILED, Status.UNREACHABLE)
+        for hostname, status in last_status.items()
+        if status in (Status.FAILED, Status.UNREACHABLE)
     }
 
 
@@ -417,10 +434,10 @@ def task_complete_on_all_targets(
         if dead_by_play is not None:
             dead = dead_by_play.get(play.play_id)
             if dead is None:
-                dead = play_dead_hosts(play)
+                dead = play_dead_hosts(play, run_state)
                 dead_by_play[play.play_id] = dead
         else:
-            dead = play_dead_hosts(play)
+            dead = play_dead_hosts(play, run_state)
 
         if fan_out_members is not None:
             group_hosts: set[str] = set()
@@ -2353,7 +2370,7 @@ class TreeProjection:
                     self._task_line(
                         runtime,
                         depth=task_depth,
-                        pending=_pending_host_count(play, play_def, runtime),
+                        pending=_pending_host_count(play, play_def, runtime, self._state),
                     )
                 )
                 self._touch_task_lease(play, runtime, None, now)
@@ -2381,7 +2398,10 @@ class TreeProjection:
                     elapsed = (
                         (now - runtime.start_time).total_seconds() if runtime.start_time else 0.0
                     )
-                    for hostname in sorted(_play_target_hostnames(play, play_def)):
+                    live_targets = _play_target_hostnames(play, play_def) - play_dead_hosts(
+                        play, self._state
+                    )
+                    for hostname in sorted(live_targets):
                         lines.append(
                             TreeLine(
                                 depth=task_depth + 1,

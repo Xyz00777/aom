@@ -170,6 +170,11 @@ class TaskDefinition:
     # so the projection can render the block as a collapsible group rather
     # than a flat leaf.
     is_block: bool = False
+    # True when this task is inside a ``rescue:`` section of a block.
+    # Under linear strategy, rescue tasks execute only on hosts whose
+    # latest status is FAILED, so synthesis targets failed hosts rather
+    # than healthy ones.
+    is_rescue: bool = False
     # The parent role name when this task is nested inside another role
     # (e.g. an ``include_role`` inside a role's ``tasks/main.yml``).
     # ``None`` for top-level play tasks and for tasks whose enclosing role

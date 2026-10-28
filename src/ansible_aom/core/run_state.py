@@ -471,16 +471,25 @@ class RunState:
         untouched.
         """
         for task in play.tasks.values():
+            rescue_only = any(
+                hs.status != Status.RUNNING and hs.start_time is None for hs in task.hosts.values()
+            ) and not any(
+                hs.status != Status.RUNNING and hs.start_time is not None
+                for hs in task.hosts.values()
+            )
             for hostname in list(task.hosts):
                 hs = task.hosts[hostname]
                 if hs.status == Status.RUNNING:
-                    task.hosts[hostname] = HostRunState(
-                        hostname=hostname,
-                        status=Status.OK,
-                        changed=False,
-                        start_time=hs.start_time,
-                        end_time=ts,
-                    )
+                    if rescue_only and hs.synthesised:
+                        del task.hosts[hostname]
+                    else:
+                        task.hosts[hostname] = HostRunState(
+                            hostname=hostname,
+                            status=Status.OK,
+                            changed=False,
+                            start_time=hs.start_time,
+                            end_time=ts,
+                        )
             if task.status == Status.RUNNING:
                 task.status = Status.COMPLETED
 
@@ -1162,6 +1171,7 @@ class RunState:
 
         task_def = self._graft_or_match_task(task_id, task_name, task_path, play_id=play_id)
         is_run_once = task_def is not None and task_def.run_once
+        is_rescue = task_def is not None and task_def.is_rescue
 
         if play_missing:
             self.plays[play_id] = PlayRunState(
@@ -1215,27 +1225,42 @@ class RunState:
         # event, so synthesising them would leave phantom-RUNNING hosts.
         # Skip synthesis entirely for run_once tasks.
         #
-        # A host whose latest result in this play is FAILED/UNREACHABLE
+        # A host whose latest result up through this play is FAILED/UNREACHABLE
         # has been dropped by ansible and never runs this task — never
         # synthesise it, or the RUNNING→OK cleanup fabricates a result
         # (#21). A later real result (rescue, ignore_unreachable,
-        # clear_host_errors) reactivates it; until that result arrives such
-        # a host simply isn't shown RUNNING. "Latest" is task insertion
-        # order. Without preflight hosts, the play's seen hosts are used.
+        # clear_host_errors) reactivates it; when preflight marks the task
+        # as a rescue task (``is_rescue``), only FAILED hosts are synthesised.
+        # "Latest" is play and task insertion order. Without preflight hosts,
+        # the current play's seen hosts are used as the candidate set.
         if not is_run_once:
             resolved_hosts = self._resolve_play_hosts(play)
             if play.detected_strategy == "linear":
                 last_status: dict[str, Status] = {}
-                for other_task in play.tasks.values():
-                    if other_task.task_id == task_id:
-                        continue
-                    for hostname, hs in other_task.hosts.items():
-                        last_status[hostname] = hs.status
-                resolved_hosts = [
-                    hostname
-                    for hostname in resolved_hosts or sorted(last_status)
-                    if last_status.get(hostname) not in (Status.FAILED, Status.UNREACHABLE)
-                ]
+                play_hosts: set[str] = set()
+                for p in self.plays.values():
+                    for other_task in p.tasks.values():
+                        if p.play_id == play.play_id and other_task.task_id == task_id:
+                            continue
+                        for hostname, hs in other_task.hosts.items():
+                            last_status[hostname] = hs.status
+                            if p.play_id == play.play_id:
+                                play_hosts.add(hostname)
+                    if p.play_id == play.play_id:
+                        break
+                candidates = resolved_hosts or sorted(play_hosts)
+                if is_rescue:
+                    resolved_hosts = [
+                        hostname
+                        for hostname in candidates
+                        if last_status.get(hostname) == Status.FAILED
+                    ]
+                else:
+                    resolved_hosts = [
+                        hostname
+                        for hostname in candidates
+                        if last_status.get(hostname) not in (Status.FAILED, Status.UNREACHABLE)
+                    ]
             for hostname in resolved_hosts:
                 if hostname not in play.tasks[task_id].hosts:
                     play.tasks[task_id].hosts[hostname] = HostRunState(
@@ -1265,6 +1290,13 @@ class RunState:
                             other_task.task_id, other_task.name, other_task.path, p.play_id
                         )
                         prev_run_once = prev_def is not None and prev_def.run_once
+                        rescue_only = any(
+                            hs.status != Status.RUNNING and hs.start_time is None
+                            for hs in other_task.hosts.values()
+                        ) and not any(
+                            hs.status != Status.RUNNING and hs.start_time is not None
+                            for hs in other_task.hosts.values()
+                        )
                         for hostname in list(other_task.hosts):
                             hs = other_task.hosts[hostname]
                             if hs.status == Status.RUNNING:
@@ -1272,8 +1304,14 @@ class RunState:
                                 # terminal event for only the one delegated
                                 # host; any still-RUNNING synthesised hosts
                                 # are phantom (they never ran) and flip to
-                                # SKIPPED. Real RUNNING hosts (loop items)
-                                # keep the OK flip.
+                                # SKIPPED. On a rescue task where only
+                                # previously-dropped (un-synthesised) hosts
+                                # emitted terminal results, still-RUNNING
+                                # synthesised healthy hosts never ran the
+                                # task and are purged so they don't gain a
+                                # fabricated OK. Real RUNNING hosts (loop
+                                # items) and tasks with dropped terminal
+                                # events (pause) keep the OK flip.
                                 if prev_run_once and hs.synthesised:
                                     other_task.hosts[hostname] = HostRunState(
                                         hostname=hostname,
@@ -1281,6 +1319,8 @@ class RunState:
                                         start_time=hs.start_time,
                                         end_time=ts,
                                     )
+                                elif rescue_only and hs.synthesised:
+                                    del other_task.hosts[hostname]
                                 else:
                                     other_task.hosts[hostname] = HostRunState(
                                         hostname=hostname,
