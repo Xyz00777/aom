@@ -17,10 +17,23 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import PurePath
 from typing import Literal, Mapping, NamedTuple
 
 from ansible_aom.core._async_poll import is_async_poll_payload
 from ansible_aom.core.timestamp import parse_iso_timestamp
+
+
+def is_valid_session_id(session_id: object) -> bool:
+    """Return True when *session_id* is a safe single path segment for a session directory."""
+    if not isinstance(session_id, str) or not session_id.strip():
+        return False
+    if session_id in {".", ".."}:
+        return False
+    if "/" in session_id or "\\" in session_id or "\x00" in session_id:
+        return False
+    path = PurePath(session_id)
+    return not path.is_absolute() and path.parts == (session_id,)
 
 
 class StatusCounts(NamedTuple):

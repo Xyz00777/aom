@@ -23,6 +23,7 @@ from typing import Any
 
 from ansible_aom import __version__ as _AOM_VERSION
 from ansible_aom.core import diagnostics
+from ansible_aom.core.inspect_model import is_valid_session_id
 from ansible_aom.core.stderr_classifier import classify
 from ansible_aom.core.timestamp import parse_iso_timestamp
 from ansible_aom.session import index as session_index
@@ -792,8 +793,10 @@ def load_session_meta(session_id: str, session_dir: Path) -> dict[str, Any] | No
     it is safe to call for every session on disk regardless of log size.
     Returns None if the session directory doesn't exist.
     """
+    if not is_valid_session_id(session_id):
+        return None
     session_path = session_dir / session_id
-    if not session_path.exists():
+    if not session_path.is_dir():
         return None
 
     meta_file = session_path / "meta.json"
