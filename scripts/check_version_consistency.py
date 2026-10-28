@@ -35,7 +35,7 @@ def find_version_mismatches(root: Path) -> list[str]:
     release_path = root / ".github" / "workflows" / "release.yml"
     release_text = release_path.read_text()
     required_release_contract = (
-        "RELEASE_TAG: ${{ github.ref_name }}",
+        "RELEASE_TAG:",
         'tomllib.loads(Path("pyproject.toml").read_text())',
         "if tag[1:] != version:",
     )

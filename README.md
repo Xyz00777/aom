@@ -312,6 +312,12 @@ uv run mypy src/ansible_aom
 TDD-first; tests for `core/` must pass without `ansible-core`. See
 [`AGENTS.md`](AGENTS.md) for the full rules.
 
+### Releases and Versioning
+
+- Pull requests that change application code (`src/`, `packaging/`) or dependencies (`pyproject.toml`, `uv.lock`, `flake.nix`, `flake.lock`) must bump `project.version` in `pyproject.toml` so it is higher than the `main` branch. CI enforces this via `scripts/check_version_bump.py`.
+- Documentation-only and test-only changes do not require a version bump.
+- Merging to `main` automatically triggers package creation (Python wheels, sdist, and Linux standalone bundle), creates a GitHub Release with tag `v<version>`, and publishes to PyPI when application or dependency changes are present.
+
 ## License
 
 GPL-3.0-or-later. See [`LICENSE`](LICENSE). AOM is provided as-is, with no warranty.

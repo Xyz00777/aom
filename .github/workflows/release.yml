@@ -5,14 +5,39 @@ env:
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
 
 jobs:
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      should_release: ${{ steps.evaluate.outputs.should_release }}
+      tag: ${{ steps.evaluate.outputs.tag }}
+      version: ${{ steps.evaluate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@v7
+      - name: Evaluate release trigger
+        id: evaluate
+        run: uv run python scripts/check_version_bump.py --check-release
+
   build:
+    needs: check
+    if: needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+    outputs:
+      tag: ${{ steps.validate.outputs.tag }}
+      version: ${{ steps.validate.outputs.version }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -20,8 +45,9 @@ jobs:
           python-version: "3.14"
       - uses: astral-sh/setup-uv@v7
       - name: Validate tag and project version
+        id: validate
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ needs.check.outputs.tag || github.ref_name }}
         run: |
           python - <<'PY'
           import os
@@ -35,7 +61,11 @@ jobs:
           version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
           if tag[1:] != version:
               raise SystemExit(f"tag {tag} does not match project version {version}")
-          print(f"Releasing ansible-aom {version}")
+          print(f"Releasing ansible-aom {version} ({tag})")
+          if "GITHUB_OUTPUT" in os.environ:
+              with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+                  f.write(f"tag={tag}\n")
+                  f.write(f"version={version}\n")
           PY
       - name: Install locked runtime and release tools
         run: uv sync --no-default-groups --group release --no-install-project
@@ -71,7 +101,7 @@ jobs:
           if-no-files-found: error
 
   github-release:
-    needs: build
+    needs: [check, build]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -83,10 +113,10 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" dist/* --generate-notes
+        run: gh release create "${{ needs.build.outputs.tag || needs.check.outputs.tag }}" dist/* --generate-notes
 
   pypi:
-    needs: build
+    needs: [check, build]
     runs-on: ubuntu-24.04
     permissions:
       id-token: write
