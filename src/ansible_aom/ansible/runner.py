@@ -816,6 +816,7 @@ def _drive(
             prompt = prompt_before + prompt_after
             _trace("password-pattern", prompt=prompt[:200])
             renderer.note_pty_bytes()
+            _drain_warnings(parser, renderer, sink, flush=True)
             password = renderer.handle_password_prompt(prompt)
             child.sendline(password)
             stall_count = 0
@@ -1012,11 +1013,28 @@ def _flush_pending(
     ``expect()`` returning and the ``isalive()`` check.
     """
     leftover = (child.before or "") + (_peek_unread(child) or "")
-    if not leftover.strip():
-        return
-    for sub_line in leftover.splitlines():
-        if sub_line:
-            _feed(sub_line, parser, state, renderer, sink, diag=diag)
+    if leftover.strip():
+        for sub_line in leftover.splitlines():
+            if sub_line:
+                _feed(sub_line, parser, state, renderer, sink, diag=diag)
+    _drain_warnings(parser, renderer, sink, flush=True)
+
+
+def _drain_warnings(
+    parser: PtyStreamParser,
+    renderer: Renderer,
+    sink: _SessionSink | _NullSink,
+    *,
+    flush: bool = False,
+) -> None:
+    """Drain completed warnings from *parser* and forward to *sink* + *renderer*.
+
+    When ``flush=True`` (at EOF / stream end or quiet timeout), any
+    still-open multi-line warning block is closed and emitted as well.
+    """
+    for warning in parser.drain_warnings(flush=flush):
+        sink.record_stderr(warning.message)
+        renderer.add_warning(warning.message, warning.type == WarningType.DEPRECATION)
 
 
 def _feed(
@@ -1079,9 +1097,7 @@ def _feed(
                 )
                 sys.stderr.flush()
 
-    for warning in parser.drain_warnings():
-        sink.record_stderr(warning.message)
-        renderer.add_warning(warning.message, warning.type == WarningType.DEPRECATION)
+    _drain_warnings(parser, renderer, sink)
 
 
 _PSUTIL_CACHE: dict[int, Any] = {}

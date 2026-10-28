@@ -28,7 +28,7 @@ from ansible_aom.core.models import (
     WarningType,
 )
 from ansible_aom.core.state_machine import MAX_LOG_LINES
-from ansible_aom.core.stderr_classifier import classify
+from ansible_aom.core.stderr_classifier import StderrSource, classify
 
 logger = logging.getLogger(__name__)
 
@@ -235,23 +235,23 @@ class PtyStreamParser:
         line_stripped = line.rstrip("\n\r")
 
         if self.phase == StreamPhase.PRE_RUN_PROMPTS:
-            events = self._handle_plaintext(line_stripped)
-
             if self._is_jsonl_start_event(line_stripped):
                 self.phase = StreamPhase.EXECUTION
                 return self._parse_and_return(line_stripped)
 
             for pattern in self.PASSWORD_PATTERNS:
                 if re.search(pattern, line_stripped):
+                    self._current_warning = None
                     self._pending_password_prompt = line_stripped
                     return []
 
             # Lines starting with { that aren't a start event are malformed
             # JSON (e.g. truncated carry). Return empty — not stderr.
             if line_stripped.startswith("{"):
+                self._current_warning = None
                 return []
 
-            return events
+            return self._handle_plaintext(line_stripped)
 
         if self.phase == StreamPhase.EXECUTION:
             if self._is_jsonl_stats_event(line_stripped):
@@ -266,6 +266,7 @@ class PtyStreamParser:
                 return parsed
 
             if self.RECAP_PATTERN.match(line_stripped):
+                self._current_warning = None
                 self.phase = StreamPhase.POST_RUN_RECAP
                 self._in_recap = True
                 return []
@@ -273,11 +274,13 @@ class PtyStreamParser:
             # Lines starting with { that failed _is_json are malformed JSON
             # (e.g. truncated carry). Return empty — they are not stderr.
             if line_stripped.startswith("{"):
+                self._current_warning = None
                 return []
 
             return self._handle_plaintext(line_stripped)
 
         if self.phase == StreamPhase.POST_RUN_RECAP:
+            self._current_warning = None
             self._recap_lines.append(line_stripped)
             # R13: cap _recap_lines at MAX_LOG_LINES so a verbose
             # ``PLAY RECAP`` (e.g. -v with hundreds of host stats per
@@ -293,6 +296,7 @@ class PtyStreamParser:
 
     def _parse_and_return(self, line: str) -> list[JsonlEvent]:
         """Parse JSON line and return events."""
+        self._current_warning = None
         try:
             data = _safe_loads(line)
             if isinstance(data, dict) and "_event" in data:
@@ -301,7 +305,6 @@ class PtyStreamParser:
                 # any open multi-line warning block so a later magenta line
                 # can't fold into a warning from before this event.
                 self._plaintext_is_latest_output = False
-                self._current_warning = None
                 return [cast(JsonlEvent, data)]
         except ValueError:
             pass
@@ -366,34 +369,9 @@ class PtyStreamParser:
                 self._current_warning = entry
             return []
 
-        # ansible-core 2.20 deprecation blocks emitted WITHOUT SGR codes
-        # (e.g. under the mitogen strategy, where workers write from a
-        # non-TTY context) arrive as plaintext: the header line, then the
-        # source-context and help-text continuation lines. While a
-        # *deprecation* block is open, fold an uncolored plaintext line
-        # into it instead of closing the block — otherwise each
-        # continuation becomes a spurious ``source='unknown'``
-        # aom_stderr_line event. Plain ``[WARNING]`` blocks are excluded:
-        # their continuations are always magenta-wrapped, and an uncolored
-        # line after one (e.g. ``TASK [nginx] *******``) is a new line, not
-        # a continuation. Lines carrying any other colour (red, green, …)
-        # still close the block and emit their own event. The block also
-        # closes on a blank line or a JSONL event (see feed_line).
-        if (
-            self._current_warning is not None
-            and self._current_warning.type == WarningType.DEPRECATION
-            and not _ANSI_SGR_RE.search(line)
-        ):
-            self._current_warning.message = (
-                self._current_warning.message.rstrip() + " " + clean.strip()
-            )
-            return []
-
-        # Not warning-family: any open warning block ends here.
-        self._current_warning = None
-
         retry_m = _RETRYING_RE.search(clean)
         if retry_m:
+            self._current_warning = None
             host = (retry_m.group("host1") or retry_m.group("host2") or "").strip()
             retries_left = int(retry_m.group("left"))
             task_name = retry_m.group("task").strip()
@@ -413,6 +391,7 @@ class PtyStreamParser:
 
         poll_m = _ASYNC_POLL_RE.search(clean)
         if poll_m:
+            self._current_warning = None
             host = poll_m.group("host").strip()
             jid = poll_m.group("jid").strip()
             now_iso = datetime.now(timezone.utc).isoformat()
@@ -430,9 +409,36 @@ class PtyStreamParser:
             ]
 
         # Classify the line via stderr_classifier and emit a synthetic
-
         # aom_stderr_line event so the session recording captures it.
         classified = classify(clean)
+
+        # ansible-core 2.20 deprecation blocks emitted WITHOUT SGR codes
+        # (e.g. under the mitogen strategy, where workers write from a
+        # non-TTY context) arrive as plaintext: the header line, then the
+        # source-context and help-text continuation lines. While a
+        # *deprecation* block is open, fold an uncolored unknown plaintext
+        # line into it instead of closing the block — otherwise each
+        # continuation becomes a spurious ``source='unknown'``
+        # aom_stderr_line event. Plain ``[WARNING]`` blocks are excluded:
+        # their continuations are always magenta-wrapped, and an uncolored
+        # line after one (e.g. ``TASK [nginx] *******``) is a new line, not
+        # a continuation. Lines carrying any other colour (red, green, …)
+        # or matching a known stderr classifier rule still close the block
+        # and emit their own event. The block also closes on a blank line
+        # or a JSONL event (see feed_line).
+        if (
+            self._current_warning is not None
+            and self._current_warning.type == WarningType.DEPRECATION
+            and not _ANSI_SGR_RE.search(line)
+            and classified.source == StderrSource.UNKNOWN
+        ):
+            self._current_warning.message = (
+                self._current_warning.message.rstrip() + " " + clean.strip()
+            )
+            return []
+
+        # Not warning-family: any open warning block ends here.
+        self._current_warning = None
         now_iso = datetime.now(timezone.utc).isoformat()
         conn_id, confidence = self._resolve_connection(classified.host)
         stderr_event: JsonlEvent = {
@@ -564,15 +570,24 @@ class PtyStreamParser:
     def warnings(self) -> list[WarningEntry]:
         return self._warnings
 
-    def drain_warnings(self) -> list[WarningEntry]:
-        """Return all warnings detected since the last drain and reset.
+    def drain_warnings(self, *, flush: bool = False) -> list[WarningEntry]:
+        """Return completed warnings detected since the last drain and reset.
 
         Lets the caller (typically the runner) forward newly-seen warnings
-        to the renderer without having to track an index. The internal
-        list is replaced — `self.warnings` is empty afterward.
+        to the renderer without having to track an index. While a warning
+        block is still open (``_current_warning is not None``) and may
+        receive wrapped continuation lines on subsequent ``feed_line``
+        calls, it stays buffered in ``self._warnings`` until the block
+        closes or ``flush=True`` is passed (e.g. at EOF).
         """
-        drained = self._warnings
-        self._warnings = []
+        if flush or self._current_warning is None:
+            self._current_warning = None
+            drained = self._warnings
+            self._warnings = []
+            return drained
+
+        drained = [w for w in self._warnings if w is not self._current_warning]
+        self._warnings = [self._current_warning]
         return drained
 
     @property
