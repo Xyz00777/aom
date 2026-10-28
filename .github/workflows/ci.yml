@@ -36,7 +36,7 @@ jobs:
         run: uv sync --all-extras --group release
 
       - name: Check software version bump
-        run: uv run python scripts/check_version_bump.py
+        run: uv run --no-sync python scripts/check_version_bump.py
 
       - name: Lint (ruff format check)
         run: uv run --no-sync ruff format --check src/

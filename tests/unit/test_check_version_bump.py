@@ -15,6 +15,7 @@ from check_version_bump import (  # noqa: E402
     evaluate_release_condition,
     is_app_or_dep_path,
     is_version_higher,
+    parse_version,
     should_trigger_release,
 )
 
@@ -71,6 +72,12 @@ class TestPathClassification:
 
 
 class TestVersionComparison:
+    def test_parse_version(self) -> None:
+        assert parse_version("0.102.12") == (0, 102, 12)
+        assert parse_version("v1.2.3") == (1, 2, 3)
+        with pytest.raises(ValueError, match="expected X.Y.Z"):
+            parse_version("invalid")
+
     def test_is_version_higher(self) -> None:
         assert is_version_higher("0.102.13", "0.102.12") is True
         assert is_version_higher("0.103.0", "0.102.12") is True
@@ -215,6 +222,32 @@ class TestEvaluateReleaseCondition:
         assert should_release is False
         assert "should_release=false" in out_file.read_text()
 
+    def test_release_skipped_if_version_not_higher_than_base(self, tmp_path: Path) -> None:
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _git(repo, "init", "-q")
+        _git(repo, "config", "user.name", "Test User")
+        _git(repo, "config", "user.email", "test@example.com")
+        _git(repo, "config", "commit.gpgSign", "false")
+        (repo / "pyproject.toml").write_text('[project]\nname = "x"\nversion = "0.1.0"\n')
+        (repo / "src").mkdir()
+        (repo / "src" / "app.py").write_text("v1\n")
+        _git(repo, "add", ".")
+        _git(repo, "commit", "-q", "-m", "chore: init")
+
+        (repo / "src" / "app.py").write_text("v2\n")
+        _git(repo, "commit", "-am", "fix: update without bump")
+
+        out_file = tmp_path / "github_output.txt"
+        should_release, tag, ver = evaluate_release_condition(
+            repo_root=repo,
+            base_ref="HEAD~1",
+            head_ref="HEAD",
+            output_file=out_file,
+        )
+        assert should_release is False
+        assert "should_release=false" in out_file.read_text()
+
     def test_release_triggered_for_tag_ref(self, tmp_path: Path) -> None:
         out_file = tmp_path / "github_output.txt"
         should_release, tag, ver = evaluate_release_condition(
@@ -263,3 +296,25 @@ class TestCliMain:
         captured = capsys.readouterr()
         assert "ERROR:" in captured.err
         assert "not higher than base" in captured.err
+
+    def test_script_runs_with_stdlib_only_no_site_packages(self, tmp_path: Path) -> None:
+        out_file = tmp_path / "gh_out"
+        env = _isolated_env()
+        env["GITHUB_OUTPUT"] = str(out_file)
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-I",
+                "-S",
+                str(_REPO_ROOT / "scripts" / "check_version_bump.py"),
+                "--check-release",
+                "--root",
+                str(_REPO_ROOT),
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            check=False,
+        )
+        assert result.returncode == 0, result.stderr
+        assert out_file.exists()
