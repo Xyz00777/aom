@@ -1053,6 +1053,7 @@ def _graft_section_dfs(
     visited_files: set[str] | None = None,
     fallback_base_dir: Path | None = None,
     roles_base_dir: Path | None = None,
+    in_rescue: bool = False,
 ) -> None:
     """Walk *section_tasks* for literal ``include_tasks`` directives and graft.
 
@@ -1082,10 +1083,11 @@ def _graft_section_dfs(
     for task in section_tasks:
         if not isinstance(task, dict):
             continue
-        # Stamp literal ``run_once: true`` inline tasks (playbook or role
-        # YAML) onto their preflight stub. Only a literal YAML ``true``
-        # counts; Jinja-templated and ``false`` values are left unstamped.
-        if task.get("run_once") is True:
+        # Stamp literal ``run_once: true`` and ``rescue:`` membership onto
+        # inline tasks' preflight stubs. Only a literal YAML ``true`` counts
+        # for ``run_once``; Jinja-templated and ``false`` values are left
+        # unstamped.
+        if task.get("run_once") is True or in_rescue:
             yaml_name = str(task.get("name") or "")
             stub = name_index.get(yaml_name)
             if stub is None and yaml_name:
@@ -1094,7 +1096,10 @@ def _graft_section_dfs(
                         stub = v
                         break
             if stub is not None:
-                stub.run_once = True
+                if task.get("run_once") is True:
+                    stub.run_once = True
+                if in_rescue:
+                    stub.is_rescue = True
         for sub_key in ("block", "rescue", "always"):
             sub = task.get(sub_key)
             if isinstance(sub, list):
@@ -1106,6 +1111,7 @@ def _graft_section_dfs(
                     visited_files=visited_files,
                     fallback_base_dir=fallback_base_dir,
                     roles_base_dir=roles_base_dir,
+                    in_rescue=in_rescue or sub_key == "rescue",
                 )
         target = _include_target_value(task)
         if target is not None:
@@ -1129,6 +1135,9 @@ def _graft_section_dfs(
                             stub = _find_stub_by_role(name_index)
                         if stub is not None:
                             _graft_children(stub, cache_entry)
+                            if in_rescue:
+                                for child in stub.children:
+                                    child.is_rescue = True
                             nested_tasks = _load_task_list(resolved)
                             if nested_tasks:
                                 child_index: dict[str, TaskDefinition] = {
@@ -1141,6 +1150,7 @@ def _graft_section_dfs(
                                     name_index=child_index,
                                     visited_files=visited_files,
                                     roles_base_dir=roles_base_dir,
+                                    in_rescue=in_rescue,
                                 )
 
         # Check include_role / import_role
