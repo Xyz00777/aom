@@ -21,7 +21,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ansible_aom.core.run_config import RunConfigKey, build_run_config_key
+from ansible_aom.core.run_config import (
+    RunConfigKey,
+    build_run_config_key,
+    resolve_stored_playbook,
+)
 from ansible_aom.core.timestamp import parse_iso_timestamp
 
 
@@ -249,9 +253,15 @@ def _match_strict(meta: dict[str, Any], key: RunConfigKey, host_count: int) -> b
     """True when the stored session matches the current invocation exactly."""
     if meta.get("resolved_host_count") != host_count:
         return False
+    resolved_playbook = resolve_stored_playbook(meta.get("playbook"), meta.get("cwd"))
+    if resolved_playbook is None:
+        return False
+    ansible_args = meta.get("ansible_args")
+    if not isinstance(ansible_args, list):
+        return False
     candidate_key = build_run_config_key(
-        playbook=meta.get("playbook", ""),
-        ansible_args=list(meta.get("ansible_args", [])),
+        playbook=resolved_playbook,
+        ansible_args=list(ansible_args),
     )
     return candidate_key == key
 
@@ -267,10 +277,10 @@ def _match_loose(meta: dict[str, Any], key: RunConfigKey, host_count: int) -> bo
     """
     if meta.get("resolved_host_count") != host_count:
         return False
-    stored_playbook = meta.get("playbook", "")
-    if not isinstance(stored_playbook, str):
+    resolved_playbook = resolve_stored_playbook(meta.get("playbook"), meta.get("cwd"))
+    if resolved_playbook is None:
         return False
-    return str(Path(stored_playbook).resolve()) == key.playbook
+    return resolved_playbook == key.playbook
 
 
 def _build_prior(meta: dict[str, Any], entry: Path, end_time: datetime) -> PriorRun:

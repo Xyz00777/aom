@@ -325,3 +325,77 @@ def test_corrupt_meta_is_skipped(tmp_path: Path) -> None:
     prior = find_previous_run(sessions, key, host_count=2)
     assert prior is not None
     assert prior.session_id == "good"
+
+
+def test_relative_playbook_resolves_against_recorded_cwd_not_current_cwd(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A relative playbook in meta.json resolves against its recorded cwd, not the caller's cwd."""
+    from ansible_aom.session.store import SessionManager
+
+    project_a = tmp_path / "project-a"
+    project_b = tmp_path / "project-b"
+    project_a.mkdir()
+    project_b.mkdir()
+    (project_a / "site.yml").write_text("")
+    (project_b / "site.yml").write_text("")
+    sessions = tmp_path / "sessions"
+
+    monkeypatch.chdir(project_a)
+    mgr = SessionManager(session_dir=sessions)
+    sid_a = mgr.start_session("site.yml", ansible_args=["-i", "inv.ini"])
+    mgr.end_session(sid_a, "completed", preflight_task_count=15, resolved_host_count=2)
+
+    # Running in project_b with identically named site.yml + inv.ini must NOT
+    # match project_a's prior run (neither strict nor loose).
+    monkeypatch.chdir(project_b)
+    key_b_strict = build_run_config_key(playbook="site.yml", ansible_args=["-i", "inv.ini"])
+    assert find_previous_run(sessions, key_b_strict, host_count=2) is None
+
+    key_b_loose = build_run_config_key(playbook="site.yml", ansible_args=["--tags", "db"])
+    assert find_previous_run(sessions, key_b_loose, host_count=2) is None
+
+    # Running project_a's playbook (while process cwd is project_b) DOES match
+    # project_a's session.
+    key_a_strict = build_run_config_key(
+        playbook=str(project_a / "site.yml"), ansible_args=["-i", "inv.ini"]
+    )
+    prior_strict = find_previous_run(sessions, key_a_strict, host_count=2)
+    assert prior_strict is not None
+    assert prior_strict.session_id == sid_a
+    assert prior_strict.exact_match is True
+
+    key_a_loose = build_run_config_key(
+        playbook=str(project_a / "site.yml"), ansible_args=["--tags", "db"]
+    )
+    prior_loose = find_previous_run(sessions, key_a_loose, host_count=2)
+    assert prior_loose is not None
+    assert prior_loose.session_id == sid_a
+    assert prior_loose.exact_match is False
+
+
+def test_legacy_relative_playbook_without_cwd_does_not_match_current_cwd(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A legacy session with a relative playbook and no cwd must not guess the current cwd."""
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "site.yml").write_text("")
+    sessions = tmp_path / "sessions"
+
+    _write_session(
+        sessions,
+        sid="legacy_rel",
+        playbook="site.yml",
+        ansible_args=[],
+        status="completed",
+        start="2026-05-20T10:00:00Z",
+        end="2026-05-20T10:01:00Z",
+        duration=60.0,
+        task_count=10,
+        host_count=2,
+    )
+
+    monkeypatch.chdir(project)
+    key = build_run_config_key(playbook="site.yml", ansible_args=[])
+    assert find_previous_run(sessions, key, host_count=2) is None

@@ -21,6 +21,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from ansible_aom.session.store import SessionManager, load_session
 
 
@@ -125,3 +127,18 @@ def test_load_session_of_v2_session_round_trips_schema_version_2(tmp_path: Path)
     assert session["_schema_version"] == 2
     assert session["playbook"] == "site.yml"
     assert session["status"] == "completed"
+
+
+def test_start_session_records_working_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Issue #17: ``cwd`` is persisted so ``aom rerun`` can resolve relative inputs."""
+    project = tmp_path / "project"
+    project.mkdir()
+    monkeypatch.chdir(project)
+    mgr = SessionManager(session_dir=tmp_path / "sessions", playbook="play.yml")
+    sid = mgr.start_session("play.yml", ansible_args=["-i", "inv.ini"])
+    mgr.end_session(sid, "completed")
+
+    meta = json.loads((tmp_path / "sessions" / sid / "meta.json").read_text())
+    assert meta["cwd"] == str(project.resolve())

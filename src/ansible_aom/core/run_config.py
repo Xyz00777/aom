@@ -57,7 +57,33 @@ def _split_csv_sorted(value: str) -> tuple[str, ...]:
     return tuple(sorted(p for p in parts if p))
 
 
-def build_run_config_key(*, playbook: str, ansible_args: list[str]) -> RunConfigKey:
+def resolve_stored_playbook(playbook: object, cwd: object = None) -> str | None:
+    """Resolve a persisted session's playbook path without guessing against process cwd.
+
+    An already-absolute *playbook* resolves directly. A relative *playbook*
+    requires *cwd* to be a non-blank absolute path string; otherwise returns
+    ``None`` so callers never accidentally resolve another project's relative
+    playbook against the current working directory.
+    """
+    if not isinstance(playbook, str) or not playbook.strip():
+        return None
+    pb = Path(playbook)
+    if pb.is_absolute():
+        return str(pb.resolve())
+    if not isinstance(cwd, str) or not cwd.strip():
+        return None
+    cwd_path = Path(cwd)
+    if not cwd_path.is_absolute():
+        return None
+    return str((cwd_path / pb).resolve())
+
+
+def build_run_config_key(
+    *,
+    playbook: str,
+    ansible_args: list[str],
+    cwd: str | Path | None = None,
+) -> RunConfigKey:
     """Build a :class:`RunConfigKey` from a playbook path and ansible argv tail.
 
     ``ansible_args`` is the list of tokens that would be passed to
@@ -65,6 +91,9 @@ def build_run_config_key(*, playbook: str, ansible_args: list[str]) -> RunConfig
     silently dropped — a future ansible flag must never crash this parser. The
     acceptable trade-off is that two argvs differing only by an unknown flag
     will bucket together (the history hint may be slightly off, never wrong).
+
+    When *cwd* is provided and *playbook* is relative, *playbook* is resolved
+    against *cwd* rather than the current process working directory.
     """
     inventories: list[str] = []
     limit: str | None = None
@@ -154,8 +183,12 @@ def build_run_config_key(*, playbook: str, ansible_args: list[str]) -> RunConfig
         # default — if it happens to be a known flag, we still pick it up.
         i += 1
 
+    pb = Path(playbook)
+    if not pb.is_absolute() and cwd is not None:
+        pb = Path(cwd) / pb
+
     return RunConfigKey(
-        playbook=str(Path(playbook).resolve()),
+        playbook=str(pb.resolve()),
         inventories=tuple(inventories),
         limit=limit,
         tags=tags,
