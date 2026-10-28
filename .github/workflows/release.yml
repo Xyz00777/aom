@@ -24,10 +24,9 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
-      - uses: astral-sh/setup-uv@v7
       - name: Evaluate release trigger
         id: evaluate
-        run: uv run python scripts/check_version_bump.py --check-release
+        run: python scripts/check_version_bump.py --check-release
 
   build:
     needs: check
@@ -113,7 +112,8 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ needs.build.outputs.tag || needs.check.outputs.tag }}" dist/* --generate-notes
+          GH_REPO: ${{ github.repository }}
+        run: gh release create "${{ needs.build.outputs.tag || needs.check.outputs.tag }}" dist/* --generate-notes --target "${{ github.sha }}"
 
   pypi:
     needs: [check, build]

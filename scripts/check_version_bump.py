@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import tomllib
@@ -21,12 +22,11 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Final
 
-from packaging.version import Version
-
 APPLICATION_PREFIXES: Final[tuple[str, ...]] = ("src/", "packaging/")
 DEPENDENCY_FILES: Final[frozenset[str]] = frozenset(
     {"pyproject.toml", "uv.lock", "flake.nix", "flake.lock"}
 )
+_SEMVER_RE: Final[re.Pattern[str]] = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 
 
 def is_app_or_dep_path(path: str) -> bool:
@@ -46,9 +46,17 @@ def should_trigger_release(changed_files: Iterable[str]) -> bool:
     return any(is_app_or_dep_path(p) for p in changed_files)
 
 
+def parse_version(version: str) -> tuple[int, int, int]:
+    """Parse an X.Y.Z (or vX.Y.Z) version string into an integer tuple."""
+    match = _SEMVER_RE.fullmatch(version.strip())
+    if not match:
+        raise ValueError(f"Invalid version {version!r}; expected X.Y.Z")
+    return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+
+
 def is_version_higher(head_version: str, base_version: str) -> bool:
     """Return True if head_version is strictly greater than base_version."""
-    return Version(head_version) > Version(base_version)
+    return parse_version(head_version) > parse_version(base_version)
 
 
 def _run_git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -196,9 +204,13 @@ def evaluate_release_condition(
         if changed_files is None:
             resolved_base = resolve_base_ref(root, base_ref)
             files = get_changed_files(root, resolved_base, head_ref)
+            b_ver = get_pyproject_version(root, resolved_base)
         else:
             files = list(changed_files)
+            b_ver = None
         should_rel = should_trigger_release(files)
+        if should_rel and b_ver is not None and not is_version_higher(ver, b_ver):
+            should_rel = False
         tag = f"v{ver}"
 
         # If the tag already exists on git, do not attempt to re-release.
