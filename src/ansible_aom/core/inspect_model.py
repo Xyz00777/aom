@@ -21,6 +21,7 @@ from pathlib import PurePath
 from typing import Literal, Mapping, NamedTuple
 
 from ansible_aom.core._async_poll import is_async_poll_payload
+from ansible_aom.core.text import replace_surrogates
 from ansible_aom.core.timestamp import parse_iso_timestamp
 
 
@@ -161,8 +162,10 @@ def _parse_iso(value: str | None) -> datetime | None:
 
 def build_run_summary(session: dict) -> RunSummary:
     """Derive a ``RunSummary`` from a session dict (output of ``load_session``)."""
-    session_id = session.get("session_id", "")
-    status = session.get("status") or ("running" if not session.get("end_time") else "unknown")
+    session_id = replace_surrogates(str(session.get("session_id", "")))
+    status = replace_surrogates(
+        str(session.get("status") or ("running" if not session.get("end_time") else "unknown"))
+    )
     start_time = _parse_iso(session.get("start_time"))
     end_time = _parse_iso(session.get("end_time"))
     duration_seconds = session.get("duration_seconds")
@@ -182,12 +185,15 @@ def build_run_summary(session: dict) -> RunSummary:
             continue
         hosts = event.get("hosts") or {}
         task_data = event.get("task")
-        task_id = task_data.get("id", "") if isinstance(task_data, dict) else ""
+        task_id = (
+            replace_surrogates(str(task_data.get("id", ""))) if isinstance(task_data, dict) else ""
+        )
         for host, result in hosts.items():
             changed = bool(result.get("changed", False)) if isinstance(result, dict) else False
-            current = host_counts.get(host)
+            host_key = replace_surrogates(str(host))
+            current = host_counts.get(host_key)
             if current is None:
-                current = host_counts[host] = _MutCounts()
+                current = host_counts[host_key] = _MutCounts()
             current.add_event(event_type, changed=changed)
         if event_type == "v2_runner_on_failed" and task_id:
             failed_task_ids.add(task_id)
@@ -195,7 +201,7 @@ def build_run_summary(session: dict) -> RunSummary:
     return RunSummary(
         session_id=session_id,
         short_id=session_id[:8],
-        playbook=session.get("playbook", ""),
+        playbook=replace_surrogates(str(session.get("playbook", ""))),
         start_time=start_time,
         end_time=end_time,
         duration=duration,
@@ -452,9 +458,9 @@ def stderr_row_from_event(event: dict) -> StderrRow:
     source = event.get("source")
     conn_id = event.get("connection_id")
     return StderrRow(
-        str(event.get("line", "")),
-        source if isinstance(source, str) else None,
-        conn_id if isinstance(conn_id, str) else None,
+        replace_surrogates(str(event.get("line", ""))),
+        replace_surrogates(source) if isinstance(source, str) else None,
+        replace_surrogates(conn_id) if isinstance(conn_id, str) else None,
         event.get("attribution_confidence") == "ambiguous",
     )
 
@@ -522,8 +528,8 @@ class SessionIndexAccumulator:
 
         if et == "v2_playbook_on_play_start":
             play = event.get("play") or {}
-            pid = str(play.get("id", ""))
-            pname = str(play.get("name", "unnamed play"))
+            pid = replace_surrogates(str(play.get("id", "")))
+            pname = replace_surrogates(str(play.get("name", "unnamed play")))
             if pid and pid not in self._play_seen:
                 self._play_seen.add(pid)
                 self._plays.append(PlayRow(play_id=pid, name=pname))
@@ -533,7 +539,11 @@ class SessionIndexAccumulator:
 
         if et == "v2_playbook_on_task_start":
             task_data = event.get("task")
-            tid = str(task_data.get("id", "")) if isinstance(task_data, dict) else ""
+            tid = (
+                replace_surrogates(str(task_data.get("id", "")))
+                if isinstance(task_data, dict)
+                else ""
+            )
             if tid:
                 ts = _parse_iso(event.get("_timestamp"))
                 if ts is not None:
@@ -555,7 +565,11 @@ class SessionIndexAccumulator:
                 # pair — guaranteed today because aom_connection derives the
                 # id deterministically from (task_uuid, host).
                 self._connections.setdefault(
-                    conn_id, (task_id, host if isinstance(host, str) else "")
+                    replace_surrogates(conn_id),
+                    (
+                        replace_surrogates(task_id),
+                        replace_surrogates(host) if isinstance(host, str) else "",
+                    ),
                 )
             return
 
@@ -570,15 +584,16 @@ class SessionIndexAccumulator:
 
         hosts = event.get("hosts") or {}
         task = event.get("task")
-        tid = str(task.get("id", "")) if isinstance(task, dict) else ""
+        tid = replace_surrogates(str(task.get("id", ""))) if isinstance(task, dict) else ""
 
         # Run-level per-host tally counts every runner event, even ones
         # without a task id (matches build_run_summary's behavior).
         for host, result in hosts.items():
             changed = bool(result.get("changed", False)) if isinstance(result, dict) else False
-            current = self._host_counts.get(host)
+            host_key = replace_surrogates(str(host))
+            current = self._host_counts.get(host_key)
             if current is None:
-                current = self._host_counts[host] = _MutCounts()
+                current = self._host_counts[host_key] = _MutCounts()
             current.add_event(runner_et, changed=changed)
 
         if runner_et == "v2_runner_on_failed" and tid:
@@ -595,11 +610,12 @@ class SessionIndexAccumulator:
             pid = self._current_pid
             if not pid:
                 evt_play = event.get("play") or {}
-                pid = str(evt_play.get("id", ""))
+                pid = replace_surrogates(str(evt_play.get("id", "")))
+            raw_path = task.get("path")
             rec = self._tasks[tid] = _TaskAcc(
-                label=str(task.get("name") or "unnamed task"),
-                path=task.get("path"),
-                group=_group_key(task),
+                label=replace_surrogates(str(task.get("name") or "unnamed task")),
+                path=replace_surrogates(str(raw_path)) if raw_path is not None else None,
+                group=replace_surrogates(_group_key(task)),
                 play_id=pid,
             )
 
@@ -615,7 +631,7 @@ class SessionIndexAccumulator:
         raw = None if ref is not None else event
         for host, result in hosts.items():
             changed = bool(result.get("changed", False)) if isinstance(result, dict) else False
-            host_key = str(host)
+            host_key = replace_surrogates(str(host))
             hacc = rec.hosts.get(host_key)
             if hacc is None:
                 hacc = rec.hosts[host_key] = _HostAcc()
@@ -668,13 +684,15 @@ class SessionIndexAccumulator:
 
 def summary_from_index(index: SessionIndex, meta: Mapping) -> RunSummary:
     """Derive a ``RunSummary`` from a ``SessionIndex`` plus meta.json fields."""
-    session_id = str(meta.get("session_id", ""))
-    status = str(meta.get("status") or ("running" if not meta.get("end_time") else "unknown"))
+    session_id = replace_surrogates(str(meta.get("session_id", "")))
+    status = replace_surrogates(
+        str(meta.get("status") or ("running" if not meta.get("end_time") else "unknown"))
+    )
     duration_seconds = meta.get("duration_seconds")
     return RunSummary(
         session_id=session_id,
         short_id=session_id[:8],
-        playbook=str(meta.get("playbook", "")),
+        playbook=replace_surrogates(str(meta.get("playbook", ""))),
         start_time=_parse_iso(meta.get("start_time")),
         end_time=_parse_iso(meta.get("end_time")),
         duration=timedelta(seconds=duration_seconds) if duration_seconds is not None else None,
@@ -805,7 +823,7 @@ def tree_from_index(index: SessionIndex, *, playbook: str) -> TaskTreeNode:
 
     return TaskTreeNode(
         kind="run",
-        label=playbook,
+        label=replace_surrogates(playbook),
         stats=mut_run_stats.freeze(),
         per_host=_freeze_map(mut_run_per_host),
         children=tuple(play_nodes),
@@ -913,8 +931,8 @@ def _render_value(value: object) -> str:
     the first place.
     """
     if isinstance(value, str):
-        return value
-    return json.dumps(value, indent=2, ensure_ascii=False)
+        return replace_surrogates(value)
+    return replace_surrogates(json.dumps(value, indent=2, ensure_ascii=False))
 
 
 def _verbose_vars(host_data: dict) -> tuple[tuple[str, str], ...]:
@@ -933,7 +951,7 @@ def _verbose_vars(host_data: dict) -> tuple[tuple[str, str], ...]:
     if host_data.get("_ansible_verbose_override") is True:
         return ()
     return tuple(
-        (key, _render_value(value))
+        (replace_surrogates(str(key)), _render_value(value))
         for key, value in host_data.items()
         if not key.startswith("_") and key not in _RESULT_ENVELOPE_KEYS
     )
@@ -957,12 +975,14 @@ def _make_loop_item(raw: dict) -> LoopItem:
         label = f"(async, job_id={job_id})"
     else:
         label = str(raw.get("_ansible_item_label") or raw.get("item") or "")
+    raw_msg = raw.get("msg")
+    raw_stderr = raw.get("stderr") or raw.get("module_stderr")
     return LoopItem(
-        label=label,
+        label=replace_surrogates(label),
         failed=bool(raw.get("failed", False)),
         changed=bool(raw.get("changed", False)),
-        msg=raw.get("msg"),
-        stderr=raw.get("stderr") or raw.get("module_stderr"),
+        msg=replace_surrogates(str(raw_msg)) if raw_msg is not None else None,
+        stderr=replace_surrogates(str(raw_stderr)) if raw_stderr is not None else None,
     )
 
 
@@ -992,13 +1012,22 @@ def build_detail_block(
 
     event_type = (raw_event or {}).get("_event", "")
     host_data: dict = {}
-    if raw_event and host_label and host_label in (raw_event.get("hosts") or {}):
-        host_data = raw_event["hosts"][host_label]
-    elif raw_event:
-        hosts = raw_event.get("hosts") or {}
-        if hosts:
-            host_label = host_label or next(iter(hosts))
-            host_data = hosts.get(host_label, {})
+    hosts = (raw_event or {}).get("hosts") or {}
+    if isinstance(hosts, dict) and hosts:
+        if host_label and host_label in hosts:
+            host_data = hosts[host_label]
+        elif host_label:
+            target_host = replace_surrogates(host_label)
+            for raw_host, candidate in hosts.items():
+                if replace_surrogates(str(raw_host)) == target_host:
+                    host_data = candidate
+                    break
+        else:
+            first_host = next(iter(hosts))
+            host_label = str(first_host)
+            host_data = hosts.get(first_host, {})
+    if not isinstance(host_data, dict):
+        host_data = {}
 
     changed = bool(host_data.get("changed", False))
     status = _status_from_event_type(event_type, changed)
@@ -1014,23 +1043,27 @@ def build_detail_block(
         (failed_items if item.failed else ok_items).append(item)
 
     warnings_raw = host_data.get("warnings") or []
-    warnings = tuple(str(w) for w in warnings_raw if isinstance(w, (str, bytes)))
+    warnings = tuple(
+        replace_surrogates(str(w)) for w in warnings_raw if isinstance(w, (str, bytes))
+    )
+    raw_stdout = host_data.get("stdout")
+    raw_stderr = host_data.get("stderr") or host_data.get("module_stderr")
 
     return DetailBlock(
-        task_name=task_node.label,
-        file_line=task_node.path,
-        host=host_label,
+        task_name=replace_surrogates(task_node.label),
+        file_line=replace_surrogates(task_node.path) if task_node.path is not None else None,
+        host=replace_surrogates(host_label) if host_label is not None else None,
         duration=task_node.duration,
         status=status,
-        action=str(action) if action else None,
+        action=replace_surrogates(str(action)) if action else None,
         # A YAML-list ``msg:`` is a list, not a str — rendering it rather
         # than dropping it is why this goes through _render_value.
         msg=None if msg is None else _render_value(msg),
         verbose_vars=_verbose_vars(host_data),
         failed_items=tuple(failed_items),
         ok_items=tuple(ok_items),
-        module_stdout=host_data.get("stdout"),
-        module_stderr=host_data.get("stderr") or host_data.get("module_stderr"),
+        module_stdout=replace_surrogates(str(raw_stdout)) if raw_stdout is not None else None,
+        module_stderr=replace_surrogates(str(raw_stderr)) if raw_stderr is not None else None,
         warnings=warnings,
         raw_event=raw_event,
     )
@@ -1086,14 +1119,17 @@ def verbose_lines_from_rows(
     """
     selected_connection_id: str | None = None
     if level == "task" and task_id and host:
+        task_key = replace_surrogates(task_id)
+        host_key = replace_surrogates(host)
         # First acquisition for the (task, host) pair wins — connections
         # preserves acquisition order with first-wins per connection id.
         for conn_id, (conn_task, conn_host) in connections.items():
-            if conn_task == task_id and conn_host == host:
+            if conn_task == task_key and conn_host == host_key:
                 selected_connection_id = conn_id
                 break
 
-    selected_play_task_ids = play_task_ids.get(play_name or "", set())
+    play_key = replace_surrogates(play_name or "")
+    selected_play_task_ids = play_task_ids.get(play_key, set())
 
     lines: list[str] = []
     for row in stderr:
@@ -1182,6 +1218,23 @@ class WarningRecord:
     host: str | None
 
 
+def _sanitise_diff(diff: object) -> str | dict | list | None:
+    if diff is None:
+        return None
+    if isinstance(diff, str):
+        return replace_surrogates(diff)
+    if isinstance(diff, dict):
+        return {
+            replace_surrogates(str(k)): _sanitise_diff(v) if isinstance(v, (str, dict, list)) else v
+            for k, v in diff.items()
+        }
+    if isinstance(diff, list):
+        return [
+            _sanitise_diff(item) if isinstance(item, (str, dict, list)) else item for item in diff
+        ]
+    return replace_surrogates(str(diff))
+
+
 def extract_changes(
     session: dict | list[dict],
     *,
@@ -1192,6 +1245,9 @@ def extract_changes(
     """Extract all task change records from a session dict or events list."""
     events = session.get("events", []) if isinstance(session, dict) else session
     records: list[TaskChangeRecord] = []
+    host_filter = replace_surrogates(host) if host else None
+    play_filter = replace_surrogates(play_name) if play_name else None
+    task_filter = replace_surrogates(task_name) if task_name else None
 
     current_play_name = ""
     task_starts: dict[str, dict] = {}
@@ -1200,19 +1256,22 @@ def extract_changes(
         et = event.get("_event", "")
         if et == "v2_playbook_on_play_start":
             play = event.get("play") or {}
-            current_play_name = str(play.get("name", "unnamed play"))
+            current_play_name = replace_surrogates(str(play.get("name", "unnamed play")))
             continue
 
         if et == "v2_playbook_on_task_start":
             t_data = event.get("task")
             if isinstance(t_data, dict):
-                tid = str(t_data.get("id", ""))
+                tid = replace_surrogates(str(t_data.get("id", "")))
                 if tid:
+                    raw_path = t_data.get("path")
+                    raw_role = t_data.get("role") or (
+                        _group_key(t_data) if _group_key(t_data) != "_root" else None
+                    )
                     task_starts[tid] = {
-                        "name": str(t_data.get("name") or "unnamed task"),
-                        "path": t_data.get("path"),
-                        "role": t_data.get("role")
-                        or (_group_key(t_data) if _group_key(t_data) != "_root" else None),
+                        "name": replace_surrogates(str(t_data.get("name") or "unnamed task")),
+                        "path": replace_surrogates(str(raw_path)) if raw_path is not None else None,
+                        "role": replace_surrogates(str(raw_role)) if raw_role is not None else None,
                         "start_ts": _parse_iso(event.get("_timestamp")),
                         "play_name": current_play_name,
                     }
@@ -1223,29 +1282,35 @@ def extract_changes(
             continue
 
         task_data = event.get("task") or {}
-        tid = str(task_data.get("id", "")) if isinstance(task_data, dict) else ""
+        tid = (
+            replace_surrogates(str(task_data.get("id", ""))) if isinstance(task_data, dict) else ""
+        )
         start_info = task_starts.get(tid, {})
 
-        t_name = str(
-            (task_data.get("name") if isinstance(task_data, dict) else None)
-            or start_info.get("name")
-            or "unnamed task"
+        t_name = replace_surrogates(
+            str(
+                (task_data.get("name") if isinstance(task_data, dict) else None)
+                or start_info.get("name")
+                or "unnamed task"
+            )
         )
-        t_path = (task_data.get("path") if isinstance(task_data, dict) else None) or start_info.get(
-            "path"
-        )
-        t_role = (task_data.get("role") if isinstance(task_data, dict) else None) or start_info.get(
-            "role"
-        )
-        if not t_role and isinstance(task_data, dict):
+        raw_t_path = (
+            task_data.get("path") if isinstance(task_data, dict) else None
+        ) or start_info.get("path")
+        t_path = replace_surrogates(str(raw_t_path)) if raw_t_path is not None else None
+        raw_t_role = (
+            task_data.get("role") if isinstance(task_data, dict) else None
+        ) or start_info.get("role")
+        if not raw_t_role and isinstance(task_data, dict):
             grp = _group_key(task_data)
             if grp != "_root":
-                t_role = grp
-        p_name = start_info.get("play_name") or current_play_name
+                raw_t_role = grp
+        t_role = replace_surrogates(str(raw_t_role)) if raw_t_role is not None else None
+        p_name = replace_surrogates(str(start_info.get("play_name") or current_play_name))
 
-        if play_name and p_name != play_name:
+        if play_filter and p_name != play_filter:
             continue
-        if task_name and t_name != task_name:
+        if task_filter and t_name != task_filter:
             continue
 
         event_ts = _parse_iso(event.get("_timestamp"))
@@ -1255,52 +1320,56 @@ def extract_changes(
         )
 
         hosts_data = event.get("hosts") or {}
-        for h_name, host_res in hosts_data.items():
-            if host and h_name != host:
+        for raw_h_name, host_res in hosts_data.items():
+            h_name = replace_surrogates(str(raw_h_name))
+            if host_filter and h_name != host_filter:
                 continue
             if not isinstance(host_res, dict):
                 continue
             if not host_res.get("changed", False):
                 continue
 
-            action = (
+            raw_action = (
                 host_res.get("action")
                 or host_res.get("_ansible_module_name")
                 or (task_data.get("action") if isinstance(task_data, dict) else None)
             )
+            action = replace_surrogates(str(raw_action)) if raw_action is not None else None
             raw_cmd = host_res.get("cmd")
             if isinstance(raw_cmd, list):
-                cmd_str = " ".join(str(c) for c in raw_cmd)
+                cmd_str = replace_surrogates(" ".join(str(c) for c in raw_cmd))
             elif isinstance(raw_cmd, str):
-                cmd_str = raw_cmd
+                cmd_str = replace_surrogates(raw_cmd)
             else:
                 cmd_str = None
 
             msg = host_res.get("msg")
             if isinstance(msg, list):
-                msg_str = "\n".join(str(m) for m in msg)
+                msg_str = replace_surrogates("\n".join(str(m) for m in msg))
             elif msg is not None:
-                msg_str = str(msg)
+                msg_str = replace_surrogates(str(msg))
             else:
                 msg_str = None
 
-            stdout = host_res.get("stdout")
+            raw_stdout = host_res.get("stdout")
             if (
-                not stdout
+                not raw_stdout
                 and "stdout_lines" in host_res
                 and isinstance(host_res["stdout_lines"], list)
             ):
-                stdout = "\n".join(str(line) for line in host_res["stdout_lines"])
+                raw_stdout = "\n".join(str(line) for line in host_res["stdout_lines"])
+            stdout = replace_surrogates(str(raw_stdout)) if raw_stdout is not None else None
 
-            stderr = host_res.get("stderr")
+            raw_stderr = host_res.get("stderr")
             if (
-                not stderr
+                not raw_stderr
                 and "stderr_lines" in host_res
                 and isinstance(host_res["stderr_lines"], list)
             ):
-                stderr = "\n".join(str(line) for line in host_res["stderr_lines"])
+                raw_stderr = "\n".join(str(line) for line in host_res["stderr_lines"])
+            stderr = replace_surrogates(str(raw_stderr)) if raw_stderr is not None else None
 
-            diff = host_res.get("diff")
+            diff = _sanitise_diff(host_res.get("diff"))
 
             results_arr = host_res.get("results")
             changed_items: list[LoopItem] = []
@@ -1312,7 +1381,7 @@ def extract_changes(
             details: dict[str, str] = {}
             for k in ("dest", "path", "state", "mode", "owner", "group", "src", "before", "after"):
                 if k in host_res and host_res[k] is not None:
-                    details[k] = str(host_res[k])
+                    details[k] = replace_surrogates(str(host_res[k]))
 
             records.append(
                 TaskChangeRecord(
@@ -1346,6 +1415,9 @@ def extract_warnings(
     """Extract all warnings and deprecations from a session dict or events list."""
     events = session.get("events", []) if isinstance(session, dict) else session
     records: list[WarningRecord] = []
+    host_filter = replace_surrogates(host) if host else None
+    play_filter = replace_surrogates(play_name) if play_name else None
+    task_filter = replace_surrogates(task_name) if task_name else None
 
     current_play_name = ""
     task_starts: dict[str, dict] = {}
@@ -1354,25 +1426,28 @@ def extract_warnings(
         et = event.get("_event", "")
         if et == "v2_playbook_on_play_start":
             play = event.get("play") or {}
-            current_play_name = str(play.get("name", "unnamed play"))
+            current_play_name = replace_surrogates(str(play.get("name", "unnamed play")))
             continue
 
         if et == "v2_playbook_on_task_start":
             t_data = event.get("task")
             if isinstance(t_data, dict):
-                tid = str(t_data.get("id", ""))
+                tid = replace_surrogates(str(t_data.get("id", "")))
                 if tid:
+                    raw_path = t_data.get("path")
+                    raw_role = t_data.get("role") or (
+                        _group_key(t_data) if _group_key(t_data) != "_root" else None
+                    )
                     task_starts[tid] = {
-                        "name": str(t_data.get("name") or "unnamed task"),
-                        "path": t_data.get("path"),
-                        "role": t_data.get("role")
-                        or (_group_key(t_data) if _group_key(t_data) != "_root" else None),
+                        "name": replace_surrogates(str(t_data.get("name") or "unnamed task")),
+                        "path": replace_surrogates(str(raw_path)) if raw_path is not None else None,
+                        "role": replace_surrogates(str(raw_role)) if raw_role is not None else None,
                         "play_name": current_play_name,
                     }
             continue
 
         if et == "aom_stderr_line":
-            line = str(event.get("line") or "").strip()
+            line = replace_surrogates(str(event.get("line") or "")).strip()
             if not line:
                 continue
             w_type: Literal["warning", "deprecation"] | None = None
@@ -1403,40 +1478,47 @@ def extract_warnings(
             continue
 
         task_data = event.get("task") or {}
-        tid = str(task_data.get("id", "")) if isinstance(task_data, dict) else ""
+        tid = (
+            replace_surrogates(str(task_data.get("id", ""))) if isinstance(task_data, dict) else ""
+        )
         start_info = task_starts.get(tid, {})
 
-        t_name = str(
-            (task_data.get("name") if isinstance(task_data, dict) else None)
-            or start_info.get("name")
-            or "unnamed task"
+        t_name = replace_surrogates(
+            str(
+                (task_data.get("name") if isinstance(task_data, dict) else None)
+                or start_info.get("name")
+                or "unnamed task"
+            )
         )
-        t_path = (task_data.get("path") if isinstance(task_data, dict) else None) or start_info.get(
-            "path"
-        )
-        t_role = (task_data.get("role") if isinstance(task_data, dict) else None) or start_info.get(
-            "role"
-        )
-        if not t_role and isinstance(task_data, dict):
+        raw_t_path = (
+            task_data.get("path") if isinstance(task_data, dict) else None
+        ) or start_info.get("path")
+        t_path = replace_surrogates(str(raw_t_path)) if raw_t_path is not None else None
+        raw_t_role = (
+            task_data.get("role") if isinstance(task_data, dict) else None
+        ) or start_info.get("role")
+        if not raw_t_role and isinstance(task_data, dict):
             grp = _group_key(task_data)
             if grp != "_root":
-                t_role = grp
-        p_name = start_info.get("play_name") or current_play_name
+                raw_t_role = grp
+        t_role = replace_surrogates(str(raw_t_role)) if raw_t_role is not None else None
+        p_name = replace_surrogates(str(start_info.get("play_name") or current_play_name))
 
-        if play_name and p_name != play_name:
+        if play_filter and p_name != play_filter:
             continue
-        if task_name and t_name != task_name:
+        if task_filter and t_name != task_filter:
             continue
 
         hosts_data = event.get("hosts") or {}
-        for h_name, host_res in hosts_data.items():
-            if host and h_name != host:
+        for raw_h_name, host_res in hosts_data.items():
+            h_name = replace_surrogates(str(raw_h_name))
+            if host_filter and h_name != host_filter:
                 continue
             if not isinstance(host_res, dict):
                 continue
 
             for w in host_res.get("warnings") or []:
-                w_str = str(w).strip()
+                w_str = replace_surrogates(str(w)).strip()
                 if w_str:
                     records.append(
                         WarningRecord(
@@ -1455,7 +1537,7 @@ def extract_warnings(
                     d_msg = d.get("msg") or str(d)
                 else:
                     d_msg = str(d)
-                d_str = d_msg.strip()
+                d_str = replace_surrogates(str(d_msg)).strip()
                 if d_str:
                     records.append(
                         WarningRecord(
