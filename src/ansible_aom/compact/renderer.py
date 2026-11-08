@@ -283,6 +283,9 @@ class CompactRenderer:
         # task is never revisited and this stays bounded by the in-flight
         # task set, not run length.
         self._announced_order: dict[str, None] = {}
+        # Tasks with an early cohort aggregate still await all relevant
+        # hosts; each receives one later final/incomplete update.
+        self._provisional_task_ids: set[str] = set()
         # Memo of each play's dead-host set (play_id → hostnames), fed to
         # ``task_complete_on_all_targets`` so completion checks don't
         # rescan the whole play per call (the quadratic sweep behind the
@@ -570,8 +573,10 @@ class CompactRenderer:
                 task_uuid = self._task_dict(event).get("id", "")
                 if event_name in _DEATH_RUNNER_EVENTS or not task_uuid:
                     self._flush_ready_summaries(event_time, behind_only=True)
-                elif task_uuid != self._last_task_uuid:
-                    self._maybe_flush_completed(task_uuid, event_time)
+                else:
+                    if task_uuid != self._last_task_uuid:
+                        self._maybe_flush_completed(task_uuid, event_time)
+                    self._maybe_emit_provisional_summary(task_uuid, event_time)
 
         # HS-2: bump the incremental counters using the freshly-mutated
         # state. Done after ``handle_event`` so the task's hosts dict
@@ -1423,6 +1428,16 @@ class CompactRenderer:
                 # reads as spanning to cancel-time (misleadingly long) when
                 # its hosts actually finished much earlier.
                 summary_now = self._task_last_result_time(task_uuid) or now
+                if task_uuid in self._provisional_task_ids:
+                    complete = task_complete_on_all_targets(
+                        self._state,
+                        task_uuid,
+                        dead_by_play=self._play_dead_cache,
+                        fan_out_groups=self._fan_out_groups,
+                    )
+                    summary_label = "final" if complete else "incomplete"
+                else:
+                    summary_label = None
             else:
                 emit = task_complete_on_all_targets(
                     self._state,
@@ -1431,8 +1446,9 @@ class CompactRenderer:
                     fan_out_groups=self._fan_out_groups,
                 )
                 summary_now = now
+                summary_label = "final" if task_uuid in self._provisional_task_ids else None
             if emit:
-                self._emit_task_summary(task_uuid, summary_now)
+                self._emit_task_summary(task_uuid, summary_now, label=summary_label)
                 emitted.append(task_uuid)
         for task_uuid in emitted:
             del self._announced_order[task_uuid]
@@ -1477,9 +1493,40 @@ class CompactRenderer:
                     if member != task_uuid and member in self._announced_order
                 )
         for member in to_emit:
-            self._emit_task_summary(member, now)
+            label = "final" if member in self._provisional_task_ids else None
+            self._emit_task_summary(member, now, label=label)
             del self._announced_order[member]
             self._discard_task_state(member)
+
+    def _maybe_emit_provisional_summary(self, task_uuid: str, now: float) -> None:
+        if (
+            self._state is None
+            or task_uuid not in self._announced_order
+            or task_uuid in self._provisional_task_ids
+            or not self._task_has_terminal_result(task_uuid)
+            or self._task_has_running_hosts(task_uuid)
+        ):
+            return
+        play = next(
+            (candidate for candidate in self._state.plays.values() if task_uuid in candidate.tasks),
+            None,
+        )
+        if play is None or play.detected_strategy != "free":
+            return
+        if task_complete_on_all_targets(
+            self._state,
+            task_uuid,
+            dead_by_play=self._play_dead_cache,
+            fan_out_groups=self._fan_out_groups,
+        ):
+            self._maybe_flush_completed(task_uuid, now)
+            return
+        group_key = self._fan_out_group_keys.get(task_uuid)
+        group_members = self._fan_out_groups.get(group_key, set()) if group_key else set()
+        if len(group_members) > 1:
+            return
+        self._provisional_task_ids.add(task_uuid)
+        self._emit_task_summary(task_uuid, now, label="provisional")
 
     def _discard_task_state(self, task_uuid: str) -> None:
         """Drop a summarised task's per-task bookkeeping (keeps memory
@@ -1487,6 +1534,7 @@ class CompactRenderer:
         self._task_start_times.pop(task_uuid, None)
         self._task_names.pop(task_uuid, None)
         self._task_inline_duration_hosts.pop(task_uuid, None)
+        self._provisional_task_ids.discard(task_uuid)
         group_key = self._fan_out_group_keys.get(task_uuid)
         if group_key is None:
             return
@@ -1533,7 +1581,7 @@ class CompactRenderer:
             return latest
         return None
 
-    def _emit_task_summary(self, task_uuid: str, now: float) -> None:
+    def _emit_task_summary(self, task_uuid: str, now: float, *, label: str | None = None) -> None:
         """Print a one-line summary of ``task_uuid``. Format:
 
             [HH:MM:SS] <task name> — N.Ns (H:MM:SS)  (1 failed, 2 ok)
@@ -1549,6 +1597,8 @@ class CompactRenderer:
         name = self._task_names.get(task_uuid)
         if start is None or name is None:
             return
+        if label is not None:
+            name = f"[{label}] {name}"
         duration = now - start
         cum = now - self._start_time
 
@@ -1719,7 +1769,9 @@ class CompactRenderer:
         # its own last host reported (``behind_only`` skips only the
         # current one), so no sweep is needed here.
         if event_time is not None and self._last_task_uuid is not None:
-            self._maybe_flush_completed(self._last_task_uuid, event_time)
+            displaced_uuid = self._last_task_uuid
+            self._maybe_flush_completed(displaced_uuid, event_time)
+            self._maybe_emit_provisional_summary(displaced_uuid, event_time)
         self._display.print_log(f"\nTASK [{task_name}] " + "*" * 50)
         self._maybe_emit_pause_seconds_hint(task_meta)
         # Stash timing/name and register the task in announce order so its
@@ -1731,6 +1783,17 @@ class CompactRenderer:
         if task_uuid:
             self._announced_task_uuids.add(task_uuid)
             self._announced_order[task_uuid] = None
+
+    def _task_has_running_hosts(self, task_uuid: str) -> bool:
+        if self._state is None:
+            return False
+        return any(
+            host_state.status == Status.RUNNING
+            and not (host_state.synthesised and play.detected_strategy == "free")
+            for play in self._state.plays.values()
+            if (task := play.tasks.get(task_uuid)) is not None
+            for host_state in task.hosts.values()
+        )
 
     def _task_dict(self, event: JsonlEvent) -> JsonlTask:
         """Extract the ``task`` field as a dict.

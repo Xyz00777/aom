@@ -112,6 +112,10 @@ def test_shared_uuid_still_waits_for_all_targets() -> None:
 
     renderer.update_state(_start("next", "a", name="Next", path="site.yml:20"))
 
-    assert not _summary_lines(renderer)
+    provisional = _summary_lines(renderer)
+    assert len(provisional) == 1
+    assert "provisional" in provisional[0].lower()
     renderer.handle_completion(130, "crashed")
-    assert len(_summary_lines(renderer)) == 1
+    summaries = _summary_lines(renderer)
+    assert len(summaries) == 2
+    assert "incomplete" in summaries[1].lower()
