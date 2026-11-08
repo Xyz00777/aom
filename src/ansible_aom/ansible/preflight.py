@@ -35,9 +35,6 @@ from ansible_aom.core.parser import (
     parse_list_tasks_output,
 )
 
-_PREFLIGHT_TIMEOUT_S = float(os.environ.get("AOM_PREFLIGHT_TIMEOUT", "120.0"))
-
-
 # When ansible-playbook gets bad args, argparse dumps `usage:`, the error line,
 # then the full `--help` text again to stderr. Keep only the actual error.
 _ARGPARSE_ERROR_RE = re.compile(r"^[\w.-]+:\s*error:\s*.+", re.MULTILINE)
@@ -153,7 +150,6 @@ def _spawn_one(
             [executable, mode_flag, playbook, *ansible_args],
             capture_output=True,
             text=True,
-            timeout=_PREFLIGHT_TIMEOUT_S,
             check=False,
             env=_preflight_env(),
         )
@@ -161,8 +157,6 @@ def _spawn_one(
         return 127, "", f"executable not found: {exc}"
     except PermissionError as exc:
         return 126, "", f"executable not executable: {exc}"
-    except subprocess.TimeoutExpired:
-        return 124, "", f"{mode_flag} timed out after {_PREFLIGHT_TIMEOUT_S}s"
     except OSError as exc:
         return 1, "", f"{mode_flag} failed: {exc}"
     return completed.returncode, completed.stdout, completed.stderr
