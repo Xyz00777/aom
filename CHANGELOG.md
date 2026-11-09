@@ -14,3 +14,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `aom inspect --warnings`: Non-interactive CLI report of all warnings and deprecations emitted during the session, with source file/line and host context.
 - `--json` support for `aom inspect --changes` and `aom inspect --warnings` for programmatic inspection and CI integration.
 - `--host`, `--play`, and `--task` filters for `aom inspect --changes` and `aom inspect --warnings`.
+- Free-strategy task summaries for completed host cohorts are labeled provisional while slower hosts continue, then updated as final or incomplete when run outcomes settle.
