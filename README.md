@@ -95,7 +95,10 @@ uv run pip install -e .
 
 Requirements: Python ≥ 3.14, plus a working `ansible-playbook` on your
 `$PATH`. AOM never imports `ansible-core`; it shells out and parses the
-JSONL callback.
+JSONL callback. The real-Ansible integration smoke tests pass locally with
+ansible-core 2.20.11 and 2.21.5. CI is configured to run them against the
+latest patch releases in both the 2.20 and 2.21 minor lines. Other versions
+may work, but are not currently covered by that matrix.
 
 After install, sanity check:
 

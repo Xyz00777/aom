@@ -4,7 +4,8 @@
 # whose base is another feature branch).
 #
 # Uses uv for Python dependency management (matching the project's
-# existing tooling). Python 3.14 only — no matrix builds.
+# existing tooling). Python 3.14 only for AOM; a separate job tests supported
+# ansible-core minor versions against the real-Ansible integration smoke tests.
 
 name: CI
 
@@ -62,6 +63,35 @@ jobs:
           /tmp/aom-ci-smoke/bin/aom --version
           /tmp/aom-ci-smoke/bin/aom --help >/dev/null
           /tmp/aom-ci-smoke/bin/python -c 'from pathlib import Path; import ansible_aom.ansible.runner as r; assert (Path(r.__file__).parent / "callback" / "aom_jsonl.py").is_file()'
+
+  ansible-compatibility:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ansible_core: ["2.20.*", "2.21.*"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Install AOM and ansible-core ${{ matrix.ansible_core }}
+        run: |
+          uv sync --no-default-groups --extra dev --no-install-project
+          uv pip install -e . "ansible-core==${{ matrix.ansible_core }}"
+
+      - name: Install ansible.posix callback collection
+        run: uv run ansible-galaxy collection install ansible.posix
+
+      - name: Show tested Ansible version
+        run: uv run ansible-playbook --version
+
+      - name: Run real-Ansible compatibility smoke tests
+        run: uv run --no-sync pytest tests/integration/test_real_ansible.py -q
 
   nix:
     runs-on: ubuntu-24.04
