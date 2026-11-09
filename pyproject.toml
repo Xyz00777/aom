@@ -3,8 +3,9 @@
 
 [project]
 name = "ansible-aom"
-version = "0.102.13"
+version = "0.102.14"
 description = "Ansible Output Monitor - nom-style TUI for ansible-playbook"
+readme = "README.md"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 authors = [
