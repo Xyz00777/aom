@@ -81,7 +81,7 @@ jobs:
 
       - name: Install AOM and ansible-core ${{ matrix.ansible_core }}
         run: |
-          uv sync --no-default-groups --group dev --no-install-project
+          uv sync --no-default-groups --extra dev --no-install-project
           uv pip install -e . "ansible-core==${{ matrix.ansible_core }}"
 
       - name: Install ansible.posix callback collection
