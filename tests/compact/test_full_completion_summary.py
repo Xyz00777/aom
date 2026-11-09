@@ -38,11 +38,14 @@ def _logged(r: CompactRenderer) -> list[str]:
     return [c.args[0] for c in r._display.print_log.call_args_list]
 
 
-def _start(task_id: str, name: str, host: str, ts: str) -> dict:
+def _start(task_id: str, name: str, host: str, ts: str, path: str | None = None) -> dict:
+    task = {"id": task_id, "name": name}
+    if path is not None:
+        task["path"] = path
     return {
         "_event": "v2_runner_on_start",
         "_timestamp": ts,
-        "task": {"id": task_id, "name": name},
+        "task": task,
         "play": {"id": "p1"},
         "host": host,
     }
@@ -95,6 +98,84 @@ def test_free_strategy_summary_lands_after_later_task_header() -> None:
     assert summary_idx > header_idx, logged
 
 
+def test_free_strategy_provisional_summary_updates_when_lagging_host_succeeds() -> None:
+    r = _renderer(["fast", "slow"])
+    r.update_state(_start("t1", "First", "fast", "2026-05-11T10:00:00Z", "site.yml:1"))
+    r.update_state(_ok("t1", "First", "fast", "2026-05-11T10:00:01Z"))
+    r.update_state(_start("t2", "Second", "fast", "2026-05-11T10:00:02Z", "site.yml:2"))
+
+    lines = _summary_lines(r, "First")
+    assert len(lines) == 1, _logged(r)
+    assert "provisional" in lines[0].lower()
+    assert "1 ok" in lines[0]
+
+    r.update_state(_start("t1", "First", "slow", "2026-05-11T10:00:03Z", "site.yml:1"))
+    r.update_state(_ok("t1", "First", "slow", "2026-05-11T10:00:04Z"))
+
+    lines = _summary_lines(r, "First")
+    assert len(lines) == 2, _logged(r)
+    assert "provisional" in lines[0].lower()
+    assert "final" in lines[1].lower()
+    assert "(2 ok)" in lines[1]
+
+
+def test_free_strategy_provisional_summary_finalizes_when_lagging_host_fails() -> None:
+    r = _renderer(["fast", "slow"])
+    r.update_state(_start("t0", "Earlier", "slow", "2026-05-11T10:00:00Z", "site.yml:0"))
+    r.update_state(_start("t1", "First", "fast", "2026-05-11T10:00:01Z", "site.yml:1"))
+    r.update_state(_ok("t1", "First", "fast", "2026-05-11T10:00:02Z"))
+    r.update_state(_start("t2", "Second", "fast", "2026-05-11T10:00:03Z", "site.yml:2"))
+
+    provisional = _summary_lines(r, "First")
+    assert len(provisional) == 1, _logged(r)
+    assert "provisional" in provisional[0].lower()
+
+    r.update_state(
+        {
+            "_event": "v2_runner_on_failed",
+            "_timestamp": "2026-05-11T10:00:04Z",
+            "task": {"id": "t0", "name": "Earlier"},
+            "play": {"id": "p1"},
+            "hosts": {"slow": {"failed": True, "msg": "boom"}},
+        }
+    )
+
+    lines = _summary_lines(r, "First")
+    assert len(lines) == 2, _logged(r)
+    assert "final" in lines[1].lower()
+    assert "(1 ok)" in lines[1]
+
+
+def test_free_strategy_waits_for_started_fast_cohort_before_provisional() -> None:
+    r = _renderer(["fast1", "fast2", "slow"])
+    r.update_state(_start("t0", "Earlier", "slow", "2026-05-11T10:00:00Z"))
+    r.update_state(_start("t1", "First", "fast1", "2026-05-11T10:00:01Z"))
+    r.update_state(_start("t1", "First", "fast2", "2026-05-11T10:00:01Z"))
+    r.update_state(_ok("t1", "First", "fast1", "2026-05-11T10:00:02Z"))
+    r.update_state(_start("t2", "Second", "fast1", "2026-05-11T10:00:03Z"))
+
+    assert not _summary_lines(r, "First")
+    r.update_state(_ok("t1", "First", "fast2", "2026-05-11T10:00:04Z"))
+    provisional = _summary_lines(r, "First")
+    assert len(provisional) == 1
+    assert "provisional" in provisional[0].lower()
+
+    r.update_state(
+        {
+            "_event": "v2_runner_on_failed",
+            "_timestamp": "2026-05-11T10:00:05Z",
+            "task": {"id": "t0", "name": "Earlier"},
+            "play": {"id": "p1"},
+            "hosts": {"slow": {"failed": True, "msg": "boom"}},
+        }
+    )
+
+    lines = _summary_lines(r, "First")
+    assert len(lines) == 2, _logged(r)
+    assert "final" in lines[1].lower()
+    assert "(2 ok)" in lines[1]
+
+
 def test_cancel_flushes_incomplete_task_with_partial_count() -> None:
     """A task that never completes on all hosts (run cancelled) still gets
     a summary at handle_completion, counting the hosts that did run it —
@@ -107,15 +188,18 @@ def test_cancel_flushes_incomplete_task_with_partial_count() -> None:
     r.update_state(_ok("t1", "First", "b", "2026-05-11T10:00:02Z"))
     # a races ahead into a later task; c never runs First; then cancel.
     r.update_state(_start("t2", "Second", "a", "2026-05-11T10:00:05Z"))
-    assert not _summary_lines(r, "First")  # not complete yet
+    provisional = _summary_lines(r, "First")
+    assert len(provisional) == 1
+    assert "provisional" in provisional[0].lower()
     r.handle_completion(130, "crashed")
     lines = _summary_lines(r, "First")
-    assert len(lines) == 1, _logged(r)
-    assert "(2 ok)" in lines[0]
+    assert len(lines) == 2, _logged(r)
+    assert "incomplete" in lines[1].lower()
+    assert "(2 ok)" in lines[1]
     # Duration = start (10:00:00) → last host result (10:00:02) = 2.0s,
     # not → the t2 start / cancel moment (10:00:05).
-    assert "2.0s" in lines[0], lines[0]
-    assert "5.0s" not in lines[0], lines[0]
+    assert "2.0s" in lines[1], lines[1]
+    assert "5.0s" not in lines[1], lines[1]
 
 
 def test_purely_inflight_task_gets_no_summary_at_cancel() -> None:

@@ -51,7 +51,11 @@ def _start(task_id: str, host: str, name: str | None = None) -> dict:
     return {
         "_event": "v2_runner_on_start",
         "_timestamp": TS,
-        "task": {"id": task_id, "name": name or f"task {task_id}"},
+        "task": {
+            "id": task_id,
+            "name": name or f"task {task_id}",
+            "path": f"site.yml:{task_id}",
+        },
         "play": {"id": "p1"},
         "host": host,
     }
@@ -112,8 +116,11 @@ def test_completion_checks_stay_linear_with_a_straggler_host(monkeypatch) -> Non
     # ~2 events per task; allow a small constant factor of checks per
     # event. The quadratic sweep performed ~n_tasks²/2 calls (>10 000).
     assert calls <= 4 * n_tasks, f"completion checks swept the backlog: {calls} calls"
-    # Nothing may have been summarised — the straggler blocks every task.
-    assert not [line for line in _logged(r) if " — " in line]
+    # Fast-host aggregates may be shown provisionally, but none may be
+    # represented as a final summary while the straggler is still alive.
+    summaries = [line for line in _logged(r) if " — " in line]
+    assert summaries
+    assert all("provisional" in line.lower() for line in summaries)
 
 
 def test_host_death_flushes_other_pending_tasks() -> None:
@@ -126,10 +133,14 @@ def test_host_death_flushes_other_pending_tasks() -> None:
     # b never reports First (divergent include path), goes on to Second.
     r.update_state(_start("t2", "a", "Second"))
     r.update_state(_start("t2", "b", "Second"))
-    assert not _summary_lines(r, "First")
+    provisional = _summary_lines(r, "First")
+    assert len(provisional) == 1
+    assert "provisional" in provisional[0].lower()
     r.update_state(_unreachable("t2", "b"))
     # b is dead → First's live targets shrink to {a} → complete.
-    assert len(_summary_lines(r, "First")) == 1, _logged(r)
+    lines = _summary_lines(r, "First")
+    assert len(lines) == 2, _logged(r)
+    assert "final" in lines[1].lower()
 
 
 def test_revived_host_blocks_completion_again() -> None:
@@ -152,4 +163,6 @@ def test_revived_host_blocks_completion_again() -> None:
     r.update_state(_ok("t3", "a", "Third"))
     r.update_state(_start("t4", "a", "Fourth"))
     # Third must NOT summarise: b is alive again and hasn't run it.
-    assert not _summary_lines(r, "Third"), _logged(r)
+    third_lines = _summary_lines(r, "Third")
+    assert len(third_lines) == 1, _logged(r)
+    assert "provisional" in third_lines[0].lower()
