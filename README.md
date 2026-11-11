@@ -113,10 +113,16 @@ aom --help
 aom site.yml                          # compact view
 aom site.yml -i inv.ini --tags deploy # any ansible-playbook flag works
 aom site.yml -vvv                     # ansible verbosity flows through
+aom site.yml --diff                   # show module diffs beneath changed task results
+aom site.yml --check --diff           # preview supported changes without applying them
 ```
 
 Anything after the playbook path is forwarded verbatim to
 `ansible-playbook`. AOM never silently rewrites your arguments.
+
+When modules supply diffs, the compact task log shows unified hunks beneath
+each changed host or loop item. Recorded diffs also appear during replay.
+Tasks that disable diff output or censor their results do not show diff content.
 
 ### Inspect past runs
 
