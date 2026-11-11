@@ -189,7 +189,10 @@ class CallbackModule(jsonl.CallbackModule):
         res = result._result or {}
         retries = res.get("retries", 0)
         attempts = res.get("attempts", 0)
-        retries_left = retries - attempts
+        # Ansible 2.22 can replace numeric result values with a masked string.
+        retries_left = (
+            retries - attempts if isinstance(retries, int) and isinstance(attempts, int) else None
+        )
         task_result = self._find_result_task(host, task)
         task_info = (
             task_result["task"]
