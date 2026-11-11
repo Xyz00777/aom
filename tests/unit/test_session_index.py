@@ -14,8 +14,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from ansible_aom.core.inspect_model import (
     EventRef,
+    StatusCounts,
     build_run_summary,
     build_task_tree,
     build_verbose_lines,
@@ -23,6 +26,7 @@ from ansible_aom.core.inspect_model import (
 from ansible_aom.session.index import (
     build_index,
     ensure_index,
+    find_task_id_by_name,
     index_is_fresh,
     index_path,
     load_structure,
@@ -113,6 +117,50 @@ def test_build_index_creates_fresh_index(tmp_path: Path) -> None:
 
     assert index_path(session_path).exists()
     assert index_is_fresh(session_path)
+
+
+@pytest.mark.parametrize("relative", [False, True])
+@pytest.mark.parametrize("reader", ["freshness", "tree", "summary", "task_name", "verbose"])
+def test_index_readers_escape_filesystem_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, relative: bool, reader: str
+) -> None:
+    # Raw URI interpolation misread #/?/% in legal parent-directory names.
+    session_path = _write_session(tmp_path / "state #1?mode=rw%2F")
+    assert build_index(session_path)
+    if relative:
+        monkeypatch.chdir(tmp_path)
+        session_path = session_path.relative_to(tmp_path)
+
+    if reader == "freshness":
+        assert index_is_fresh(session_path)
+    elif reader == "tree":
+        tree = load_tree(session_path, playbook="site.yml")
+        assert tree is not None
+        task = tree.children[0].children[0]
+        assert task.label == "Install päckages"
+        assert task.per_host == {"web1": StatusCounts(changed=1), "web2": StatusCounts(failed=1)}
+        host = next(host for host in task.children if host.label == "web1")
+        assert host.raw_ref is not None
+        assert read_event(session_path, host.raw_ref) == _events()[5]
+    elif reader == "summary":
+        summary = load_summary(
+            session_path, {"session_id": session_path.name, "playbook": "site.yml"}
+        )
+        assert summary is not None
+        assert summary.host_counts == {
+            "web1": StatusCounts(changed=1),
+            "web2": StatusCounts(failed=1),
+        }
+    elif reader == "task_name":
+        assert find_task_id_by_name(session_path, "Install päckages") == "task-1"
+    else:
+        tree = build_task_tree({"events": _events()})
+        assert query_verbose(
+            session_path, tree=tree, level="task", task_id="task-1", host="web1"
+        ) == (
+            "run-level warning",
+            "? ssh chatter für task-1",
+        )
 
 
 def test_index_goes_stale_when_events_grow(tmp_path: Path) -> None:
