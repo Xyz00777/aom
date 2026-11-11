@@ -299,6 +299,60 @@ def test_task_tree_multi_host_per_host_breakdown():
 
 
 @pytest.mark.parametrize(
+    "order", [("broken-first", "healthy"), ("healthy", "broken-first", "broken-second", "last")]
+)
+def test_aggregate_detail_prefers_failed_host_over_last_result(order: tuple[str, ...]) -> None:
+    # The task retains its last result; aggregate detail must still show the failed host.
+    events = [{"_event": "v2_playbook_on_task_start", "task": {"id": "t1", "name": "Deploy"}}]
+    for host in order:
+        events.append(
+            {
+                "_event": "v2_runner_on_failed" if host.startswith("broken") else "v2_runner_on_ok",
+                "task": {"id": "t1", "name": "Deploy"},
+                "hosts": {host: {"msg": f"result from {host}"}},
+            }
+        )
+    session = {"events": events}
+    task = build_task_tree(session).children[0].children[0]
+
+    block = build_detail_block(session, task, None)
+    assert (block.host, block.status, block.msg) == (
+        "broken-first",
+        "failed",
+        "result from broken-first",
+    )
+    # An explicit healthy selection overrides aggregate failure preference.
+    healthy = next(child for child in task.children if child.label == "healthy")
+    explicit = build_detail_block(session, task, healthy)
+    assert (explicit.host, explicit.status, explicit.msg) == (
+        "healthy",
+        "ok",
+        "result from healthy",
+    )
+
+
+def test_aggregate_detail_uses_first_direct_host_when_none_failed() -> None:
+    # An included task can precede hosts; its failure belongs to its own detail.
+    first = TaskTreeNode(
+        kind="host",
+        label="first",
+        raw_event={
+            "_event": "v2_runner_on_ok",
+            "hosts": {"first": {"msg": "first result"}},
+        },
+    )
+    last = TaskTreeNode(
+        kind="host",
+        label="last",
+        raw_event={"_event": "v2_runner_on_ok", "hosts": {"last": {"msg": "last result"}}},
+    )
+    nested = TaskTreeNode(kind="task", label="nested", stats=StatusCounts(failed=1))
+    task = TaskTreeNode(kind="task", label="Include", children=(nested, first, last))
+    block = build_detail_block({}, task, None)
+    assert (block.host, block.status, block.msg) == ("first", "ok", "first result")
+
+
+@pytest.mark.parametrize(
     ("raw", "expected"),
     [
         ({"item": 0}, "0"),
