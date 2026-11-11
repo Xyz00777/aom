@@ -59,8 +59,8 @@ On both 2.21.6 and 2.22.0:
   censorship.
 - After the narrow retry fix, seven direct callback checks passed.
 
-These are scoped compatibility checks, not full-suite qualification for either
-new version.
+These initial checks were scoped compatibility probes. The follow-up below
+records full-suite results and their limits.
 
 ## Why 2.22 needs more work
 
@@ -127,3 +127,99 @@ callback tests initialize Ansible's collection loader as the CLI does, fixing
 the push-time collection import failure without requiring temporary PYTHONPATH
 settings. The same test collection failed before that bootstrap fix and passes
 afterward.
+
+## Follow-up: 2.22 readiness checklist
+
+Decision: retain `>=2.21.6,<2.22`. Defer the callback transport decision and
+2.22 support. No dependency, callback or event-schema change is included in
+this follow-up.
+
+The follow-up used application-stack commit
+`e3b77a936718191459475c57c99b49c91b18aa30` (PR #68), Python 3.14.8,
+ansible.posix 2.2.2 and separate temporary environments for each core version.
+`NO_COLOR` was unset consistently. The independent test-quality PR #61 is not
+part of this base, so these totals differ from the combined review branch.
+
+| Gate | Observed result | Remaining work |
+|---|---|---|
+| Full suite | Both 2.21.6 and 2.22.0: 3,569 passed, 7 skipped, 3 xfailed, 1 xpassed. | Green existing tests do not qualify registered-secret behavior. |
+| Free and serial strategies | Both versions: two hosts, six loop-item events, three named tasks including a dynamic include, correct per-host recaps. | Preserve these semantics in a future callback change. |
+| Check/diff and no-log | Both versions: two visible diffs, two censored results, unchanged original files, expected changed/ok counts. | Add registered-secret and mixed visible/censored-item cases. |
+| Ordinary live/record/replay/inspect | All commands exit zero on both versions and retain expected outcomes. | Assert the same event census and outcomes with secret registration. |
+| Registered-secret transport | 2.22 fails with a public dummy numeric value: 11 valid raw JSON lines, one invalid recap line, only two recognized events. | Replace the whole-serialized-text masking boundary. |
+| Masked result keys | On 2.22, registering `changed` makes genuinely changed hosts appear OK; registering `results` loses loop total 3 even though all six task loop-item events arrive. Both playbooks assert the correct underlying Ansible result successfully. The 2.21 baseline retains the expected state. | Preserve control fields independently of masked payload keys. A writer-only fix is insufficient. |
+| Colliding host labels | On 2.22, registering the synthetic host names `first` and `second` collapses both to the same label. The recap has duplicate JSON keys and decoding loses a host. The 2.21 baseline preserves both identities. | Choose an identity/label policy before changing the output boundary. |
+| Recorded masked run | AOM reports 0/2 hosts and 0/2 tasks. The malformed recap is dropped; replay and inspect also exit zero, without host statistics. | Detect event loss; command exit status and parseable recordings are insufficient oracles. |
+| Python and collection loading | Both isolated full suites collect and run with the normal installed collection. | Add a 2.22 CI job only after the masking gates pass. |
+| Real inventory compatibility | Not checked; probes use synthetic local playbooks. | Review inventory-specific removals and collection requirements before an operational upgrade. |
+
+Both full-suite logs also contain an ignored interpreter-finalization
+`OSError: Bad file descriptor`. Both processes exit zero; its cause was not
+diagnosed, so these runs are not described as warning-free.
+
+### Regression tests to prepare before enabling 2.22
+
+Use only public dummy strings. Assert complete, recognizable events and correct
+state, rather than merely valid JSON, absence of a dummy string, or exit zero.
+
+- Register a short numeric dummy; preserve event kinds, IDs, timestamps and
+  recap counters while masking user payloads. Check retry counters without
+  assuming their masked values are numeric.
+- Register dummy strings matching result keys, such as `changed` and `results`.
+  The public result mapping is already masked and may lose those keys. Pin
+  changed/failed/skipped/unreachable outcomes and loop counts. The public
+  status methods expose operational state independently of masked payloads;
+  do not recover it through private unmasked result data.
+- Cover quotes, backslashes, Unicode, diffs, warnings, task names and paths;
+  check task no-log and mixed visible/censored loop items.
+- Exercise two host labels that mask to the same text. They must remain two
+  distinct hosts with correct counts in live, replay and inspect views.
+- Keep the existing free/serial/include/check/diff cases and compare their
+  live, recorded and inspected semantics under masking.
+
+Assertions must distinguish protocol metadata from user content. For example,
+registering the dummy `2` does not justify asserting that the byte `2` is
+absent from timestamps, event names and counters. Use field-specific checks,
+plus a distinctive long dummy for whole-artifact absence checks.
+
+### Decisions deliberately left open
+
+The smallest transport candidate is an AOM-owned stdout writer that masks
+selected user content before serialization. A dedicated event channel is an
+alternative with additional process-lifecycle, ordering and buffering work.
+Neither is implemented or approved here. Moving the channel alone does not
+solve masking or preserve operational fields.
+
+Host names currently serve as both visible labels and executable inventory
+identities for rerun `--limit`. Keeping raw names would require an explicit
+exception when a name matches a registered secret. Masking names can collapse
+distinct hosts and break reruns; separating identities from labels would
+require an event/storage design. Do not silently choose either policy.
+
+The independent review refined the initial suggestion that every host name
+must be masked: upstream permits selective masking, but does not grant host
+names an automatic exception. That review added a verification requirement
+and identified a policy choice; it did not authorize a schema change.
+
+Recording protection also needs an explicit scope. Source inspection shows
+that session metadata retains original CLI arguments for reruns, generic
+interactive answers are recorded, and preflight runs before runtime secret
+registration. No real secret was read or tested. Fixing the callback alone
+must not be described as guaranteeing secret-free recordings; changing these
+other paths can affect rerun behavior and is separate work.
+
+The [2.22 developer guide](https://docs.ansible.com/projects/ansible-core/2.22/dev_guide/developing_secret_masking.html)
+documents selective pre-serialization masking and the invalid-JSON hazard.
+The [user guide](https://docs.ansible.com/projects/ansible-core/2.22/playbook_guide/playbooks_secret_masking.html)
+documents callback responsibilities and best-effort limits. The
+[public callback result implementation](https://github.com/ansible/ansible/blob/v2.22.0/lib/ansible/executor/task_result.py)
+separates masked payload access from status methods.
+
+Local reproducibility evidence from this session lives under
+`/tmp/aom-upgrade-probe/`: `readiness-full-v222.log`, and
+`workflows-v221/` / `workflows-v222/`. The final 2.21.6 verification log is
+`/tmp/aom-final-readiness-v221.log`.
+The supported registered-key and host-collision playbooks, raw output and
+semantic summaries are in `key-probes-v221/` and `key-probes-v222/`.
+These temporary artifacts are not shipped and may be deleted; the observations
+and required regression cases above are the durable record.
