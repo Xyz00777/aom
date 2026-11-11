@@ -667,7 +667,7 @@ def _drive(
     # Cadence chosen so a 0.5s expect-timeout polls roughly every 2s.
     cpu_sample_every = max(1, int(2.0 / max(timeout, 0.05)))
     timeout_count = 0
-    dead_child_drain_pending = False
+    dead_child_drain_deadline: float | None = None
     jsonl_prefix = ""
 
     # R8: post-stats EOF watchdog. The parser flips its phase to
@@ -692,8 +692,11 @@ def _drive(
         # liveness / prompt heuristics still tick on the normal cadence.
         # R11: once ``v2_playbook_on_stats`` has set the run's
         # ``end_time``, shrink the watchdog to the "quiet" window.
-        if dead_child_drain_pending:
-            read_timeout = min(timeout, 0.05)
+        if dead_child_drain_deadline is not None:
+            read_timeout = dead_child_drain_deadline - time.monotonic()
+            if read_timeout <= 0:
+                _flush_pending(child, parser, state, renderer, sink, prefix=jsonl_prefix, diag=diag)
+                break
         elif parser.phase == StreamPhase.POST_RUN_RECAP and state.end_time is not None:
             read_timeout = _EOF_WATCHDOG_S_QUIET
         else:
@@ -731,7 +734,7 @@ def _drive(
                 stall_count = 0
             # pexpect's ``_before`` StringIO holds the per-match buffer
             # that's exposed as ``child.before`` on the next match.
-            # When the post-match ``isalive`` break runs, it calls
+            # When the dead-child drain deadline expires, it calls
             # ``_flush_pending`` which reads ``child.before`` again —
             # the same lines we just fed. Reset the documented per-match
             # accumulator to an empty string so the re-read sees nothing.
@@ -742,17 +745,18 @@ def _drive(
                 child.before = ""
             except AttributeError:
                 pass
-            if dead_child_drain_pending:
-                _flush_pending(child, parser, state, renderer, sink, diag=diag)
-                break
-            if not child.isalive():
-                dead_child_drain_pending = True
+            if dead_child_drain_deadline is None and not child.isalive():
+                # A match can consume buffered data without reading the PTY.
+                # Drain until EOF or the existing short wait expires, rather
+                # than discarding kernel output after one buffered newline.
+                # Never rearm: a chatty descendant must not keep us alive.
+                dead_child_drain_deadline = time.monotonic() + min(timeout, 0.05)
         elif idx == eof_idx:
             _trace("eof", leftover=(child.before or "")[:200])
             _flush_pending(child, parser, state, renderer, sink, prefix=jsonl_prefix, diag=diag)
             break
         elif idx == timeout_idx:
-            if dead_child_drain_pending:
+            if dead_child_drain_deadline is not None:
                 _flush_pending(child, parser, state, renderer, sink, prefix=jsonl_prefix, diag=diag)
                 break
             # R8: post-stats timeout = EOF watchdog fired. The child
@@ -835,6 +839,9 @@ def _drive(
             # event or enter getpass; rejoin it at the next newline/EOF.
             if prompt.lstrip().startswith("{"):
                 jsonl_prefix = prompt
+                # The prefix owns this match now. If the drain deadline
+                # expires before another expect, flush the unread suffix.
+                child.before = ""
                 continue
             _trace("password-pattern", prompt=prompt[:200])
             renderer.note_pty_bytes()
@@ -1035,7 +1042,10 @@ def _flush_pending(
     trailing events are silently dropped when the child exits between
     ``expect()`` returning and the ``isalive()`` check.
     """
-    leftover = prefix + (child.before or "") + (_peek_unread(child) or "")
+    # On TIMEOUT, ``before`` already includes the unread buffer; joining
+    # both duplicates the final fragment. After a newline, ``before`` was
+    # cleared and the buffer alone contains the remainder.
+    leftover = prefix + (child.before or _peek_unread(child) or "")
     if leftover.strip():
         for sub_line in leftover.splitlines():
             if sub_line:
