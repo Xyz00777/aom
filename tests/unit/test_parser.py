@@ -214,6 +214,17 @@ class TestJsonLineStreamCarryBuffer:
         assert result[0]["_event"] == "v2_runner_on_ok"
         assert result[0]["hosts"]["web1"]["msg"] == "hello"
 
+    def test_chunk_boundaries_preserve_payload_whitespace(self):
+        # Stripping an incomplete chunk used to delete spaces inside strings.
+        event = {"_event": "v2_runner_on_ok", "msg": '  hello  world \\"  '}
+        encoded = json.dumps(event)
+        for split in range(1, len(encoded)):
+            parser = JsonLineStream()
+            assert parser.feed_line(encoded[:split]) == []
+            assert parser.feed_line(encoded[split:]) == [event], split
+        parser = JsonLineStream()
+        assert [e for char in encoded for e in parser.feed_line(char)] == [event]
+
     def test_many_small_chunks_join(self):
         """A 100-chunk slow-drip split still yields exactly one event."""
         full = '{"_event":"v2_playbook_on_start","msg":"' + ("x" * 200) + '"}'

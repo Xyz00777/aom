@@ -82,6 +82,7 @@ from ansible_aom.core.log_filter import (
 )
 from ansible_aom.core.models import RunState, Status
 from ansible_aom.core.stderr_classifier import is_profiling_banner
+from ansible_aom.core.text import loop_item_label
 from ansible_aom.core.tree import TreeProjection, run_state_status_counts
 from ansible_aom.core.tree_projection import task_complete_on_all_targets
 
@@ -2119,7 +2120,7 @@ class CompactRenderer:
                 _YELLOW,
                 self._colorize,
             )
-        label = str(raw.get("_ansible_item_label") or raw.get("item") or "")
+        label = loop_item_label(raw)
         if event_type == "v2_runner_item_on_failed" or raw.get("failed"):
             msg = _extract_error_msg(raw)
             text = f"failed: [{host}] => (item={label})"
