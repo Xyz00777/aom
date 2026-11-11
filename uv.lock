@@ -26,7 +26,7 @@ wheels = [
 
 [[package]]
 name = "ansible-aom"
-version = "0.102.18"
+version = "0.102.19"
 source = { editable = "." }
 dependencies = [
     { name = "argcomplete" },
