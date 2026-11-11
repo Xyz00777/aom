@@ -13,9 +13,8 @@ checked after each ``expect()`` call we exit within a single ``timeout``
 window of detecting the death.
 
 The test below constructs a fake child that returns newline matches
-forever (``isalive()`` False) and asserts the loop terminates promptly
-(``<2 s`` for our short ``expect`` timeout), not after the full 30 s
-post-stats watchdog.
+forever (``isalive()`` False) and advances a controlled clock. The drain
+must end at its original deadline even while more output arrives.
 """
 
 from __future__ import annotations
@@ -24,6 +23,9 @@ import time
 from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
+
+from ansible_aom.ansible import runner
 from ansible_aom.ansible.runner import _drive
 from ansible_aom.core.parser import PtyStreamParser, StreamPhase
 from ansible_aom.core.run_state import RunState
@@ -81,22 +83,28 @@ def _build_parser_in_post_run_recap() -> PtyStreamParser:
     return parser
 
 
-def test_drive_exits_promptly_when_child_dead_but_pty_open() -> None:
+def test_drive_exits_promptly_when_child_dead_but_pty_open(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """R10: isalive() == False in POST_RUN_RECAP must terminate the loop.
 
-    Without the isalive check, the post-stats 30s watchdog is the only
-    safety net. With it, the loop exits on the first iteration after
-    the child's death. We assert the wall time stays well under the
-    30s watchdog (use 2s to leave generous slack for CI noise).
+    The drain window permits trailing output after the child's death,
+    while a chatty descendant cannot extend it by emitting more lines.
     """
     parser = _build_parser_in_post_run_recap()
     renderer = MagicMock()
     sink = MagicMock()
-    # Short timeout so the test runs fast if isalive is *not* honored —
-    # we'd still see ~30s. But we cap line_count to bound the loop's
-    # worst case; if isalive is honored we'll break after 1 call.
-    child = _FakeChildIsaliveDead(line_count=100_000)
-    start = time.monotonic()
+    # A short clock-controlled window checks both premature stopping and
+    # a deadline that mistakenly rearms on each new line.
+    clock = [0.0]
+
+    class _ChattyDescendant(_FakeChildIsaliveDead):
+        def expect(self, patterns: Any, timeout: float = 0) -> int:
+            clock[0] += 0.003
+            return super().expect(patterns, timeout)
+
+    child = _ChattyDescendant(line_count=100)
+    monkeypatch.setattr(runner.time, "monotonic", lambda: clock[0])
     exit_code = _drive(
         child,
         parser,
@@ -106,17 +114,10 @@ def test_drive_exits_promptly_when_child_dead_but_pty_open() -> None:
         sink=sink,
         diag=None,  # noqa: F841
     )
-    elapsed = time.monotonic() - start
-
     assert child.closed, "loop should close the child before returning"
-    assert child._expect_calls <= 5, (
-        f"loop should exit after very few expect() calls when child is dead, "
-        f"but it made {child._expect_calls} calls in {elapsed:.2f}s"
-    )
-    assert elapsed < 2.0, (
-        f"loop took {elapsed:.2f}s to exit when child was already dead — "
-        f"R10 isalive check missing or ineffective"
-    )
+    # First detection is at .003s. Later output must neither stop the
+    # drain early nor extend its original .01s window indefinitely.
+    assert 0.013 <= clock[0] < 0.020
     assert exit_code == 0
 
 
