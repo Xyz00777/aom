@@ -29,8 +29,13 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from ansible.plugins.loader import init_plugin_loader
 
-from ansible_aom.ansible.callback.aom_jsonl import CallbackModule
+# Match Ansible's CLI bootstrap so collections resolve from their configured
+# paths, without requiring a PYTHONPATH pointing at the collection directory.
+init_plugin_loader()
+
+from ansible_aom.ansible.callback.aom_jsonl import CallbackModule  # noqa: E402
 
 CALLBACK_DIR = Path(__file__).resolve().parents[2] / "src" / "ansible_aom" / "ansible" / "callback"
 
@@ -190,6 +195,46 @@ class TestCallbackModuleDirect:
             cb._is_lockstep = lockstep
             cb.results = [{"play": {"duration": {"start": "2026-10-27T00:00:00Z"}}, "tasks": []}]
             return cb
+
+    @pytest.mark.parametrize(
+        ("retries", "attempts", "retries_left"),
+        [
+            (5, 2, 3),
+            (5, 5, 0),
+            (5, "$REDACTED$", None),
+            ("$REDACTED$", 2, None),
+            ("$REDACTED$", "$REDACTED$", None),
+        ],
+    )
+    def test_retry_event_preserves_masked_counters(
+        self, retries: int | str, attempts: int | str, retries_left: int | None
+    ) -> None:
+        """Ansible 2.22 can mask numeric counters; keep the event without inventing a remainder."""
+        cb = self._make_callback()
+        host = MagicMock()
+        host.get_name.return_value = "retry-host"
+        task = MagicMock()
+        task._uuid = "retry-task-id"
+        task.get_name.return_value = "Retry task"
+        task.get_path.return_value = "retry.yml:4"
+        result = MagicMock()
+        result._host = host
+        result._task = task
+        result._result = {"retries": retries, "attempts": attempts}
+
+        cb.v2_runner_retry(result)
+
+        event = json.loads(cb._display.display.call_args[0][0])
+        event.pop("_timestamp")
+        event["task"].pop("duration")
+        assert event == {
+            "_event": "v2_runner_retry",
+            "task": {"id": "retry-task-id", "name": "Retry task", "path": "retry.yml:4"},
+            "host": "retry-host",
+            "retries": retries,
+            "attempts": attempts,
+            "retries_left": retries_left,
+        }
 
     def test_find_result_task_creates_new_task_when_not_in_task_map(self) -> None:
         cb = self._make_callback(lockstep=False)
