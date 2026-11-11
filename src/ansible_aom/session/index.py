@@ -46,7 +46,7 @@ from ansible_aom.core.text import replace_surrogates
 
 logger = logging.getLogger(__name__)
 
-INDEX_SCHEMA_VERSION = 1
+INDEX_SCHEMA_VERSION = 2
 
 _SCHEMA = """
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
@@ -100,7 +100,7 @@ def events_stat(session_path: Path) -> tuple[int, int] | None:
 
 def _read_meta_table(db_path: Path) -> dict[str, str] | None:
     try:
-        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        conn = sqlite3.connect(f"{db_path.absolute().as_uri()}?mode=ro", uri=True)
     except sqlite3.Error:
         return None
     try:
@@ -109,6 +109,18 @@ def _read_meta_table(db_path: Path) -> dict[str, str] | None:
         return None
     finally:
         conn.close()
+
+
+def _failed_task_count(meta: Mapping[str, object]) -> int | None:
+    """Decode the required count from sqlite metadata, rejecting damaged values."""
+    value = meta.get("failed_task_count")
+    if not isinstance(value, str):
+        return None
+    try:
+        count = int(value)
+    except ValueError:
+        return None
+    return count if count >= 0 else None
 
 
 def index_is_fresh(session_path: Path) -> bool:
@@ -127,6 +139,7 @@ def index_is_fresh(session_path: Path) -> bool:
         meta.get("schema_version") == str(INDEX_SCHEMA_VERSION)
         and meta.get("events_size") == str(stat[0])
         and meta.get("events_mtime_ns") == str(stat[1])
+        and _failed_task_count(meta) is not None
     )
 
 
@@ -483,11 +496,14 @@ def load_structure(
     if not db_path.exists():
         return None
     try:
-        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        conn = sqlite3.connect(f"{db_path.absolute().as_uri()}?mode=ro", uri=True)
     except sqlite3.Error:
         return None
     try:
         meta = dict(conn.execute("SELECT key, value FROM meta"))
+        failed_task_count = _failed_task_count(meta)
+        if failed_task_count is None:
+            return None
         plays = tuple(
             PlayRow(play_id=row[0], name=row[1])
             for row in conn.execute("SELECT play_id, name FROM plays ORDER BY seq")
@@ -549,7 +565,7 @@ def load_structure(
         plays=plays,
         tasks=tuple(tasks),
         host_counts=host_counts,
-        failed_task_count=int(meta.get("failed_task_count", "0")),
+        failed_task_count=failed_task_count,
         stderr=(),
         connections={},
         fallback_play_name=meta.get("fallback_play_name", ""),
@@ -562,7 +578,7 @@ def find_task_id_by_name(session_path: Path, task_name: str) -> str | None:
     if not db_path.exists():
         return None
     try:
-        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        conn = sqlite3.connect(f"{db_path.absolute().as_uri()}?mode=ro", uri=True)
     except sqlite3.Error:
         return None
     try:
@@ -596,11 +612,14 @@ def load_summary(session_path: Path, meta: Mapping) -> RunSummary | None:
     if not db_path.exists():
         return None
     try:
-        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        conn = sqlite3.connect(f"{db_path.absolute().as_uri()}?mode=ro", uri=True)
     except sqlite3.Error:
         return None
     try:
         db_meta = dict(conn.execute("SELECT key, value FROM meta"))
+        failed_task_count = _failed_task_count(db_meta)
+        if failed_task_count is None:
+            return None
         host_counts = {
             row[0]: _counts(row, 1)
             for row in conn.execute(
@@ -615,7 +634,7 @@ def load_summary(session_path: Path, meta: Mapping) -> RunSummary | None:
         plays=(),
         tasks=(),
         host_counts=host_counts,
-        failed_task_count=int(db_meta.get("failed_task_count", "0")),
+        failed_task_count=failed_task_count,
         stderr=(),
         connections={},
         fallback_play_name="",
@@ -648,7 +667,7 @@ def query_verbose(
     if not db_path.exists():
         return ()
     try:
-        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        conn = sqlite3.connect(f"{db_path.absolute().as_uri()}?mode=ro", uri=True)
     except sqlite3.Error:
         return ()
     try:

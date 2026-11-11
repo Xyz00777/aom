@@ -475,7 +475,18 @@ class _HostAcc:
 
 
 class _TaskAcc:
-    __slots__ = ("label", "path", "group", "play_id", "counts", "hosts", "raw", "ref", "last_ts")
+    __slots__ = (
+        "label",
+        "path",
+        "group",
+        "play_id",
+        "counts",
+        "hosts",
+        "raw",
+        "ref",
+        "last_ts",
+        "completed_duration",
+    )
 
     def __init__(self, label: str, path: str | None, group: str, play_id: str) -> None:
         self.label = label
@@ -486,7 +497,9 @@ class _TaskAcc:
         self.hosts: dict[str, _HostAcc] = {}
         self.raw: dict | None = None
         self.ref: EventRef | None = None
+        # Timing for the current occurrence; serial batches reuse task IDs.
         self.last_ts: datetime | None = None
+        self.completed_duration: timedelta | None = None
 
 
 class SessionIndexAccumulator:
@@ -545,13 +558,21 @@ class SessionIndexAccumulator:
                 else ""
             )
             if tid:
+                rec = self._tasks.get(tid)
+                if rec is not None:
+                    start = self._task_start_ts.get(tid)
+                    if start is not None and rec.last_ts is not None:
+                        rec.completed_duration = (
+                            (rec.completed_duration or timedelta()) + rec.last_ts - start
+                        )
+                    # Results from a previous occurrence cannot time this one,
+                    # even while the new occurrence has no host outcome yet.
+                    rec.last_ts = None
                 ts = _parse_iso(event.get("_timestamp"))
                 if ts is not None:
                     self._task_start_ts[tid] = ts
                 elif tid in self._task_start_ts:
-                    # A later start event without a parseable timestamp
-                    # overrides an earlier one, like the dict-of-events
-                    # implementation this replaced.
+                    # An untimed occurrence cannot reuse the earlier start.
                     del self._task_start_ts[tid]
             return
 
@@ -625,7 +646,12 @@ class SessionIndexAccumulator:
         # implementation).
         if hosts:
             event_ts = _parse_iso(event.get("_timestamp"))
-            if event_ts is not None and (rec.last_ts is None or event_ts > rec.last_ts):
+            start = self._task_start_ts.get(tid)
+            if (
+                event_ts is not None
+                and (start is None or event_ts >= start)
+                and (rec.last_ts is None or event_ts > rec.last_ts)
+            ):
                 rec.last_ts = event_ts
 
         raw = None if ref is not None else event
@@ -645,10 +671,10 @@ class SessionIndexAccumulator:
     def finish(self) -> SessionIndex:
         tasks: list[TaskRow] = []
         for tid, rec in self._tasks.items():
-            duration: timedelta | None = None
+            duration = rec.completed_duration
             start = self._task_start_ts.get(tid)
             if start is not None and rec.last_ts is not None:
-                duration = rec.last_ts - start
+                duration = (duration or timedelta()) + rec.last_ts - start
             tasks.append(
                 TaskRow(
                     task_id=tid,
