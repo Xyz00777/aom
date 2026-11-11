@@ -58,9 +58,13 @@ python3 -m pip install ansible-aom
 Before running a playbook, install Ansible and the JSONL callback collection:
 
 ```bash
-python3 -m pip install ansible-core
+python3 -m pip install 'ansible-core>=2.21.6,<2.22'
 ansible-galaxy collection install ansible.posix
 ```
+
+Use the 2.21 series for now. Ansible 2.22's output masking needs further
+JSONL callback integration work; the compatibility audit is in
+[`docs/reviews/2026-11-11-ansible-core-upgrade.md`](docs/reviews/2026-11-11-ansible-core-upgrade.md).
 
 The package provides AOM and its bundled callback plugins. It does not bundle
 `ansible-playbook`, Ansible collections, SSH, inventories, roles, or playbook
