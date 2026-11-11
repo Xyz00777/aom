@@ -83,14 +83,16 @@ def _mine_loop_totals(session_path: Path) -> dict[str, dict[str, int]]:
         return {}
     totals: dict[str, dict[str, int]] = {}
     try:
-        with open(events_file) as f:
+        with open(events_file, "rb") as f:
             for line in f:
                 line = line.strip()
                 if not line:
                     continue
                 try:
                     event = json.loads(line)
-                except json.JSONDecodeError:
+                except json.JSONDecodeError, UnicodeDecodeError:
+                    continue
+                if not isinstance(event, dict):
                     continue
                 if event.get("_event") not in ("v2_runner_on_ok", "v2_runner_on_failed"):
                     continue
@@ -155,14 +157,16 @@ def _mine_task_wall(
         grand_total += delta
 
     try:
-        with open(events_file) as f:
+        with open(events_file, "rb") as f:
             for line in f:
                 line = line.strip()
                 if not line:
                     continue
                 try:
                     event = json.loads(line)
-                except json.JSONDecodeError:
+                except json.JSONDecodeError, UnicodeDecodeError:
+                    continue
+                if not isinstance(event, dict):
                     continue
                 task_dict = event.get("task")
                 if isinstance(task_dict, dict):
@@ -232,7 +236,9 @@ def _iter_completed_sessions(
         try:
             with open(meta_file) as f:
                 meta: dict[str, Any] = json.load(f)
-        except json.JSONDecodeError, OSError:
+        except json.JSONDecodeError, UnicodeDecodeError, OSError:
+            continue
+        if not isinstance(meta, dict):
             continue
         if meta.get("status") != "completed":
             continue

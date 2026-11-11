@@ -46,10 +46,11 @@ from typing import Callable
 
 import argcomplete
 
+from ansible_aom.core.inspect_model import is_valid_session_id
 from ansible_aom.core.timestamp import parse_iso_timestamp
 from ansible_aom.renderer.factory import create_renderer
 from ansible_aom.renderer.protocol import Renderer
-from ansible_aom.session.store import load_session
+from ansible_aom.session.store import load_session, resolve_session_id
 
 
 def _parse_timestamp(value: object) -> datetime | None:
@@ -203,7 +204,7 @@ def _build_parser() -> argparse.ArgumentParser:
         epilog=_REPLAY_HELP_EPILOG,
     )
     session_action = parser.add_argument(
-        "session_id", help="Session ID (UUIDv7 directory name) to replay"
+        "session_id", help="Full session ID, unique prefix, or 'latest' to replay"
     )
     setattr(session_action, "completer", session_id_completer)
     parser.add_argument(
@@ -243,10 +244,23 @@ def cli_main(argv: list[str]) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
+    # Keep exact directory loads working for crash-recovered sessions without metadata.
+    session_id = args.session_id
+    if session_id == "latest" or not (
+        is_valid_session_id(session_id) and (args.state_dir / session_id).is_dir()
+    ):
+        try:
+            session_id = resolve_session_id(
+                args.state_dir, None if session_id == "latest" else session_id
+            )
+        except LookupError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+
     renderer = create_renderer(mode="compact", is_tty=sys.stdout.isatty())
     driver = ReplayDriver(
         session_dir=args.state_dir,
-        session_id=args.session_id,
+        session_id=session_id,
         speed=float(args.speed),
     )
     return driver.drive(renderer)

@@ -707,6 +707,8 @@ def cleanup_old_sessions(
             try:
                 with open(meta_file) as f:
                     meta = json.load(f)
+                if not isinstance(meta, dict):
+                    meta = {}
                 start_time_str = meta.get("start_time", "")
                 if start_time_str:
                     start_time = parse_iso_timestamp(start_time_str)
@@ -766,6 +768,8 @@ def list_sessions(session_dir: Path) -> list[dict[str, Any]]:
             with open(meta_file) as f:
                 meta = json.load(f)
 
+            if not isinstance(meta, dict):
+                continue
             session_id = session_path.name
             sessions.append(
                 {
@@ -777,12 +781,54 @@ def list_sessions(session_dir: Path) -> list[dict[str, Any]]:
                     "duration_seconds": meta.get("duration_seconds"),
                 }
             )
-        except json.JSONDecodeError, KeyError:
+        except json.JSONDecodeError, UnicodeDecodeError, KeyError:
             continue
 
     sessions.sort(key=lambda x: x.get("start_time", ""), reverse=True)
 
     return sessions
+
+
+def resolve_session_id(state_dir: Path, session_id_or_short: str | None) -> str:
+    """Resolve an explicit session ID, short prefix, or "most recent" intent.
+
+    Mirrors the inspect command's resolution semantics: full UUID wins
+    over prefix match, prefix match must be unique, "no argument" picks
+    the most recent session by start_time.
+
+    Args:
+        state_dir: Directory containing session sub-directories.
+        session_id_or_short: Either a full 36-char UUID, an 8-char (or
+            longer) prefix, or ``None`` to pick the latest session.
+
+    Returns:
+        The resolved full session ID.
+
+    Raises:
+        LookupError: When no session matches, no sessions exist at all,
+            or a short prefix matches more than one session.
+    """
+    sessions = list_sessions(state_dir)
+    if not sessions:
+        raise LookupError(f"No sessions found in {state_dir}")
+
+    if session_id_or_short is None:
+        # list_sessions returns newest-first.
+        return str(sessions[0]["session_id"])
+
+    # Exact full-id match wins.
+    for s in sessions:
+        if s["session_id"] == session_id_or_short:
+            return session_id_or_short
+
+    # Otherwise treat as prefix.
+    matches = [s for s in sessions if s["session_id"].startswith(session_id_or_short)]
+    if not matches:
+        raise LookupError(f"No session matching {session_id_or_short!r} in {state_dir}")
+    if len(matches) > 1:
+        ids = ", ".join(s["session_id"] for s in matches)
+        raise LookupError(f"Prefix {session_id_or_short!r} is ambiguous: matches {ids}")
+    return str(matches[0]["session_id"])
 
 
 def load_session_meta(session_id: str, session_dir: Path) -> dict[str, Any] | None:
@@ -806,7 +852,9 @@ def load_session_meta(session_id: str, session_dir: Path) -> dict[str, Any] | No
         try:
             with open(meta_file) as f:
                 result = json.load(f)
-        except json.JSONDecodeError:
+            if not isinstance(result, dict):
+                result = {"playbook": "", "status": ""}
+        except json.JSONDecodeError, UnicodeDecodeError:
             result = {"playbook": "", "status": ""}
 
     if "_schema_version" not in result:
