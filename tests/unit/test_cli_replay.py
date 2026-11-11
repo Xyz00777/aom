@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, call, patch
+
+import pytest
 
 
 class TestReplayDispatch:
@@ -58,6 +60,46 @@ def _make_session(base: Path, session_id: str, events: list[dict]) -> Path:
 
 class TestReplayCLIMain:
     """`replay.cli_main` parses argv, builds a renderer, calls replay_session."""
+
+    @pytest.mark.parametrize("selector", ["latest", "new", "new-session"])
+    def test_session_selectors_replay_the_matching_events(
+        self, tmp_path: Path, selector: str
+    ) -> None:
+        # Dispatch-only tests missed that documented latest/prefix selectors never loaded.
+        from ansible_aom.drivers.replay import cli_main
+
+        _make_session(tmp_path, "old-session", [{"_event": "old"}])
+        event = {"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-08T10:00:00Z"}
+        newest = _make_session(tmp_path, "new-session", [event])
+        (newest / "meta.json").write_text(
+            json.dumps(
+                {
+                    "playbook": "new.yml",
+                    "status": "completed",
+                    "start_time": "2026-05-08T10:00:00Z",
+                }
+            )
+        )
+        renderer = MagicMock()
+        with patch("ansible_aom.drivers.replay.create_renderer", return_value=renderer):
+            assert cli_main([selector, "--state-dir", str(tmp_path), "--speed", "0"]) == 0
+        renderer.start.assert_called_once_with("new.yml", [])
+        assert renderer.update_state.call_args_list == [call(event)]
+        renderer.handle_completion.assert_called_once_with(0, "completed")
+        renderer.stop.assert_called_once_with()
+
+    def test_ambiguous_prefix_reports_error_without_starting_renderer(
+        self, tmp_path: Path, capsys
+    ) -> None:
+        from ansible_aom.drivers.replay import cli_main
+
+        _make_session(tmp_path, "same-a", [])
+        _make_session(tmp_path, "same-b", [])
+        renderer = MagicMock()
+        with patch("ansible_aom.drivers.replay.create_renderer", return_value=renderer):
+            assert cli_main(["same", "--state-dir", str(tmp_path)]) == 1
+        assert "ambiguous" in capsys.readouterr().err
+        renderer.start.assert_not_called()
 
     def test_cli_main_default_uses_compact_renderer(self, tmp_path: Path) -> None:
         from ansible_aom.drivers.replay import cli_main
@@ -133,11 +175,25 @@ class TestReplayCLIMain:
 
         assert captured.get("speed") == 0.0
 
-    def test_cli_main_returns_1_when_session_missing(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize("selector", ["nope", "latest"])
+    def test_cli_main_returns_1_when_session_missing(self, tmp_path: Path, selector: str) -> None:
         from ansible_aom.drivers.replay import cli_main
 
         # No session created — replay_session returns 1 (real behaviour).
         with patch("ansible_aom.drivers.replay.create_renderer", return_value=object()):
-            exit_code = cli_main(["nope", "--state-dir", str(tmp_path)])
+            exit_code = cli_main([selector, "--state-dir", str(tmp_path)])
 
         assert exit_code == 1
+
+    def test_exact_session_without_metadata_still_replays(self, tmp_path: Path) -> None:
+        from ansible_aom.drivers.replay import cli_main
+
+        event = {"_event": "v2_playbook_on_stats"}
+        session_path = _make_session(tmp_path, "recovered", [event])
+        (session_path / "meta.json").unlink()
+        # Exact IDs must win even when they also prefix a listed session.
+        _make_session(tmp_path, "recovered-other", [{"_event": "wrong"}])
+        renderer = MagicMock()
+        with patch("ansible_aom.drivers.replay.create_renderer", return_value=renderer):
+            assert cli_main(["recovered", "--state-dir", str(tmp_path), "--speed", "0"]) == 0
+        assert renderer.update_state.call_args_list == [call(event)]
