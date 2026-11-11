@@ -64,6 +64,7 @@ from ansible_aom.compact.format import (
 from ansible_aom.compact.password import handle_password_prompt as do_handle_password_prompt
 from ansible_aom.core import diagnostics
 from ansible_aom.core._async_poll import is_async_poll_payload
+from ansible_aom.core.diff import format_result_diff
 from ansible_aom.core.duration import format_duration_decimal
 from ansible_aom.core.estimate import (
     RunEstimate,
@@ -1912,6 +1913,7 @@ class CompactRenderer:
                 if body is not None:
                     text += f" => {body}"
                 lines.append(_wrap(text, color, self._colorize) + stale)
+                lines.extend(self._diff_lines(result))
             if lines:
                 self._display.print_log("\n".join(lines))
         elif name == "v2_runner_on_failed":
@@ -1949,6 +1951,7 @@ class CompactRenderer:
                     )
                     + stale
                 )
+                lines.extend(self._diff_lines(result))
             if lines:
                 self._display.print_log("\n".join(lines))
         elif name == "v2_runner_on_unreachable":
@@ -2011,6 +2014,7 @@ class CompactRenderer:
                         continue
                     self._streamed_loop_items.add((host, task_id))
                     streamed_lines.append(self._format_loop_item_line(host, raw, name))
+                    streamed_lines.extend(self._diff_lines(raw))
                 if streamed_lines:
                     self._display.print_log("\n".join(streamed_lines))
             else:
@@ -2028,6 +2032,7 @@ class CompactRenderer:
                         continue
                     self._streamed_loop_items.add((host, task_id))
                     streamed_lines_alt.append(self._format_loop_item_line(host, raw, name))
+                    streamed_lines_alt.extend(self._diff_lines(raw))
                 if streamed_lines_alt:
                     if name != "v2_runner_item_on_skipped":
                         self._flush_pending_skips(force_individual=True)
@@ -2080,7 +2085,28 @@ class CompactRenderer:
         results = result.get("results")
         if not isinstance(results, list) or not results:
             return []
-        return [self._format_loop_item_line(host, raw) for raw in results if isinstance(raw, dict)]
+        lines: list[str] = []
+        censored = result.get("_ansible_no_log") or "censored" in result
+        for raw in results:
+            if not isinstance(raw, dict):
+                continue
+            lines.append(self._format_loop_item_line(host, raw))
+            if not censored:
+                lines.extend(self._diff_lines(raw))
+        return lines
+
+    def _diff_lines(self, result: dict) -> list[str]:
+        """Indent and color a result's plain diff for the compact log."""
+        lines: list[str] = []
+        for line in format_result_diff(result):
+            if line.startswith("-"):
+                line = _wrap(line, _RED, self._colorize)
+            elif line.startswith("+"):
+                line = _wrap(line, _GREEN, self._colorize)
+            elif line.startswith("@@"):
+                line = _wrap(line, _CYAN, self._colorize)
+            lines.append("    " + line)
+        return lines
 
     def _format_loop_item_line(self, host: str, raw: dict, event_type: str | None = None) -> str:
         """Format one loop item's result as a coloured log line.
