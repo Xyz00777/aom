@@ -6,8 +6,64 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from ansible_aom.core.run_config import build_run_config_key
 from ansible_aom.session.history import PriorRun, find_previous_run
+
+
+@pytest.mark.parametrize("bad_line", [b"[]", b"null", b"1", b'"text"', b"\xff"])
+def test_history_preserves_valid_events_around_malformed_lines(
+    tmp_path: Path, bad_line: bytes
+) -> None:
+    # Corrupt historical events used to abort history lookup and the next live run.
+    pb = tmp_path / "site.yml"
+    sessions = tmp_path / "sessions"
+    _write_session(
+        sessions,
+        sid="prior",
+        playbook=str(pb),
+        ansible_args=[],
+        status="completed",
+        start="2026-05-18T10:00:00Z",
+        end="2026-05-18T10:00:07Z",
+        duration=7,
+        task_count=1,
+        host_count=1,
+    )
+    events = [
+        {
+            "_event": "v2_playbook_on_task_start",
+            "_timestamp": "2026-05-18T10:00:00Z",
+            "task": {"id": "t1", "path": "site.yml:1"},
+        },
+        {
+            "_event": "v2_runner_on_ok",
+            "task": {"id": "t1", "path": "site.yml:1"},
+            "hosts": {"web1": {"changed": True, "results": [{"item": 0}, {"item": 1}]}},
+        },
+        {"_event": "v2_playbook_on_stats", "_timestamp": "2026-05-18T10:00:07Z"},
+    ]
+    data = b"\n".join(json.dumps(event).encode() + b"\n" + bad_line for event in events)
+    (sessions / "prior" / "events.jsonl").write_bytes(data + b"\n")
+    prior = find_previous_run(sessions, build_run_config_key(playbook=str(pb), ansible_args=[]), 1)
+    assert prior is not None
+    assert prior.session_id == "prior"
+    assert prior.observed_task_count == 1
+    assert prior.task_wall_s == {"site.yml:1": 7.0}
+    assert prior.prior_wall_total_s == 7.0
+    assert prior.variable_paths == frozenset({"site.yml:1"})
+    assert prior.prior_var_total_s == 7.0
+    assert prior.loop_totals == {"site.yml:1": {"web1": 2}}
+
+
+@pytest.mark.parametrize("bad_meta", [b"[]", b"null", b"1", b'"text"', b"\xff"])
+def test_history_ignores_malformed_metadata(tmp_path: Path, bad_meta: bytes) -> None:
+    # Malformed neighboring sessions must not prevent even an empty lookup.
+    (tmp_path / "broken").mkdir()
+    (tmp_path / "broken" / "meta.json").write_bytes(bad_meta)
+    key = build_run_config_key(playbook=str(tmp_path / "site.yml"), ansible_args=[])
+    assert find_previous_run(tmp_path, key, 1) is None
 
 
 def _write_session(

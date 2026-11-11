@@ -9,6 +9,32 @@ from ansible_aom.core.inspect_model import is_valid_session_id
 from ansible_aom.session.store import find_latest_session, load_session, load_session_meta
 
 
+@pytest.mark.parametrize("metadata", [b"[]", b"null", b"1", b'"text"', b"true", b"\xff"])
+def test_malformed_metadata_does_not_break_session_readers(tmp_path: Path, metadata: bytes) -> None:
+    # Invalid UTF-8 and valid JSON with the wrong shape need the same fallback.
+    from ansible_aom.session.store import cleanup_old_sessions, list_sessions
+
+    _write_session(tmp_path, "healthy", "2026-05-20T11:24:09Z")
+    broken = tmp_path / "broken"
+    broken.mkdir()
+    (broken / "meta.json").write_bytes(metadata)
+    event = {"_event": "v2_playbook_on_start"}
+    (broken / "events.jsonl").write_text(json.dumps(event) + "\n")
+
+    assert [s["session_id"] for s in list_sessions(tmp_path)] == ["healthy"]
+    assert load_session_meta("broken", tmp_path) == {
+        "playbook": "",
+        "status": "",
+        "_schema_version": 1,
+        "diagnostics": None,
+        "session_id": "broken",
+    }
+    loaded = load_session("broken", tmp_path)
+    assert loaded is not None
+    assert loaded["events"] == [event]
+    assert cleanup_old_sessions(tmp_path, keep_days=100000) == 0
+
+
 def _write_session(root: Path, session_id: str, start_time: str) -> None:
     d = root / session_id
     d.mkdir(parents=True)
