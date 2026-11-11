@@ -668,6 +668,7 @@ def _drive(
     cpu_sample_every = max(1, int(2.0 / max(timeout, 0.05)))
     timeout_count = 0
     dead_child_drain_pending = False
+    jsonl_prefix = ""
 
     # R8: post-stats EOF watchdog. The parser flips its phase to
     # POST_RUN_RECAP exactly when it consumes a ``v2_playbook_on_stats``
@@ -702,13 +703,14 @@ def _drive(
         try:
             idx = child.expect(patterns, timeout=read_timeout)
         except pexpect.exceptions.EOF:
-            _flush_pending(child, parser, state, renderer, sink, diag=diag)
+            _flush_pending(child, parser, state, renderer, sink, prefix=jsonl_prefix, diag=diag)
             break
 
         if idx == newline_idx:
             before: str = cast("str", child.before or "")
             after: str = cast("str", child.after or "")
-            line = before + after
+            line = jsonl_prefix + before + after
+            jsonl_prefix = ""
             _trace("newline", line=line[:200])
             # pexpect's `before` carries the entire unread chunk since
             # the last match; when that chunk spans multiple JSONL
@@ -747,11 +749,11 @@ def _drive(
                 dead_child_drain_pending = True
         elif idx == eof_idx:
             _trace("eof", leftover=(child.before or "")[:200])
-            _flush_pending(child, parser, state, renderer, sink, diag=diag)
+            _flush_pending(child, parser, state, renderer, sink, prefix=jsonl_prefix, diag=diag)
             break
         elif idx == timeout_idx:
             if dead_child_drain_pending:
-                _flush_pending(child, parser, state, renderer, sink, diag=diag)
+                _flush_pending(child, parser, state, renderer, sink, prefix=jsonl_prefix, diag=diag)
                 break
             # R8: post-stats timeout = EOF watchdog fired. The child
             # refused to close its PTY within ``_EOF_WATCHDOG_S`` of
@@ -794,9 +796,16 @@ def _drive(
                 prior=(prior or "")[:120],
                 block=(prompt_block or "")[:200],
             )
-            stall_count = _handle_timeout_branch(
-                child, renderer, sink, stall_count, prior, prompt_block
-            )
+            pending = _peek_unread(child) or (child.before or "")
+            if jsonl_prefix or pending.lstrip().startswith("{"):
+                # A partial event is not a stalled plaintext prompt. Keep it
+                # intact until its newline/EOF, even across long quiet gaps.
+                renderer.tick()
+                stall_count = 0
+            else:
+                stall_count = _handle_timeout_branch(
+                    child, renderer, sink, stall_count, prior, prompt_block
+                )
             if diag is not None:
                 diag.note_timeout()
                 diag.note_stall(stall_count if stall_count > 0 else 0)
@@ -813,7 +822,20 @@ def _drive(
             # haven't routed yet) and the matched prompt itself.
             prompt_before: str = cast("str", child.before or "")
             prompt_after: str = cast("str", child.after or "")
-            prompt = prompt_before + prompt_after
+            prompt = jsonl_prefix + prompt_before + prompt_after
+            complete_lines, separator, last_line = prompt.rpartition("\n")
+            if separator:
+                for sub_line in complete_lines.splitlines():
+                    if sub_line:
+                        _feed(sub_line, parser, state, renderer, sink, diag=diag)
+                prompt = last_line
+                jsonl_prefix = ""
+            # sudo -V and other module results can contain literal password
+            # prompts inside JSON strings. Matching one must not consume the
+            # event or enter getpass; rejoin it at the next newline/EOF.
+            if prompt.lstrip().startswith("{"):
+                jsonl_prefix = prompt
+                continue
             _trace("password-pattern", prompt=prompt[:200])
             renderer.note_pty_bytes()
             _drain_warnings(parser, renderer, sink, flush=True)
@@ -992,6 +1014,7 @@ def _flush_pending(
     renderer: Renderer,
     sink: _SessionSink | _NullSink,
     *,
+    prefix: str = "",
     diag: diagnostics.RunDiagnostics | None = None,
 ) -> None:
     """Drain any final bytes left in the buffer when the subprocess ends.
@@ -1012,7 +1035,7 @@ def _flush_pending(
     trailing events are silently dropped when the child exits between
     ``expect()`` returning and the ``isalive()`` check.
     """
-    leftover = (child.before or "") + (_peek_unread(child) or "")
+    leftover = prefix + (child.before or "") + (_peek_unread(child) or "")
     if leftover.strip():
         for sub_line in leftover.splitlines():
             if sub_line:
