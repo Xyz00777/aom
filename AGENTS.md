@@ -60,6 +60,7 @@ System design (module map, data flow, key decisions) and the full development ph
 
 ## Testing Convention
 
+- **Test quality over coverage targets.** Use coverage to find entirely untested behavior, not as a quality score. Prefer discriminating fixtures, independent expected results, and semantic mutations that prove assertions catch wrong behavior. Do not add coverage percentage ratchets.
 - **TDD by spec**: `TEST_SPECIFICATION.md` defines TC-001 through TC-200+. Write test FIRST, then implement.
 - **Categories**: `tests/unit/` (isolated), `tests/integration/` (multi-component), `tests/tui/` (Textual widgets), `tests/compact/` (snapshot tests)
 - **Fixtures**: `tests/fixtures/` — JSONL event samples, playbook snippets

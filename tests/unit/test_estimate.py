@@ -9,6 +9,8 @@ the variable tasks' actual-vs-prior wall.
 
 from __future__ import annotations
 
+import pytest
+
 from ansible_aom.core.estimate import (
     RunEstimate,
     RunProgress,
@@ -120,6 +122,14 @@ def test_warmup_fraction_gate() -> None:
     est = _est(fixed={f"a{i}": 10.0 for i in range(10)})  # total 100
     prog = RunProgress(completed_covered_s=5.0, covered_fixed_s=5.0, matched_tasks=2)
     assert project_remaining(est, prog) is None
+
+
+@pytest.mark.parametrize(("covered", "remaining"), [(9.0, None), (10.0, 90.0), (11.0, 89.0)])
+def test_warmup_opens_at_exact_fraction(covered: float, remaining: float | None) -> None:
+    # A <= mutation survived: the old tests never reached exactly 10% completed work.
+    est = _est(fixed={"first": 4.0, "second": 6.0, "rest": 90.0})
+    progress = RunProgress(completed_covered_s=covered, covered_fixed_s=covered, matched_tasks=2)
+    assert project_remaining(est, progress) == remaining
 
 
 # --- project_remaining: the segmented model -------------------------------
