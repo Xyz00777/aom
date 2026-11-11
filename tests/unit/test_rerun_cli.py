@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from ansible_aom.rerun.cli import _resolve_session_id
+from ansible_aom.session.store import resolve_session_id
 
 
 def _make_session(state_dir: Path, session_id: str, start_time: str) -> Path:
@@ -29,13 +29,13 @@ class TestResolveSessionId:
         state_dir = tmp_path / "sessions"
         sid = "01971111-1111-7000-8000-000000000001"
         _make_session(state_dir, sid, "2026-05-12T10:00:00Z")
-        assert _resolve_session_id(state_dir, sid) == sid
+        assert resolve_session_id(state_dir, sid) == sid
 
     def test_explicit_short_id_resolved_to_full(self, tmp_path: Path):
         state_dir = tmp_path / "sessions"
         sid = "01971111-1111-7000-8000-000000000001"
         _make_session(state_dir, sid, "2026-05-12T10:00:00Z")
-        assert _resolve_session_id(state_dir, "01971111") == sid
+        assert resolve_session_id(state_dir, "01971111") == sid
 
     def test_omitted_returns_most_recent(self, tmp_path: Path):
         state_dir = tmp_path / "sessions"
@@ -43,20 +43,20 @@ class TestResolveSessionId:
         newer = "01971112-2222-7000-8000-000000000002"
         _make_session(state_dir, older, "2026-05-10T10:00:00Z")
         _make_session(state_dir, newer, "2026-05-12T10:00:00Z")
-        assert _resolve_session_id(state_dir, None) == newer
+        assert resolve_session_id(state_dir, None) == newer
 
     def test_unknown_id_raises(self, tmp_path: Path):
         state_dir = tmp_path / "sessions"
         sid = "01971111-1111-7000-8000-000000000001"
         _make_session(state_dir, sid, "2026-05-12T10:00:00Z")
         with pytest.raises(LookupError, match="No session matching"):
-            _resolve_session_id(state_dir, "deadbeef")
+            resolve_session_id(state_dir, "deadbeef")
 
     def test_no_sessions_at_all_raises(self, tmp_path: Path):
         state_dir = tmp_path / "sessions"
         state_dir.mkdir()
         with pytest.raises(LookupError, match="No sessions"):
-            _resolve_session_id(state_dir, None)
+            resolve_session_id(state_dir, None)
 
     def test_ambiguous_short_id_raises(self, tmp_path: Path):
         state_dir = tmp_path / "sessions"
@@ -65,7 +65,7 @@ class TestResolveSessionId:
         _make_session(state_dir, sid_a, "2026-05-10T10:00:00Z")
         _make_session(state_dir, sid_b, "2026-05-12T10:00:00Z")
         with pytest.raises(LookupError, match="ambiguous"):
-            _resolve_session_id(state_dir, "01971111")
+            resolve_session_id(state_dir, "01971111")
 
 
 from ansible_aom.rerun.cli import _compose_host_set  # noqa: E402
