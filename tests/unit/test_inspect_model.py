@@ -4,6 +4,8 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
+
 from ansible_aom.core.inspect_model import (
     DetailBlock,  # noqa: F401  (re-exported for downstream tests)
     LoopItem,  # noqa: F401
@@ -294,6 +296,31 @@ def test_task_tree_multi_host_per_host_breakdown():
 
 
 # ── DetailBlock ──────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ({"item": 0}, "0"),
+        ({"item": False}, "False"),
+        ({"_ansible_item_label": 0, "item": "wrong"}, "0"),
+        ({"_ansible_item_label": False, "item": "wrong"}, "False"),
+        ({"_ansible_item_label": "", "item": "wrong"}, ""),
+        ({"_ansible_item_label": None, "item": 0}, "0"),
+    ],
+)
+def test_detail_preserves_falsy_loop_item_labels(raw: dict, expected: str) -> None:
+    # Truthiness fallback used to erase zero/False or replace an explicit label.
+    task = TaskTreeNode(
+        kind="task",
+        label="Loop",
+        raw_event={
+            "_event": "v2_runner_on_ok",
+            "hosts": {"web1": {"results": [raw]}},
+        },
+    )
+    block = build_detail_block({}, task, None)
+    assert tuple(item.label for item in block.ok_items) == (expected,)
 
 
 def test_detail_block_loop_failure():
