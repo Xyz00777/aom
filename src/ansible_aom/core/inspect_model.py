@@ -986,6 +986,23 @@ def _make_loop_item(raw: dict) -> LoopItem:
     )
 
 
+def select_detail_host(task_node: TaskTreeNode) -> TaskTreeNode | None:
+    """Choose the first failed direct host, falling back to the first host.
+
+    Use counts rather than payloads so index-backed callers can choose which
+    single event to hydrate before building the detail block.
+    """
+    first_host = None
+    for child in task_node.children:
+        if child.kind != "host":
+            continue
+        if child.stats.failed:
+            return child
+        if first_host is None:
+            first_host = child
+    return first_host
+
+
 def build_detail_block(
     session: dict,
     task_node: TaskTreeNode,
@@ -1002,6 +1019,8 @@ def build_detail_block(
     """
     del session  # session-wide content lives elsewhere now
 
+    if host_node is None:
+        host_node = select_detail_host(task_node)
     raw_event: dict | None = None
     host_label: str | None = None
     if host_node is not None and host_node.kind == "host":
