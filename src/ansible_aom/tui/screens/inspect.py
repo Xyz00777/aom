@@ -62,6 +62,7 @@ from ansible_aom.core.inspect_model import (
     build_run_summary,
     build_task_tree,
     build_verbose_lines,
+    select_detail_host,
     task_ids_by_play,
     tree_from_index,
 )
@@ -1471,10 +1472,13 @@ class InspectApp(App):
             self._detail_text = "Select a task to see details."
             detail.write(self._detail_text)
             return
+        host = self._focused_host
+        if host is None:
+            host = select_detail_host(self._focused_task)
         block = build_detail_block(
             self._current_session,
             self._hydrate_node(self._focused_task),
-            None if self._focused_host is None else self._hydrate_node(self._focused_host),
+            None if host is None else self._hydrate_node(host),
         )
         self._detail_text = self._render_detail_block(block, full_stdout=self._detail_force_full)
         # One write, not one per line: each write does its own measure +
