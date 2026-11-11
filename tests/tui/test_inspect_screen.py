@@ -189,6 +189,28 @@ async def test_detail_pane_hydrates_payload_from_disk(state_dir: Path):
 
 
 @pytest.mark.asyncio
+async def test_aggregate_detail_hydrates_failed_host_not_latest_result(state_dir: Path):
+    # A later healthy result must not hide the failed host in aggregate detail.
+    from ansible_aom.tui.screens.inspect import InspectApp
+
+    events_path = state_dir / _ALIASES["multi_host"] / "events.jsonl"
+    lines = events_path.read_text().splitlines()
+    lines[4], lines[5] = lines[5], lines[4]
+    events_path.write_text("\n".join(lines) + "\n")
+    app = InspectApp(state_dir=state_dir, initial_session_id=_ALIASES["multi_host"])
+    async with app.run_test() as pilot:
+        await _settle(pilot)
+        assert app._focused_task is not None
+        assert app._focused_task.raw_event is None
+        assert app._focused_task.raw_ref is not None
+        app._focused_host = None
+        app._detail_key = None
+        app._update_detail()
+        assert "systemctl: Unit not found" in app._detail_text
+        assert "web2" in app._detail_text
+
+
+@pytest.mark.asyncio
 async def test_runs_rows_hydrate_via_background_backfill(state_dir: Path):
     """On startup a background worker indexes sessions that lack one; each
     Runs row's host roll-up appears as its index lands — without ever
