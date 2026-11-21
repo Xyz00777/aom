@@ -31,6 +31,31 @@ from ansible_aom.session import index as session_index
 logger = logging.getLogger(__name__)
 
 
+def _ensure_private_directory(path: Path) -> None:
+    """Create missing directories in ``path`` with owner-only permissions.
+
+    Existing directories are left untouched. Each newly created component is
+    chmodded immediately so traversal remains possible when the umask strips
+    all permissions from the initial mkdir.
+    """
+    missing: list[Path] = []
+    directory = path
+    while not directory.is_dir():
+        missing.append(directory)
+        if directory.parent == directory:
+            break
+        directory = directory.parent
+
+    for directory in reversed(missing):
+        try:
+            directory.mkdir(mode=0o700)
+        except FileExistsError:
+            if not directory.is_dir():
+                raise
+        else:
+            directory.chmod(0o700)
+
+
 def _open_private_file(path: Path, mode: str) -> IO[Any]:
     """Open a sensitive session file with owner-only permissions at creation."""
     fd = os.open(path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
@@ -351,8 +376,7 @@ class SessionManager:
 
         assert self._session_dir is not None, "Session directory must be set"
         session_path = self._session_dir / session_id
-        session_path.mkdir(mode=0o700, parents=True, exist_ok=True)
-        session_path.chmod(0o700)
+        _ensure_private_directory(session_path)
 
         self._events_file = session_path / "events.jsonl"
         self._meta_file = session_path / "meta.json"
@@ -624,7 +648,7 @@ class SessionManager:
         if self._artifacts_dir is None:
             raise ValueError("artifacts_dir not set")
 
-        self._artifacts_dir.mkdir(parents=True, exist_ok=True)
+        _ensure_private_directory(self._artifacts_dir)
         artifact_path = self._artifacts_dir / f"{session_id}.aom"
 
         events_file = session_path / "events.jsonl"
