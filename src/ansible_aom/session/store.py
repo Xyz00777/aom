@@ -19,7 +19,7 @@ import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
 
 from ansible_aom import __version__ as _AOM_VERSION
 from ansible_aom.core import diagnostics
@@ -29,6 +29,18 @@ from ansible_aom.core.timestamp import parse_iso_timestamp
 from ansible_aom.session import index as session_index
 
 logger = logging.getLogger(__name__)
+
+
+def _open_private_file(path: Path, mode: str) -> IO[Any]:
+    """Open a sensitive session file with owner-only permissions at creation."""
+    fd = os.open(path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+    except OSError:
+        os.close(fd)
+        raise
+    return os.fdopen(fd, mode)
+
 
 # Env vars worth snapshotting alongside the session diagnostics. Kept
 # deliberately small to avoid leaking sensitive shell env into a
@@ -339,14 +351,14 @@ class SessionManager:
 
         assert self._session_dir is not None, "Session directory must be set"
         session_path = self._session_dir / session_id
-        session_path.mkdir(parents=True, exist_ok=True)
-        session_path.chmod(0o755)
+        session_path.mkdir(mode=0o700, parents=True, exist_ok=True)
+        session_path.chmod(0o700)
 
         self._events_file = session_path / "events.jsonl"
         self._meta_file = session_path / "meta.json"
 
-        self._events_file.touch()
-        self._events_file.chmod(0o644)
+        with _open_private_file(self._events_file, "w"):
+            pass
 
         meta = {
             "playbook": playbook,
@@ -362,9 +374,8 @@ class SessionManager:
             # defaults a missing field to ``1`` for legacy sessions.
             "_schema_version": 2,
         }
-        with open(self._meta_file, "w") as f:
+        with _open_private_file(self._meta_file, "w") as f:
             json.dump(meta, f)
-        self._meta_file.chmod(0o644)
 
         self._active_sessions[session_id] = {
             "session_path": session_path,
@@ -495,7 +506,7 @@ class SessionManager:
         meta["preflight_task_count"] = preflight_task_count
         meta["resolved_host_count"] = resolved_host_count
 
-        with open(meta_file, "w") as f:
+        with _open_private_file(meta_file, "w") as f:
             json.dump(meta, f)
 
         # Write diagnostics.json (phase 5). Best-effort: if disk write
@@ -583,7 +594,7 @@ class SessionManager:
         )
 
         diag_file = self._active_sessions[session_id]["session_path"] / "diagnostics.json"
-        with open(diag_file, "w") as f:
+        with _open_private_file(diag_file, "w") as f:
             json.dump(record, f)
 
     def create_artifact(self, session_id: str) -> Path:
@@ -636,7 +647,7 @@ class SessionManager:
                 stats_event = event
                 break
 
-        with open(artifact_path, "w") as f:
+        with _open_private_file(artifact_path, "w") as f:
             metadata_line = {
                 "type": "metadata",
                 "playbook": meta["playbook"],
@@ -660,8 +671,6 @@ class SessionManager:
             else:
                 stats_line = {"type": "stats"}
             f.write(json.dumps(stats_line) + "\n")
-
-        artifact_path.chmod(0o600)
 
         return artifact_path
 

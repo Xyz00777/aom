@@ -3,9 +3,68 @@
 from __future__ import annotations
 
 import json
+import os
+import stat
 from pathlib import Path
 
+from ansible_aom.session.index import build_index
 from ansible_aom.session.store import SessionManager
+
+
+def test_new_session_files_are_private_under_permissive_umask(tmp_path: Path) -> None:
+    parent = tmp_path / "sessions"
+    parent.mkdir(mode=0o755)
+    manager = SessionManager(session_dir=parent)
+
+    previous_umask = os.umask(0)
+    try:
+        session_id = manager.start_session("play.yml", ansible_args=[])
+        manager.record_event(session_id, {"_event": "sample"})
+        manager.end_session(session_id, "completed")
+    finally:
+        os.umask(previous_umask)
+
+    session_path = parent / session_id
+    assert stat.S_IMODE(session_path.stat().st_mode) == 0o700
+    for name in ("events.jsonl", "meta.json", "diagnostics.json", "index.db"):
+        assert stat.S_IMODE((session_path / name).stat().st_mode) == 0o600
+    assert stat.S_IMODE(parent.stat().st_mode) == 0o755
+
+
+def test_legacy_index_rebuild_succeeds_under_restrictive_umask(tmp_path: Path) -> None:
+    session_path = tmp_path / "legacy-session"
+    session_path.mkdir()
+    (session_path / "events.jsonl").write_text('{"_event":"sample"}\n')
+
+    previous_umask = os.umask(0o777)
+    try:
+        assert build_index(session_path)
+    finally:
+        os.umask(previous_umask)
+
+    assert stat.S_IMODE((session_path / "index.db").stat().st_mode) == 0o600
+
+
+def test_artifact_is_private_before_first_write(tmp_path: Path, monkeypatch) -> None:
+    import ansible_aom.session.store as store
+
+    manager = SessionManager(
+        session_dir=tmp_path / "sessions",
+        artifacts_dir=tmp_path / "artifacts",
+    )
+    session_id = manager.start_session("play.yml", ansible_args=[])
+    manager.end_session(session_id, "completed")
+    original_fdopen = store.os.fdopen
+    modes_at_open: list[int] = []
+
+    def observe_fdopen(fd: int, mode: str):
+        modes_at_open.append(stat.S_IMODE(os.fstat(fd).st_mode))
+        return original_fdopen(fd, mode)
+
+    monkeypatch.setattr(store.os, "fdopen", observe_fdopen)
+    manager.create_artifact(session_id)
+
+    assert modes_at_open == [0o600]
 
 
 def test_end_session_persists_task_and_host_counts(tmp_path: Path) -> None:
