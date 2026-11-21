@@ -7,7 +7,10 @@ The complete recorded stream must survive this scheduling boundary.
 
 from __future__ import annotations
 
+import codecs
 import json
+import os
+import tty
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -63,6 +66,11 @@ class _DeadChildWithUnreadTail:
 
     def isalive(self) -> bool:
         return False
+
+    def read_nonblocking(self, size: int, timeout: float) -> str:
+        assert size > 0
+        assert timeout == 0
+        raise pexpect.exceptions.TIMEOUT("no additional PTY bytes")
 
     def close(self) -> None:
         self.closed = True
@@ -153,10 +161,12 @@ def test_dead_child_deadline_preserves_json_containing_password_prompt(
                 self.after = "\r\n"
                 return 0
             assert self.reads == 2, "the expired deadline must flush the remaining buffer"
-            self.before, self.after, remainder = self.lines[1].partition(prompt)
-            self.buffer = remainder + self.lines[2]
+            assert len(patterns) == 3, "dead children must not dispatch password prompts"
             clock[0] = 0.1
-            return 3  # password pattern matched inside the JSON string
+            self.before = self.lines[1][:-2]
+            self.after = "\r\n"
+            self.buffer = self.lines[2]
+            return 0
 
     child = _JsonPromptChild(events, "timeout")
     renderer = MagicMock()
@@ -175,3 +185,50 @@ def test_dead_child_deadline_preserves_json_containing_password_prompt(
     ]
     assert recorded == events
     renderer.handle_password_prompt.assert_not_called()
+
+
+def test_dead_child_final_drain_stops_at_byte_cap_and_warns(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    event = {"_event": "v2_playbook_on_start", "task": {"name": "café"}}
+    queued = (json.dumps(event, ensure_ascii=False) + "\n").encode()
+    character = "é".encode()
+    split = queued.index(character) + 1
+    prefix_bytes = queued[:split]
+    tail_bytes = queued[split:]
+    master_fd, slave_fd = os.openpty()
+    tty.setraw(slave_fd)
+    try:
+        os.write(slave_fd, tail_bytes + b"AFTER")
+        decoder = codecs.getincrementaldecoder("utf-8")("surrogateescape")
+        child = MagicMock()
+        child.before = decoder.decode(prefix_bytes, final=False)
+        child.buffer = ""
+        child.child_fd = master_fd
+        child._decoder = decoder
+        child._log = MagicMock()
+        monkeypatch.setattr(runner, "_DEAD_CHILD_DRAIN_MAX_BYTES", len(queued))
+
+        parser = runner.PtyStreamParser()
+        state = runner.RunState(playbook="site.yml")
+        renderer = MagicMock()
+        sink = MagicMock()
+
+        read = os.read
+
+        def require_nonblocking_read(fd: int, size: int) -> bytes:
+            assert not os.get_blocking(fd)
+            return read(fd, size)
+
+        with monkeypatch.context() as patch:
+            patch.setattr(os, "read", require_nonblocking_read)
+            runner._flush_dead_child(child, parser, state, renderer, sink)
+
+        sink.record_event.assert_called_once_with(event)
+        assert os.get_blocking(master_fd)
+        assert os.read(master_fd, len(b"AFTER")) == b"AFTER"
+        renderer.print_log.assert_called_once()
+        assert "dead-child PTY drain reached" in caplog.text
+    finally:
+        os.close(master_fd)
+        os.close(slave_fd)
