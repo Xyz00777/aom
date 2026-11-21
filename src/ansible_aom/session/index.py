@@ -189,6 +189,11 @@ def build_index(session_path: Path) -> bool:
     try:
         acc = SessionIndexAccumulator(collect_stderr=False)
         tmp_path.unlink(missing_ok=True)
+        fd = os.open(tmp_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        try:
+            os.fchmod(fd, 0o600)
+        finally:
+            os.close(fd)
         conn = sqlite3.connect(tmp_path)
         try:
             # The temp db is disposable (atomically renamed on success,
@@ -243,6 +248,7 @@ def build_index(session_path: Path) -> bool:
         if events_stat(session_path) != stat:
             tmp_path.unlink(missing_ok=True)
             return False
+        tmp_path.chmod(0o600)
         os.replace(tmp_path, index_path(session_path))
     except Exception:
         # Deliberately broad: the index is optional and derived, and this

@@ -473,7 +473,7 @@ class TestCreateArtifact:
 
 
 class TestSessionFilePermissions:
-    """TC-226: Session file permissions 0o644."""
+    """New session directories and sensitive files are owner-only."""
 
     def test_session_directory_permissions(self, tmp_path: Path):
         """Session directory created with appropriate permissions."""
@@ -484,10 +484,10 @@ class TestSessionFilePermissions:
         session_path = session_dir / session_id
         mode = stat.S_IMODE(session_path.stat().st_mode)
 
-        assert mode & 0o755 == 0o755
+        assert mode == 0o700
 
     def test_events_file_permissions(self, tmp_path: Path):
-        """TC-226: events.jsonl created with 0o644 permissions."""
+        """events.jsonl is created with owner-only permissions."""
         session_dir = tmp_path / "sessions"
         manager = SessionManager(session_dir=session_dir, playbook="test.yml")
         session_id = manager.start_session("test.yml")
@@ -495,7 +495,7 @@ class TestSessionFilePermissions:
         events_file = session_dir / session_id / "events.jsonl"
         mode = stat.S_IMODE(events_file.stat().st_mode)
 
-        assert mode & 0o644 == 0o644
+        assert mode == 0o600
 
     def test_stderr_file_not_created(self, tmp_path: Path):
         """Phase 4: stderr.log is no longer created (stderr goes to events.jsonl)."""
@@ -507,7 +507,7 @@ class TestSessionFilePermissions:
         assert not stderr_file.exists()
 
     def test_meta_file_permissions(self, tmp_path: Path):
-        """meta.json created with 0o644 permissions."""
+        """meta.json is created with owner-only permissions."""
         session_dir = tmp_path / "sessions"
         manager = SessionManager(session_dir=session_dir, playbook="test.yml")
         session_id = manager.start_session("test.yml")
@@ -515,7 +515,7 @@ class TestSessionFilePermissions:
         meta_file = session_dir / session_id / "meta.json"
         mode = stat.S_IMODE(meta_file.stat().st_mode)
 
-        assert mode & 0o644 == 0o644
+        assert mode == 0o600
 
 
 class TestArtifactPermissions:
