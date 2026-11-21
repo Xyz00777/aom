@@ -64,7 +64,7 @@ from ansible_aom.compact.format import (
 from ansible_aom.compact.password import handle_password_prompt as do_handle_password_prompt
 from ansible_aom.core import diagnostics
 from ansible_aom.core._async_poll import is_async_poll_payload
-from ansible_aom.core.diff import format_result_diff
+from ansible_aom.core.diff import DiffBudget, format_result_diff
 from ansible_aom.core.duration import format_duration_decimal
 from ansible_aom.core.estimate import (
     RunEstimate,
@@ -2086,19 +2086,20 @@ class CompactRenderer:
         if not isinstance(results, list) or not results:
             return []
         lines: list[str] = []
+        diff_budget = DiffBudget()
         censored = result.get("_ansible_no_log") or "censored" in result
         for raw in results:
             if not isinstance(raw, dict):
                 continue
             lines.append(self._format_loop_item_line(host, raw))
-            if not censored:
-                lines.extend(self._diff_lines(raw))
+            if not censored and not diff_budget.truncated:
+                lines.extend(self._diff_lines(raw, diff_budget))
         return lines
 
-    def _diff_lines(self, result: dict) -> list[str]:
+    def _diff_lines(self, result: dict, budget: DiffBudget | None = None) -> list[str]:
         """Indent and color a result's plain diff for the compact log."""
         lines: list[str] = []
-        for line in format_result_diff(result):
+        for line in format_result_diff(result, budget):
             if line.startswith("-"):
                 line = _wrap(line, _RED, self._colorize)
             elif line.startswith("+"):
