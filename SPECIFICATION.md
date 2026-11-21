@@ -1843,6 +1843,14 @@ class RunState:
 post-run `diagnostics.json` and optional `index.db` are derived artifacts;
 inspection rebuilds a stale or missing index from `events.jsonl`.
 
+On POSIX systems, newly created session directories use mode `0700` and
+`events.jsonl`, `meta.json`, `diagnostics.json`, and `index.db` use mode
+`0600`, including temporary index files before atomic replacement. These
+modes are enforced independently of the process umask. AOM does not change
+the permissions of the caller-supplied sessions parent directory and does
+not migrate permissions on existing sessions; older recordings remain
+readable through the legacy inspect paths.
+
 **Artifact Format (after completion):**
 ```
 ~/.local/state/aom/artifacts/{uuidv7}.aom
