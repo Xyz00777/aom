@@ -1,4 +1,6 @@
 import shlex
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -6,6 +8,64 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_release_runs_only_daily_or_manually_on_main() -> None:
+    config = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
+    triggers = config.get("on", config.get(True, {}))
+    assert triggers == {"schedule": [{"cron": "17 4 * * *"}], "workflow_dispatch": None}
+    assert config["jobs"]["check"]["if"] == "github.ref == 'refs/heads/main'"
+    assert config["concurrency"]["cancel-in-progress"] is False
+    assert config["jobs"]["build"]["if"] == "needs.check.outputs.should_release == 'true'"
+    assert config["jobs"]["build"]["steps"][0]["with"]["ref"] == "${{ needs.check.outputs.sha }}"
+    assert "pypi" in config["jobs"]["github-release"]["needs"]
+
+
+def test_release_evaluates_since_last_tag_after_a_docs_only_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
+    evaluate = next(
+        step for step in config["jobs"]["check"]["steps"] if step.get("id") == "evaluate"
+    )
+
+    def git(*args: str) -> None:
+        subprocess.run(
+            ["git", "-c", "user.name=Test", "-c", "user.email=test@example.com", *args],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+        )
+
+    for name in ("GITHUB_REF_TYPE", "GITHUB_BASE_REF", "GITHUB_EVENT_PATH"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("GITHUB_OUTPUT", str(tmp_path / "outputs"))
+    git("init", "-b", "main")
+    manifest = tmp_path / "pyproject.toml"
+    for version in ("1.0.0", "1.0.1"):
+        manifest.write_text(f'[project]\nversion = "{version}"\n')
+        git("add", "pyproject.toml")
+        git("commit", "-m", version)
+        if version == "1.0.0":
+            git("tag", "v1.0.0")
+    (tmp_path / "README.md").write_text("A later docs-only change.\n")
+    git("add", "README.md")
+    git("commit", "-m", "docs")
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts/check_version_bump.py").write_text(
+        (ROOT / "scripts/check_version_bump.py").read_text()
+    )
+
+    outputs = tmp_path / "outputs"
+    for expected in ("true", "false"):
+        outputs.write_text("")
+        command = evaluate["run"].replace(
+            "python scripts/", f"{shlex.quote(sys.executable)} scripts/"
+        )
+        subprocess.run(["bash", "-eo", "pipefail", "-c", command], cwd=tmp_path, check=True)
+        assert f"should_release={expected}" in outputs.read_text().splitlines()
+        if expected == "true":
+            git("tag", "v1.0.1")
 
 
 def test_release_tools_are_locked_without_becoming_runtime_dependencies() -> None:
