@@ -91,6 +91,38 @@ def test_aggregate_only_loop_diffs_follow_their_own_item_once():
     ]
 
 
+def test_aggregate_loop_shares_diff_budget_but_keeps_every_item_line():
+    renderer = _renderer()
+    results = [_result(str(index) * 20_000, "new", item=str(index)) for index in range(3)]
+    renderer.update_state(_event({"web": {"changed": True, "results": results}}))
+    output = _logged(renderer)[0]
+    assert output.count("changed: [web] => (item=") == 3
+    assert output.count("diff truncated") == 1
+    assert len(output.encode("utf-8")) < 17_000
+
+
+def test_aggregate_loop_stops_formatting_diffs_when_shared_budget_runs_out(monkeypatch):
+    import ansible_aom.core.diff as diff_module
+
+    calls = 0
+    original_unified_diff = diff_module.unified_diff
+
+    def count_diff(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        yield from original_unified_diff(*args, **kwargs)
+
+    monkeypatch.setattr(diff_module, "unified_diff", count_diff)
+    renderer = _renderer()
+    results = [_result(f"old-{index}", f"new-{index}", item=str(index)) for index in range(500)]
+    renderer.update_state(_event({"web": {"changed": True, "results": results}}))
+
+    output = _logged(renderer)[0]
+    assert output.count("changed: [web] => (item=") == len(results)
+    assert output.count("diff truncated") == 1
+    assert calls < len(results)
+
+
 @pytest.mark.parametrize("name", ["v2_runner_on_ok", "v2_runner_item_on_ok"])
 def test_hidden_changed_results_also_hide_their_diff(name):
     renderer = _renderer(hide_states=["changed"])
