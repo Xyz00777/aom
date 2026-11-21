@@ -256,8 +256,9 @@ class TestTaskSummaryUnreachable:
 
 
 class TestTaskSummaryWithColors:
-    def test_colored_output_has_ansi_codes(self) -> None:
+    def test_colored_output_has_ansi_codes(self, monkeypatch) -> None:
         """When colorize=True, the suffix uses ANSI escape codes."""
+        monkeypatch.delenv("NO_COLOR", raising=False)
         r = CompactRenderer(is_tty=True, hide_states=[])
         r.start("test.yml", [])
         r._display = MagicMock()
