@@ -40,7 +40,8 @@ def test_runner_records_events_buffered_after_child_exits_in_real_pty(
         "import json, os, sys; "
         f"payload = json.loads({payload!r}); "
         "os.write(sys.stdout.fileno(), "
-        "b''.join((json.dumps(event) + '\\n').encode() for event in payload))"
+        "b''.join((json.dumps(event) + ('\\n' if index < len(payload) - 1 else '')).encode() "
+        "for index, event in enumerate(payload)))"
     )
     spawn = runner.pexpect.spawn
 
@@ -51,14 +52,10 @@ def test_runner_records_events_buffered_after_child_exits_in_real_pty(
             self._child = child
             self._pidfd = os.pidfd_open(child.pid)
             self._first_expect = True
-            self._expect_calls = 0
 
         def expect(self, *args: Any, **kwargs: Any) -> int:
-            self._expect_calls += 1
-            if self._expect_calls == 2:
-                delay_started = system_time.monotonic()
-                system_time.sleep(0.075)
-                assert system_time.monotonic() - delay_started >= 0.05
+            if self._first_expect:
+                kwargs["timeout"] = 10
             result = self._child.expect(*args, **kwargs)
             if self._first_expect:
                 self._first_expect = False
@@ -97,8 +94,15 @@ def test_runner_records_events_buffered_after_child_exits_in_real_pty(
     )
 
     class _RunnerDeadlineClock:
+        def __init__(self) -> None:
+            self._calls = 0
+
         def monotonic(self) -> float:
-            return 0.0
+            self._calls += 1
+            # The first call sets the dead-child deadline after the initial
+            # match. Advance beyond it before the next PTY read so output
+            # still queued in the kernel cannot be rescued by a later read.
+            return 0.0 if self._calls == 1 else 0.06
 
         def monotonic_ns(self) -> int:
             return system_time.monotonic_ns()
