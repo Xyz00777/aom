@@ -1843,13 +1843,19 @@ class RunState:
 post-run `diagnostics.json` and optional `index.db` are derived artifacts;
 inspection rebuilds a stale or missing index from `events.jsonl`.
 
-On POSIX systems, newly created session directories use mode `0700` and
-`events.jsonl`, `meta.json`, `diagnostics.json`, and `index.db` use mode
-`0600`, including temporary index files before atomic replacement. These
-modes are enforced independently of the process umask. AOM does not change
-the permissions of the caller-supplied sessions parent directory and does
-not migrate permissions on existing sessions; older recordings remain
-readable through the legacy inspect paths.
+On POSIX systems, every directory AOM newly creates for session storage or
+artifact export, including any missing parent directories, uses mode `0700`
+(owner-only), independently of the process umask. Directories that already
+exist, including a caller-supplied sessions or export parent, retain their
+existing permissions; AOM does not chmod or otherwise migrate them. Existing
+session directories are likewise left unchanged.
+
+Session files (`events.jsonl`, `meta.json`, `diagnostics.json`, and `index.db`)
+and temporary index files use mode `0600` (owner-only) when created. Exported
+`.aom` artifact files also use mode `0600`. These file modes are enforced
+independently of the process umask. Existing files are not chmodded. With
+`--no-record`, AOM creates no session directory or session files; this does
+not disable unrelated debug output.
 
 **Artifact Format (after completion):**
 ```
@@ -1884,10 +1890,6 @@ aom inspect prune --days 30    # delete sessions older than 30 days
 
 The prune command is safe to schedule; it only removes session
 directories whose recorded start time is older than the threshold.
-
-**File Permissions:**
-- Session files are created with mode 0o644 (world-readable)
-- Artifact files (.aom) are created with mode 0o600 (user-only) as they may contain sensitive playbook names
 
 **Corrupted Session Handling:**
 - If a .jsonl artifact is truncated or contains malformed JSON, AOM skips the malformed line and logs a WARNING
