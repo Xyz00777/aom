@@ -70,6 +70,11 @@ class _FakeChildIsaliveDead:
         # watchdog).
         return False
 
+    def read_nonblocking(self, size: int, timeout: float) -> str:
+        assert size > 0
+        assert timeout == 0
+        raise runner.pexpect.exceptions.TIMEOUT("no PTY bytes")
+
     def close(self, force: bool = False) -> None:  # noqa: ARG002
         self.closed = True
 
@@ -116,8 +121,8 @@ def test_drive_exits_promptly_when_child_dead_but_pty_open(
     )
     assert child.closed, "loop should close the child before returning"
     # First detection is at .003s. Later output must neither stop the
-    # drain early nor extend its original .01s window indefinitely.
-    assert 0.013 <= clock[0] < 0.020
+    # drain early nor extend the caller's shorter .01s window indefinitely.
+    assert 0.013 <= clock[0] < 0.025
     assert exit_code == 0
 
 

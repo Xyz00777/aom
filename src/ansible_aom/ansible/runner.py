@@ -16,6 +16,7 @@ the moment one fires.
 
 from __future__ import annotations
 
+import errno
 import logging
 import os
 import sys
@@ -372,6 +373,9 @@ _STALL_HINT_TIMEOUTS: int = 4  # ~2s at the default 0.5s timeout
 
 _DEFAULT_TIMEOUT_S = 0.5
 
+_DEAD_CHILD_DRAIN_S = 0.05
+_DEAD_CHILD_DRAIN_MAX_BYTES = 64 * 1024
+
 # R8: after ``v2_playbook_on_stats`` has been consumed, the wait for
 # EOF is bounded by this many seconds. If EOF doesn't fire within the
 # window we log a warning and treat it as a synthetic EOF so a child
@@ -695,7 +699,9 @@ def _drive(
         if dead_child_drain_deadline is not None:
             read_timeout = dead_child_drain_deadline - time.monotonic()
             if read_timeout <= 0:
-                _flush_pending(child, parser, state, renderer, sink, prefix=jsonl_prefix, diag=diag)
+                _flush_dead_child(
+                    child, parser, state, renderer, sink, prefix=jsonl_prefix, diag=diag
+                )
                 break
         elif parser.phase == StreamPhase.POST_RUN_RECAP and state.end_time is not None:
             read_timeout = _EOF_WATCHDOG_S_QUIET
@@ -704,7 +710,10 @@ def _drive(
                 _EOF_WATCHDOG_S if parser.phase == StreamPhase.POST_RUN_RECAP else timeout
             )
         try:
-            idx = child.expect(patterns, timeout=read_timeout)
+            active_patterns = (
+                patterns[: timeout_idx + 1] if dead_child_drain_deadline is not None else patterns
+            )
+            idx = child.expect(active_patterns, timeout=read_timeout)
         except pexpect.exceptions.EOF:
             _flush_pending(child, parser, state, renderer, sink, prefix=jsonl_prefix, diag=diag)
             break
@@ -750,14 +759,16 @@ def _drive(
                 # Drain until EOF or the existing short wait expires, rather
                 # than discarding kernel output after one buffered newline.
                 # Never rearm: a chatty descendant must not keep us alive.
-                dead_child_drain_deadline = time.monotonic() + min(timeout, 0.05)
+                dead_child_drain_deadline = time.monotonic() + min(timeout, _DEAD_CHILD_DRAIN_S)
         elif idx == eof_idx:
             _trace("eof", leftover=(child.before or "")[:200])
             _flush_pending(child, parser, state, renderer, sink, prefix=jsonl_prefix, diag=diag)
             break
         elif idx == timeout_idx:
             if dead_child_drain_deadline is not None:
-                _flush_pending(child, parser, state, renderer, sink, prefix=jsonl_prefix, diag=diag)
+                _flush_dead_child(
+                    child, parser, state, renderer, sink, prefix=jsonl_prefix, diag=diag
+                )
                 break
             # R8: post-stats timeout = EOF watchdog fired. The child
             # refused to close its PTY within ``_EOF_WATCHDOG_S`` of
@@ -1051,6 +1062,69 @@ def _flush_pending(
             if sub_line:
                 _feed(sub_line, parser, state, renderer, sink, diag=diag)
     _drain_warnings(parser, renderer, sink, flush=True)
+
+
+def _flush_dead_child(
+    child: pexpect.spawn,
+    parser: PtyStreamParser,
+    state: RunState,
+    renderer: Renderer,
+    sink: _SessionSink | _NullSink,
+    *,
+    prefix: str = "",
+    diag: diagnostics.RunDiagnostics | None = None,
+) -> None:
+    pending = prefix + (child.before or _consume_unread(child))
+    fd = getattr(child, "child_fd", -1)
+    # Reuse pexpect's incremental decoder: the last expect may have read the
+    # first bytes of a character without yet adding it to its text buffer.
+    decoder = child._decoder if isinstance(fd, int) and fd >= 0 else None
+    carry = len(decoder.getstate()[0]) if decoder is not None else 0
+    remaining = max(0, _DEAD_CHILD_DRAIN_MAX_BYTES - carry)
+
+    def keep_within_budget(text: str) -> str:
+        nonlocal remaining
+        encoded = text.encode("utf-8", "surrogateescape")
+        kept = encoded[:remaining]
+        remaining -= len(kept)
+        return kept.decode("utf-8", "surrogateescape")
+
+    collected = [keep_within_budget(pending)]
+    if decoder is not None:
+        was_blocking = os.get_blocking(fd)
+        os.set_blocking(fd, False)
+        try:
+            while remaining:
+                try:
+                    chunk = os.read(fd, min(remaining, 4096))
+                except BlockingIOError:
+                    break
+                except OSError as error:
+                    if error.errno != errno.EIO:  # Linux reports a closed slave as EIO.
+                        raise
+                    chunk = b""
+                if not chunk:
+                    collected.append(decoder.decode(b"", final=True))
+                    break
+                remaining -= len(chunk)
+                text = decoder.decode(chunk, final=False)
+                child._log(text, "read")
+                collected.append(text)
+        finally:
+            os.set_blocking(fd, was_blocking)
+
+    for line in "".join(collected).splitlines():
+        if line:
+            _feed(line, parser, state, renderer, sink, diag=diag)
+    _drain_warnings(parser, renderer, sink, flush=True)
+
+    if remaining == 0:
+        warning = (
+            f"dead-child PTY drain reached {_DEAD_CHILD_DRAIN_MAX_BYTES} byte limit; "
+            "some final output may be missing"
+        )
+        logger.warning(warning)
+        renderer.print_log(f"[aom] {warning}")
 
 
 def _drain_warnings(
