@@ -48,7 +48,7 @@ from ansible_aom.core.run_config import build_run_config_key
 from ansible_aom.core.run_state import RunState, count_leaf_tasks
 from ansible_aom.renderer.protocol import Renderer
 from ansible_aom.session.history import find_previous_run
-from ansible_aom.session.store import SessionManager
+from ansible_aom.session.store import SessionManager, _ensure_private_directory
 
 logger = logging.getLogger(__name__)
 
@@ -265,7 +265,7 @@ class _SessionSink:
         self._renderer = renderer
         self._disabled = False
         try:
-            session_dir.mkdir(parents=True, exist_ok=True)
+            _ensure_private_directory(session_dir)
             manager = SessionManager(session_dir=session_dir, playbook=playbook)
             self._session_id = manager.start_session(playbook, ansible_args=ansible_args or [])
             self._manager = manager
