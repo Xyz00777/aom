@@ -62,3 +62,6 @@ Thumbs.db
 
 # pytest-testmon per-machine coverage DB (pre-push hook)
 .testmondata*
+
+# Isolated PR worktrees
+.worktrees/
