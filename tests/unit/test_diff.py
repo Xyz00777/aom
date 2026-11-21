@@ -242,3 +242,53 @@ def test_crlf_content_produces_plain_lines_without_terminal_carriage_returns():
             },
         }
     ) == ["--- before", "+++ after", "@@ -1,2 +1,2 @@", " context", "-old", "+new"]
+
+
+def test_prepared_diff_is_truncated_to_line_budget():
+    lines = format_result_diff({"changed": True, "diff": {"prepared": "line\n" * 300}})
+    assert len(lines) == 200
+    assert lines[-1] == "... diff truncated (200 lines, 16384 bytes)"
+    assert sum(len(line.encode("utf-8")) for line in lines) <= 16_384
+
+
+def test_prepared_diff_is_truncated_to_utf8_byte_budget():
+    lines = format_result_diff({"changed": True, "diff": {"prepared": "é" * 10_000}})
+    assert len(lines) <= 200
+    assert sum(len(line.encode("utf-8")) for line in lines) <= 16_384
+    assert len(lines[-1].encode("utf-8")) <= 16_384
+    assert lines[-1].startswith("... diff truncated (200 lines, 16384 bytes)")
+
+
+def test_large_sources_are_rejected_before_unified_diff(monkeypatch):
+    import ansible_aom.core.diff as diff_module
+
+    def unexpected_diff(*args, **kwargs):
+        pytest.fail("unified diff must not process oversized sources")
+
+    monkeypatch.setattr(diff_module, "unified_diff", unexpected_diff)
+    lines = format_result_diff({"changed": True, "diff": {"before": "x" * 20_000, "after": "y"}})
+    assert lines == ["... diff truncated (200 lines, 16384 bytes)"]
+
+
+def test_structured_sources_are_bounded_before_normalization():
+    traversed = 0
+
+    class LargeList(list[int]):
+        def __iter__(self):
+            nonlocal traversed
+            for value in super().__iter__():
+                traversed += 1
+                yield value
+
+    source = LargeList(range(100_000))
+    lines = format_result_diff({"changed": True, "diff": {"before": source, "after": []}})
+    assert lines == ["... diff truncated (200 lines, 16384 bytes)"]
+    assert traversed < len(source)
+
+
+def test_generated_unified_diff_obeys_output_line_budget():
+    before = "\n".join(f"old-{index}" for index in range(300))
+    after = "\n".join(f"new-{index}" for index in range(300))
+    lines = format_result_diff({"changed": True, "diff": {"before": before, "after": after}})
+    assert len(lines) == 200
+    assert lines[-1] == "... diff truncated (200 lines, 16384 bytes)"
