@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import json
+import os
+import stat
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 def _fake_ansible_command(events: list[dict], exit_code: int = 0) -> tuple[str, list[str]]:
@@ -34,14 +38,21 @@ class TestRunPlaybookRecordParameter:
 
         with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
             exit_code = run_playbook(
-                "playbook.yml", [], renderer, session_dir=tmp_path, record=False
+                "playbook.yml",
+                [],
+                renderer,
+                session_dir=tmp_path / "nested" / "sessions",
+                record=False,
             )
 
         assert exit_code == 0
         # No session directory should have been created.
-        assert list(tmp_path.iterdir()) == []
+        assert not (tmp_path / "nested").exists()
 
-    def test_record_true_default_still_writes(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize("umask", [0o022, 0o777])
+    def test_record_true_default_creates_nested_session_path_privately(
+        self, tmp_path: Path, umask: int
+    ) -> None:
         from ansible_aom.ansible.runner import run_playbook
 
         renderer = MagicMock()
@@ -50,11 +61,23 @@ class TestRunPlaybookRecordParameter:
             exit_code=0,
         )
 
-        with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
-            run_playbook("playbook.yml", [], renderer, session_dir=tmp_path)
+        session_dir = tmp_path / "state" / "aom" / "sessions"
+        previous_umask = os.umask(umask)
+        try:
+            with patch("ansible_aom.ansible.runner._build_command", return_value=(cmd, args)):
+                run_playbook("playbook.yml", [], renderer, session_dir=session_dir)
+        finally:
+            os.umask(previous_umask)
 
-        sessions = list(tmp_path.iterdir())
+        sessions = list(session_dir.iterdir())
         assert len(sessions) == 1
+        for directory in (
+            tmp_path / "state",
+            tmp_path / "state" / "aom",
+            session_dir,
+            sessions[0],
+        ):
+            assert stat.S_IMODE(directory.stat().st_mode) == 0o700
 
 
 class TestNoRecordParserFlag:
