@@ -21,7 +21,7 @@ from pathlib import PurePath
 from typing import Literal, Mapping, NamedTuple
 
 from ansible_aom.core._async_poll import is_async_poll_payload
-from ansible_aom.core.text import replace_surrogates
+from ansible_aom.core.text import loop_item_label, replace_surrogates
 from ansible_aom.core.timestamp import parse_iso_timestamp
 
 
@@ -974,7 +974,7 @@ def _make_loop_item(raw: dict) -> LoopItem:
         job_id = raw.get("ansible_job_id", "?")
         label = f"(async, job_id={job_id})"
     else:
-        label = str(raw.get("_ansible_item_label") or raw.get("item") or "")
+        label = loop_item_label(raw)
     raw_msg = raw.get("msg")
     raw_stderr = raw.get("stderr") or raw.get("module_stderr")
     return LoopItem(

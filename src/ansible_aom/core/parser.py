@@ -131,6 +131,7 @@ class JsonLineStream:
             line = self._carry + line
             self._carry = ""
 
+        unstripped = line
         line = line.strip()
         if not line:
             return []
@@ -161,8 +162,8 @@ class JsonLineStream:
             # Stash as carry if there's room, otherwise drop. Without
             # the cap a runaway/garbage stream would grow ``_carry``
             # without bound.
-            if len(line) <= self._CARRY_LIMIT:
-                self._carry = line
+            if len(unstripped) <= self._CARRY_LIMIT:
+                self._carry = unstripped
                 return []
             logger.warning("Invalid JSON line (carry overflow, dropped): %s", line[:100])
             if self._non_json_handler:

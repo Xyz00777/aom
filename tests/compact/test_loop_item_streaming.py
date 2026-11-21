@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from ansible_aom.compact.renderer import (
     _CYAN,
     _GREEN,
@@ -95,6 +97,27 @@ def _logged(r: CompactRenderer) -> list[str]:
 
 def _all_text(r: CompactRenderer) -> str:
     return "\n".join(_logged(r))
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ({"item": 0}, "0"),
+        ({"item": False}, "False"),
+        ({"_ansible_item_label": 0, "item": "wrong"}, "0"),
+        ({"_ansible_item_label": False, "item": "wrong"}, "False"),
+        ({"_ansible_item_label": "", "item": "wrong"}, ""),
+        ({"_ansible_item_label": None, "item": 0}, "0"),
+    ],
+)
+def test_live_log_preserves_falsy_loop_item_labels(raw: dict, expected: str) -> None:
+    # Loop labels must keep their value in the live view as well as inspect.
+    renderer = _renderer()
+    renderer.update_state(_task_start())
+    event = _item_event("v2_runner_item_on_ok", "localhost", "unused")
+    event["hosts"]["localhost"] = raw
+    renderer.update_state(event)
+    assert f"ok: [localhost] => (item={expected})" in _logged(renderer)
 
 
 class TestItemEventRendersImmediately:
