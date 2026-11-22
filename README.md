@@ -329,7 +329,7 @@ TDD-first; tests for `core/` must pass without `ansible-core`. See
 
 - Pull requests that change application code (`src/`, `packaging/`) or dependencies (`pyproject.toml`, `uv.lock`, `flake.nix`, `flake.lock`) must bump `project.version` in `pyproject.toml` so it is higher than the `main` branch. CI enforces this via `scripts/check_version_bump.py`.
 - Documentation-only and test-only changes do not require a version bump.
-- Merging to `main` automatically triggers package creation (Python wheels, sdist, and Linux standalone bundle), creates a GitHub Release with tag `v<version>`, and publishes to PyPI when application or dependency changes are present.
+- The Release workflow checks `main` daily at 04:17 UTC. To publish sooner, run **Actions → Release → Run workflow** on `main` (or `gh workflow run release.yml --ref main`). If there is a new, untagged package version, it builds the wheel, sdist, and Linux standalone bundle, publishes to PyPI, then creates the GitHub Release. PR and push CI still run independently.
 
 ## License
 

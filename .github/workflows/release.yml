@@ -4,29 +4,42 @@ env:
   UV_LOCKED: "true"
 
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - "v*"
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: publish-aom-release
+  cancel-in-progress: false
 
 jobs:
   check:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     outputs:
       should_release: ${{ steps.evaluate.outputs.should_release }}
       tag: ${{ steps.evaluate.outputs.tag }}
       version: ${{ steps.evaluate.outputs.version }}
+      sha: ${{ steps.evaluate.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: refs/heads/main
           fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
       - name: Evaluate release trigger
         id: evaluate
-        run: python scripts/check_version_bump.py --check-release
+        run: |
+          base=$(git tag --merged HEAD --list 'v*' --sort=-version:refname | awk '/^v[0-9]+\.[0-9]+\.[0-9]+$/ && !found++ {print}')
+          if [[ -z "$base" ]]; then
+            base=$(git hash-object -t tree -w /dev/null)
+          fi
+          python scripts/check_version_bump.py --check-release --base "$base"
+          printf 'sha=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   build:
     needs: check
@@ -39,6 +52,8 @@ jobs:
       version: ${{ steps.validate.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.check.outputs.sha }}
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
@@ -46,7 +61,7 @@ jobs:
       - name: Validate tag and project version
         id: validate
         env:
-          RELEASE_TAG: ${{ needs.check.outputs.tag || github.ref_name }}
+          RELEASE_TAG: ${{ needs.check.outputs.tag }}
         run: |
           python - <<'PY'
           import os
@@ -100,7 +115,7 @@ jobs:
           if-no-files-found: error
 
   github-release:
-    needs: [check, build]
+    needs: [check, build, pypi]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -113,7 +128,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh release create "${{ needs.build.outputs.tag || needs.check.outputs.tag }}" dist/* --generate-notes --target "${{ github.sha }}"
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+          RELEASE_SHA: ${{ needs.check.outputs.sha }}
+        run: gh release create "$RELEASE_TAG" dist/* --generate-notes --target "$RELEASE_SHA"
 
   pypi:
     needs: [check, build]
@@ -133,3 +150,4 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist
+          skip-existing: true
